@@ -83,12 +83,18 @@ const CALCULATORS = [
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
 const calcForReform = reform => (reform === 'pre' ? 'old' : 'ofek');
+// למנהלת בית ספר יש מחשבון נפרד — אופק ניהול
+const calcForTeacher = t => (isPrincipalRow(t) ? 'mgmt' : calcForReform(t?.reform));
 
 const REFORMS = [
   { id: 'ofek', label: 'אופק חדש' },
   { id: 'pre',  label: 'עולם ישן' },
 ];
 const reformLabel = r => (REFORMS.find(x => x.id === r) || REFORMS[0]).label;
+
+// שורת המנהלת מזוהה לפי התפקיד, שכבר קיים ב-ROLES
+const PRINCIPAL_ROLE = 'principal';
+const isPrincipalRow = t => t?.role === PRINCIPAL_ROLE;
 
 const REASON_TYPES = [
   { id: 'maternity', label: 'מילוי מקום לחל"ד' },
@@ -267,6 +273,7 @@ function readableVal(field, val) {
 const LS_SCHOOLS  = 'ss-schools-v2';
 const LS_SEEDED   = 'ss-seeded-v1';     // כדי שמחיקה מכוונת לא תשוחזר בטעינה הבאה
 const LS_REFORM_FIX = 'ss-reform-fix-v1';
+const LS_PRINCIPAL_ROWS = 'ss-principal-rows-v1';
 
 // בתי הספר של הרשת. השמות לקוחים מ-schools.config.json של מערכת תקציב
 // בית הספר, כדי ששתי המערכות יקראו לאותו בית ספר באותו שם.
@@ -329,6 +336,27 @@ const EMPTY_TEACHER = {
 };
 
 const fmt = d => d ? d.split('-').reverse().join('/') : '—';
+
+// המנהלת היא עובדת של הרשת, ולכן יש לה שורה משלה בטבלת השכר —
+// אחרת התקציב של בית הספר מציג את כל צוות ההוראה חוץ ממי שמנהלת אותו.
+const PRINCIPAL_PLACEHOLDER = 'מנהלת בית הספר';
+function makePrincipalRow(school) {
+  return {
+    ...EMPTY_TEACHER,
+    id: uid(),
+    schoolId: school.id,
+    name: PRINCIPAL_PLACEHOLDER,
+    role: PRINCIPAL_ROLE,
+    reform: school.reform || 'ofek',
+    _changedAt: new Date().toISOString(),
+    _approved: false,
+  };
+}
+// משלים שורת מנהלת לכל בית ספר שאין לו אחת בחודש הנתון
+function withPrincipalRows(schools, teachers) {
+  const missing = schools.filter(s => !teachers.some(t => t.schoolId === s.id && isPrincipalRow(t)));
+  return missing.length ? [...teachers, ...missing.map(makePrincipalRow)] : teachers;
+}
 
 /* ═══════════════════════════════════════════════════════════════
    BACKUP — כל המצב חי ב-localStorage בלבד, ולכן חייב לצאת החוצה
@@ -1105,7 +1133,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
   const [t, setT] = useState({ ...EMPTY_TEACHER, ...teacher, scopeChanges: teacher.scopeChanges || [], _files: teacher._files || [] });
   const [showScopeChange, setShowScopeChange] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
-  const [simCalc, setSimCalc] = useState(calcForReform(teacher?.reform));
+  const [simCalc, setSimCalc] = useState(calcForTeacher(teacher));
   const set = (k, v) => setT(p => ({ ...p, [k]: v }));
 
 
@@ -1831,7 +1859,10 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   const [editingId, setEditingId]   = useState(null);   // teacher id or 'new'
   const [editData,  setEditData]    = useState(null);
   const ts       = teachers.filter(t => t.schoolId === school.id);
-  const filtered = ts.filter(t => t.name.includes(search) || (t.tzId || '').includes(search));
+  const filtered = ts
+    .filter(t => t.name.includes(search) || (t.tzId || '').includes(search))
+    // שורת המנהלת ראשונה — היא ראש הצוות וגם הסעיף הגדול בתקציב
+    .sort((a, b) => (isPrincipalRow(b) ? 1 : 0) - (isPrincipalRow(a) ? 1 : 0));
   const tsOfficial = ts.filter(t => t._officialGross);
   const totEmp   = tsOfficial.reduce((s, t) => s + calcEmployer(t).total, 0);
   const totGross = tsOfficial.reduce((s, t) => s + Number(t._officialGross), 0);
@@ -2220,7 +2251,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       <div style={{ display:'flex', alignItems:'center', gap:6, fontWeight:600, color:'var(--text)' }}>
                         {isSim  && <Calculator size={13} strokeWidth={2.4} color="var(--warn)" aria-label="נדרשת סימולציה" />}
                         {isAppr && <ClipboardCheck size={13} strokeWidth={2.4} color="var(--teal-700)" aria-label="ממתין לאישור" />}
-                        {t.name}
+                        <span style={{ color: t.name === PRINCIPAL_PLACEHOLDER ? 'var(--text3)' : undefined }}>{t.name}</span>
+                        {isPrincipalRow(t) && <span className="apple-badge badge-purple" style={{ fontSize:10.5, padding:'2px 8px' }}>מנהלת</span>}
                       </div>
                     </td>
                     <td style={{ textAlign:'center', fontFamily:'monospace', fontSize:12, color:'var(--apple-text2)' }}>{t.tzId||'—'}</td>
@@ -2504,7 +2536,7 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
   // מפני הזנת מספר שחושב במחשבון הלא נכון.
   const selectTeacher = (t) => {
     setActiveId(t.id);
-    setCalc(calcForReform(t.reform));
+    setCalc(calcForTeacher(t));
   };
 
   const handleSave = (t) => {
@@ -2793,15 +2825,30 @@ export default function App() {
   // months: { '2025-09': [teacher,...], ... }  — migrate from legacy if needed
   const [months, setMonths] = useState(() => {
     const saved = loadObj(LS_MONTHS);
-    if (saved && Object.keys(saved).length > 0) return saved;
-    // migrate legacy flat teachers
-    const legacy = load(LS_TEACHERS);
-    if (legacy.length > 0) {
-      const mk = nowMonthKey();
-      return { [mk]: legacy };
+    let base = (saved && Object.keys(saved).length > 0) ? saved : null;
+    if (!base) {
+      // migrate legacy flat teachers
+      const legacy = load(LS_TEACHERS);
+      base = legacy.length > 0 ? { [nowMonthKey()]: legacy } : {};
     }
-    return {};
+    // השלמה חד-פעמית: בית ספר שאין לו שורת מנהלת בחודש האחרון מקבל אחת.
+    // רץ כאן ולא ב-effect כדי לא לגרום לרינדור נוסף מיד אחרי הטעינה.
+    if (!localStorage.getItem(LS_PRINCIPAL_ROWS)) {
+      const allSchools = load(LS_SCHOOLS);
+      if (allSchools.length) {
+        const keys = Object.keys(base).sort();
+        const mk = keys.length ? keys[keys.length - 1] : nowMonthKey();
+        const filled = withPrincipalRows(allSchools, base[mk] || []);
+        if (filled !== (base[mk] || [])) {
+          base = { ...base, [mk]: filled };
+          save(LS_MONTHS, base);
+        }
+        try { localStorage.setItem(LS_PRINCIPAL_ROWS, '1'); } catch { /* לא קריטי */ }
+      }
+    }
+    return base;
   });
+
   const [activeMonth, setActiveMonth] = useState(() => {
     const saved = loadObj(LS_MONTHS);
     const keys = Object.keys(saved || {}).sort();
@@ -2855,7 +2902,13 @@ export default function App() {
   };
 
   const onSaveSchool = s => {
-    persistS(s.id ? schools.map(x => x.id===s.id ? s : x) : [...schools, {...s, id: uid()}]);
+    if (s.id) {
+      persistS(schools.map(x => x.id === s.id ? s : x));
+    } else {
+      const created = { ...s, id: uid() };
+      persistS([...schools, created]);
+      persistT([...teachers, makePrincipalRow(created)]);
+    }
     setSchoolModal(null);
   };
   const onDeleteSchool = id => {
