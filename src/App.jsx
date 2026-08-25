@@ -124,6 +124,19 @@ function calcGross(t) {
   return Math.round((base + role) * scope / 100);
 }
 function calcNet(gross) { return Math.round(gross * 0.735); }
+// אחוז המשרה נגזר מהשעות הפרונטליות ומהשלב, אחרי הפחתת הגיל.
+// המנהלת מזינה שעות — האחוז מחושב, לא מוקלד.
+function baseFrontalFor(t) {
+  const lvl = LEVELS[t.level] || LEVELS.elementary;
+  const agR = AGE_RED[t.ageGroup] || AGE_RED.none;
+  return lvl.frontal - agR.f;
+}
+function scopeFromFrontal(t, hours) {
+  const bf = baseFrontalFor(t);
+  if (!bf) return t.scopePct ?? 100;
+  return Math.round((Number(hours) || 0) / bf * 100);
+}
+
 function deriveHours(t, scopeOverride) {
   if (t.reform !== 'ofek') return null;
   const lvl = LEVELS[t.level] || LEVELS.elementary;
@@ -160,13 +173,16 @@ function calcExtras(t) {
   const havraah = Math.round(havraahDays(t.seniority) * HAVRAAH_DAY * factor / 12);
   return { biguud, havraah, total: biguud + havraah };
 }
-// ברוטו למעסיק = (ברוטו + ביגוד + הבראה) × 1.30
-// ביטוח לאומי 7.5% + פנסיה+פיצויים 15% + קרן השתלמות 7.5%
+// הוצאות המעביד מעל הברוטו — ביטוח לאומי, פנסיה, פיצויים וקרן השתלמות.
+// שיעור אחד לכל המערכת; שינוי כאן מתגלגל לכל החישובים, הדוחות והייצוא.
+const EMPLOYER_RATE  = 0.40;
+const EMPLOYER_PCT   = Math.round(EMPLOYER_RATE * 100);   // לתצוגה
+// ברוטו למעסיק = (ברוטו + ביגוד + הבראה) × (1 + EMPLOYER_RATE)
 function calcEmployer(t) {
   const gross  = calcGross(t);
   const extras = calcExtras(t);
   const base   = gross + extras.total;
-  const social = Math.round(base * 0.30);
+  const social = Math.round(base * EMPLOYER_RATE);
   return { gross, extras, base, social, total: base + social };
 }
 
@@ -1412,7 +1428,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 </div>
               </div>
               <p style={{ fontSize:11, color:'#666', textAlign:'center', marginTop:10 }}>
-                נטו משוער {calcNet(Number(t._officialGross)).toLocaleString()} ₪ · מעסיק 30%: {emp.social.toLocaleString()} ₪
+                נטו משוער {calcNet(Number(t._officialGross)).toLocaleString('he-IL')} ₪ · מעסיק {EMPLOYER_PCT}%: {emp.social.toLocaleString('he-IL')} ₪
               </p>
             </div>
           ) : (
@@ -1620,8 +1636,8 @@ function SchoolReport({ school, teachers, onClose }) {
         )}
 
         <div style={{ marginTop:16, padding:14, background:'var(--apple-fill)', borderRadius:12, fontSize:12, color:'var(--apple-text2)', lineHeight:1.8 }}>
-          <strong style={{ color:'var(--apple-text)' }}>פירוט ברוטו למעסיק:</strong> ברוטו + ביגוד + הבראה × 1.30<br/>
-          30% = ביטוח לאומי 7.5% + פנסיה ופיצויים 15% + קרן השתלמות 7.5%<br/>
+          <strong style={{ color:'var(--text)' }}>פירוט ברוטו למעסיק:</strong> (ברוטו + ביגוד + הבראה) × {(1 + EMPLOYER_RATE).toFixed(2)}<br/>
+          {EMPLOYER_PCT}% הוצאות מעביד — ביטוח לאומי, פנסיה ופיצויים, קרן השתלמות<br/>
           ביגוד: {Math.round(BIGUUD_ANNUAL/12)} ₪/חודש · יום הבראה: {HAVRAAH_DAY} ₪ (2024) · הסכומים הם הערכה בלבד
         </div>
       </div>
@@ -1928,6 +1944,18 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         </div>
       )}
 
+      {isPrincipal && (
+        <div style={{ maxWidth:1400, margin:'0 auto', padding:'18px 20px 0' }}>
+          <div style={{ background:'var(--teal-100)', border:'1px solid #B8EAF2', borderRadius:14, padding:'11px 14px', display:'flex', gap:9, alignItems:'flex-start' }}>
+            <Calculator size={15} strokeWidth={2.2} color="var(--teal-700)" style={{ flexShrink:0, marginTop:2 }} />
+            <p style={{ fontSize:12.5, color:'var(--teal-700)', lineHeight:1.6 }}>
+              מזיני את פרטי המורה ואת <strong>השעות הפרונטליות</strong> — אחוז המשרה מחושב מהן,
+              והשכר נקבע בסימולציה במחשבון הרשמי אצל חשבת השכר.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ══ Table ══ */}
       <div style={{ maxWidth:1400, margin:'0 auto', padding:'18px 20px 40px' }}>
         <div className="sheet-wrap">
@@ -1970,7 +1998,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       {REFORMS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                     </select>
                   </td>
-                  <td><input type="number" className="apple-input" dir="ltr" value={editData.scopePct??100} onChange={e=>setF('scopePct',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td style={{ textAlign:'center' }}>
+                    {/* נגזר מהשעות הפרונטליות — לא מוקלד */}
+                    <span style={{ fontWeight:700, color:'var(--text)' }}>{editData.scopePct ?? 100}%</span>
+                    <span style={{ display:'block', fontSize:10.5, color:'var(--text3)' }}>מחושב</span>
+                  </td>
                   <td>
                     <select value={editData.degree||'BA'} onChange={e=>setF('degree',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
                       <option value="intern">מתמחה</option>
@@ -1988,7 +2020,13 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       : <span style={{ color:'var(--text3)' }}>—</span>}
                   </td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.seniority??0} onChange={e=>setF('seniority',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                  <td><input type="number" className="apple-input" dir="ltr" value={editData.frontalHours??26} onChange={e=>setF('frontalHours',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td><input type="number" className="apple-input" dir="ltr" min="0" max="40" value={editData.frontalHours??26}
+                      onChange={e => {
+                        const hrs = Number(e.target.value);
+                        // השעות הן הקלט; אחוז המשרה נגזר מהן ומהשלב, אחרי הפחתת גיל
+                        setEditData(p => ({ ...p, frontalHours: hrs, scopePct: scopeFromFrontal(p, hrs) }));
+                      }}
+                      style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td style={{ textAlign:'center' }}>
                     <label className="apple-toggle">
                       <input type="checkbox" checked={!!editData.isTemp} onChange={e=>setF('isTemp',e.target.checked)} />
@@ -2000,7 +2038,13 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.mmHours??0} onChange={e=>setF('mmHours',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td><input className="apple-input" value={editData.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם המורה" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.monthlyExtras??0} onChange={e=>setF('monthlyExtras',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:70, textAlign:'center' }} /></td>
-                  <td><input type="number" className="apple-input" dir="ltr" value={editData._officialGross||''} onChange={e=>setF('_officialGross',e.target.value?Number(e.target.value):null)} placeholder="—" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>
+                  {isPrincipal
+                    ? <td style={{ textAlign:'center' }} title="נקבע בסימולציה אצל חשבת השכר">
+                        {editData._officialGross
+                          ? <span style={{ fontWeight:700, color:'var(--text)' }}>{Number(editData._officialGross).toLocaleString('he-IL')}</span>
+                          : <span className="apple-badge badge-orange" style={{ fontWeight:600 }}>נדרשת סימולציה</span>}
+                      </td>
+                    : <td><input type="number" className="apple-input" dir="ltr" value={editData._officialGross||''} onChange={e=>setF('_officialGross',e.target.value?Number(e.target.value):null)} placeholder="—" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>}
                   {!isPrincipal && <td><input type="number" className="apple-input" dir="ltr" value={editData._officialGrossPre||''} onChange={e=>setF('_officialGrossPre',e.target.value?Number(e.target.value):null)} placeholder="—" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>}
                   {!isPrincipal && <td style={{ textAlign:'center', color:'var(--apple-purple)', fontWeight:700 }}>
                     {editData._officialGross && editData._officialGrossPre ? (Number(editData._officialGross)-Number(editData._officialGrossPre)).toLocaleString()+' ₪' : '—'}
@@ -2044,7 +2088,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         {REFORMS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                       </select>
                     </td>
-                    <td><input type="number" className="apple-input" dir="ltr" value={d.scopePct??100} onChange={e=>setF('scopePct',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                    <td style={{ textAlign:'center' }}>
+                    {/* נגזר מהשעות הפרונטליות — לא מוקלד */}
+                    <span style={{ fontWeight:700, color:'var(--text)' }}>{d.scopePct ?? 100}%</span>
+                    <span style={{ display:'block', fontSize:10.5, color:'var(--text3)' }}>מחושב</span>
+                  </td>
                     <td>
                       <select value={d.degree||'BA'} onChange={e=>setF('degree',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
                         <option value="intern">מתמחה</option>
@@ -2062,7 +2110,13 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         : <span style={{ color:'var(--text3)' }}>—</span>}
                     </td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.seniority??0} onChange={e=>setF('seniority',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                    <td><input type="number" className="apple-input" dir="ltr" value={d.frontalHours??26} onChange={e=>setF('frontalHours',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                    <td><input type="number" className="apple-input" dir="ltr" min="0" max="40" value={d.frontalHours??26}
+                      onChange={e => {
+                        const hrs = Number(e.target.value);
+                        // השעות הן הקלט; אחוז המשרה נגזר מהן ומהשלב, אחרי הפחתת גיל
+                        setEditData(p => ({ ...p, frontalHours: hrs, scopePct: scopeFromFrontal(p, hrs) }));
+                      }}
+                      style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                     <td style={{ textAlign:'center' }}>
                       <label className="apple-toggle">
                         <input type="checkbox" checked={!!d.isTemp} onChange={e=>setF('isTemp',e.target.checked)} />
@@ -2074,7 +2128,13 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td><input type="number" className="apple-input" dir="ltr" value={d.mmHours??0} onChange={e=>setF('mmHours',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                     <td><input className="apple-input" value={d.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם המורה" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.monthlyExtras??0} onChange={e=>setF('monthlyExtras',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:70, textAlign:'center' }} /></td>
-                    <td><input type="number" className="apple-input" dir="ltr" value={d._officialGross||''} onChange={e=>setF('_officialGross',e.target.value?Number(e.target.value):null)} placeholder="—" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>
+                    {isPrincipal
+                    ? <td style={{ textAlign:'center' }} title="נקבע בסימולציה אצל חשבת השכר">
+                        {d._officialGross
+                          ? <span style={{ fontWeight:700, color:'var(--text)' }}>{Number(d._officialGross).toLocaleString('he-IL')}</span>
+                          : <span className="apple-badge badge-orange" style={{ fontWeight:600 }}>נדרשת סימולציה</span>}
+                      </td>
+                    : <td><input type="number" className="apple-input" dir="ltr" value={d._officialGross||''} onChange={e=>setF('_officialGross',e.target.value?Number(e.target.value):null)} placeholder="—" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>}
                     {!isPrincipal && <td><input type="number" className="apple-input" dir="ltr" value={d._officialGrossPre||''} onChange={e=>setF('_officialGrossPre',e.target.value?Number(e.target.value):null)} placeholder="—" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>}
                     {!isPrincipal && <td style={{ textAlign:'center', color:'var(--apple-purple)', fontWeight:700 }}>
                       {d._officialGross && d._officialGrossPre ? (Number(d._officialGross)-Number(d._officialGrossPre)).toLocaleString()+' ₪' : '—'}
@@ -2327,7 +2387,7 @@ function ReportView({ schools, teachers }) {
           </div>
         </div>
         <p style={{ fontSize:11, color:'var(--text3)', marginTop:10, padding:'0 4px' }}>
-          ברוטו למעסיק = (ברוטו + ביגוד + הבראה) × 1.30 · כולל ביטוח לאומי, פנסיה ופיצויים, קרן השתלמות
+          ברוטו למעסיק = (ברוטו + ביגוד + הבראה) × {(1 + EMPLOYER_RATE).toFixed(2)} · {EMPLOYER_PCT}% הוצאות מעביד: ביטוח לאומי, פנסיה ופיצויים, קרן השתלמות
         </p>
       </div>
     </div>
