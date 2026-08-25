@@ -38,7 +38,7 @@ const note = await p.getByText(/הוצאות מעביד/).first().textContent().
 await p.getByRole('button', { name: 'דוח רשת' }).click(); await p.waitForTimeout(500);
 const netNote = (await p.getByText(/ברוטו למעסיק =/).textContent()) || '';
 check('הערת הדוח מציגה 40% ולא 30%', netNote.includes('40%') && !netNote.includes('30%'), netNote.trim().slice(0, 80));
-check('הערת הדוח מציגה מכפיל 1.40', netNote.includes('1.40'), netNote.trim().slice(0, 60));
+check('הערת הדוח אינה מפרטת רכיבים', !/ביטוח לאומי|פנסיה|קרן השתלמות/.test(netNote), netNote.trim().slice(0, 70));
 
 // ══ 2. principal: frontal hours drive scope, salary locked ══
 await p.getByRole('button', { name: 'יציאה' }).click(); await p.waitForTimeout(300);

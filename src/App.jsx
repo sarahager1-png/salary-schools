@@ -173,8 +173,8 @@ function calcExtras(t) {
   const havraah = Math.round(havraahDays(t.seniority) * HAVRAAH_DAY * factor / 12);
   return { biguud, havraah, total: biguud + havraah };
 }
-// הוצאות המעביד מעל הברוטו — ביטוח לאומי, פנסיה, פיצויים וקרן השתלמות.
-// שיעור אחד לכל המערכת; שינוי כאן מתגלגל לכל החישובים, הדוחות והייצוא.
+// הוצאות המעביד מעל הברוטו. שיעור אחד לכל המערכת; שינוי כאן מתגלגל
+// לכל החישובים, הדוחות והייצוא. הרכיבים אינם מפורטים — רק העלות.
 const EMPLOYER_RATE  = 0.40;
 const EMPLOYER_PCT   = Math.round(EMPLOYER_RATE * 100);   // לתצוגה
 // ברוטו למעסיק = (ברוטו + ביגוד + הבראה) × (1 + EMPLOYER_RATE)
@@ -1428,7 +1428,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 </div>
               </div>
               <p style={{ fontSize:11, color:'#666', textAlign:'center', marginTop:10 }}>
-                נטו משוער {calcNet(Number(t._officialGross)).toLocaleString('he-IL')} ₪ · מעסיק {EMPLOYER_PCT}%: {emp.social.toLocaleString('he-IL')} ₪
+                נטו משוער {calcNet(Number(t._officialGross)).toLocaleString('he-IL')} ₪ · עלות מעסיק {emp.total.toLocaleString('he-IL')} ₪
               </p>
             </div>
           ) : (
@@ -1636,8 +1636,7 @@ function SchoolReport({ school, teachers, onClose }) {
         )}
 
         <div style={{ marginTop:16, padding:14, background:'var(--apple-fill)', borderRadius:12, fontSize:12, color:'var(--apple-text2)', lineHeight:1.8 }}>
-          <strong style={{ color:'var(--text)' }}>פירוט ברוטו למעסיק:</strong> (ברוטו + ביגוד + הבראה) × {(1 + EMPLOYER_RATE).toFixed(2)}<br/>
-          {EMPLOYER_PCT}% הוצאות מעביד — ביטוח לאומי, פנסיה ופיצויים, קרן השתלמות<br/>
+          <strong style={{ color:'var(--text)' }}>ברוטו למעסיק:</strong> (ברוטו + ביגוד + הבראה) + {EMPLOYER_PCT}% הוצאות מעביד<br/>
           ביגוד: {Math.round(BIGUUD_ANNUAL/12)} ₪/חודש · יום הבראה: {HAVRAAH_DAY} ₪ (2024) · הסכומים הם הערכה בלבד
         </div>
       </div>
@@ -1792,7 +1791,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
       { key:'monthlyExtras', label:'תוספות (₪)' }, { key:'official', label:'שכר רשמי (₪)' },
       ...(isPrincipal ? [] : [
         { key:'officialPre', label:'עולם ישן (₪)' }, { key:'chabad', label:'תוספת חב"ד (₪)' },
-        { key:'social', label:'סוציאלי (₪)' }, { key:'employer', label:'סה"כ למעסיק (₪)' },
+        { key:'social', label:'ביגוד + הבראה (₪)' }, { key:'employer', label:'סה"כ למעסיק (₪)' },
       ]),
       { key:'source', label:'מקור הנתון' },
     ];
@@ -1981,7 +1980,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <th style={{ textAlign:'center' }}>שכר רשמי (₪)</th>
                 {!isPrincipal && <th style={{ textAlign:'center' }}>עולם ישן (₪)</th>}
                 {!isPrincipal && <th style={{ textAlign:'center' }}>תוספת חב"ד</th>}
-                {!isPrincipal && <th style={{ textAlign:'center' }}>סוציאלי</th>}
+                {!isPrincipal && <th style={{ textAlign:'center' }}>ביגוד + הבראה</th>}
                 {!isPrincipal && <th style={{ textAlign:'center', color:'var(--purple)' }}>סה״כ למעסיק</th>}
                 <th style={{ width:92 }}></th>
               </tr>
@@ -2387,7 +2386,7 @@ function ReportView({ schools, teachers }) {
           </div>
         </div>
         <p style={{ fontSize:11, color:'var(--text3)', marginTop:10, padding:'0 4px' }}>
-          ברוטו למעסיק = (ברוטו + ביגוד + הבראה) × {(1 + EMPLOYER_RATE).toFixed(2)} · {EMPLOYER_PCT}% הוצאות מעביד: ביטוח לאומי, פנסיה ופיצויים, קרן השתלמות
+          ברוטו למעסיק = (ברוטו + ביגוד + הבראה) + {EMPLOYER_PCT}% הוצאות מעביד
         </p>
       </div>
     </div>
