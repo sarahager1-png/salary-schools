@@ -266,21 +266,25 @@ function readableVal(field, val) {
 ═══════════════════════════════════════════════════════════════ */
 const LS_SCHOOLS  = 'ss-schools-v2';
 const LS_SEEDED   = 'ss-seeded-v1';     // כדי שמחיקה מכוונת לא תשוחזר בטעינה הבאה
+const LS_REFORM_FIX = 'ss-reform-fix-v1';
 
 // בתי הספר של הרשת. השמות לקוחים מ-schools.config.json של מערכת תקציב
 // בית הספר, כדי ששתי המערכות יקראו לאותו בית ספר באותו שם.
-// המסלול נקבע כאן כברירת מחדל וניתן לשינוי בהגדרות בית הספר.
+// המסלול קובע אם תוספת אם נכנסת לחישוב, ואיזה מחשבון רשמי נפתח.
 const DEFAULT_SCHOOLS = [
-  { name: 'בית חינוך רעננה',      city: 'רעננה' },
-  { name: 'שלהבות מזכרת בתיה',    city: 'מזכרת בתיה' },
-  { name: 'שלהבות אשקלון',        city: 'אשקלון' },
-  { name: 'שלהבות אור עקיבא',     city: 'אור עקיבא' },
-  { name: 'שלהבות ירושלים',       city: 'ירושלים' },
-  { name: 'שלהבות גני תקוה',      city: 'גני תקוה' },
-  { name: 'שלהבות רמת ישי',       city: 'רמת ישי' },
-  { name: 'שלהבות קרית ביאליק',   city: 'קרית ביאליק' },
-  { name: 'בית חינוך עפולה',      city: 'עפולה' },
+  { name: 'בית חינוך רעננה',      city: 'רעננה',        reform: 'ofek' },
+  { name: 'שלהבות מזכרת בתיה',    city: 'מזכרת בתיה',   reform: 'ofek' },
+  { name: 'שלהבות אשקלון',        city: 'אשקלון',       reform: 'ofek' },
+  { name: 'שלהבות אור עקיבא',     city: 'אור עקיבא',    reform: 'ofek' },
+  { name: 'שלהבות ירושלים',       city: 'ירושלים',      reform: 'pre'  },
+  { name: 'שלהבות גני תקוה',      city: 'גני תקוה',     reform: 'ofek' },
+  { name: 'שלהבות רמת ישי',       city: 'רמת ישי',      reform: 'ofek' },
+  { name: 'שלהבות קרית ביאליק',   city: 'קרית ביאליק',  reform: 'ofek' },
+  { name: 'בית חינוך עפולה',      city: 'עפולה',        reform: 'pre'  },
 ];
+// ירושלים ועפולה נזרעו בטעות כאופק בגרסה קודמת — תיקון חד-פעמי לפי שם,
+// כדי שהתקנה קיימת לא תישאר עם המסלול הלא נכון. שינוי ידני אחריו נשמר.
+const OLD_WORLD_NAMES = DEFAULT_SCHOOLS.filter(s => s.reform === 'pre').map(s => s.name);
 const LS_TEACHERS = 'ss-teachers-v2';   // legacy
 const LS_MONTHS   = 'ss-months-v1';
 const load  = k => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; } };
@@ -2769,12 +2773,19 @@ function BackupModal({ schools, months, onRestore, onClose }) {
 export default function App() {
   const [schools,  setSchools]  = useState(() => {
     const saved = load(LS_SCHOOLS);
-    if (saved.length > 0) return saved;
+    if (saved.length > 0) {
+      if (localStorage.getItem(LS_REFORM_FIX)) return saved;
+      const fixed = saved.map(s => (OLD_WORLD_NAMES.includes(s.name) && s.reform !== 'pre')
+        ? { ...s, reform: 'pre' } : s);
+      try { localStorage.setItem(LS_REFORM_FIX, '1'); } catch { /* לא קריטי */ }
+      if (fixed.some((s, i) => s !== saved[i])) { save(LS_SCHOOLS, fixed); return fixed; }
+      return saved;
+    }
     // זריעה חד-פעמית בלבד — אם מחקת את כולם, הם לא יחזרו
     if (localStorage.getItem(LS_SEEDED)) return saved;
-    const seeded = DEFAULT_SCHOOLS.map(s => ({ ...s, id: uid(), reform: 'ofek' }));
+    const seeded = DEFAULT_SCHOOLS.map(s => ({ ...s, id: uid() }));
     if (save(LS_SCHOOLS, seeded)) {
-      try { localStorage.setItem(LS_SEEDED, '1'); } catch { /* לא קריטי */ }
+      try { localStorage.setItem(LS_SEEDED, '1'); localStorage.setItem(LS_REFORM_FIX, '1'); } catch { /* לא קריטי */ }
       return seeded;
     }
     return saved;
