@@ -24,15 +24,16 @@ await p.evaluate(([s, ts]) => {
 await p.reload(); await p.waitForTimeout(400);
 
 // ══ 1. employer rate is 40% ══
-// ברוטו 12,500 · ותק 12 -> 20 ימי הבראה · ביגוד 2028/12=169 · הבראה 20*421/12=702
-// base = 12500+871 = 13371 · 40% = 5348 · total = 18719   (ב-30% זה היה 17,382)
+// ביגוד והבראה כלולים בתוך ה-40% ואינם מתווספים מעליו:
+// ברוטו 12,500 · הוצאות מעביד 40% = 5,000 · סה"כ למעסיק = 17,500
 await p.getByText('כניסה למערכת').click(); await p.waitForTimeout(400);
 await p.getByText('שלהבות אשקלון').first().click(); await p.waitForTimeout(600);
 const empCell = (await p.locator('table tbody tr').first().locator('td').last().textContent()) || '';
 const totalTxt = (await p.locator('table tbody tr').first().textContent()) || '';
-check('הוצאות מעביד 40% — סה"כ למעסיק 18,719 ₪', totalTxt.includes('18,719'),
-  totalTxt.match(/[\d,]{5,}\s*₪/g)?.join(' | ') || empCell);
-check('הסכום אינו עוד לפי 30% (17,382)', !totalTxt.includes('17,382'));
+check('סה"כ למעסיק = ברוטו + 40% = 17,500 ₪', totalTxt.includes('17,500'),
+  totalTxt.match(/[\d,]{4,}/g)?.join(' | ') || empCell);
+check('ביגוד והבראה אינם מתווספים מעל ה-40%', !totalTxt.includes('18,719'));
+check('עמודת הוצאות המעביד מציגה 5,000', totalTxt.includes('5,000'), totalTxt.match(/[\d,]{4,}/g)?.join(' | '));
 
 const note = await p.getByText(/הוצאות מעביד/).first().textContent().catch(() => '');
 await p.getByRole('button', { name: 'דוח רשת' }).click(); await p.waitForTimeout(500);

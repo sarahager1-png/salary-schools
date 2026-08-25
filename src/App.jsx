@@ -173,17 +173,17 @@ function calcExtras(t) {
   const havraah = Math.round(havraahDays(t.seniority) * HAVRAAH_DAY * factor / 12);
   return { biguud, havraah, total: biguud + havraah };
 }
-// הוצאות המעביד מעל הברוטו. שיעור אחד לכל המערכת; שינוי כאן מתגלגל
-// לכל החישובים, הדוחות והייצוא. הרכיבים אינם מפורטים — רק העלות.
+// הוצאות המעביד מעל הברוטו — שיעור אחד לכל המערכת.
+// ביגוד והבראה כלולים בתוך השיעור הזה ואינם מתווספים מעליו.
 const EMPLOYER_RATE  = 0.40;
 const EMPLOYER_PCT   = Math.round(EMPLOYER_RATE * 100);   // לתצוגה
-// ברוטו למעסיק = (ברוטו + ביגוד + הבראה) × (1 + EMPLOYER_RATE)
+// ברוטו למעסיק = ברוטו × (1 + EMPLOYER_RATE)
 function calcEmployer(t) {
   const gross  = calcGross(t);
+  // מוחזר לצורכי מידע בלבד (כמה מתוך העלות הם ביגוד והבראה) — לא מתווסף לסכום
   const extras = calcExtras(t);
-  const base   = gross + extras.total;
-  const social = Math.round(base * EMPLOYER_RATE);
-  return { gross, extras, base, social, total: base + social };
+  const social = Math.round(gross * EMPLOYER_RATE);
+  return { gross, extras, base: gross, social, total: gross + social };
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1070,7 +1070,6 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
   const cur     = currentScope(t);
   const derived = deriveHours(t, cur);
   const emp     = calcEmployer(t);
-  const extras  = emp.extras;
 
   const addScopeChange = c => {
     const changes = [...t.scopeChanges, c].sort((a,b) => a.date.localeCompare(b.date));
@@ -1419,8 +1418,8 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                   <p style={{ fontSize:20, fontWeight:800, color:'#1B5E20' }}>{Number(t._officialGross).toLocaleString()} ₪</p>
                 </div>
                 <div style={{ background:'#C8E6C9', borderRadius:8, padding:'10px 8px' }}>
-                  <p style={{ fontSize:11, color:'#555', marginBottom:4 }}>ביגוד + הבראה</p>
-                  <p style={{ fontSize:16, fontWeight:700, color:'#1B5E20' }}>{extras.total.toLocaleString()} ₪</p>
+                  <p style={{ fontSize:11, color:'#555', marginBottom:4 }}>הוצאות מעביד {EMPLOYER_PCT}%</p>
+                  <p style={{ fontSize:16, fontWeight:700, color:'#1B5E20' }}>{emp.social.toLocaleString('he-IL')} ₪</p>
                 </div>
                 <div style={{ background:'#A5D6A7', borderRadius:8, padding:'10px 8px' }}>
                   <p style={{ fontSize:11, color:'#333', marginBottom:4 }}>ברוטו למעסיק</p>
@@ -1550,7 +1549,7 @@ function SchoolReport({ school, teachers, onClose }) {
               <th style={{ textAlign:'center' }}>% משרה</th><th style={{ textAlign:'center' }}>פרונטלי</th>
               <th style={{ textAlign:'center' }}>פרטני</th><th style={{ textAlign:'center' }}>שהייה</th>
               <th>תפקיד</th><th style={{ textAlign:'center' }}>מתאריך</th><th style={{ textAlign:'center' }}>עד תאריך</th>
-              <th>ברוטו</th><th>ביגוד+הבראה</th><th style={{ color:'var(--apple-purple)' }}>ברוטו למעסיק</th>
+              <th>ברוטו</th><th>הוצאות מעביד</th><th style={{ color:'var(--purple)' }}>ברוטו למעסיק</th>
             </tr>
           </thead>
           <tbody>
@@ -1577,7 +1576,7 @@ function SchoolReport({ school, teachers, onClose }) {
                   <td style={{ fontWeight: t._officialGross ? 700 : 400, color: t._officialGross ? 'var(--apple-green)' : '#bbb' }}>
                     {t._officialGross ? Number(t._officialGross).toLocaleString()+' ₪' : '—'}
                   </td>
-                  <td style={{ color:'var(--apple-text2)' }}>{emp.extras.total.toLocaleString()} ₪</td>
+                  <td style={{ color:'var(--text2)' }}>{emp.social.toLocaleString('he-IL')} ₪</td>
                   <td style={{ fontWeight:800, color:'var(--apple-purple)' }}>{emp.total.toLocaleString()} ₪</td>
                 </tr>
               );
@@ -1636,8 +1635,8 @@ function SchoolReport({ school, teachers, onClose }) {
         )}
 
         <div style={{ marginTop:16, padding:14, background:'var(--apple-fill)', borderRadius:12, fontSize:12, color:'var(--apple-text2)', lineHeight:1.8 }}>
-          <strong style={{ color:'var(--text)' }}>ברוטו למעסיק:</strong> (ברוטו + ביגוד + הבראה) + {EMPLOYER_PCT}% הוצאות מעביד<br/>
-          ביגוד: {Math.round(BIGUUD_ANNUAL/12)} ₪/חודש · יום הבראה: {HAVRAAH_DAY} ₪ (2024) · הסכומים הם הערכה בלבד
+          <strong style={{ color:'var(--text)' }}>ברוטו למעסיק:</strong> ברוטו + {EMPLOYER_PCT}% הוצאות מעביד (כולל ביגוד והבראה)<br/>
+          הסכומים לשורות ללא שכר רשמי הם הערכה בלבד
         </div>
       </div>
     </div>
@@ -1774,7 +1773,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   const tsOfficial = ts.filter(t => t._officialGross);
   const totEmp   = tsOfficial.reduce((s, t) => s + calcEmployer(t).total, 0);
   const totGross = tsOfficial.reduce((s, t) => s + Number(t._officialGross), 0);
-  const totExtras = tsOfficial.reduce((s, t) => s + calcEmployer(t).extras.total, 0);
+  const totExtras = tsOfficial.reduce((s, t) => s + calcEmployer(t).social, 0);
   const totMonthly = ts.reduce((s, t) => s + (Number(t.monthlyExtras) || 0), 0);
   const needsSimCount   = ts.filter(needsSim).length;
   const needsApprCount  = ts.filter(needsApproval).length;
@@ -1791,7 +1790,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
       { key:'monthlyExtras', label:'תוספות (₪)' }, { key:'official', label:'שכר רשמי (₪)' },
       ...(isPrincipal ? [] : [
         { key:'officialPre', label:'עולם ישן (₪)' }, { key:'chabad', label:'תוספת חב"ד (₪)' },
-        { key:'social', label:'ביגוד + הבראה (₪)' }, { key:'employer', label:'סה"כ למעסיק (₪)' },
+        { key:'social', label:`הוצאות מעביד ${EMPLOYER_PCT}% (₪)` }, { key:'employer', label:'סה"כ למעסיק (₪)' },
       ]),
       { key:'source', label:'מקור הנתון' },
     ];
@@ -1818,7 +1817,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         official: official ?? '',
         officialPre: t._officialGrossPre ? Number(t._officialGrossPre) : '',
         chabad: official && t._officialGrossPre ? official - Number(t._officialGrossPre) : '',
-        social: official ? emp.extras.total : '',
+        social: official ? emp.social : '',
         employer: official ? emp.total : '',
         // הדוח לא מסתיר שהמספר של מי שטרם עבר סימולציה הוא אומדן פנימי
         source: official ? 'רשמי' : 'טרם הורצה סימולציה',
@@ -1980,7 +1979,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <th style={{ textAlign:'center' }}>שכר רשמי (₪)</th>
                 {!isPrincipal && <th style={{ textAlign:'center' }}>עולם ישן (₪)</th>}
                 {!isPrincipal && <th style={{ textAlign:'center' }}>תוספת חב"ד</th>}
-                {!isPrincipal && <th style={{ textAlign:'center' }}>ביגוד + הבראה</th>}
+                {!isPrincipal && <th style={{ textAlign:'center' }}>הוצאות מעביד</th>}
                 {!isPrincipal && <th style={{ textAlign:'center', color:'var(--purple)' }}>סה״כ למעסיק</th>}
                 <th style={{ width:92 }}></th>
               </tr>
@@ -2203,8 +2202,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         ? <span className="apple-badge badge-purple">{chabadBonus.toLocaleString('he-IL')} ₪</span>
                         : <span style={{ color:'var(--text3)' }}>—</span>}
                     </td>}
-                    {!isPrincipal && <td style={{ textAlign:'center', color:'var(--apple-text2)' }}>
-                      {t._officialGross ? emp.extras.total.toLocaleString() : '—'}
+                    {!isPrincipal && <td style={{ textAlign:'center', color:'var(--text2)' }}>
+                      {t._officialGross ? emp.social.toLocaleString('he-IL') : '—'}
                     </td>}
                     {!isPrincipal && <td style={{ textAlign:'center', fontWeight:800, color: t._officialGross ? 'var(--purple)' : 'var(--text3)' }}>
                       {t._officialGross ? emp.total.toLocaleString('he-IL')+' ₪'
@@ -2386,7 +2385,7 @@ function ReportView({ schools, teachers }) {
           </div>
         </div>
         <p style={{ fontSize:11, color:'var(--text3)', marginTop:10, padding:'0 4px' }}>
-          ברוטו למעסיק = (ברוטו + ביגוד + הבראה) + {EMPLOYER_PCT}% הוצאות מעביד
+          ברוטו למעסיק = ברוטו + {EMPLOYER_PCT}% הוצאות מעביד · ביגוד והבראה כלולים בשיעור הזה
         </p>
       </div>
     </div>
