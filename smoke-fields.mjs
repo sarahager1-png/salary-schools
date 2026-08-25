@@ -51,17 +51,32 @@ for (const [label, apply] of [
     after._snapshot ? Object.keys(after._snapshot).length + ' שדות' : 'אין snapshot');
 }
 
-// ══ 2. childrenUnder18 מופיע ב-diff (קודם הפיל אישור בלי להיראות) ══
+// ══ 2. תוספת אם — עולם ישן בלבד ══
+// באופק אין לה ביטוי בשכר, ולכן שינוי מספר הילדים אינו אמור להפיל אישור
 await seed(T);
 await p.getByText('שלהבות אשקלון').first().click(); await p.waitForTimeout(500);
 await p.getByTitle('עריכה').first().click(); await p.waitForTimeout(300);
 // ותק(0) פרונטלי(1) ילדים(2) ...
 await p.locator('table input[type="number"]').nth(2).fill('3');
-await p.getByRole('button', { name: 'שמור' }).click(); await p.waitForTimeout(500);
-const kids = (await read())['2026-08'].find(x => x.id === 't1');
-check('שינוי מספר ילדים מפיל אישור', kids._approved === false);
-check('שינוי מספר ילדים מופיע ב-diff', !!kids._snapshot && 'childrenUnder18' in kids._snapshot,
-  Object.keys(kids._snapshot || {}).length + ' שדות ב-snapshot');
+await p.getByRole('button', { name: 'שמור' }).click(); await p.waitForTimeout(600);
+const kidsOfek = (await read())['2026-08'].find(x => x.id === 't1');
+check('אופק — שינוי מספר ילדים אינו מפיל אישור',
+  kidsOfek._approved === true && kidsOfek._officialGross === 12500,
+  `approved=${kidsOfek._approved} gross=${kidsOfek._officialGross}`);
+check('אופק — מספר הילדים נשמר', kidsOfek.childrenUnder18 === 3, String(kidsOfek.childrenUnder18));
+
+// בעולם ישן המערכת מחשבת אותה, ולכן שינוי כן מחייב סימולציה מחדש
+await seed([mk({ id: 't1', name: 'עולם ישן', reform: 'pre', degree: 'MA', scope: 100 })]);
+await p.getByText('שלהבות אשקלון').first().click(); await p.waitForTimeout(500);
+await p.getByTitle('עריכה').first().click(); await p.waitForTimeout(300);
+await p.locator('table input[type="number"]').nth(2).fill('3');
+await p.getByRole('button', { name: 'שמור' }).click(); await p.waitForTimeout(600);
+const kidsPre = (await read())['2026-08'].find(x => x.id === 't1');
+check('עולם ישן — שינוי מספר ילדים מפיל אישור',
+  kidsPre._approved === false && kidsPre._officialGross === null,
+  `approved=${kidsPre._approved} gross=${kidsPre._officialGross}`);
+check('עולם ישן — השינוי מופיע ב-diff', !!kidsPre._snapshot && 'childrenUnder18' in kidsPre._snapshot,
+  Object.keys(kidsPre._snapshot || {}).length + ' שדות ב-snapshot');
 // המורה שלמעלה עברה ל"נדרשת סימולציה" (שדה בסיס אופס את השכר), ולכן היא
 // עוד לא בתור האישורים. נזרע ישירות מורה שממתינה לאישור עם אותו שינוי.
 await seed([mk({
@@ -120,6 +135,24 @@ await seed([mk({ id: 't1', name: 'עולם ישן', reform: 'pre', degree: 'MA',
 await p.getByText('שלהבות אשקלון').first().click(); await p.waitForTimeout(600);
 const rowTxt = (await p.locator('table tbody tr').first().textContent()) || '';
 check('מורת עולם ישן ב-50% מוצגת כ-50%', rowTxt.includes('50%'), rowTxt.match(/\d+%/g)?.join(' ') || '');
+
+// ══ 6. תצוגת הזכאות שונה בין המסלולים ══
+await seed([
+  mk({ id: 't1', name: 'אופק עם ילדים',     reform: 'ofek', childrenUnder18: 3 }),
+  mk({ id: 't2', name: 'עולם ישן עם ילדים', reform: 'pre', degree: 'MA', childrenUnder18: 3, scope: 100 }),
+]);
+await p.getByText('שלהבות אשקלון').first().click(); await p.waitForTimeout(600);
+const rows = p.locator('table tbody tr');
+check('אופק — מספר ילדים בלי טענת זכאות',
+  !((await rows.nth(0).textContent()) || '').includes('זכאית'));
+check('עולם ישן — מסומנת זכאות לתוספת אם',
+  await rows.nth(1).getByTitle('זכאית לתוספת אם עובדת').isVisible().catch(() => false));
+
+// עולם ישן מתחת ל-79% משרה — לא זכאית
+await seed([mk({ id: 't1', name: 'עולם ישן חלקית', reform: 'pre', degree: 'MA', childrenUnder18: 2, scope: 60, scopePct: 60 })]);
+await p.getByText('שלהבות אשקלון').first().click(); await p.waitForTimeout(600);
+check('עולם ישן מתחת ל-79% — לא זכאית',
+  ((await rows.nth(0).textContent()) || '').includes('לא זכאית'));
 
 await b.close();
 console.log(fails.length ? `\n${fails.length} כשלונות` : '\nהכול עבר');

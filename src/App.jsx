@@ -122,12 +122,11 @@ function effectiveScope(t) {
   if (t.reform === 'ofek') return currentScope(t).scopePct || 100;
   return t.scope ?? t.scopePct ?? 100;
 }
-// זכאות לתוספת אם עובדת: ילד אחד ומעלה עד גיל 18, בהיקף משרה 79% ומעלה.
-// הכלל הזה היה משוכפל בשלושה מסכים; כאן הוא נקבע פעם אחת.
-// השיעור עצמו אינו ידוע לנו ולכן אינו מחושב — הזכאות מסומנת בלבד,
-// והסכום המחייב מגיע ממילא מהסימולציה במחשבון הרשמי.
+// תוספת אם עובדת קיימת בעולם ישן בלבד. באופק חדש אין לה ביטוי בשכר,
+// ולכן מספר הילדים נאסף שם כמידע ואינו רכיב שכר.
+// זכאות בעולם ישן: ילד אחד ומעלה עד גיל 18, בהיקף משרה 79% ומעלה.
 function momBonusEligible(t) {
-  return (t.childrenUnder18 || 0) > 0 && effectiveScope(t) >= 79;
+  return t.reform === 'pre' && (t.childrenUnder18 || 0) > 0 && effectiveScope(t) >= 79;
 }
 function calcGross(t) {
   if (t._officialGross) return Number(t._officialGross);
@@ -223,7 +222,8 @@ const FIELDS = [
   { key:'scopePct',        label:'% משרה',         base:true,  tracked:true,  fmt: v => `${v}%` },
   { key:'frontalHours',    label:'שעות פרונטלי',   base:true,  tracked:true },
   { key:'scope',           label:'% משרה',         base:true,  tracked:false, fmt: v => `${v}%` },
-  { key:'childrenUnder18', label:'ילדים עד 18',    base:true,  tracked:true },
+  // משפיע על השכר בעולם ישן בלבד — באופק אין לו ביטוי בשכר
+  { key:'childrenUnder18', label:'ילדים עד 18',    base: t => t.reform === 'pre', tracked:true },
   { key:'isTemp',          label:'שיבוץ זמני',     base:false, tracked:true,  fmt: v => v ? 'כן' : 'לא' },
   { key:'startDate',       label:'מתאריך',         base:false, tracked:true,  fmt: v => v.split('-').reverse().join('/') },
   { key:'endDate',         label:'עד תאריך',       base:false, tracked:true,  fmt: v => v.split('-').reverse().join('/') },
@@ -239,7 +239,13 @@ function diffT(t) {
 }
 // שינוי בשדה בסיס מבטל את הסימולציה ואת האישור
 function baseFieldsChanged(next, prev) {
-  return BASE_FIELDS.some(k => String(next[k] ?? '') !== String(prev[k] ?? ''));
+  return FIELDS.some(f => {
+    if (!f.base) return false;
+    // base יכול להיות מותנה במסלול — נבדק על שני הצדדים, כדי שגם מעבר
+    // מסלול שמכניס שדה לחישוב ייחשב שינוי
+    const affectsPay = typeof f.base === 'function' ? (f.base(next) || f.base(prev)) : true;
+    return affectsPay && String(next[f.key] ?? '') !== String(prev[f.key] ?? '');
+  });
 }
 // סטטוס מורה בזרימת העבודה:
 // needs_sim: מנהלת שמרה שינויים, ממתין לסימולציה אצל חשבת שכר
@@ -1379,8 +1385,14 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
           <div style={{ background:'rgba(88,86,214,0.06)', borderRadius:14, padding:14 }}>
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
               <div style={{ flex:1 }}>
-                <p style={{ fontSize:13, fontWeight:600, color:'var(--apple-purple)', marginBottom:2 }}>תוספת אם עובדת</p>
-                <p style={{ fontSize:12, color:'var(--apple-text2)' }}>ילדים עד גיל 18 (זכאות מ-79% משרה)</p>
+                <p style={{ fontSize:13, fontWeight:600, color:'var(--purple)', marginBottom:2 }}>
+                  {t.reform === 'pre' ? 'תוספת אם עובדת' : 'ילדים עד גיל 18'}
+                </p>
+                <p style={{ fontSize:12, color:'var(--text2)' }}>
+                  {t.reform === 'pre'
+                    ? 'ילדים עד גיל 18 (זכאות מ-79% משרה)'
+                    : 'באופק חדש אינה רכיב שכר — נאסף כמידע בלבד'}
+                </p>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <button onClick={() => set('childrenUnder18', Math.max(0, (t.childrenUnder18||0)-1))}
@@ -1392,10 +1404,10 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             </div>
             {momBonusEligible(t) && (
               <p style={{ fontSize:12, color:'var(--apple-purple)', fontWeight:600, marginTop:8 }}>
-                ✓ זכאית לתוספת אם — {t.childrenUnder18} ילדים עד גיל 18
+                זכאית לתוספת אם — {t.childrenUnder18} ילדים עד גיל 18
               </p>
             )}
-            {(t.childrenUnder18||0) > 0 && !momBonusEligible(t) && (
+            {t.reform === 'pre' && (t.childrenUnder18||0) > 0 && !momBonusEligible(t) && (
               <p style={{ fontSize:12, color:'var(--apple-orange)', marginTop:8 }}>
                 אחוז משרה נמוך מ-79% — אין זכאות לתוספת אם
               </p>
@@ -2226,9 +2238,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     </td>
                     <td style={{ textAlign:'center' }}>
                       {momBonus
-                        ? <span className="apple-badge badge-purple"><Check size={11} strokeWidth={3} />{t.childrenUnder18}</span>
+                        ? <span className="apple-badge badge-purple" title="זכאית לתוספת אם עובדת"><Check size={11} strokeWidth={3} />{t.childrenUnder18}</span>
                         : (t.childrenUnder18||0) > 0
-                          ? <span style={{ fontSize:11, color:'var(--apple-text3)' }}>לא זכאית</span>
+                          ? (t.reform === 'pre'
+                              ? <span style={{ fontSize:11, color:'var(--text3)' }}>לא זכאית</span>
+                              : <span style={{ color:'var(--text2)' }} title="באופק חדש אינה רכיב שכר">{t.childrenUnder18}</span>)
                           : <span style={{ color:'var(--text3)' }}>—</span>}
                     </td>
                     <td style={{ textAlign:'center', color: (t.absenceDays||0)>0 ? 'var(--danger)' : 'var(--text3)', fontWeight: (t.absenceDays||0)>0 ? 700 : 400 }}>
