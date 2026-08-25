@@ -116,11 +116,24 @@ function currentScope(t) {
   }
   return { scopePct: t.scopePct || 100, frontalHours: t.frontalHours || 26 };
 }
+// אחוז המשרה בפועל. עורך הטבלה כותב scopePct גם לעולם ישן, אבל רשומות
+// ותיקות נשמרו ב-scope בלבד — ולכן שתיהן נקראות כאן.
+function effectiveScope(t) {
+  if (t.reform === 'ofek') return currentScope(t).scopePct || 100;
+  return t.scope ?? t.scopePct ?? 100;
+}
+// זכאות לתוספת אם עובדת: ילד אחד ומעלה עד גיל 18, בהיקף משרה 79% ומעלה.
+// הכלל הזה היה משוכפל בשלושה מסכים; כאן הוא נקבע פעם אחת.
+// השיעור עצמו אינו ידוע לנו ולכן אינו מחושב — הזכאות מסומנת בלבד,
+// והסכום המחייב מגיע ממילא מהסימולציה במחשבון הרשמי.
+function momBonusEligible(t) {
+  return (t.childrenUnder18 || 0) > 0 && effectiveScope(t) >= 79;
+}
 function calcGross(t) {
   if (t._officialGross) return Number(t._officialGross);
   const base  = calcBase(t);
   const role  = calcRoleSupp(base, t.role);
-  const scope = t.reform === 'ofek' ? (currentScope(t).scopePct || 100) : (t.scope || 100);
+  const scope = effectiveScope(t);
   return Math.round((base + role) * scope / 100);
 }
 function calcNet(gross) { return Math.round(gross * 0.735); }
@@ -167,8 +180,7 @@ function havraahDays(sen) {
 }
 function calcExtras(t) {
   // ביגוד והבראה משולמים יחסית לאחוז משרה
-  const scope   = t.reform === 'ofek' ? (currentScope(t).scopePct || 100) : (t.scope || 100);
-  const factor  = scope / 100;
+  const factor  = effectiveScope(t) / 100;
   const biguud  = Math.round(BIGUUD_ANNUAL * factor / 12);
   const havraah = Math.round(havraahDays(t.seniority) * HAVRAAH_DAY * factor / 12);
   return { biguud, havraah, total: biguud + havraah };
@@ -189,17 +201,45 @@ function calcEmployer(t) {
 /* ═══════════════════════════════════════════════════════════════
    CHANGE TRACKING
 ═══════════════════════════════════════════════════════════════ */
-const TRACKED = ['reform','grade','degree','level','ageGroup','seniority','role','scopePct','frontalHours','scope','isTemp','startDate','endDate'];
-const FIELD_LBL = {
-  reform:'רפורמה', grade:'דרגה', degree:'תואר', level:'שלב',
-  ageGroup:'קבוצת גיל', seniority:'ותק', role:'תפקיד',
-  scopePct:'% משרה', frontalHours:'שעות פרונטלי',
-  scope:'% משרה(טרום)', startDate:'מתאריך', endDate:'עד תאריך',
-};
+/*
+  מקור אמת אחד לשדות המורה.
+  קודם היו כאן שלוש רשימות ידניות (TRACKED, FIELD_LBL, BASE_FIELDS) שיצאו
+  מסנכרון: role/level/ageGroup השפיעו על השכר ולא הפילו אישור מאושר,
+  childrenUnder18 הפיל אישור אבל לא הופיע ב-diff, ו-isTemp הופיע ב-diff
+  בלי תווית. עכשיו כל אחת מהן נגזרת מכאן.
+
+  base    — משפיע על השכר. שינוי מבטל את הסימולציה ואת האישור.
+  tracked — מוצג לשליח כ"לפני / אחרי".
+  fmt     — תצוגה קריאה בעברית.
+*/
+const FIELDS = [
+  { key:'reform',          label:'מסלול',          base:true,  tracked:true,  fmt: v => reformLabel(v) },
+  { key:'grade',           label:'דרגה',           base:true,  tracked:true,  fmt: v => v === 'intern' ? 'מתמחה' : `ד${v}` },
+  { key:'degree',          label:'תואר',           base:true,  tracked:true,  fmt: v => DEGREE_LABELS[v] || v },
+  { key:'level',           label:'שלב',            base:true,  tracked:true,  fmt: v => LEVELS[v]?.label || v },
+  { key:'ageGroup',        label:'קבוצת גיל',      base:true,  tracked:true,  fmt: v => AGE_RED[v]?.label || v },
+  { key:'seniority',       label:'ותק',            base:true,  tracked:true },
+  { key:'role',            label:'תפקיד',          base:true,  tracked:true,  fmt: v => ROLES.find(r => r.id === v)?.label.split('(')[0].trim() || v },
+  { key:'scopePct',        label:'% משרה',         base:true,  tracked:true,  fmt: v => `${v}%` },
+  { key:'frontalHours',    label:'שעות פרונטלי',   base:true,  tracked:true },
+  { key:'scope',           label:'% משרה',         base:true,  tracked:false, fmt: v => `${v}%` },
+  { key:'childrenUnder18', label:'ילדים עד 18',    base:true,  tracked:true },
+  { key:'isTemp',          label:'שיבוץ זמני',     base:false, tracked:true,  fmt: v => v ? 'כן' : 'לא' },
+  { key:'startDate',       label:'מתאריך',         base:false, tracked:true,  fmt: v => v.split('-').reverse().join('/') },
+  { key:'endDate',         label:'עד תאריך',       base:false, tracked:true,  fmt: v => v.split('-').reverse().join('/') },
+];
+const TRACKED     = FIELDS.filter(f => f.tracked).map(f => f.key);
+const BASE_FIELDS = FIELDS.filter(f => f.base).map(f => f.key);
+const FIELD_LBL   = Object.fromEntries(FIELDS.map(f => [f.key, f.label]));
+const FIELD_FMT   = Object.fromEntries(FIELDS.filter(f => f.fmt).map(f => [f.key, f.fmt]));
 function snapT(t) { return Object.fromEntries(TRACKED.map(k => [k, t[k]])); }
 function diffT(t) {
   if (!t._snapshot) return [];
   return TRACKED.filter(k => String(t[k] ?? '') !== String(t._snapshot[k] ?? ''));
+}
+// שינוי בשדה בסיס מבטל את הסימולציה ואת האישור
+function baseFieldsChanged(next, prev) {
+  return BASE_FIELDS.some(k => String(next[k] ?? '') !== String(prev[k] ?? ''));
 }
 // סטטוס מורה בזרימת העבודה:
 // needs_sim: מנהלת שמרה שינויים, ממתין לסימולציה אצל חשבת שכר
@@ -211,24 +251,30 @@ const isPending     = t => Boolean(t._changedAt && !t._approved); // = needsSim 
 
 function readableVal(field, val) {
   if (val === undefined || val === null || val === '') return '—';
-  const maps = {
-    grade:    v => v === 'intern' ? 'מתמחה' : `ד${v}`,
-    degree:   v => (DEGREE_LABELS[v] || v),
-    reform:   v => reformLabel(v),
-    level:    v => LEVELS[v]?.label || v,
-    ageGroup: v => AGE_RED[v]?.label || v,
-    role:     v => ROLES.find(r => r.id === v)?.label.split('(')[0].trim() || v,
-    scopePct: v => `${v}%`, scope: v => `${v}%`,
-    startDate: v => v.split('-').reverse().join('/'),
-    endDate:   v => v.split('-').reverse().join('/'),
-  };
-  return maps[field] ? maps[field](val) : String(val);
+  if (typeof val === 'boolean') return FIELD_FMT[field] ? FIELD_FMT[field](val) : (val ? 'כן' : 'לא');
+  return FIELD_FMT[field] ? FIELD_FMT[field](val) : String(val);
 }
 
 /* ═══════════════════════════════════════════════════════════════
    STORAGE
 ═══════════════════════════════════════════════════════════════ */
 const LS_SCHOOLS  = 'ss-schools-v2';
+const LS_SEEDED   = 'ss-seeded-v1';     // כדי שמחיקה מכוונת לא תשוחזר בטעינה הבאה
+
+// בתי הספר של הרשת. השמות לקוחים מ-schools.config.json של מערכת תקציב
+// בית הספר, כדי ששתי המערכות יקראו לאותו בית ספר באותו שם.
+// המסלול נקבע כאן כברירת מחדל וניתן לשינוי בהגדרות בית הספר.
+const DEFAULT_SCHOOLS = [
+  { name: 'בית חינוך רעננה',      city: 'רעננה' },
+  { name: 'שלהבות מזכרת בתיה',    city: 'מזכרת בתיה' },
+  { name: 'שלהבות אשקלון',        city: 'אשקלון' },
+  { name: 'שלהבות אור עקיבא',     city: 'אור עקיבא' },
+  { name: 'שלהבות ירושלים',       city: 'ירושלים' },
+  { name: 'שלהבות גני תקוה',      city: 'גני תקוה' },
+  { name: 'שלהבות רמת ישי',       city: 'רמת ישי' },
+  { name: 'שלהבות קרית ביאליק',   city: 'קרית ביאליק' },
+  { name: 'בית חינוך עפולה',      city: 'עפולה' },
+];
 const LS_TEACHERS = 'ss-teachers-v2';   // legacy
 const LS_MONTHS   = 'ss-months-v1';
 const load  = k => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; } };
@@ -253,7 +299,6 @@ const fmtMonth     = k => { if (!k) return ''; const [y,m]=k.split('-'); return 
 const nextMonthKey = k => { const [y,m]=k.split('-').map(Number); return m===12 ? toMonthKey(y+1,1) : toMonthKey(y,m+1); };
 
 // Base fields — if changed, simulation clears for that month
-const BASE_FIELDS = ['reform','degree','grade','seniority','scopePct','frontalHours','scope','childrenUnder18'];
 
 const EMPTY_TEACHER = {
   id: '', schoolId: '', tzId: '', name: '', email: '',
@@ -1345,12 +1390,12 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                   style={{ width:28, height:28, borderRadius:'50%', border:'1px solid var(--apple-fill2)', background:'var(--apple-fill)', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>+</button>
               </div>
             </div>
-            {(t.childrenUnder18||0) > 0 && (t.scopePct||t.scope||100) >= 79 && (
+            {momBonusEligible(t) && (
               <p style={{ fontSize:12, color:'var(--apple-purple)', fontWeight:600, marginTop:8 }}>
                 ✓ זכאית לתוספת אם — {t.childrenUnder18} ילדים עד גיל 18
               </p>
             )}
-            {(t.childrenUnder18||0) > 0 && (t.scopePct||t.scope||100) < 79 && (
+            {(t.childrenUnder18||0) > 0 && !momBonusEligible(t) && (
               <p style={{ fontSize:12, color:'var(--apple-orange)', marginTop:8 }}>
                 אחוז משרה נמוך מ-79% — אין זכאות לתוספת אם
               </p>
@@ -1765,6 +1810,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   const [showReport, setShowReport]   = useState(false);
   const [showAbsence, setShowAbsence] = useState(false);
   const [showImport, setShowImport]   = useState(false);
+  const [fullEdit, setFullEdit]      = useState(null);   // מורה בעריכת פרטים מלאים
   const schoolReform = school.reform || 'ofek';
   const [editingId, setEditingId]   = useState(null);   // teacher id or 'new'
   const [editData,  setEditData]    = useState(null);
@@ -2022,7 +2068,9 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       onChange={e => {
                         const hrs = Number(e.target.value);
                         // השעות הן הקלט; אחוז המשרה נגזר מהן ומהשלב, אחרי הפחתת גיל
-                        setEditData(p => ({ ...p, frontalHours: hrs, scopePct: scopeFromFrontal(p, hrs) }));
+                        const pct = scopeFromFrontal({ ...editData, frontalHours: hrs }, hrs);
+                        // scope הוא שדה העולם הישן; שומרים את שניהם כדי שלא ייפרדו
+                        setEditData(p => ({ ...p, frontalHours: hrs, scopePct: pct, scope: pct }));
                       }}
                       style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td style={{ textAlign:'center' }}>
@@ -2074,7 +2122,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 const isAppr = needsApproval(t);
                 const chabadBonus = t.reform === 'ofek' && t._officialGross && t._officialGrossPre
                   ? Number(t._officialGross) - Number(t._officialGrossPre) : null;
-                const momBonus = (t.childrenUnder18||0) > 0 && (scope||100) >= 79;
+                const momBonus = momBonusEligible(t);
 
                 if (isEditing) return (
                   <tr key={t.id} style={{ background:'var(--purple-100)', borderBottom:'2px solid var(--purple)' }}>
@@ -2112,7 +2160,9 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       onChange={e => {
                         const hrs = Number(e.target.value);
                         // השעות הן הקלט; אחוז המשרה נגזר מהן ומהשלב, אחרי הפחתת גיל
-                        setEditData(p => ({ ...p, frontalHours: hrs, scopePct: scopeFromFrontal(p, hrs) }));
+                        const pct = scopeFromFrontal({ ...editData, frontalHours: hrs }, hrs);
+                        // scope הוא שדה העולם הישן; שומרים את שניהם כדי שלא ייפרדו
+                        setEditData(p => ({ ...p, frontalHours: hrs, scopePct: pct, scope: pct }));
                       }}
                       style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                     <td style={{ textAlign:'center' }}>
@@ -2211,7 +2261,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     </td>}
                     <td>
                       <div style={{ display:'flex', gap:4 }}>
-                        <button className="apple-btn apple-btn-ghost" title="עריכה" onClick={() => startEdit(t)} style={{ padding:'0 9px', minHeight:30 }}><Pencil size={13} strokeWidth={2.2} /></button>
+                        <button className="apple-btn apple-btn-ghost" title="עריכה מהירה בשורה" onClick={() => startEdit(t)} style={{ padding:'0 9px', minHeight:30 }}><Pencil size={13} strokeWidth={2.2} /></button>
+                        <button className="apple-btn apple-btn-ghost" title="פרטים מלאים — תפקיד, שלב, קבוצת גיל, שינויי משרה וקבצים" onClick={() => setFullEdit(t)} style={{ padding:'0 9px', minHeight:30 }}><Users size={13} strokeWidth={2.2} /></button>
                         {isCoord && isAppr && onApproveTeacher && (
                           <button className="apple-btn apple-btn-green" title="אישור" onClick={() => onApproveTeacher(t.id)} style={{ padding:'0 9px', minHeight:30 }}><Check size={14} strokeWidth={2.8} /></button>
                         )}
@@ -2244,6 +2295,15 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         </div>
       </div>
 
+      {fullEdit && (
+        <TeacherModal
+          teacher={fullEdit}
+          schools={[school]}
+          userRole={userRole}
+          onSave={t2 => { onSaveTeacher(t2); setFullEdit(null); }}
+          onClose={() => setFullEdit(null)}
+        />
+      )}
       {showReport  && <SchoolReport   school={school} teachers={teachers} onClose={() => setShowReport(false)} />}
       {showAbsence && <AbsenceReport school={school} teachers={teachers} monthLabel={fmtMonthFn ? fmtMonthFn(activeMonth) : activeMonth} onClose={() => setShowAbsence(false)} />}
       {showImport && (
@@ -2693,7 +2753,18 @@ function BackupModal({ schools, months, onRestore, onClose }) {
 }
 
 export default function App() {
-  const [schools,  setSchools]  = useState(() => load(LS_SCHOOLS));
+  const [schools,  setSchools]  = useState(() => {
+    const saved = load(LS_SCHOOLS);
+    if (saved.length > 0) return saved;
+    // זריעה חד-פעמית בלבד — אם מחקת את כולם, הם לא יחזרו
+    if (localStorage.getItem(LS_SEEDED)) return saved;
+    const seeded = DEFAULT_SCHOOLS.map(s => ({ ...s, id: uid(), reform: 'ofek' }));
+    if (save(LS_SCHOOLS, seeded)) {
+      try { localStorage.setItem(LS_SEEDED, '1'); } catch { /* לא קריטי */ }
+      return seeded;
+    }
+    return saved;
+  });
   // months: { '2025-09': [teacher,...], ... }  — migrate from legacy if needed
   const [months, setMonths] = useState(() => {
     const saved = loadObj(LS_MONTHS);
@@ -2743,13 +2814,17 @@ export default function App() {
 
   // Open a new month — copy teachers from current, reset monthly fields
   const openNewMonth = () => {
+    const now = new Date().toISOString();
     const nextKey = nextMonthKey(activeMonth);
     if (months[nextKey]) { setActiveMonth(nextKey); return; }
     // _files חייב להתאפס יחד עם sickFiles — אחרת כל קובץ base64 מועתק לכל חודש חדש
     // ומכסת ה-localStorage נגמרת תוך שנה.
+    // חודש חדש מתחיל בלי שכר רשמי: בלי איפוס _officialGross הטבלה הציגה את
+    // שכר החודש הקודם כשכר החודש הזה, והמורים לא הופיעו באף רשימת עבודה.
     const MONTHLY_RESET = { absenceDays:0, sickFiles:[], _files:[], mmHours:0, mmFor:'', monthlyExtras:0,
-                             _approved:false, _approvedAt:null, _changedAt:null, _snapshot:null };
-    const nextTeachers = teachers.map(t => ({ ...t, ...MONTHLY_RESET }));
+                             _officialGross:null, _officialGrossPre:null,
+                             _approved:false, _approvedAt:null, _snapshot:null };
+    const nextTeachers = teachers.map(t => ({ ...t, ...MONTHLY_RESET, _changedAt: now }));
     persistMT(nextKey, nextTeachers);
     setActiveMonth(nextKey);
   };
@@ -2770,7 +2845,7 @@ export default function App() {
 
     if (old) {
       // If base salary fields changed → clear simulation for this month
-      const baseChanged = BASE_FIELDS.some(k => String(t[k] ?? '') !== String(old[k] ?? ''));
+      const baseChanged = baseFieldsChanged(t, old);
       if (baseChanged) {
         updated._officialGross    = null;
         updated._officialGrossPre = null;
@@ -2807,9 +2882,14 @@ export default function App() {
       : t
     ));
   };
+  // רק מורות שיש להן שכר רשמי וממתינות לאישור. קודם זה עבר על כל מורי
+  // הרשת — כולל מי שלא שינה דבר וכולל מי שטרם עברה סימולציה, שנעלמה
+  // אחרי הפעולה מכל רשימות העבודה.
   const onApproveAll = () => {
     const now = new Date().toISOString();
-    persistT(teachers.map(t => ({ ...t, _snapshot: null, _changedAt: null, _approved: true, _approvedAt: now })));
+    persistT(teachers.map(t => needsApproval(t)
+      ? { ...t, _snapshot: null, _changedAt: null, _approved: true, _approvedAt: now }
+      : t));
     setShowApproval(false);
   };
 

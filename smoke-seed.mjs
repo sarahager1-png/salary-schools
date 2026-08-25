@@ -1,0 +1,23 @@
+import { chromium } from 'file:///C:/tmp/node_modules/playwright/index.mjs';
+const b = await chromium.launch();
+const p = await (await b.newContext({ viewport:{width:1440,height:1000}, locale:'he-IL' })).newPage();
+const fails=[]; const check=(n,ok,e='')=>{console.log(`${ok?'PASS':'FAIL'}  ${n}${e?' — '+e:''}`); if(!ok)fails.push(n);};
+await p.goto('http://localhost:5190/');
+await p.evaluate(() => localStorage.clear());
+await p.reload(); await p.waitForTimeout(500);
+await p.getByText('כניסה למערכת').click(); await p.waitForTimeout(600);
+const names = await p.evaluate(() => JSON.parse(localStorage.getItem('ss-schools-v2')).map(s=>s.name));
+const want = ['בית חינוך רעננה','שלהבות מזכרת בתיה','שלהבות אשקלון','שלהבות אור עקיבא','שלהבות ירושלים','שלהבות גני תקוה','שלהבות רמת ישי','שלהבות קרית ביאליק','בית חינוך עפולה'];
+check('נזרעו 9 בתי ספר', names.length===9, `${names.length}: ${names.join(', ')}`);
+check('כל השמות תואמים לרשימה', want.every(w=>names.includes(w)), names.filter(n=>!want.includes(n)).join(', ')||'—');
+check('אין הרצליה/חיפה/באר שבע', !names.some(n=>/הרצליה|חיפה|באר שבע/.test(n)));
+check('כולם מוצגים על המסך', (await p.getByText('שלהבות אשקלון').count())>0 && (await p.getByText('בית חינוך עפולה').count())>0);
+// מחיקה מכוונת לא משוחזרת
+await p.evaluate(() => localStorage.setItem('ss-schools-v2','[]'));
+await p.reload(); await p.waitForTimeout(500);
+await p.getByText('כניסה למערכת').click(); await p.waitForTimeout(500);
+const after = await p.evaluate(() => JSON.parse(localStorage.getItem('ss-schools-v2')));
+check('מחיקה מכוונת אינה משוחזרת', after.length===0, String(after.length));
+await b.close();
+console.log(fails.length?`\n${fails.length} כשלונות`:'\nהכול עבר');
+process.exit(fails.length?1:0);
