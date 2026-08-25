@@ -23,7 +23,9 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // argsIgnorePattern זהה ל-varsIgnorePattern: פרמטר בשם PascalCase הוא קומפוננטה
+      // שנעשה בה שימוש ב-JSX, ואין כאן eslint-plugin-react שיזהה את זה.
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' }],
     },
   },
 ])

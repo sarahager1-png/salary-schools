@@ -193,7 +193,16 @@ const LS_TEACHERS = 'ss-teachers-v2';   // legacy
 const LS_MONTHS   = 'ss-months-v1';
 const load  = k => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; } };
 const loadObj = k => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; } };
-const save  = (k, d) => localStorage.setItem(k, JSON.stringify(d));
+const save  = (k, d) => {
+  try {
+    localStorage.setItem(k, JSON.stringify(d));
+    return true;
+  } catch (e) {
+    // QuotaExceededError או מצב פרטי — עד היום זה נבלע והמסך הציג "נשמר" בזמן שהדיסק לא עודכן.
+    alert('השמירה נכשלה — ייתכן שאחסון הדפדפן מלא.\n\nאל תסגרי את החלון לפני שייצאת גיבוי.\n\n(' + (e && e.name ? e.name : 'שגיאה לא ידועה') + ')');
+    return false;
+  }
+};
 const uid   = () => Math.random().toString(36).slice(2, 10);
 
 // Month helpers
@@ -202,7 +211,6 @@ const toMonthKey   = (y, m) => `${y}-${String(m).padStart(2,'0')}`;
 const nowMonthKey  = () => { const d=new Date(); return toMonthKey(d.getFullYear(), d.getMonth()+1); };
 const fmtMonth     = k => { if (!k) return ''; const [y,m]=k.split('-'); return `${MONTH_NAMES[Number(m)-1]} ${y}`; };
 const nextMonthKey = k => { const [y,m]=k.split('-').map(Number); return m===12 ? toMonthKey(y+1,1) : toMonthKey(y,m+1); };
-const prevMonthKey = k => { const [y,m]=k.split('-').map(Number); return m===1 ? toMonthKey(y-1,12) : toMonthKey(y,m-1); };
 
 // Base fields — if changed, simulation clears for that month
 const BASE_FIELDS = ['reform','degree','grade','seniority','scopePct','frontalHours','scope','childrenUnder18'];
@@ -406,7 +414,7 @@ function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
                   <span style={{ fontWeight:600, fontSize:14, color:'var(--apple-text)' }}>{school.name}{school.city ? ` — ${school.city}` : ''}</span>
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {ts.map((t, i) => {
+                  {ts.map(t => {
                     const emp = calcEmployer(t);
                     return (
                       <div key={t.id} className="apple-card" style={{ padding:16 }}>
@@ -913,7 +921,6 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
 
   const cur     = currentScope(t);
   const derived = deriveHours(t, cur);
-  const base    = calcBase(t);
   const emp     = calcEmployer(t);
   const extras  = emp.extras;
 
@@ -1573,7 +1580,7 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
 /* ═══════════════════════════════════════════════════════════════
    SCHOOL DETAIL
 ═══════════════════════════════════════════════════════════════ */
-function SchoolView({ school, schools, teachers, userRole, onBack, onAddTeacher, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn }) {
+function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn }) {
   const [search, setSearch]           = useState('');
   const [showReport, setShowReport]   = useState(false);
   const [showAbsence, setShowAbsence] = useState(false);
@@ -1586,7 +1593,6 @@ function SchoolView({ school, schools, teachers, userRole, onBack, onAddTeacher,
   const totEmp   = tsOfficial.reduce((s, t) => s + calcEmployer(t).total, 0);
   const totGross = tsOfficial.reduce((s, t) => s + Number(t._officialGross), 0);
   const totExtras = tsOfficial.reduce((s, t) => s + calcEmployer(t).extras.total, 0);
-  const totSupp   = tsOfficial.reduce((s, t) => { const e = calcEmployer(t); return s + (e.total - e.gross); }, 0);
   const totMonthly = ts.reduce((s, t) => s + (Number(t.monthlyExtras) || 0), 0);
   const needsSimCount   = ts.filter(needsSim).length;
   const needsApprCount  = ts.filter(needsApproval).length;
@@ -1602,15 +1608,6 @@ function SchoolView({ school, schools, teachers, userRole, onBack, onAddTeacher,
     cancelEdit();
   };
   const setF = (k, v) => setEditData(p => ({ ...p, [k]: v }));
-
-  const inp = (k, props={}) => (
-    <input className="apple-input" value={editData[k] ?? ''} onChange={e => setF(k, e.target.value)}
-      style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:0, ...props.style }} {...props} />
-  );
-  const num = (k, props={}) => (
-    <input type="number" className="apple-input" dir="ltr" value={editData[k] ?? ''} onChange={e => setF(k, e.target.value === '' ? '' : Number(e.target.value))}
-      style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:72, textAlign:'center', ...props.style }} {...props} />
-  );
 
   return (
     <div style={{ minHeight:'100vh' }} dir="rtl">
@@ -2295,11 +2292,11 @@ export default function App() {
 
   const teachers = months[activeMonth] || [];
 
-  const persistS  = s  => { setSchools(s);  save(LS_SCHOOLS, s); };
+  // שומרים קודם, ורק אם הכתיבה הצליחה מעדכנים את ה-state.
+  const persistS  = s  => { if (save(LS_SCHOOLS, s)) setSchools(s); };
   const persistMT = (mk, ts) => {
     const newMonths = { ...months, [mk]: ts };
-    setMonths(newMonths);
-    save(LS_MONTHS, newMonths);
+    if (save(LS_MONTHS, newMonths)) setMonths(newMonths);
   };
   const persistT  = ts => persistMT(activeMonth, ts);
 
@@ -2312,14 +2309,15 @@ export default function App() {
   const isClerk = user.role === 'clerk';
   const needsSimCount      = teachers.filter(needsSim).length;
   const needsApprovalCount = teachers.filter(needsApproval).length;
-  const pendingCount = teachers.filter(isPending).length;
   const sortedMonthKeys = Object.keys(months).sort();
 
   // Open a new month — copy teachers from current, reset monthly fields
   const openNewMonth = () => {
     const nextKey = nextMonthKey(activeMonth);
     if (months[nextKey]) { setActiveMonth(nextKey); return; }
-    const MONTHLY_RESET = { absenceDays:0, sickFiles:[], mmHours:0, mmFor:'', monthlyExtras:0,
+    // _files חייב להתאפס יחד עם sickFiles — אחרת כל קובץ base64 מועתק לכל חודש חדש
+    // ומכסת ה-localStorage נגמרת תוך שנה.
+    const MONTHLY_RESET = { absenceDays:0, sickFiles:[], _files:[], mmHours:0, mmFor:'', monthlyExtras:0,
                              _approved:false, _approvedAt:null, _changedAt:null, _snapshot:null };
     const nextTeachers = teachers.map(t => ({ ...t, ...MONTHLY_RESET }));
     persistMT(nextKey, nextTeachers);
@@ -2355,9 +2353,12 @@ export default function App() {
       updated._approved  = false;
     }
 
-    persistT(t.id
+    // startNew מקצה id מראש, ולכן אי אפשר להסתמך על t.id כדי לזהות רשומה חדשה —
+    // חייבים לבדוק אם היא באמת קיימת ברשימה, אחרת ה-map מחזיר עותק זהה והמורה נעלמת בשקט.
+    const exists = teachers.some(x => x.id === t.id);
+    persistT(exists
       ? teachers.map(x => x.id === t.id ? updated : x)
-      : [...teachers, { ...updated, id: uid() }]
+      : [...teachers, { ...updated, id: t.id || uid() }]
     );
     setTeacherModal(null);
   };
@@ -2483,11 +2484,9 @@ export default function App() {
         !isCoord && principalSchool ? (
           <SchoolView
             school={principalSchool}
-            schools={schools}
             teachers={teachers}
             userRole={user.role}
             onBack={null}
-            onAddTeacher={null}
             onSaveTeacher={onSaveTeacher}
             onDeleteTeacher={null}
             onApproveTeacher={null}
@@ -2506,11 +2505,9 @@ export default function App() {
         ) : view === 'school' && activeSchool ? (
           <SchoolView
             school={activeSchool}
-            schools={schools}
             teachers={teachers}
             userRole={user.role}
             onBack={() => setView('schools')}
-            onAddTeacher={null}
             onSaveTeacher={onSaveTeacher}
             onDeleteTeacher={onDeleteTeacher}
             onApproveTeacher={onApproveTeacher}
@@ -2578,7 +2575,7 @@ export default function App() {
                           <p style={{ fontWeight:700, fontSize:14, color:'var(--apple-text)', letterSpacing:'-0.01em' }}>{empTot > 0 ? empTot.toLocaleString()+' ₪' : '—'}</p>
                         </div>
                       </div>
-                      <button className="apple-btn apple-btn-ghost" onClick={e => { e.stopPropagation(); openAddTeacher(s.id); }}
+                      <button className="apple-btn apple-btn-ghost" onClick={e => { e.stopPropagation(); setTeacherModal({ ...EMPTY_TEACHER, schoolId: s.id }); }}
                         style={{ width:'100%', fontSize:13, borderRadius:10, border:'1.5px dashed var(--apple-fill2)' }}>
                         + הוסף מורה
                       </button>
