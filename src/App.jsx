@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, Plus, LogOut, BarChart3, ClipboardCheck,
   Printer, Download, Upload, Send, Pencil, Trash2, X, Search,
   Paperclip, Image as ImageIcon, FileText, AlertTriangle, Lightbulb,
-  CalendarClock, Bell, Users, FolderOpen,
+  CalendarClock, Bell, Users, FolderOpen, Database, FileSpreadsheet, ShieldAlert,
 } from 'lucide-react';
 import './index.css';
 // v3 — רשת חינוך חב"ד design system
@@ -234,6 +234,42 @@ const EMPTY_TEACHER = {
 };
 
 const fmt = d => d ? d.split('-').reverse().join('/') : '—';
+
+/* ═══════════════════════════════════════════════════════════════
+   BACKUP — כל המצב חי ב-localStorage בלבד, ולכן חייב לצאת החוצה
+═══════════════════════════════════════════════════════════════ */
+const BACKUP_VERSION = 1;
+
+function exportBackup(schools, months) {
+  const teacherCount = Object.values(months).reduce((s, ts) => s + ts.length, 0);
+  const payload = {
+    app: 'salary-schools',
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    counts: { schools: schools.length, months: Object.keys(months).length, teacherRecords: teacherCount },
+    schools,
+    months,
+  };
+  downloadBlob(JSON.stringify(payload, null, 2), `גיבוי_שכר_${stampToday()}.json`, 'application/json;charset=utf-8;');
+  return payload.counts;
+}
+
+// מחזיר { schools, months } או זורק שגיאה עם הסבר בעברית
+function parseBackup(text) {
+  let d;
+  try { d = JSON.parse(text); }
+  catch { throw new Error('הקובץ אינו JSON תקין. ודאי שבחרת קובץ גיבוי שיצא מהמערכת.'); }
+  if (!d || typeof d !== 'object') throw new Error('הקובץ ריק או פגום.');
+  if (d.app !== 'salary-schools') throw new Error('זה לא קובץ גיבוי של מערכת השכר.');
+  if (d.version > BACKUP_VERSION) throw new Error(`הגיבוי נוצר בגרסה חדשה יותר (${d.version}). עדכני את המערכת לפני השחזור.`);
+  if (!Array.isArray(d.schools)) throw new Error('חסרה רשימת בתי הספר בקובץ.');
+  if (!d.months || typeof d.months !== 'object' || Array.isArray(d.months)) throw new Error('חסרים נתוני החודשים בקובץ.');
+  for (const [k, v] of Object.entries(d.months)) {
+    if (!/^\d{4}-\d{2}$/.test(k)) throw new Error(`מפתח חודש לא תקין בקובץ: "${k}"`);
+    if (!Array.isArray(v)) throw new Error(`נתוני החודש ${k} פגומים.`);
+  }
+  return { schools: d.schools, months: d.months, exportedAt: d.exportedAt };
+}
 
 /* ═══════════════════════════════════════════════════════════════
    LOGIN SCREEN
@@ -694,6 +730,38 @@ function parseTeachers(text, schoolId) {
 }
 
 /* ─── CSV template download ─── */
+/* ═══════════════════════════════════════════════════════════════
+   EXPORT — הורדת קבצים (CSV עם BOM, וגיבוי JSON)
+═══════════════════════════════════════════════════════════════ */
+function downloadBlob(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  // בלי revoke הדפדפן מחזיק את הקובץ בזיכרון עד לרענון
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// עוטף שדה בודד: פסיק, מרכאות או שורה חדשה בתוך ערך שוברים את הקובץ
+function csvCell(v) {
+  if (v == null) return '';
+  const s = String(v);
+  return /[",\r\n]/.test(s) ? '"' + s.split('"').join('""') + '"' : s;
+}
+
+// headers: [{ key, label }] · rows: מערך אובייקטים · footer: שורה אחת אופציונלית
+function downloadCSV(headers, rows, filename, footer) {
+  const BOM   = '\uFEFF';
+  const lines = [headers.map(h => csvCell(h.label)).join(',')];
+  rows.forEach(r => lines.push(headers.map(h => csvCell(r[h.key])).join(',')));
+  if (footer) lines.push(headers.map(h => csvCell(footer[h.key])).join(','));
+  downloadBlob(BOM + lines.join('\r\n'), filename, 'text/csv;charset=utf-8;');
+}
+
+const stampToday = () => new Date().toISOString().slice(0, 10);
+
 function downloadTemplate(schoolName) {
   const BOM = '\uFEFF';
   // שורת הסבר (מתחילה ב-# — תדלג עליה המערכת)
@@ -705,11 +773,7 @@ function downloadTemplate(schoolName) {
   const ex2 = 'רחל לוי,987654321,rachel@school.edu,אופק,מתמחה,1,100,ללא תפקיד,לא,01/09/2024,';
   const ex3 = 'מרים דוד,111222333,miriam@school.edu,טרום,תואר-שני,18,75,ללא תפקיד,כן,01/09/2024,31/01/2025';
   const csv = BOM + [note1, note2, note3, header, ex1, ex2, ex3].join('\r\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `מורים_${schoolName || 'בית_ספר'}.csv`;
-  a.click();
+  downloadBlob(csv, `מורים_${schoolName || 'בית_ספר'}.csv`, 'text/csv;charset=utf-8;');
 }
 
 function ImportModal({ schoolId, schoolName, onImport, onClose }) {
@@ -1492,6 +1556,24 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
   const totMM      = ts.reduce((s,t) => s + (t.mmHours||0), 0);
   const totExtras  = ts.reduce((s,t) => s + (t.monthlyExtras||0), 0);
 
+  const exportCSV = () => {
+    const headers = [
+      { key:'name', label:'שם עובדת' }, { key:'tzId', label:'ת.ז.' },
+      { key:'absence', label:'ימי היעדרות' }, { key:'sickFiles', label:'אישורי מחלה' },
+      { key:'mmHours', label:'שעות ממ"מ' }, { key:'mmFor', label:'במקום מי' },
+      { key:'extras', label:'תוספות חודשיות (₪)' },
+    ];
+    const body = withAbsence.map(t => ({
+      name: t.name, tzId: t.tzId || '',
+      absence: t.absenceDays || 0,
+      sickFiles: (t.sickFiles || []).length,
+      mmHours: t.mmHours || 0, mmFor: t.mmFor || '',
+      extras: t.monthlyExtras || 0,
+    }));
+    const footer = { name: 'סה"כ', absence: totAbsence, mmHours: totMM, extras: totExtras };
+    downloadCSV(headers, body, `ממ"מ_והעדרויות_${school.name}_${monthLabel || stampToday()}.csv`, footer);
+  };
+
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:100, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'24px 16px', overflowY:'auto' }} dir="rtl">
       <div style={{ background:'#fff', borderRadius:18, width:'100%', maxWidth:860, boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
@@ -1502,6 +1584,7 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
             <p style={{ fontSize:13, opacity:.85 }}>{school.name} — {monthLabel}</p>
           </div>
           <div style={{ display:'flex', gap:8 }}>
+            <button onClick={exportCSV} disabled={withAbsence.length === 0} style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:10, padding:'7px 13px', color:'#fff', cursor: withAbsence.length ? 'pointer' : 'not-allowed', opacity: withAbsence.length ? 1 : .5, fontWeight:600, fontSize:13, fontFamily:'inherit', display:'inline-flex', alignItems:'center', gap:6 }}><FileSpreadsheet size={14} strokeWidth={2.2} />ייצוא CSV</button>
             <button onClick={() => window.print()} style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:10, padding:'7px 13px', color:'#fff', cursor:'pointer', fontWeight:600, fontSize:13, fontFamily:'inherit', display:'inline-flex', alignItems:'center', gap:6 }}><Printer size={14} strokeWidth={2.2} />הדפסה</button>
             <button onClick={onClose} title="סגירה" style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:10, padding:'8px 10px', color:'#fff', cursor:'pointer', display:'inline-flex' }}><X size={16} strokeWidth={2.4} /></button>
           </div>
@@ -1599,6 +1682,59 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   const isCoord  = userRole === 'coordinator';
   const isPrincipal = userRole === 'principal';
 
+  const exportCSV = () => {
+    const headers = [
+      { key:'name', label:'שם עובדת' }, { key:'tzId', label:'ת.ז.' }, { key:'email', label:'מייל' },
+      { key:'reform', label:'רפורמה' }, { key:'scope', label:'% משרה' }, { key:'degree', label:'תואר' },
+      { key:'grade', label:'דרגת אופק' }, { key:'seniority', label:'ותק' }, { key:'frontal', label:'פרונטלי' },
+      { key:'temp', label:'שיבוץ' }, { key:'children', label:'ילדים עד 18' },
+      { key:'absence', label:'העדרות (ימים)' }, { key:'mmHours', label:'ממ"מ שעות' }, { key:'mmFor', label:'במקום מי' },
+      { key:'monthlyExtras', label:'תוספות (₪)' }, { key:'official', label:'שכר רשמי (₪)' },
+      ...(isPrincipal ? [] : [
+        { key:'officialPre', label:'טרום-רפורמה (₪)' }, { key:'chabad', label:'תוספת חב"ד (₪)' },
+        { key:'social', label:'סוציאלי (₪)' }, { key:'employer', label:'סה"כ למעסיק (₪)' },
+      ]),
+      { key:'source', label:'מקור הנתון' },
+    ];
+    const rows = ts.map(t => {
+      const emp     = calcEmployer(t);
+      const derived = deriveHours(t);
+      const official = t._officialGross ? Number(t._officialGross) : null;
+      return {
+        name: t.name,
+        tzId: t.tzId || '',
+        email: t.email || '',
+        reform: t.reform === 'ofek' ? 'אופק חדש' : 'טרום רפורמה',
+        scope: t.reform === 'ofek' ? (derived?.scopePct || t.scopePct || 100) : (t.scope || 100),
+        degree: DEGREE_LABELS[t.degree] || t.degree || '',
+        grade: t.reform === 'ofek' ? (t.grade === 'intern' ? 'מתמחה' : t.grade) : '',
+        seniority: t.seniority ?? '',
+        frontal: derived ? derived.frontal : '',
+        temp: t.isTemp ? 'זמני' : 'קבוע',
+        children: t.childrenUnder18 || 0,
+        absence: t.absenceDays || 0,
+        mmHours: t.mmHours || 0,
+        mmFor: t.mmFor || '',
+        monthlyExtras: t.monthlyExtras || 0,
+        official: official ?? '',
+        officialPre: t._officialGrossPre ? Number(t._officialGrossPre) : '',
+        chabad: official && t._officialGrossPre ? official - Number(t._officialGrossPre) : '',
+        social: official ? emp.extras.total : '',
+        employer: official ? emp.total : '',
+        // הדוח לא מסתיר שהמספר של מי שטרם עבר סימולציה הוא אומדן פנימי
+        source: official ? 'רשמי' : 'טרם הורצה סימולציה',
+      };
+    });
+    const footer = {
+      name: `סה"כ (${tsOfficial.length} מורות עם שכר רשמי)`,
+      monthlyExtras: totMonthly,
+      official: totGross,
+      social: totExtras,
+      employer: totEmp,
+    };
+    downloadCSV(headers, rows, `שכר_${school.name}_${activeMonth || stampToday()}.csv`, footer);
+  };
+
   const startEdit = t => { setEditingId(t.id); setEditData({ ...t }); };
   const startNew  = () => { setEditingId('new'); setEditData({ ...EMPTY_TEACHER, schoolId: school.id, id: uid() }); };
   const cancelEdit = () => { setEditingId(null); setEditData(null); };
@@ -1668,6 +1804,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
             <button className="apple-btn apple-btn-ghost" onClick={() => setShowAbsence(true)} style={{ minHeight:38, fontSize:13.5 }}>
               <CalendarClock size={14} strokeWidth={2.2} />
               ממ"מ והעדרויות
+            </button>
+            <button className="apple-btn apple-btn-ghost" onClick={exportCSV} disabled={ts.length === 0}
+              title={ts.length === 0 ? 'אין מורות לייצוא' : 'ייצוא הטבלה לקובץ CSV'} style={{ minHeight:38, fontSize:13.5 }}>
+              <FileSpreadsheet size={14} strokeWidth={2.2} />
+              ייצוא CSV
             </button>
             <button className="apple-btn apple-btn-ghost" onClick={() => downloadTemplate(school.name)} style={{ minHeight:38, fontSize:13.5 }}>
               <Download size={14} strokeWidth={2.2} />
@@ -1993,6 +2134,25 @@ function ReportView({ schools, teachers }) {
   const totAnnual = rows.reduce((s,r) => s + r.annual, 0);
   const totCount  = rows.reduce((s,r) => s + r.count, 0);
   const totPending = rows.reduce((s,r) => s + r.pending, 0);
+  const totOfficial = rows.reduce((s,r) => s + r.officialCount, 0);
+
+  const exportCSV = () => {
+    const headers = [
+      { key:'name', label:'בית ספר' }, { key:'city', label:'עיר' },
+      { key:'count', label:'מורות' }, { key:'officialCount', label:'מתוכן עם שכר רשמי' },
+      { key:'gross', label:'ברוטו / חודש (₪)' }, { key:'empTot', label:'ברוטו למעסיק (₪)' },
+      { key:'annual', label:'עלות שנתית (₪)' }, { key:'pending', label:'ממתינים לאישור' },
+    ];
+    const body = rows.map(r => ({
+      name: r.name, city: r.city || '', count: r.count, officialCount: r.officialCount,
+      gross: r.gross || '', empTot: r.empTot || '', annual: r.annual || '', pending: r.pending,
+    }));
+    const footer = {
+      name: 'סה"כ רשת', count: totCount, officialCount: totOfficial,
+      gross: totGross, empTot: totEmp, annual: totAnnual, pending: totPending,
+    };
+    downloadCSV(headers, body, `דוח_רשת_${stampToday()}.csv`, footer);
+  };
 
   return (
     <div style={{ minHeight:'100vh' }} dir="rtl">
@@ -2007,6 +2167,10 @@ function ReportView({ schools, teachers }) {
           <p style={{ fontSize:13, color:'var(--text3)', marginTop:2, marginInlineStart:13 }}>{rows.filter(r=>r.count>0).length} בתי ספר · {totCount} מורות</p>
         </div>
         {totPending > 0 && <span className="apple-badge badge-orange"><Bell size={12} strokeWidth={2.3} />{totPending} ממתינים לאישור</span>}
+        <button className="apple-btn apple-btn-ghost" onClick={exportCSV} disabled={rows.length === 0} style={{ fontSize:13 }}>
+          <FileSpreadsheet size={14} strokeWidth={2.2} />
+          ייצוא CSV
+        </button>
         <button className="apple-btn apple-btn-ghost" onClick={() => window.print()} style={{ fontSize:13 }}><Printer size={14} strokeWidth={2.2} />הדפסה</button>
       </div>
 
@@ -2046,7 +2210,14 @@ function ReportView({ schools, teachers }) {
                 <tr key={r.id}>
                   <td style={{ fontWeight:700 }}>{r.name}</td>
                   <td style={{ color:'var(--apple-text2)', fontSize:13 }}>{r.city||'—'}</td>
-                  <td style={{ textAlign:'center', fontWeight:600 }}>{r.count}</td>
+                  <td style={{ textAlign:'center', fontWeight:600 }}>
+                    {r.count}
+                    {r.count > 0 && r.officialCount < r.count && (
+                      <span title="מספר המורות שכבר עברו סימולציה" style={{ fontSize:11, color:'var(--warn)', fontWeight:600, marginInlineStart:5 }}>
+                        ({r.officialCount} רשמי)
+                      </span>
+                    )}
+                  </td>
                   <td style={{ textAlign:'center', color:'var(--text)', fontWeight:600 }}>{r.gross>0 ? r.gross.toLocaleString('he-IL')+' ₪' : '—'}</td>
                   <td style={{ textAlign:'center', fontWeight:700, color:'var(--text)' }}>{r.empTot>0 ? r.empTot.toLocaleString('he-IL')+' ₪' : '—'}</td>
                   <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>{r.annual>0 ? r.annual.toLocaleString('he-IL')+' ₪' : '—'}</td>
@@ -2263,6 +2434,114 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
 /* ═══════════════════════════════════════════════════════════════
    APP
 ═══════════════════════════════════════════════════════════════ */
+function BackupModal({ schools, months, onRestore, onClose }) {
+  const [busy, setBusy]   = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone]   = useState('');
+
+  const teacherRecords = Object.values(months).reduce((s, ts) => s + ts.length, 0);
+  const monthKeys = Object.keys(months).sort();
+
+  const handleExport = () => {
+    setError(''); setDone('');
+    const c = exportBackup(schools, months);
+    setDone(`הגיבוי ירד — ${c.schools} בתי ספר, ${c.months} חודשים, ${c.teacherRecords} רשומות מורים.`);
+  };
+
+  const handleFile = e => {
+    const f = e.target.files?.[0];
+    e.target.value = '';           // כדי שבחירת אותו קובץ שוב תפעיל onChange
+    if (!f) return;
+    setError(''); setDone(''); setBusy(true);
+    const r = new FileReader();
+    r.onerror = () => { setBusy(false); setError('קריאת הקובץ נכשלה.'); };
+    r.onload = () => {
+      setBusy(false);
+      let parsed;
+      try { parsed = parseBackup(String(r.result)); }
+      catch (err) { setError(err.message); return; }
+
+      const nTeachers = Object.values(parsed.months).reduce((s, ts) => s + ts.length, 0);
+      const when = parsed.exportedAt ? new Date(parsed.exportedAt).toLocaleString('he-IL') : 'לא ידוע';
+      const ok = window.confirm(
+        `שחזור יחליף את כל הנתונים הקיימים במערכת.\n\n` +
+        `הגיבוי: ${parsed.schools.length} בתי ספר · ${Object.keys(parsed.months).length} חודשים · ${nTeachers} רשומות מורים\n` +
+        `נוצר ב: ${when}\n\n` +
+        `הנתונים הנוכחיים (${schools.length} בתי ספר, ${teacherRecords} רשומות) יימחקו.\n\n` +
+        `להמשיך?`
+      );
+      if (!ok) return;
+      onRestore(parsed.schools, parsed.months);
+    };
+    r.readAsText(f, 'utf-8');
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(6px)', overflowY:'auto' }} dir="rtl">
+      <div className="apple-card spring-enter" style={{ width:'100%', maxWidth:440, padding:24, margin:'auto' }}>
+
+        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, marginBottom:18 }}>
+          <div>
+            <h2 style={{ fontSize:18, fontWeight:800, letterSpacing:'-0.02em', color:'var(--text)', marginBottom:3 }}>גיבוי ושחזור</h2>
+            <p style={{ fontSize:12.5, color:'var(--text3)', lineHeight:1.5 }}>כל נתוני המערכת שמורים בדפדפן הזה בלבד — ייצאי גיבוי באופן קבוע</p>
+          </div>
+          <button onClick={onClose} title="סגירה" style={{ background:'var(--fill)', border:'none', borderRadius:'50%', width:30, height:30, cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <X size={15} strokeWidth={2.4} />
+          </button>
+        </div>
+
+      <div style={{ background:'var(--warn-bg)', border:'1px solid var(--warn-line)', borderRadius:12, padding:'11px 13px', marginBottom:16, display:'flex', gap:9 }}>
+        <ShieldAlert size={16} strokeWidth={2.2} color="var(--warn)" style={{ flexShrink:0, marginTop:1 }} />
+        <p style={{ fontSize:12.5, color:'var(--warn)', lineHeight:1.6 }}>
+          ניקוי היסטוריית הדפדפן או מחיקת נתוני האתר ימחקו את כל תקציב השכר — ואין דרך לשחזר בלי קובץ גיבוי.
+        </p>
+      </div>
+
+      <div className="apple-section" style={{ marginBottom:14 }}>
+        <p style={{ fontSize:12.5, color:'var(--text2)', marginBottom:10, lineHeight:1.6 }}>
+          במערכת כרגע: <strong style={{ color:'var(--text)' }}>{schools.length}</strong> בתי ספר ·{' '}
+          <strong style={{ color:'var(--text)' }}>{teacherRecords}</strong> רשומות מורים ·{' '}
+          <strong style={{ color:'var(--text)' }}>{monthKeys.length}</strong> חודשים
+          {monthKeys.length > 0 && ` (${fmtMonth(monthKeys[0])} — ${fmtMonth(monthKeys[monthKeys.length-1])})`}
+        </p>
+        <button className="apple-btn apple-btn-blue" onClick={handleExport} style={{ width:'100%' }}>
+          <Download size={15} strokeWidth={2.2} />
+          ייצוא גיבוי מלא
+        </button>
+      </div>
+
+      <div className="apple-section">
+        <p className="apple-label">שחזור מקובץ גיבוי</p>
+        <label style={{ cursor: busy ? 'wait' : 'pointer', display:'block' }}>
+          <span className="apple-btn apple-btn-ghost" style={{ width:'100%' }}>
+            <Upload size={15} strokeWidth={2.2} />
+            {busy ? 'קורא קובץ…' : 'בחרי קובץ גיבוי'}
+          </span>
+          <input type="file" accept=".json,application/json" onChange={handleFile} style={{ display:'none' }} disabled={busy} />
+        </label>
+        <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:8, lineHeight:1.6 }}>
+          השחזור מחליף את כל הנתונים הקיימים. תוצג אזהרה לפני הביצוע.
+        </p>
+      </div>
+
+      {error && (
+        <div style={{ background:'var(--danger-bg)', border:'1px solid var(--danger-line)', borderRadius:12, padding:'10px 13px', marginTop:14, fontSize:13, color:'var(--danger)', fontWeight:600 }}>
+          {error}
+        </div>
+      )}
+      {done && (
+        <div style={{ background:'var(--ok-bg)', border:'1px solid var(--ok-line)', borderRadius:12, padding:'10px 13px', marginTop:14, fontSize:13, color:'var(--ok)', fontWeight:600, display:'flex', gap:7, alignItems:'center' }}>
+          <Check size={15} strokeWidth={2.6} />
+          {done}
+        </div>
+      )}
+
+        <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ width:'100%', marginTop:16 }}>סגירה</button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [schools,  setSchools]  = useState(() => load(LS_SCHOOLS));
   // months: { '2025-09': [teacher,...], ... }  — migrate from legacy if needed
@@ -2289,6 +2568,7 @@ export default function App() {
   const [schoolModal,   setSchoolModal]   = useState(null);
   const [teacherModal,  setTeacherModal]  = useState(null);
   const [showApproval,  setShowApproval]  = useState(false);
+  const [showBackup,    setShowBackup]    = useState(false);
 
   const teachers = months[activeMonth] || [];
 
@@ -2383,6 +2663,19 @@ export default function App() {
     setShowApproval(false);
   };
 
+  const onRestoreBackup = (nextSchools, nextMonths) => {
+    if (!save(LS_SCHOOLS, nextSchools)) return;
+    if (!save(LS_MONTHS, nextMonths)) return;
+    setSchools(nextSchools);
+    setMonths(nextMonths);
+    const keys = Object.keys(nextMonths).sort();
+    setActiveMonth(keys.length ? keys[keys.length - 1] : nowMonthKey());
+    setActiveSchool(null);
+    setView(user.role === 'clerk' ? 'calc' : 'schools');
+    setShowBackup(false);
+    alert('השחזור הושלם.');
+  };
+
   // Principal goes directly to their school
   const principalSchool = user.role === 'principal' ? schools.find(s => s.id === user.schoolId) : null;
 
@@ -2463,6 +2756,11 @@ export default function App() {
                 </button>
               )}
             </div>
+
+            <button className="nav-btn" onClick={() => setShowBackup(true)} title="גיבוי ושחזור">
+              <Database size={15} strokeWidth={2.2} />
+              גיבוי
+            </button>
 
             <button className="nav-btn danger" onClick={() => setUser(null)} title="יציאה">
               <LogOut size={15} strokeWidth={2.2} />
@@ -2598,6 +2896,7 @@ export default function App() {
         />
       )}
       {schoolModal  && <SchoolModal  school={schoolModal}  onSave={onSaveSchool}  onClose={() => setSchoolModal(null)} />}
+      {showBackup && <BackupModal schools={schools} months={months} onRestore={onRestoreBackup} onClose={() => setShowBackup(false)} />}
       {teacherModal && <TeacherModal teacher={teacherModal} schools={schools} userRole={user.role} onSave={onSaveTeacher} onClose={() => setTeacherModal(null)} />}
     </div>
   );
