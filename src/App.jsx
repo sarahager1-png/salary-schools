@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Briefcase, Calculator, School, Check, ArrowLeft, ArrowRight,
   ChevronLeft, ChevronRight, Plus, LogOut, BarChart3, ClipboardCheck,
   Printer, Download, Upload, Send, Pencil, Trash2, X, Search,
   Paperclip, Image as ImageIcon, FileText, AlertTriangle, Lightbulb,
   CalendarClock, Bell, Users, FolderOpen, Database, FileSpreadsheet, ShieldAlert,
+  ExternalLink,
 } from 'lucide-react';
 import './index.css';
 // v3 — רשת חינוך חב"ד design system
@@ -66,6 +67,29 @@ const AGE_RED = {
   age55: { label: "גיל 55+ (ותיק/ה)", f: 3, i: 1 },
   age55n:{ label: "גיל 55+ (חדש/ה)",  f: 2, i: 0 },
 };
+/* ═══════════════════════════════════════════════════════════════
+   המחשבון הרשמי של משרד החינוך
+   הראוטים שמיים. קודם היו כאן מספרים (Calculators/1..4) — כל אחד מהם
+   מפנה בשקט לרשימת המחשבונים, כך שהחשבת חשבה שהיא במחשבון אחד
+   בזמן שהמסך שלפניה היה מסך אחר לגמרי.
+═══════════════════════════════════════════════════════════════ */
+const CALC_BASE = 'https://educalc.unq.co.il/#/Calculators/';
+const CALCULATORS = [
+  { id: 'ofek', route: 'OfekHadash', label: 'אופק חדש' },
+  { id: 'oz',   route: 'OzLetmura',  label: 'עוז לתמורה' },
+  { id: 'mgmt', route: 'OfekNihul',  label: 'אופק — ניהול' },
+  { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
+];
+const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
+// מסלול המורה -> המחשבון שמתאים לו
+const calcForReform = reform => (reform === 'pre' ? 'old' : 'ofek');
+
+const REFORMS = [
+  { id: 'ofek', label: 'אופק חדש' },
+  { id: 'pre',  label: 'עולם ישן' },
+];
+const reformLabel = r => (REFORMS.find(x => x.id === r) || REFORMS[0]).label;
+
 const REASON_TYPES = [
   { id: 'maternity', label: 'מילוי מקום לחל"ד' },
   { id: 'system',    label: 'צרכי מערכת' },
@@ -174,7 +198,7 @@ function readableVal(field, val) {
   const maps = {
     grade:    v => v === 'intern' ? 'מתמחה' : `ד${v}`,
     degree:   v => (DEGREE_LABELS[v] || v),
-    reform:   v => ({ ofek:'אופק חדש', pre:'טרום רפורמה' }[v] || v),
+    reform:   v => reformLabel(v),
     level:    v => LEVELS[v]?.label || v,
     ageGroup: v => AGE_RED[v]?.label || v,
     role:     v => ROLES.find(r => r.id === v)?.label.split('(')[0].trim() || v,
@@ -274,6 +298,55 @@ function parseBackup(text) {
 /* ═══════════════════════════════════════════════════════════════
    LOGIN SCREEN
 ═══════════════════════════════════════════════════════════════ */
+/* iframe של אתר חיצוני — אם הוא לא נטען (חסימת עוגיות צד-שלישי, תקלה
+   באתר, רשת מסוננת) המסך נשאר לבן בלי הסבר. כאן יש מצב טעינה,
+   פסק זמן, ותמיד דרך לפתוח את המחשבון בחלון נפרד. */
+function CalculatorFrame({ calcId, style }) {
+  const url = calcUrl(calcId);
+  const [state, setState] = useState('loading');   // loading | ready | slow
+
+  // הקומפוננטה ממופתחת ב-key לפי calcId בצד הקורא, ולכן החלפת מחשבון
+  // מרכיבה אותה מחדש והמצב חוזר ל-loading בלי setState בתוך effect.
+  useEffect(() => {
+    const timer = setTimeout(() => setState(s => (s === 'loading' ? 'slow' : s)), 8000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div style={{ position:'relative', flex:1, minHeight:0, ...style }}>
+      <iframe
+        src={url}
+        onLoad={() => setState('ready')}
+        style={{ width:'100%', height:'100%', border:'none', display:'block' }}
+        title="מחשבון שכר רשמי — משרד החינוך"
+        allow="fullscreen"
+      />
+      {state !== 'ready' && (
+        <div style={{ position:'absolute', inset:0, background:'var(--bg)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, padding:24, textAlign:'center' }}>
+          {state === 'loading' ? (
+            <p style={{ fontSize:13.5, color:'var(--text3)', fontWeight:600 }}>טוען את המחשבון הרשמי…</p>
+          ) : (
+            <>
+              <div style={{ width:52, height:52, borderRadius:16, background:'var(--warn-bg)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <AlertTriangle size={24} strokeWidth={2} color="var(--warn)" />
+              </div>
+              <p style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>המחשבון הרשמי לא נטען</p>
+              <p style={{ fontSize:12.5, color:'var(--text3)', maxWidth:320, lineHeight:1.6 }}>
+                ייתכן שהדפדפן חוסם עוגיות צד-שלישי, או שהאתר של משרד החינוך אינו זמין כרגע.
+                אפשר לפתוח אותו בחלון נפרד ולחזור לכאן עם התוצאה.
+              </p>
+            </>
+          )}
+          <a href={url} target="_blank" rel="noopener noreferrer" className="apple-btn apple-btn-ghost" style={{ textDecoration:'none' }}>
+            <ExternalLink size={14} strokeWidth={2.2} />
+            פתיחה בחלון נפרד
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LoginScreen({ schools, onLogin }) {
   const [role, setRole] = useState('coordinator');
   const [schoolId, setSchoolId] = useState('');
@@ -584,7 +657,7 @@ function buildEmailBody(school, teachers) {
   ts.forEach(t => {
     const emp   = calcEmployer(t);
     const grade = t.reform === 'ofek' ? (t.grade === 'intern' ? 'מתמחה' : `ד${t.grade}`) : (t.degree === 'intern' ? 'מתמחה' : t.degree);
-    body += `\n${t.name} | ת.ז.: ${t.tzId||'—'} | ${t.reform==='ofek'?'אופק':'טרום'} ${grade} | ותק: ${t.seniority} | ברוטו: ${emp.gross.toLocaleString()} ₪ | למעסיק: ${emp.total.toLocaleString()} ₪`;
+    body += `\n${t.name} | ת.ז.: ${t.tzId||'—'} | ${reformLabel(t.reform)} ${grade} | ותק: ${t.seniority} | ברוטו: ${emp.gross.toLocaleString()} ₪ | למעסיק: ${emp.total.toLocaleString()} ₪`;
   });
   if (pending.length > 0) {
     body += `\n\n⚠️ שינויים ממתינים לאישור (${pending.length}):\n`;
@@ -675,7 +748,7 @@ function parseTeachers(text, schoolId) {
         isTempRaw = '';
       }
 
-      const reform = reformRaw?.includes('טרום') ? 'pre' : 'ofek';
+      const reform = (reformRaw?.includes('טרום') || reformRaw?.includes('ישן')) ? 'pre' : 'ofek';
       const grade  = parseGrade(gradeRaw, reform);
       const scope  = Number(scopePct) || 100;
       const isTemp = isTempRaw?.trim() === 'כן';
@@ -863,7 +936,7 @@ function ImportModal({ schoolId, schoolName, onImport, onClose }) {
                       <td style={{ fontWeight:600 }}>{t.name}</td>
                       <td style={{ fontFamily:'monospace', fontSize:11 }}>{t.tzId||'—'}</td>
                       <td style={{ fontSize:11, color:'var(--apple-text2)' }}>{t.email||'—'}</td>
-                      <td>{t.reform==='ofek'?'אופק':'טרום'}</td>
+                      <td>{reformLabel(t.reform)}</td>
                       <td>{t.grade==='intern'?'מתמחה':t.grade}</td>
                       <td>{t.seniority}</td>
                       <td>{t.scopePct}%</td>
@@ -961,14 +1034,9 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
   const [t, setT] = useState({ ...EMPTY_TEACHER, ...teacher, scopeChanges: teacher.scopeChanges || [], _files: teacher._files || [] });
   const [showScopeChange, setShowScopeChange] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
-  const [simCalc, setSimCalc] = useState('ofek');
+  const [simCalc, setSimCalc] = useState(calcForReform(teacher?.reform));
   const set = (k, v) => setT(p => ({ ...p, [k]: v }));
 
-  const simUrls = {
-    ofek: 'https://educalc.unq.co.il/#/Calculators/2',
-    old:  'https://educalc.unq.co.il/#/Calculators/1',
-    mgmt: 'https://educalc.unq.co.il/#/Calculators/4',
-  };
 
   const lvl = LEVELS[t.level] || LEVELS.elementary;
   const agR = AGE_RED[t.ageGroup] || AGE_RED.none;
@@ -1005,12 +1073,12 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
           <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', background:'var(--apple-fill)', borderBottom:'0.5px solid var(--apple-fill2)', flexWrap:'wrap' }}>
             <span style={{ fontSize:12, fontWeight:600, color:'var(--apple-text2)' }}>מחשבון רשמי</span>
             <div className="apple-seg">
-              {[['ofek','אופק'],['old','טרום'],['mgmt','ניהול']].map(([id,label]) => (
-                <button key={id} onClick={() => setSimCalc(id)} className={['apple-seg-item', simCalc===id?'active':''].join(' ')} style={{ padding:'5px 10px', fontSize:12 }}>{label}</button>
+              {CALCULATORS.map(c => (
+                <button key={c.id} onClick={() => setSimCalc(c.id)} className={['apple-seg-item', simCalc===c.id?'active':''].join(' ')} style={{ padding:'5px 10px', fontSize:12 }}>{c.label}</button>
               ))}
             </div>
           </div>
-          <iframe key={simCalc} src={simUrls[simCalc]} style={{ flex:1, width:'100%', border:'none' }} title="סימולטור רשמי" />
+          <CalculatorFrame key={simCalc} calcId={simCalc} />
         </div>
       )}
 
@@ -1083,7 +1151,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
           <div>
             <p className="apple-label">רפורמה</p>
             <div className="apple-seg" style={{ width:'100%' }}>
-              {[['ofek','אופק חדש'],['pre','טרום רפורמה']].map(([v,l]) => (
+              {REFORMS.map(({ id: v, label: l }) => (
                 <button key={v} onClick={() => set('reform', v)} className={['apple-seg-item', t.reform===v?'active':''].join(' ')}>{l}</button>
               ))}
             </div>
@@ -1200,7 +1268,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             </div>
           </>)}
 
-          {/* טרום רפורמה */}
+          {/* עולם ישן */}
           {t.reform === 'pre' && (<>
             <div>
               <p className="apple-label">דרגה / תואר</p>
@@ -1298,7 +1366,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                   </div>
                 </div>
                 <div>
-                  <p style={{ fontSize:11, fontWeight:700, color:'#8B5CF6', marginBottom:4 }}>סימולציית טרום רפורמה</p>
+                  <p style={{ fontSize:11, fontWeight:700, color:'var(--purple)', marginBottom:4 }}>סימולציית עולם ישן</p>
                   <div style={{ display:'flex', gap:4, alignItems:'center' }}>
                     <input type="number" className="apple-input" dir="ltr" style={{ fontSize:13 }}
                       value={t._officialGrossPre || ''}
@@ -1387,12 +1455,27 @@ function SchoolModal({ school, onSave, onClose }) {
         <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
           <input value={s.name || ''} onChange={e => setS(p => ({...p, name: e.target.value}))} placeholder="שם בית הספר *" className="apple-input" />
           <input value={s.city || ''} onChange={e => setS(p => ({...p, city: e.target.value}))} placeholder="עיר / יישוב" className="apple-input" />
+
+          <div>
+            <p className="apple-label">מסלול בית הספר</p>
+            <div className="apple-seg" style={{ width:'100%' }}>
+              {REFORMS.map(r => (
+                <button key={r.id} onClick={() => setS(p => ({...p, reform: r.id}))}
+                  className={['apple-seg-item', (s.reform || 'ofek') === r.id ? 'active' : ''].join(' ')}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:6, lineHeight:1.5 }}>
+              קובע את ברירת המחדל למורות חדשות ואת המחשבון הרשמי שייפתח. אפשר לשנות מסלול למורה בודדת.
+            </p>
+          </div>
           <input value={s.principalEmail || ''} onChange={e => setS(p => ({...p, principalEmail: e.target.value}))} placeholder="מייל מנהלת" dir="ltr" className="apple-input" />
           <input value={s.coordinatorEmail || ''} onChange={e => setS(p => ({...p, coordinatorEmail: e.target.value}))} placeholder="מייל שליח (עותק)" dir="ltr" className="apple-input" />
         </div>
         <div style={{ display:'flex', gap:8 }}>
           <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ flex:1 }}>ביטול</button>
-          <button className="apple-btn apple-btn-blue" onClick={() => { if (!s.name?.trim()) return; onSave(s); }} style={{ flex:1 }}>שמור</button>
+          <button className="apple-btn apple-btn-blue" onClick={() => { if (!s.name?.trim()) return; onSave({ ...s, reform: s.reform || 'ofek' }); }} style={{ flex:1 }}>שמור</button>
         </div>
       </div>
     </div>
@@ -1433,7 +1516,7 @@ function SchoolReport({ school, teachers, onClose }) {
           {[
             { label: 'סה"כ מורים', val: ts.length },
             { label: 'אופק חדש',   val: ts.filter(t=>t.reform==='ofek').length },
-            { label: 'טרום רפורמה', val: ts.filter(t=>t.reform==='pre').length },
+            { label: 'עולם ישן', val: ts.filter(t=>t.reform==='pre').length },
             { label: 'ברוטו למעסיק', val: totEmpGross.toLocaleString()+' ₪' },
           ].map(c => (
             <div key={c.label} className="apple-stat" style={{ textAlign:'center' }}>
@@ -1465,7 +1548,7 @@ function SchoolReport({ school, teachers, onClose }) {
                 <tr key={t.id} style={pending ? { background:'rgba(255,159,10,0.08)' } : {}}>
                   <td style={{ fontWeight:600, color:'var(--text)' }}>{pending && <Bell size={12} strokeWidth={2.4} color="var(--warn)" style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:5 }} />}{t.name}</td>
                   <td style={{ fontFamily:'monospace', fontSize:11 }}>{t.tzId||'—'}</td>
-                  <td style={{ textAlign:'center' }}>{t.reform==='ofek'?'אופק':'טרום'}</td>
+                  <td style={{ textAlign:'center' }}>{reformLabel(t.reform)}</td>
                   <td style={{ textAlign:'center', fontWeight:700 }}>{grade}</td>
                   <td style={{ textAlign:'center' }}>{t.seniority}</td>
                   <td style={{ textAlign:'center', fontWeight:600, color:'var(--apple-blue)' }}>{scope}%</td>
@@ -1668,6 +1751,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   const [showReport, setShowReport]   = useState(false);
   const [showAbsence, setShowAbsence] = useState(false);
   const [showImport, setShowImport]   = useState(false);
+  const schoolReform = school.reform || 'ofek';
   const [editingId, setEditingId]   = useState(null);   // teacher id or 'new'
   const [editData,  setEditData]    = useState(null);
   const ts       = teachers.filter(t => t.schoolId === school.id);
@@ -1691,7 +1775,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
       { key:'absence', label:'העדרות (ימים)' }, { key:'mmHours', label:'ממ"מ שעות' }, { key:'mmFor', label:'במקום מי' },
       { key:'monthlyExtras', label:'תוספות (₪)' }, { key:'official', label:'שכר רשמי (₪)' },
       ...(isPrincipal ? [] : [
-        { key:'officialPre', label:'טרום-רפורמה (₪)' }, { key:'chabad', label:'תוספת חב"ד (₪)' },
+        { key:'officialPre', label:'עולם ישן (₪)' }, { key:'chabad', label:'תוספת חב"ד (₪)' },
         { key:'social', label:'סוציאלי (₪)' }, { key:'employer', label:'סה"כ למעסיק (₪)' },
       ]),
       { key:'source', label:'מקור הנתון' },
@@ -1736,7 +1820,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   };
 
   const startEdit = t => { setEditingId(t.id); setEditData({ ...t }); };
-  const startNew  = () => { setEditingId('new'); setEditData({ ...EMPTY_TEACHER, schoolId: school.id, id: uid() }); };
+  const startNew  = () => { setEditingId('new'); setEditData({ ...EMPTY_TEACHER, schoolId: school.id, reform: school.reform || 'ofek', id: uid() }); };
   const cancelEdit = () => { setEditingId(null); setEditData(null); };
   const saveEdit = () => {
     if (!editData.name.trim()) return alert('יש למלא שם');
@@ -1764,7 +1848,9 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <span className="title-bar" />
                 <h1 style={{ fontSize:23, fontWeight:800, color:'var(--text)', letterSpacing:'-0.025em', lineHeight:1.2 }}>{school.name}</h1>
               </div>
-              {school.city && <p style={{ fontSize:13, color:'var(--text3)', marginInlineStart:13 }}>{school.city}</p>}
+              <p style={{ fontSize:13, color:'var(--text3)', marginInlineStart:13 }}>
+                {school.city}{school.city ? ' · ' : ''}מסלול {reformLabel(school.reform)}
+              </p>
             </div>
             <div style={{ display:'flex', gap:7, alignItems:'center', flexWrap:'wrap' }}>
               {needsSimCount > 0 && (
@@ -1865,7 +1951,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <th style={{ textAlign:'center' }}>במקום מי</th>
                 <th style={{ textAlign:'center' }}>תוספות (₪)</th>
                 <th style={{ textAlign:'center' }}>שכר רשמי (₪)</th>
-                {!isPrincipal && <th style={{ textAlign:'center' }}>טרום-רפורמה (₪)</th>}
+                {!isPrincipal && <th style={{ textAlign:'center' }}>עולם ישן (₪)</th>}
                 {!isPrincipal && <th style={{ textAlign:'center' }}>תוספת חב"ד</th>}
                 {!isPrincipal && <th style={{ textAlign:'center' }}>סוציאלי</th>}
                 {!isPrincipal && <th style={{ textAlign:'center', color:'var(--purple)' }}>סה״כ למעסיק</th>}
@@ -1881,8 +1967,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                   <td><input className="apple-input" value={editData.email||''} onChange={e=>setF('email',e.target.value)} placeholder="מייל" dir="ltr" style={{ fontSize:12, padding:'4px 8px', borderRadius:6 }} /></td>
                   <td style={{ textAlign:'center' }}>
                     <select value={editData.reform} onChange={e=>setF('reform',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
-                      <option value="ofek">אופק חדש</option>
-                      <option value="pre">טרום</option>
+                      {REFORMS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                     </select>
                   </td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.scopePct??100} onChange={e=>setF('scopePct',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
@@ -1956,8 +2041,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td><input className="apple-input" value={d.email||''} onChange={e=>setF('email',e.target.value)} dir="ltr" placeholder="מייל" style={{ fontSize:12, padding:'4px 8px', borderRadius:6 }} /></td>
                     <td style={{ textAlign:'center' }}>
                       <select value={d.reform} onChange={e=>setF('reform',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
-                        <option value="ofek">אופק חדש</option>
-                        <option value="pre">טרום רפורמה</option>
+                        {REFORMS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                       </select>
                     </td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.scopePct??100} onChange={e=>setF('scopePct',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
@@ -2019,7 +2103,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td style={{ fontSize:12, color:'var(--apple-text3)' }}>{t.email||'—'}</td>
                     <td style={{ textAlign:'center' }}>
                       <span className={`apple-badge ${t.reform==='ofek' ? 'badge-blue' : 'badge-gray'}`}>
-                        {t.reform==='ofek' ? 'אופק חדש' : 'טרום רפורמה'}
+                        {reformLabel(t.reform)}
                       </span>
                     </td>
                     <td style={{ textAlign:'center', fontWeight:600, color:'var(--text)' }}>{scope}%</td>
@@ -2108,7 +2192,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         <ImportModal
           schoolId={school.id}
           schoolName={school.name}
-          onImport={ts => { onImportTeachers(ts); setShowImport(false); }}
+          onImport={ts => { onImportTeachers(ts.map(x => ({ ...x, reform: x.reform || schoolReform }))); setShowImport(false); }}
           onClose={() => setShowImport(false)}
         />
       )}
@@ -2258,20 +2342,9 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
   const [filterSchool, setFilterSchool] = useState('all');
   const [inputs, setInputs] = useState({});    // teacherId → string
   const [saved, setSaved]   = useState({});    // teacherId → true (just saved flash)
+  const [preInputs, setPreInputs] = useState({});   // סימולציית עולם ישן, לחישוב תוספת בית חב"ד
   const [activeId, setActiveId] = useState(null);
 
-  const urls = {
-    ofek:  'https://educalc.unq.co.il/#/Calculators/2',
-    oz:    'https://educalc.unq.co.il/#/Calculators/3',
-    mgmt:  'https://educalc.unq.co.il/#/Calculators/4',
-    old:   'https://educalc.unq.co.il/#/Calculators/1',
-  };
-  const calcOptions = [
-    { id: 'ofek', label: 'אופק חדש' },
-    { id: 'oz',   label: 'עוז לתמורה' },
-    { id: 'mgmt', label: 'אופק — ניהול' },
-    { id: 'old',  label: 'טרום רפורמה' },
-  ];
 
   // כל המורים שממתינים לסימולציה (שינוי נתונים, אין עדיין שכר רשמי)
   const allMissing = teachers.filter(needsSim);
@@ -2291,16 +2364,24 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
     .map(s => ({ school: s, teachers: filtered.filter(t => t.schoolId === s.id) }))
     .filter(g => g.teachers.length > 0);
 
+  // בחירת מורה בוחרת גם את המחשבון שמתאים למסלול שלה — ההגנה האמיתית
+  // מפני הזנת מספר שחושב במחשבון הלא נכון.
+  const selectTeacher = (t) => {
+    setActiveId(t.id);
+    setCalc(calcForReform(t.reform));
+  };
+
   const handleSave = (t) => {
     const val = inputs[t.id];
     if (!val || isNaN(Number(val))) return;
-    onSaveGross(t.id, Number(val));
+    const pre = preInputs[t.id];
+    onSaveGross(t.id, Number(val), pre && !isNaN(Number(pre)) ? Number(pre) : undefined);
     setSaved(prev => ({ ...prev, [t.id]: true }));
     setTimeout(() => setSaved(prev => { const n={...prev}; delete n[t.id]; return n; }), 1500);
     // advance to next in list
     const flat = grouped.flatMap(g => g.teachers);
     const idx  = flat.findIndex(x => x.id === t.id);
-    if (idx !== -1 && idx + 1 < flat.length) setActiveId(flat[idx + 1].id);
+    if (idx !== -1 && idx + 1 < flat.length) selectTeacher(flat[idx + 1]);
   };
 
   const pct = total > 0 ? Math.round(done / total * 100) : 100;
@@ -2316,7 +2397,7 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
             מחשבון רשמי
           </span>
           <div className="apple-seg">
-            {calcOptions.map(o => (
+            {CALCULATORS.map(o => (
               <button key={o.id} onClick={() => setCalc(o.id)}
                 className={`apple-seg-item${calc === o.id ? ' active' : ''}`}>
                 {o.label}
@@ -2324,13 +2405,7 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
             ))}
           </div>
         </div>
-        <iframe
-          key={calc}
-          src={urls[calc]}
-          style={{ flex:1, width:'100%', border:'none' }}
-          title="מחשבון שכר רשמי"
-          allow="fullscreen"
-        />
+        <CalculatorFrame key={calc} calcId={calc} />
       </div>
 
       {/* RIGHT — teacher list */}
@@ -2378,14 +2453,14 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                   const isActive = activeId === t.id;
                   const wasSaved = saved[t.id];
                   return (
-                    <div key={t.id} onClick={() => setActiveId(t.id)}
+                    <div key={t.id} onClick={() => selectTeacher(t)}
                       className="apple-card"
                       style={{ padding:'12px 14px', cursor:'pointer', borderRight: isActive ? '3px solid var(--apple-blue)' : '3px solid transparent', boxShadow: isActive ? '0 4px 20px rgba(0,122,255,0.12)' : '' }}>
                       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8, marginBottom: isActive ? 10 : 0 }}>
                         <div>
                           <p style={{ fontWeight:600, fontSize:14, color:'var(--apple-text)', marginBottom:2 }}>{t.name}</p>
                           <p style={{ fontSize:12, color:'var(--apple-text2)' }}>
-                            {t.reform === 'ofek' ? 'אופק' : 'טרום'} · {t.reform === 'ofek' ? `דרגה ${t.grade}` : t.degree} · {t.seniority} שנות ותק
+                            {reformLabel(t.reform)} · {t.reform === 'ofek' ? `דרגה ${t.grade}` : (DEGREE_LABELS[t.degree] || t.degree)} · {t.seniority} שנות ותק
                           </p>
                         </div>
                         <div style={{ textAlign:'left', flexShrink:0 }}>
@@ -2394,6 +2469,22 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                         </div>
                       </div>
                       {isActive && (
+                        <>
+                        {t.reform === 'ofek' && (
+                          <div style={{ marginBottom:8 }}>
+                            <p className="apple-label" style={{ marginBottom:4 }}>סימולציית עולם ישן (לא חובה)</p>
+                            <input type="number" className="apple-input" dir="ltr"
+                              placeholder="שכר באותם נתונים במחשבון העולם הישן"
+                              value={preInputs[t.id] ?? (t._officialGrossPre || '')}
+                              onChange={e => setPreInputs(prev => ({ ...prev, [t.id]: e.target.value }))}
+                              onKeyDown={e => e.key === 'Enter' && handleSave(t)}
+                              style={{ fontSize:13.5, minHeight:38 }}
+                            />
+                            <p style={{ fontSize:11, color:'var(--text3)', marginTop:4 }}>
+                              ההפרש בין השניים הוא תוספת בית חב"ד. בלי השדה הזה היא לא מחושבת.
+                            </p>
+                          </div>
+                        )}
                         <div style={{ display:'flex', gap:8 }}>
                           <input type="number" className="apple-input" dir="ltr"
                             placeholder="שכר משולב מהסימולטור"
@@ -2409,9 +2500,10 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                               background: wasSaved ? 'var(--apple-green)' : inputs[t.id] ? 'var(--apple-blue)' : 'var(--apple-fill2)',
                               color: (wasSaved || inputs[t.id]) ? '#fff' : 'var(--apple-text3)',
                             }}>
-                            {wasSaved ? '✓' : 'שמור'}
+                            {wasSaved ? <Check size={15} strokeWidth={2.8} /> : 'שמור'}
                           </button>
                         </div>
+                        </>
                       )}
                     </div>
                   );
@@ -2776,7 +2868,9 @@ export default function App() {
           <SimulatorView
             teachers={teachers}
             schools={schools}
-            onSaveGross={(id, gross) => persistT(teachers.map(t => t.id === id ? { ...t, _officialGross: gross } : t))}
+            onSaveGross={(id, gross, grossPre) => persistT(teachers.map(t => t.id === id
+              ? { ...t, _officialGross: gross, ...(grossPre === undefined ? {} : { _officialGrossPre: grossPre }) }
+              : t))}
           />
         ) : /* Principal: see only their school */
         !isCoord && principalSchool ? (
@@ -2796,7 +2890,9 @@ export default function App() {
           <SimulatorView
             teachers={teachers}
             schools={schools}
-            onSaveGross={(id, gross) => persistT(teachers.map(t => t.id === id ? { ...t, _officialGross: gross } : t))}
+            onSaveGross={(id, gross, grossPre) => persistT(teachers.map(t => t.id === id
+              ? { ...t, _officialGross: gross, ...(grossPre === undefined ? {} : { _officialGrossPre: grossPre }) }
+              : t))}
           />
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} />
@@ -2822,7 +2918,7 @@ export default function App() {
                 </div>
                 <p style={{ fontSize:13, color:'var(--text3)', marginInlineStart:13 }}>{schools.length} בתי ספר ברשת</p>
               </div>
-              <button className="apple-btn apple-btn-blue" onClick={() => setSchoolModal({ id:'', name:'', city:'' })}>
+              <button className="apple-btn apple-btn-blue" onClick={() => setSchoolModal({ id:'', name:'', city:'', reform:'ofek' })}>
                 <Plus size={15} strokeWidth={2.6} />
                 הוסף בית ספר
               </button>
@@ -2854,6 +2950,9 @@ export default function App() {
                           <h3 style={{ fontWeight:700, fontSize:16, color:'var(--apple-text)', marginBottom:2, letterSpacing:'-0.01em' }}>{s.name}</h3>
                           {s.city && <p style={{ fontSize:13, color:'var(--apple-text2)' }}>{s.city}</p>}
                           <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
+                            <span className={`apple-badge ${(s.reform || 'ofek') === 'ofek' ? 'badge-blue' : 'badge-gray'}`}>
+                              {reformLabel(s.reform)}
+                            </span>
                             {simN > 0 && <span className="apple-badge badge-orange">{simN} לסימולציה</span>}
                             {apprN > 0 && <span className="apple-badge badge-teal">{apprN} לאישור</span>}
                           </div>
@@ -2873,7 +2972,7 @@ export default function App() {
                           <p style={{ fontWeight:700, fontSize:14, color:'var(--apple-text)', letterSpacing:'-0.01em' }}>{empTot > 0 ? empTot.toLocaleString()+' ₪' : '—'}</p>
                         </div>
                       </div>
-                      <button className="apple-btn apple-btn-ghost" onClick={e => { e.stopPropagation(); setTeacherModal({ ...EMPTY_TEACHER, schoolId: s.id }); }}
+                      <button className="apple-btn apple-btn-ghost" onClick={e => { e.stopPropagation(); setTeacherModal({ ...EMPTY_TEACHER, schoolId: s.id, reform: s.reform || 'ofek' }); }}
                         style={{ width:'100%', fontSize:13, borderRadius:10, border:'1.5px dashed var(--apple-fill2)' }}>
                         + הוסף מורה
                       </button>
