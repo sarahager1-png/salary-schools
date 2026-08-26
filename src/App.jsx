@@ -194,11 +194,57 @@ function calcExtras(t) {
   const havraah = Math.round(havraahDays(t.seniority) * HAVRAAH_DAY * factor / 12);
   return { biguud, havraah, total: biguud + havraah };
 }
-// הוצאות המעביד מעל הברוטו. ביגוד והבראה כלולים בשיעור הזה ואינם מתווספים מעליו.
-const EMPLOYER_RATE  = 0.40;   // על בסיס העולם הישן
-const CHABAD_RATE    = 0.30;   // על רכיב תוספת בית חב"ד (מינימום)
-const EMPLOYER_PCT   = Math.round(EMPLOYER_RATE * 100);   // לתצוגה
-const CHABAD_PCT     = Math.round(CHABAD_RATE * 100);
+/*
+  הוצאות המעביד מעל הברוטו — רכיב־רכיב.
+
+  קודם היה כאן מספר אחד, 40%, ואיש לא יכול היה לבדוק מה בתוכו. הפירוט
+  מגלה שני דברים: מס שכר של מלכ"ר לא היה מיוצג כלל, ותוספת בית חב"ד
+  נשאה 30% בזמן שהיא נושאת בפועל מס שכר וביטוח לאומי בלבד — היא אינה
+  פנסיונית ואינה נושאת קרן השתלמות.
+
+  לכן אין כאן שיעור כולל קבוע. כל רכיב מחושב על הבסיס שלו, והשיעור
+  הכולל נגזר מהתוצאה ומשתנה לפי הוותק, אחוז המשרה וגובה השכר.
+*/
+const PENSION_RATE   = 0.1483;  // תגמולי מעסיק 6.5% + פיצויים 8.33%
+const KEREN_RATE     = 0.084;   // קרן השתלמות עובדי הוראה — חלק המעסיק
+const MAS_SACHAR     = 0.075;   // מס שכר למלכ"ר (מחליף מע"מ)
+const BL_STEP        = 7703;    // מדרגת ביטוח לאומי המופחתת, 2026
+const BL_LOW         = 0.0451;  // עד המדרגה
+const BL_HIGH        = 0.076;   // מעליה
+
+// ביטוח לאומי מדורג. מחושב על כל שכר העבודה, כולל הבראה וביגוד.
+function bituachLeumi(wage) {
+  if (wage <= 0) return 0;
+  return wage <= BL_STEP
+    ? wage * BL_LOW
+    : BL_STEP * BL_LOW + (wage - BL_STEP) * BL_HIGH;
+}
+
+/*
+  פנסיה וקרן השתלמות חלים על הבסיס בלבד — תוספת בית חב"ד אינה פנסיונית
+  ואינה נושאת קרן השתלמות. מס שכר וביטוח לאומי חלים על כל שכר העבודה,
+  והבראה וביגוד הם עצמם שכר עבודה ולכן נכללים בבסיס שלהם.
+*/
+function employerParts(t, base, supplement) {
+  const { biguud, havraah } = calcExtras(t);
+  const wage = base + supplement + biguud + havraah;
+  const parts = [
+    { key:'pension',  label:'פנסיה ופיצויים',   rate:PENSION_RATE, on:base, amount: Math.round(base * PENSION_RATE) },
+    { key:'keren',    label:'קרן השתלמות',      rate:KEREN_RATE,   on:base, amount: Math.round(base * KEREN_RATE) },
+    { key:'masSachar',label:'מס שכר (מלכ"ר)',   rate:MAS_SACHAR,   on:wage, amount: Math.round(wage * MAS_SACHAR) },
+    { key:'bl',       label:'ביטוח לאומי',      rate:null,         on:wage, amount: Math.round(bituachLeumi(wage)) },
+    { key:'havraah',  label:'הבראה',            rate:null,         on:null, amount: havraah },
+    { key:'biguud',   label:'ביגוד',            rate:null,         on:null, amount: biguud },
+  ];
+  return { parts, total: parts.reduce((s, x) => s + x.amount, 0), wage };
+}
+
+// כמה מהעלות נגרר מרכיב התוספת בלבד — מס שכר וביטוח לאומי שוליים עליו
+function supplementCost(base, supplement, biguud, havraah) {
+  if (supplement <= 0) return 0;
+  const without = base + biguud + havraah;
+  return Math.round(supplement * MAS_SACHAR + (bituachLeumi(without + supplement) - bituachLeumi(without)));
+}
 
 /*
   מערכת התשלומים של הרשת היא עולם ישן. מורה במסלול אופק לא מקבלת את שכר
@@ -231,17 +277,21 @@ function payBreakdown(t) {
 // זהו אומדן. כשהנהלת החשבונות מזינה את עלות המעביד בפועל, היא גוברת.
 function calcEmployer(t) {
   const { base, supplement, gross } = payBreakdown(t);
-  const employerBase = Math.round(base * EMPLOYER_RATE);
-  const employerSupp = Math.round(supplement * CHABAD_RATE);
-  const estimate = employerBase + employerSupp;
+  const extras = calcExtras(t);
+  const { parts, total: estimate } = employerParts(t, base, supplement);
+  const employerSupp = supplementCost(base, supplement, extras.biguud, extras.havraah);
+  const employerBase = estimate - employerSupp;
   const actual   = Number(t._actualEmployerCost) || 0;
   const social   = actual || estimate;
   return {
     gross, base, supplement, employerBase, employerSupp, social,
     estimate, isEstimate: !actual,
     total: gross + social,
-    // לצורכי מידע בלבד — כמה מתוך העלות הם ביגוד והבראה. לא מתווסף לסכום.
-    extras: calcExtras(t),
+    parts,                                    // הפירוט המלא, שורה לכל רכיב
+    // השיעור בפועל, מעל הברוטו לעובדת. הוא אינו קבוע: הוא נמוך יותר
+    // ככל שחלק גדול יותר מהשכר הוא תוספת בית חב"ד, שנושאת פחות.
+    pct: gross ? Math.round(estimate / gross * 1000) / 10 : 0,
+    extras,
   };
 }
 
@@ -1741,7 +1791,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                     style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer' }}><X size={15} strokeWidth={2.4} /></button>}
                 </div>
                 <p style={{ fontSize:11, color:'var(--text3)', marginTop:6, lineHeight:1.6 }}>
-                  בחודש הראשון העלות היא אומדן לפי {EMPLOYER_PCT}% על הבסיס ו-{CHABAD_PCT}% על התוספת.
+                  בחודש הראשון העלות היא אומדן לפי רכיבי החוק — פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד — עד שהנהלת החשבונות מזינה את הסכום בפועל.
                   משהוזן כאן סכום, הוא גובר עליו בכל הדוחות.
                 </p>
               </div>
@@ -1835,9 +1885,8 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 ['עולם ישן — בסיס', emp.base, 'מה שרץ במערכת התשלומים'],
                 ...(t.reform === 'ofek' ? [['תוספת בית חב"ד', emp.supplement, 'הפער עד שכר האופק']] : []),
                 ['ברוטו לעובדת', emp.gross, null],
-                [`הוצאות מעביד`, emp.social, emp.isEstimate
-                  ? `אומדן — ${EMPLOYER_PCT}% על הבסיס${emp.supplement ? ` · ${CHABAD_PCT}% על התוספת` : ''}`
-                  : 'סכום בפועל מהנהלת החשבונות'],
+                [`הוצאות מעביד`, emp.social,
+                  emp.isEstimate ? `אומדן ${emp.pct}%` : 'סכום בפועל מהנהלת החשבונות'],
               ].map(([label, val, note]) => (
                 <div key={label} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10, padding:'5px 0' }}>
                   <span style={{ fontSize:12.5, color:'var(--text2)' }}>
@@ -1847,6 +1896,27 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                   <span className="num" style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>{val.toLocaleString('he-IL')} ₪</span>
                 </div>
               ))}
+              {/* מה בתוך הוצאות המעביד. קודם היה כאן מספר אחד, 40%, שאיש
+                  לא יכול היה להצליב מול מה שהנהלת החשבונות מוציאה בפועל. */}
+              {emp.isEstimate && (
+                <div style={{ marginTop:2, marginBottom:4, paddingInlineStart:12,
+                  borderInlineStart:'2px solid var(--ok-line)' }}>
+                  {emp.parts.filter(x => x.amount).map(x => (
+                    <div key={x.key} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, padding:'2px 0' }}>
+                      <span style={{ fontSize:11.5, color:'var(--text3)' }}>
+                        {x.label}
+                        {x.rate && <span style={{ marginInlineStart:5, opacity:.75 }}>{(x.rate * 100).toFixed(2).replace(/\.?0+$/, '')}%</span>}
+                      </span>
+                      <span className="num" style={{ fontSize:11.5, color:'var(--text3)' }}>{x.amount.toLocaleString('he-IL')} ₪</span>
+                    </div>
+                  ))}
+                  {emp.supplement > 0 && (
+                    <p style={{ fontSize:10.5, color:'var(--text3)', marginTop:4, opacity:.8 }}>
+                      מזה {emp.employerSupp.toLocaleString('he-IL')} ₪ על תוספת בית חב"ד — היא נושאת מס שכר וביטוח לאומי בלבד
+                    </p>
+                  )}
+                </div>
+              )}
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10,
                 borderTop:'1px solid var(--ok-line)', marginTop:7, paddingTop:9 }}>
                 <span style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>סה״כ למעסיק</span>
@@ -2075,7 +2145,7 @@ function SchoolReport({ school, teachers, onClose }) {
         <div style={{ marginTop:16, padding:14, background:'var(--apple-fill)', borderRadius:12, fontSize:12, color:'var(--apple-text2)', lineHeight:1.8 }}>
           <strong style={{ color:'var(--text)' }}>מבנה התשלום:</strong> התשלומים רצים במערכת של עולם ישן.
           הפער עד שכר האופק משולם כתוספת בית חב"ד.<br/>
-          ברוטו למעסיק = בסיס + {EMPLOYER_PCT}% · תוספת בית חב"ד + {CHABAD_PCT}% (כולל ביגוד והבראה)<br/>
+          ברוטו למעסיק = ברוטו לעובדת + פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד<br/>
           הסכומים לשורות ללא סימולציה מלאה הם הערכה בלבד
         </div>
       </div>
@@ -2288,7 +2358,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         chabad: done ? emp.supplement : '',
         gross: done ? emp.gross : '',
         social: done ? emp.social : '',
-        costSource: done ? (emp.isEstimate ? `אומדן ${EMPLOYER_PCT}%/${CHABAD_PCT}%` : 'בפועל — הנהלת חשבונות') : '',
+        costSource: done ? (emp.isEstimate ? `אומדן ${emp.pct}%` : 'בפועל — הנהלת חשבונות') : '',
         employer: done ? emp.total : '',
         // הדוח לא מסתיר שהמספר של מי שטרם עבר סימולציה הוא אומדן פנימי
         source: done ? 'רשמי'
@@ -2520,7 +2590,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <th style={{ textAlign:'center' }} title="סימולציית אופק חדש — רק למורות אופק">אופק חדש (₪)</th>
                 {!isPrincipal && <th style={{ textAlign:'center' }} title="הפער בין אופק לעולם הישן">תוספת בית חב"ד</th>}
                 {!isPrincipal && <th style={{ textAlign:'center' }}>ברוטו</th>}
-                {!isPrincipal && <th style={{ textAlign:'center' }} title={`${EMPLOYER_PCT}% על הבסיס · ${CHABAD_PCT}% על התוספת · ~ = אומדן שממתין לסכום מהנהלת החשבונות`}>הוצאות מעביד</th>}
+                {!isPrincipal && <th style={{ textAlign:'center' }} title={`פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד · ~ = אומדן שממתין לסכום מהנהלת החשבונות`}>הוצאות מעביד</th>}
                 {!isPrincipal && <th style={{ textAlign:'center', color:'var(--purple)' }}>סה״כ למעסיק</th>}
                 <th style={{ width:92 }}></th>
               </tr>
@@ -2754,7 +2824,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     {!isPrincipal && <td style={{ textAlign:'center', color:'var(--text2)' }}
                       title={done
                         ? (emp.isEstimate
-                            ? `אומדן: ${emp.employerBase.toLocaleString('he-IL')} על הבסיס · ${emp.employerSupp.toLocaleString('he-IL')} על התוספת. ממתין לסכום מהנהלת החשבונות.`
+                            ? `אומדן ${emp.pct}% — ${emp.parts.filter(x => x.amount).map(x => `${x.label} ${x.amount.toLocaleString('he-IL')}`).join(' · ')}${emp.supplement ? ` (מזה ${emp.employerSupp.toLocaleString('he-IL')} על התוספת)` : ''}. ממתין לסכום מהנהלת החשבונות.`
                             : `סכום בפועל מהנהלת החשבונות (האומדן היה ${emp.estimate.toLocaleString('he-IL')})`)
                         : undefined}>
                       {done
@@ -2988,7 +3058,7 @@ function ReportView({ schools, teachers }) {
         </div>
         <p style={{ fontSize:11, color:'var(--text3)', marginTop:10, padding:'0 4px', lineHeight:1.7 }}>
           התשלומים רצים במערכת של עולם ישן. הפער עד שכר האופק משולם כתוספת בית חב"ד.<br/>
-          ברוטו למעסיק = בסיס + {EMPLOYER_PCT}% · תוספת בית חב"ד + {CHABAD_PCT}% · ביגוד והבראה כלולים בשיעורים האלה
+          ברוטו למעסיק = ברוטו לעובדת + פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד
         </p>
       </div>
     </div>
