@@ -24,7 +24,9 @@ const admin = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SECRET_KEY, { aut
 const args = process.argv.slice(2);
 const baseIdx = args.indexOf('--base');
 const BASE = baseIdx !== -1 ? args[baseIdx + 1] : (env.VITE_APP_URL || 'http://localhost:5190');
-const clean = args.filter((a, i) => a !== '--base' && i !== baseIdx + 1);
+// כש---base אינו נתון, baseIdx הוא -1 ו-baseIdx+1 הוא 0 — מה שסינן בטעות
+// את הארגומנט הראשון. הסינון תקף רק כשהדגל באמת קיים.
+const clean = baseIdx === -1 ? args : args.filter((_, i) => i !== baseIdx && i !== baseIdx + 1);
 
 // ── רשימה ──
 if (clean.includes('--list')) {
