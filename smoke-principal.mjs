@@ -7,7 +7,7 @@ const T = [{
   frontalHours: 26, scopePct: 100, scope: 100, role: 'none', ageGroup: 'none',
   isTemp: false, scopeChanges: [], childrenUnder18: 0, _files: [], sickFiles: [],
   absenceDays: 0, mmHours: 0, mmFor: '', monthlyExtras: 0,
-  _officialGross: 12500, _officialGrossPre: null,
+  _officialGross: 12500, _officialGrossPre: 12500,   // בלי פער: בסיס = ברוטו
   _changedAt: null, _approved: true, _approvedAt: '2026-08-20T10:00:00.000Z', _snapshot: null,
 }];
 
@@ -38,7 +38,8 @@ check('עמודת הוצאות המעביד מציגה 5,000', totalTxt.includes
 const note = await p.getByText(/הוצאות מעביד/).first().textContent().catch(() => '');
 await p.getByRole('button', { name: 'דוח רשת' }).click(); await p.waitForTimeout(500);
 const netNote = (await p.getByText(/ברוטו למעסיק =/).textContent()) || '';
-check('הערת הדוח מציגה 40% ולא 30%', netNote.includes('40%') && !netNote.includes('30%'), netNote.trim().slice(0, 80));
+check('הערת הדוח מציגה 40% על הבסיס', netNote.includes('40%'), netNote.trim().slice(0, 90));
+check('הערת הדוח מציגה 30% על התוספת', netNote.includes('30%'), netNote.trim().slice(0, 90));
 check('הערת הדוח אינה מפרטת רכיבים', !/ביטוח לאומי|פנסיה|קרן השתלמות/.test(netNote), netNote.trim().slice(0, 70));
 
 // ══ 2. principal: frontal hours drive scope, salary locked ══

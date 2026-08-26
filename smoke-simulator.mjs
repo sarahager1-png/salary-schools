@@ -41,7 +41,7 @@ check('ברירת המחדל היא אופק חדש', src0.endsWith('OfekHadash'
 
 // ══ 2. picking a teacher picks her calculator ══
 await p.getByText('חנה לוי').click(); await p.waitForTimeout(500);
-check('מורת אופק → מחשבון OfekHadash', (await frameSrc()).endsWith('OfekHadash'), await frameSrc());
+check('מורת אופק → שלב 1 הוא מחשבון העולם הישן', (await frameSrc()).endsWith('OldWorld'), await frameSrc());
 await p.getByText('מרים כהן').click(); await p.waitForTimeout(500);
 check('מורת עולם ישן → מחשבון OldWorld', (await frameSrc()).endsWith('OldWorld'), await frameSrc());
 
@@ -66,10 +66,10 @@ check('מסך ה-fallback לא מוצג כשהטעינה הצליחה',
 
 // ══ 5. old-world simulation field only for ofek teachers ══
 await p.getByText('חנה לוי').click(); await p.waitForTimeout(400);
-check('שדה סימולציית עולם ישן מוצג למורת אופק',
-  await p.getByPlaceholder('שכר באותם נתונים במחשבון העולם הישן').isVisible().catch(() => false));
-await p.getByPlaceholder('שכר באותם נתונים במחשבון העולם הישן').fill('11000');
-await p.getByPlaceholder('שכר משולב מהסימולטור').fill('12500');
+check('שני שלבי הסימולציה מוצגים למורת אופק',
+  await p.getByPlaceholder('שכר משולב ממחשבון העולם הישן').isVisible().catch(() => false));
+await p.getByPlaceholder('שכר משולב ממחשבון העולם הישן').fill('11000');
+await p.getByPlaceholder('שכר משולב ממחשבון אופק חדש').fill('12500');
 await p.getByRole('button', { name: 'שמור' }).click();
 await p.waitForTimeout(600);
 const saved = await p.evaluate(() => JSON.parse(localStorage.getItem('ss-months-v1'))['2026-08'].find(x => x.id === 't1'));
@@ -78,8 +78,8 @@ check('סימולציית העולם הישן נשמרה', saved._officialGrossP
 check('תוספת בית חב"ד ניתנת לחישוב', saved._officialGross - saved._officialGrossPre === 1500);
 
 await p.getByText('מרים כהן').click(); await p.waitForTimeout(400);
-check('שדה עולם ישן מוסתר למורה שכבר בעולם ישן',
-  !(await p.getByPlaceholder('שכר באותם נתונים במחשבון העולם הישן').isVisible().catch(() => false)));
+check('מורת עולם ישן — שדה אחד בלי שלבים',
+  !(await p.getByPlaceholder('שכר משולב ממחשבון אופק חדש').isVisible().catch(() => false)));
 
 // ══ 6. school-level reform drives a new teacher ══
 await p.evaluate(() => localStorage.removeItem('ss-user'));

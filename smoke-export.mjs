@@ -16,9 +16,9 @@ const base = {
   _officialGrossPre: null, _snapshot: null, _changedAt: null, _approved: false,
 };
 const TEACHERS = [
-  { ...base, id: 't1', name: 'לוי, חנה', grade: 5, _officialGross: 12500, _approved: true },
+  { ...base, id: 't1', name: 'לוי, חנה', grade: 5, _officialGrossPre: 11200, _officialGross: 12500, _approved: true },
   { ...base, id: 't2', name: 'מרים כהן', grade: 3, absenceDays: 2, mmHours: 4, mmFor: 'לוי, חנה', monthlyExtras: 350 },
-  { ...base, id: 't3', name: 'שרה "שרי" גולד', schoolId: 's2', grade: 7, _officialGross: 15800 },
+  { ...base, id: 't3', name: 'שרה "שרי" גולד', schoolId: 's2', grade: 7, _officialGrossPre: 14000, _officialGross: 15800 },
 ];
 
 const b = await chromium.launch();
@@ -108,7 +108,7 @@ check('CSV בית ספר — כותרת + 2 מורות + סה"כ', lines.length 
 check('CSV בית ספר — שם עם פסיק עוטף במרכאות', lines[1].startsWith('"לוי, חנה"'), lines[1].slice(0, 24));
 check('CSV בית ספר — מסמן רשמי מול אומדן',
   lines[1].includes('רשמי') && lines[2].includes('טרם הורצה סימולציה'));
-check('CSV בית ספר — שורת סה"כ', lines[3].includes('מורות עם שכר רשמי'), lines[3].slice(0, 42));
+check('CSV בית ספר — שורת סה"כ', lines[3].includes('מורות עם סימולציה מלאה'), lines[3].slice(0, 46));
 check('CSV בית ספר — מרכאות בתוך ערך מוכפלות כנדרש', csv.text.includes('"שרה ""שרי"" גולד"') === false && lines[3].includes('""'));
 
 // ══ 5. absence CSV ══
@@ -128,7 +128,8 @@ await p.waitForTimeout(500);
 const net = await grab(() => p.getByRole('button', { name: 'ייצוא CSV' }).click());
 check('CSV דוח רשת — ירד', /^דוח_רשת_\d{4}-\d{2}-\d{2}\.csv$/.test(net.name), net.name);
 check('CSV דוח רשת — שני בתי ספר + סה"כ', net.text.replace(/^\uFEFF/, '').split('\r\n').length === 4);
-check('CSV דוח רשת — עמודת "מתוכן עם שכר רשמי"', net.text.includes('מתוכן עם שכר רשמי'));
+check('CSV דוח רשת — עמודת "מתוכן עם סימולציה מלאה"', net.text.includes('מתוכן עם סימולציה מלאה'));
+check('CSV דוח רשת — עמודות שעות ומכסה', net.text.includes('שעות בשימוש') && net.text.includes('מכסת שעות'));
 check('דוח רשת — מציג כמה מורות באמת רשמיות',
   await p.getByText('(1 רשמי)').first().isVisible().catch(() => false));
 

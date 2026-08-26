@@ -53,7 +53,6 @@ const ROLES = [
   { id: 'team',       label: 'ראש צוות / מרכז שכבה',        pct: 6.5,  min: 1000 },
   { id: 'counselor',  label: "יועץ/ת (רישיון זמני)",         pct: 12,   min: 0    },
   { id: 'counselor2', label: "יועץ/ת (רישיון קבוע)",         pct: 18,   min: 0    },
-  { id: 'vp',         label: "סגן/ית מנהל",                  pct: 20,   min: 0    },
   { id: 'principal',  label: 'מנהל/ת בית ספר (אופק ד1)',    pct: 0,    min: 0    },
 ];
 const LEVELS = {
@@ -190,17 +189,43 @@ function calcExtras(t) {
   const havraah = Math.round(havraahDays(t.seniority) * HAVRAAH_DAY * factor / 12);
   return { biguud, havraah, total: biguud + havraah };
 }
-// הוצאות המעביד מעל הברוטו — שיעור אחד לכל המערכת.
-// ביגוד והבראה כלולים בתוך השיעור הזה ואינם מתווספים מעליו.
-const EMPLOYER_RATE  = 0.40;
+// הוצאות המעביד מעל הברוטו. ביגוד והבראה כלולים בשיעור הזה ואינם מתווספים מעליו.
+const EMPLOYER_RATE  = 0.40;   // על בסיס העולם הישן
+const CHABAD_RATE    = 0.30;   // על רכיב תוספת בית חב"ד (מינימום)
 const EMPLOYER_PCT   = Math.round(EMPLOYER_RATE * 100);   // לתצוגה
-// ברוטו למעסיק = ברוטו × (1 + EMPLOYER_RATE)
+const CHABAD_PCT     = Math.round(CHABAD_RATE * 100);
+
+/*
+  מערכת התשלומים של הרשת היא עולם ישן. מורה במסלול אופק לא מקבלת את שכר
+  האופק ישירות: מה שעובר בתשלומים הוא שכר העולם הישן, והפער עד שכר האופק
+  משולם כרכיב נפרד — תוספת בית חב"ד.
+
+  base       — שכר העולם הישן, מה שרץ במערכת התשלומים
+  supplement — תוספת בית חב"ד, הפער עד שכר האופק (לעולם לא שלילי)
+  gross      — סך הברוטו לעובדת
+*/
+function payBreakdown(t) {
+  const ofek = Number(t._officialGross) || 0;
+  const old  = Number(t._officialGrossPre) || 0;
+  // בית ספר עולם ישן — סימולציה אחת, אין רכיב תוספת
+  if (t.reform !== 'ofek') return { base: ofek, supplement: 0, gross: ofek };
+  // אם האופק יוצא נמוך מהעולם הישן, העובדת נשארת עם העולם הישן
+  const supplement = Math.max(0, ofek - old);
+  return { base: old, supplement, gross: old + supplement };
+}
+
+// ברוטו למעסיק = בסיס + 40% · תוספת + 30%
 function calcEmployer(t) {
-  const gross  = calcGross(t);
-  // מוחזר לצורכי מידע בלבד (כמה מתוך העלות הם ביגוד והבראה) — לא מתווסף לסכום
-  const extras = calcExtras(t);
-  const social = Math.round(gross * EMPLOYER_RATE);
-  return { gross, extras, base: gross, social, total: gross + social };
+  const { base, supplement, gross } = payBreakdown(t);
+  const employerBase = Math.round(base * EMPLOYER_RATE);
+  const employerSupp = Math.round(supplement * CHABAD_RATE);
+  const social = employerBase + employerSupp;
+  return {
+    gross, base, supplement, employerBase, employerSupp, social,
+    total: gross + social,
+    // לצורכי מידע בלבד — כמה מתוך העלות הם ביגוד והבראה. לא מתווסף לסכום.
+    extras: calcExtras(t),
+  };
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -224,7 +249,7 @@ const FIELDS = [
   { key:'level',           label:'שלב',            base:true,  tracked:true,  fmt: v => LEVELS[v]?.label || v },
   { key:'ageGroup',        label:'קבוצת גיל',      base:true,  tracked:true,  fmt: v => AGE_RED[v]?.label || v },
   { key:'seniority',       label:'ותק',            base:true,  tracked:true },
-  { key:'role',            label:'תפקיד',          base:true,  tracked:true,  fmt: v => ROLES.find(r => r.id === v)?.label.split('(')[0].trim() || v },
+  { key:'role',            label:'תפקיד',          base:true,  tracked:true,  fmt: v => ROLES.find(r => r.id === v)?.label.split('(')[0].trim() || 'ללא תפקיד נוסף' },
   { key:'scopePct',        label:'% משרה',         base:true,  tracked:true,  fmt: v => `${v}%` },
   { key:'frontalHours',    label:'שעות פרונטלי',   base:true,  tracked:true },
   { key:'scope',           label:'% משרה',         base:true,  tracked:false, fmt: v => `${v}%` },
@@ -253,12 +278,18 @@ function baseFieldsChanged(next, prev) {
     return affectsPay && String(next[f.key] ?? '') !== String(prev[f.key] ?? '');
   });
 }
+// מורת אופק דורשת שתי סימולציות — עולם ישן ואופק — כי הפער ביניהן הוא
+// רכיב התשלום. מורת עולם ישן דורשת אחת.
+const simComplete = t => Boolean(t.reform === 'ofek'
+  ? (t._officialGross && t._officialGrossPre)
+  : t._officialGross);
+
 // סטטוס מורה בזרימת העבודה:
 // needs_sim: מנהלת שמרה שינויים, ממתין לסימולציה אצל חשבת שכר
-// needs_approval: חשבת שכר הכניסה שכר רשמי, ממתין לאישור שליח
+// needs_approval: הסימולציות הושלמו, ממתין לאישור שליח
 // approved: השליח אישר
-const needsSim      = t => Boolean(t._changedAt && !t._approved && !t._officialGross);
-const needsApproval = t => Boolean(t._changedAt && !t._approved && t._officialGross);
+const needsSim      = t => Boolean(t._changedAt && !t._approved && !simComplete(t));
+const needsApproval = t => Boolean(t._changedAt && !t._approved && simComplete(t));
 const isPending     = t => Boolean(t._changedAt && !t._approved); // = needsSim || needsApproval
 
 function readableVal(field, val) {
@@ -813,8 +844,7 @@ function parseRole(raw) {
   if (s.includes('מקצוע')) return 'subject6';
   if (s.includes('צוות') || s.includes('שכבה')) return 'team';
   if (s.includes('יועץ') || s.includes('יועצ')) return 'counselor';
-  if (s.includes("סגן") || s.includes("סגנ")) return 'vp';
-  const known = ['homeroom','homeroom1','homeroom2','subject6','subject8','team','counselor','counselor2','vp'];
+  const known = ['homeroom','homeroom1','homeroom2','subject6','subject8','team','counselor','counselor2'];
   return known.includes(s) ? s : 'none';
 }
 
@@ -1497,26 +1527,33 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             )}
           </div>
 
-          {/* תצוגה מקדימה — נתון רשמי בלבד */}
-          {t._officialGross ? (
-            <div style={{ background:'#E8F5E9', border:'2px solid #A5D6A7', borderRadius:12, padding:16 }}>
-              <p style={{ fontSize:11, fontWeight:700, color:'var(--ok)', textAlign:'center', marginBottom:12, textTransform:'uppercase', letterSpacing:'0.04em' }}>✓ שכר רשמי מסימולטור משרד החינוך</p>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, textAlign:'center' }}>
-                <div style={{ background:'#C8E6C9', borderRadius:8, padding:'10px 8px' }}>
-                  <p style={{ fontSize:11, color:'#555', marginBottom:4 }}>ברוטו חודשי</p>
-                  <p style={{ fontSize:20, fontWeight:800, color:'#1B5E20' }}>{Number(t._officialGross).toLocaleString()} ₪</p>
+          {/* פירוק התשלום — נתון רשמי בלבד */}
+          {simComplete(t) ? (
+            <div className="apple-section" style={{ background:'var(--ok-bg)', border:'1px solid var(--ok-line)' }}>
+              <p style={{ fontSize:11, fontWeight:700, color:'var(--ok)', textAlign:'center', marginBottom:12, letterSpacing:'0.04em' }}>
+                פירוק התשלום — לפי הסימולציה הרשמית
+              </p>
+              {[
+                ['עולם ישן — בסיס', emp.base, 'מה שרץ במערכת התשלומים'],
+                ...(t.reform === 'ofek' ? [['תוספת בית חב"ד', emp.supplement, 'הפער עד שכר האופק']] : []),
+                ['ברוטו לעובדת', emp.gross, null],
+                [`הוצאות מעביד`, emp.social, `${EMPLOYER_PCT}% על הבסיס${emp.supplement ? ` · ${CHABAD_PCT}% על התוספת` : ''}`],
+              ].map(([label, val, note]) => (
+                <div key={label} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10, padding:'5px 0' }}>
+                  <span style={{ fontSize:12.5, color:'var(--text2)' }}>
+                    {label}
+                    {note && <span style={{ fontSize:11, color:'var(--text3)', marginInlineStart:6 }}>{note}</span>}
+                  </span>
+                  <span className="num" style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>{val.toLocaleString('he-IL')} ₪</span>
                 </div>
-                <div style={{ background:'#C8E6C9', borderRadius:8, padding:'10px 8px' }}>
-                  <p style={{ fontSize:11, color:'#555', marginBottom:4 }}>הוצאות מעביד {EMPLOYER_PCT}%</p>
-                  <p style={{ fontSize:16, fontWeight:700, color:'#1B5E20' }}>{emp.social.toLocaleString('he-IL')} ₪</p>
-                </div>
-                <div style={{ background:'#A5D6A7', borderRadius:8, padding:'10px 8px' }}>
-                  <p style={{ fontSize:11, color:'#333', marginBottom:4 }}>ברוטו למעסיק</p>
-                  <p style={{ fontSize:20, fontWeight:800, color:'#1B5E20' }}>{emp.total.toLocaleString()} ₪</p>
-                </div>
+              ))}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10,
+                borderTop:'1px solid var(--ok-line)', marginTop:7, paddingTop:9 }}>
+                <span style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>סה״כ למעסיק</span>
+                <span className="num" style={{ fontSize:18, fontWeight:800, color:'var(--purple)' }}>{emp.total.toLocaleString('he-IL')} ₪</span>
               </div>
-              <p style={{ fontSize:11, color:'#666', textAlign:'center', marginTop:10 }}>
-                נטו משוער {calcNet(Number(t._officialGross)).toLocaleString('he-IL')} ₪ · עלות מעסיק {emp.total.toLocaleString('he-IL')} ₪
+              <p style={{ fontSize:11, color:'var(--text3)', textAlign:'center', marginTop:8 }}>
+                נטו משוער {calcNet(emp.gross).toLocaleString('he-IL')} ₪
               </p>
             </div>
           ) : (
@@ -1574,6 +1611,18 @@ function SchoolModal({ school, onSave, onClose }) {
               קובע את ברירת המחדל למורות חדשות ואת המחשבון הרשמי שייפתח. אפשר לשנות מסלול למורה בודדת.
             </p>
           </div>
+          <div>
+            <p className="apple-label">מכסת שעות עובדי הוראה</p>
+            <input type="number" min="0" dir="ltr" className="apple-input"
+              value={s.hoursQuota ?? ''}
+              onChange={e => setS(p => ({ ...p, hoursQuota: e.target.value === '' ? null : Number(e.target.value) }))}
+              placeholder="לא הוגדרה" style={{ textAlign:'center' }} />
+            <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:6, lineHeight:1.5 }}>
+              סך השעות הפרונטליות שמותר להקצות בבית הספר. אי אפשר לשמור מורה שתחרוג מהמכסה.
+              מכסה שלא הוגדרה אינה חוסמת.
+            </p>
+          </div>
+
           <input value={s.principalEmail || ''} onChange={e => setS(p => ({...p, principalEmail: e.target.value}))} placeholder="מייל מנהלת" dir="ltr" className="apple-input" />
           <input value={s.coordinatorEmail || ''} onChange={e => setS(p => ({...p, coordinatorEmail: e.target.value}))} placeholder="מייל שליח (עותק)" dir="ltr" className="apple-input" />
         </div>
@@ -1591,9 +1640,9 @@ function SchoolModal({ school, onSave, onClose }) {
 ═══════════════════════════════════════════════════════════════ */
 function SchoolReport({ school, teachers, onClose }) {
   const ts = teachers.filter(t => t.schoolId === school.id);
-  const tsOfficial  = ts.filter(t => t._officialGross);
+  const tsOfficial  = ts.filter(simComplete);
   const totEmpGross = tsOfficial.reduce((s, t) => s + calcEmployer(t).total, 0);
-  const totGross    = tsOfficial.reduce((s, t) => s + Number(t._officialGross), 0);
+  const totGross    = tsOfficial.reduce((s, t) => s + calcEmployer(t).gross, 0);
   const pendingCount = ts.filter(isPending).length;
 
   return (
@@ -1724,8 +1773,10 @@ function SchoolReport({ school, teachers, onClose }) {
         )}
 
         <div style={{ marginTop:16, padding:14, background:'var(--apple-fill)', borderRadius:12, fontSize:12, color:'var(--apple-text2)', lineHeight:1.8 }}>
-          <strong style={{ color:'var(--text)' }}>ברוטו למעסיק:</strong> ברוטו + {EMPLOYER_PCT}% הוצאות מעביד (כולל ביגוד והבראה)<br/>
-          הסכומים לשורות ללא שכר רשמי הם הערכה בלבד
+          <strong style={{ color:'var(--text)' }}>מבנה התשלום:</strong> התשלומים רצים במערכת של עולם ישן.
+          הפער עד שכר האופק משולם כתוספת בית חב"ד.<br/>
+          ברוטו למעסיק = בסיס + {EMPLOYER_PCT}% · תוספת בית חב"ד + {CHABAD_PCT}% (כולל ביגוד והבראה)<br/>
+          הסכומים לשורות ללא סימולציה מלאה הם הערכה בלבד
         </div>
       </div>
     </div>
@@ -1863,15 +1914,37 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
     .filter(t => t.name.includes(search) || (t.tzId || '').includes(search))
     // שורת המנהלת ראשונה — היא ראש הצוות וגם הסעיף הגדול בתקציב
     .sort((a, b) => (isPrincipalRow(b) ? 1 : 0) - (isPrincipalRow(a) ? 1 : 0));
-  const tsOfficial = ts.filter(t => t._officialGross);
-  const totEmp   = tsOfficial.reduce((s, t) => s + calcEmployer(t).total, 0);
-  const totGross = tsOfficial.reduce((s, t) => s + Number(t._officialGross), 0);
+  const tsOfficial = ts.filter(simComplete);
+  const totEmp    = tsOfficial.reduce((s, t) => s + calcEmployer(t).total, 0);
+  const totGross  = tsOfficial.reduce((s, t) => s + calcEmployer(t).gross, 0);
+  const totBase   = tsOfficial.reduce((s, t) => s + calcEmployer(t).base, 0);
+  const totChabad = tsOfficial.reduce((s, t) => s + calcEmployer(t).supplement, 0);
   const totExtras = tsOfficial.reduce((s, t) => s + calcEmployer(t).social, 0);
   const totMonthly = ts.reduce((s, t) => s + (Number(t.monthlyExtras) || 0), 0);
   const needsSimCount   = ts.filter(needsSim).length;
   const needsApprCount  = ts.filter(needsApproval).length;
   const isCoord  = userRole === 'coordinator';
   const isPrincipal = userRole === 'principal';
+
+  // מכסת שעות עובדי הוראה — מספר קבוע לבית הספר, נספרות שעות פרונטליות
+  const hoursQuota = Number(school.hoursQuota) || null;
+  const usedHours  = ts.reduce((s, t) => s + (Number(t.frontalHours) || 0), 0);
+  const freeHours  = hoursQuota ? hoursQuota - usedHours : null;
+  // כמה שעות מותר להקצות לרשומה מסוימת בלי לחרוג — כולל השעות שכבר רשומות לה
+  const hoursCeiling = (rec) => {
+    if (!hoursQuota) return null;
+    const own = Number(ts.find(x => x.id === rec?.id)?.frontalHours) || 0;
+    return hoursQuota - usedHours + own;
+  };
+  // מחזירה הודעת חסימה, או null אם השמירה מותרת
+  const hoursBlock = (rec) => {
+    const ceiling = hoursCeiling(rec);
+    if (ceiling === null) return null;
+    const want = Number(rec.frontalHours) || 0;
+    if (want <= ceiling) return null;
+    return `מכסת השעות של ${school.name} היא ${hoursQuota} שעות, ומתוכן פנויות ${Math.max(0, ceiling)}.\n\n`
+      + `הזנת ${want} שעות תחרוג מהמכסה ב-${want - ceiling} שעות.`;
+  };
 
   const exportCSV = () => {
     const headers = [
@@ -1880,22 +1953,24 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
       { key:'grade', label:'דרגת אופק' }, { key:'seniority', label:'ותק' }, { key:'frontal', label:'פרונטלי' },
       { key:'temp', label:'שיבוץ' }, { key:'children', label:'ילדים עד 18' },
       { key:'absence', label:'העדרות (ימים)' }, { key:'mmHours', label:'ממ"מ שעות' }, { key:'mmFor', label:'במקום מי' },
-      { key:'monthlyExtras', label:'תוספות (₪)' }, { key:'official', label:'שכר רשמי (₪)' },
+      { key:'monthlyExtras', label:'תוספות (₪)' },
+      { key:'base', label:'עולם ישן — בסיס (₪)' }, { key:'ofek', label:'אופק חדש (₪)' },
       ...(isPrincipal ? [] : [
-        { key:'officialPre', label:'עולם ישן (₪)' }, { key:'chabad', label:'תוספת חב"ד (₪)' },
-        { key:'social', label:`הוצאות מעביד ${EMPLOYER_PCT}% (₪)` }, { key:'employer', label:'סה"כ למעסיק (₪)' },
+        { key:'chabad', label:'תוספת בית חב"ד (₪)' }, { key:'gross', label:'ברוטו (₪)' },
+        { key:'social', label:`הוצאות מעביד (${EMPLOYER_PCT}% בסיס · ${CHABAD_PCT}% תוספת) (₪)` },
+        { key:'employer', label:'סה"כ למעסיק (₪)' },
       ]),
       { key:'source', label:'מקור הנתון' },
     ];
     const rows = ts.map(t => {
       const emp     = calcEmployer(t);
       const derived = deriveHours(t);
-      const official = t._officialGross ? Number(t._officialGross) : null;
+      const done = simComplete(t);
       return {
         name: t.name,
         tzId: t.tzId || '',
         email: t.email || '',
-        reform: t.reform === 'ofek' ? 'אופק חדש' : 'טרום רפורמה',
+        reform: reformLabel(t.reform),
         scope: t.reform === 'ofek' ? (derived?.scopePct || t.scopePct || 100) : (t.scope || 100),
         degree: DEGREE_LABELS[t.degree] || t.degree || '',
         grade: t.reform === 'ofek' ? (t.grade === 'intern' ? 'מתמחה' : t.grade) : '',
@@ -1907,19 +1982,24 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         mmHours: t.mmHours || 0,
         mmFor: t.mmFor || '',
         monthlyExtras: t.monthlyExtras || 0,
-        official: official ?? '',
-        officialPre: t._officialGrossPre ? Number(t._officialGrossPre) : '',
-        chabad: official && t._officialGrossPre ? official - Number(t._officialGrossPre) : '',
-        social: official ? emp.social : '',
-        employer: official ? emp.total : '',
+        base:  done ? emp.base : '',
+        ofek:  t.reform === 'ofek' && t._officialGross ? Number(t._officialGross) : '',
+        chabad: done ? emp.supplement : '',
+        gross: done ? emp.gross : '',
+        social: done ? emp.social : '',
+        employer: done ? emp.total : '',
         // הדוח לא מסתיר שהמספר של מי שטרם עבר סימולציה הוא אומדן פנימי
-        source: official ? 'רשמי' : 'טרם הורצה סימולציה',
+        source: done ? 'רשמי'
+          : t.reform === 'ofek' && t._officialGross ? 'חסרה סימולציית עולם ישן'
+          : 'טרם הורצה סימולציה',
       };
     });
     const footer = {
-      name: `סה"כ (${tsOfficial.length} מורות עם שכר רשמי)`,
+      name: `סה"כ (${tsOfficial.length} מורות עם סימולציה מלאה)`,
       monthlyExtras: totMonthly,
-      official: totGross,
+      base: totBase,
+      chabad: totChabad,
+      gross: totGross,
       social: totExtras,
       employer: totEmp,
     };
@@ -1931,10 +2011,52 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   const cancelEdit = () => { setEditingId(null); setEditData(null); };
   const saveEdit = () => {
     if (!editData.name.trim()) return alert('יש למלא שם');
+    const blocked = hoursBlock(editData);
+    if (blocked) return alert(blocked);
     onSaveTeacher(editData);
     cancelEdit();
   };
   const setF = (k, v) => setEditData(p => ({ ...p, [k]: v }));
+
+  // שתי עמודות הכסף. איזה שדה נערך תלוי במסלול: במסלול אופק הבסיס הוא
+  // סימולציית העולם הישן, ובעולם ישן יש סימולציה אחת שהיא גם הבסיס.
+  const moneyEditCells = (v) => {
+    const isOfek = v.reform === 'ofek';
+    const emp = calcEmployer(v);
+    const numCell = (key) => (
+      <td><input type="number" className="apple-input" dir="ltr" value={v[key] || ''}
+        onChange={e => setF(key, e.target.value ? Number(e.target.value) : null)} placeholder="—"
+        style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>
+    );
+    return (
+      <>
+        {isPrincipal
+          ? <td style={{ textAlign:'center' }} title="נקבע בסימולציה אצל חשבת השכר">
+              {emp.base
+                ? <span style={{ fontWeight:700, color:'var(--text)' }}>{emp.base.toLocaleString('he-IL')}</span>
+                : <span className="apple-badge badge-orange" style={{ fontWeight:600 }}>נדרשת סימולציה</span>}
+            </td>
+          : numCell(isOfek ? '_officialGrossPre' : '_officialGross')}
+        {isPrincipal || !isOfek
+          ? <td style={{ textAlign:'center', color:'var(--text3)' }}>
+              {isOfek && v._officialGross ? Number(v._officialGross).toLocaleString('he-IL') : '—'}
+            </td>
+          : numCell('_officialGross')}
+        {!isPrincipal && <td style={{ textAlign:'center', color:'var(--purple)', fontWeight:700 }}>
+          {emp.supplement > 0 ? emp.supplement.toLocaleString('he-IL') + ' ₪' : '—'}
+        </td>}
+        {!isPrincipal && <td style={{ textAlign:'center', fontWeight:700 }}>
+          {emp.gross ? emp.gross.toLocaleString('he-IL') : '—'}
+        </td>}
+        {!isPrincipal && <td style={{ textAlign:'center', color:'var(--text3)' }}>
+          {emp.social ? emp.social.toLocaleString('he-IL') : '—'}
+        </td>}
+        {!isPrincipal && <td style={{ textAlign:'center', color:'var(--text3)' }}>
+          {emp.total ? emp.total.toLocaleString('he-IL') : '—'}
+        </td>}
+      </>
+    );
+  };
 
   return (
     <div style={{ minHeight:'100vh' }} dir="rtl">
@@ -1958,6 +2080,27 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               <p style={{ fontSize:13, color:'var(--text3)', marginInlineStart:13 }}>
                 {school.city}{school.city ? ' · ' : ''}מסלול {reformLabel(school.reform)}
               </p>
+              {hoursQuota && (
+                <div style={{ marginInlineStart:13, marginTop:8, maxWidth:320 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:4 }}>
+                    <span style={{ color:'var(--text3)' }}>שעות עובדי הוראה</span>
+                    <span style={{ fontWeight:700, color: freeHours < 0 ? 'var(--danger)' : 'var(--text)' }}>
+                      {usedHours.toLocaleString('he-IL')} / {hoursQuota.toLocaleString('he-IL')}
+                      <span style={{ fontWeight:500, color:'var(--text3)' }}>
+                        {' · '}{freeHours < 0 ? `חריגה של ${Math.abs(freeHours)}` : `נותרו ${freeHours}`}
+                      </span>
+                    </span>
+                  </div>
+                  <div style={{ height:6, borderRadius:999, background:'var(--fill2)', overflow:'hidden' }}>
+                    <div style={{
+                      width: `${Math.min(100, Math.round(usedHours / hoursQuota * 100))}%`,
+                      height:'100%', borderRadius:999, transition:'width .35s var(--ease-out)',
+                      background: freeHours < 0 ? 'var(--danger)'
+                        : usedHours / hoursQuota >= 0.9 ? 'var(--warn)' : 'var(--teal)',
+                    }} />
+                  </div>
+                </div>
+              )}
             </div>
             <div style={{ display:'flex', gap:7, alignItems:'center', flexWrap:'wrap' }}>
               {needsSimCount > 0 && (
@@ -2020,7 +2163,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         <div style={{ maxWidth:1400, margin:'0 auto', padding:'20px 20px 0' }}>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(155px, 1fr))', gap:12 }}>
             {[
-              { label:'מורות',          val: ts.length.toLocaleString('he-IL'), sub: `${tsOfficial.length} עם שכר רשמי` },
+              { label:'מורות',          val: ts.length.toLocaleString('he-IL'), sub: `${tsOfficial.length} עם סימולציה מלאה` },
               { label:'ברוטו / חודש',   val: totGross.toLocaleString('he-IL') + ' ₪' },
               { label:'ברוטו למעסיק',   val: totEmp.toLocaleString('he-IL') + ' ₪', sub:'כולל תוספות מעסיק' },
               { label:'עלות שנתית',     val: (totEmp*12).toLocaleString('he-IL') + ' ₪', hero:true },
@@ -2051,7 +2194,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
       <div style={{ maxWidth:1400, margin:'0 auto', padding:'18px 20px 40px' }}>
         <div className="sheet-wrap">
           <div className="sheet-scroll">
-            <table className="apple-table sticky-head" style={{ fontSize:13, minWidth:1180 }}>
+            <table className="apple-table sticky-head" style={{ fontSize:13, minWidth:1330 }}>
             <thead>
               <tr>
                 <th>שם עובדת</th>
@@ -2069,10 +2212,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <th style={{ textAlign:'center' }}>ממ"מ שעות</th>
                 <th style={{ textAlign:'center' }}>במקום מי</th>
                 <th style={{ textAlign:'center' }}>תוספות (₪)</th>
-                <th style={{ textAlign:'center' }}>שכר רשמי (₪)</th>
-                {!isPrincipal && <th style={{ textAlign:'center' }}>עולם ישן (₪)</th>}
-                {!isPrincipal && <th style={{ textAlign:'center' }}>תוספת חב"ד</th>}
-                {!isPrincipal && <th style={{ textAlign:'center' }}>הוצאות מעביד</th>}
+                <th style={{ textAlign:'center' }} title="השכר שרץ במערכת התשלומים">עולם ישן — בסיס (₪)</th>
+                <th style={{ textAlign:'center' }} title="סימולציית אופק חדש — רק למורות אופק">אופק חדש (₪)</th>
+                {!isPrincipal && <th style={{ textAlign:'center' }} title="הפער בין אופק לעולם הישן">תוספת בית חב"ד</th>}
+                {!isPrincipal && <th style={{ textAlign:'center' }}>ברוטו</th>}
+                {!isPrincipal && <th style={{ textAlign:'center' }} title={`${EMPLOYER_PCT}% על הבסיס · ${CHABAD_PCT}% על התוספת`}>הוצאות מעביד</th>}
                 {!isPrincipal && <th style={{ textAlign:'center', color:'var(--purple)' }}>סה״כ למעסיק</th>}
                 <th style={{ width:92 }}></th>
               </tr>
@@ -2111,7 +2255,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       : <span style={{ color:'var(--text3)' }}>—</span>}
                   </td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.seniority??0} onChange={e=>setF('seniority',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                  <td><input type="number" className="apple-input" dir="ltr" min="0" max="40" value={editData.frontalHours??26}
+                  <td><input type="number" className="apple-input" dir="ltr" min="0" value={editData.frontalHours??26}
+                      max={hoursCeiling(editData) ?? 40}
                       onChange={e => {
                         const hrs = Number(e.target.value);
                         // השעות הן הקלט; אחוז המשרה נגזר מהן ומהשלב, אחרי הפחתת גיל
@@ -2131,19 +2276,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.mmHours??0} onChange={e=>setF('mmHours',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td><input className="apple-input" value={editData.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם המורה" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.monthlyExtras??0} onChange={e=>setF('monthlyExtras',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:70, textAlign:'center' }} /></td>
-                  {isPrincipal
-                    ? <td style={{ textAlign:'center' }} title="נקבע בסימולציה אצל חשבת השכר">
-                        {editData._officialGross
-                          ? <span style={{ fontWeight:700, color:'var(--text)' }}>{Number(editData._officialGross).toLocaleString('he-IL')}</span>
-                          : <span className="apple-badge badge-orange" style={{ fontWeight:600 }}>נדרשת סימולציה</span>}
-                      </td>
-                    : <td><input type="number" className="apple-input" dir="ltr" value={editData._officialGross||''} onChange={e=>setF('_officialGross',e.target.value?Number(e.target.value):null)} placeholder="—" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>}
-                  {!isPrincipal && <td><input type="number" className="apple-input" dir="ltr" value={editData._officialGrossPre||''} onChange={e=>setF('_officialGrossPre',e.target.value?Number(e.target.value):null)} placeholder="—" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>}
-                  {!isPrincipal && <td style={{ textAlign:'center', color:'var(--apple-purple)', fontWeight:700 }}>
-                    {editData._officialGross && editData._officialGrossPre ? (Number(editData._officialGross)-Number(editData._officialGrossPre)).toLocaleString()+' ₪' : '—'}
-                  </td>}
-                  {!isPrincipal && <td>—</td>}
-                  {!isPrincipal && <td>—</td>}
+                  {moneyEditCells(editData)}
                   <td>
                     <div style={{ display:'flex', gap:4 }}>
                       <button className="apple-btn apple-btn-blue" onClick={saveEdit} style={{ padding:'4px 10px', fontSize:12 }}>שמור</button>
@@ -2167,8 +2300,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 const gradeLabel  = t.reform === 'ofek' ? (t.grade === 'intern' ? 'מתמחה' : `דרגה ${t.grade}`) : '—';
                 const isSim  = needsSim(t);
                 const isAppr = needsApproval(t);
-                const chabadBonus = t.reform === 'ofek' && t._officialGross && t._officialGrossPre
-                  ? Number(t._officialGross) - Number(t._officialGrossPre) : null;
+                const done   = simComplete(t);
                 const momBonus = momBonusEligible(t);
 
                 if (isEditing) return (
@@ -2203,7 +2335,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         : <span style={{ color:'var(--text3)' }}>—</span>}
                     </td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.seniority??0} onChange={e=>setF('seniority',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                    <td><input type="number" className="apple-input" dir="ltr" min="0" max="40" value={d.frontalHours??26}
+                    <td><input type="number" className="apple-input" dir="ltr" min="0" value={d.frontalHours??26}
+                      max={hoursCeiling(editData) ?? 40}
                       onChange={e => {
                         const hrs = Number(e.target.value);
                         // השעות הן הקלט; אחוז המשרה נגזר מהן ומהשלב, אחרי הפחתת גיל
@@ -2223,19 +2356,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td><input type="number" className="apple-input" dir="ltr" value={d.mmHours??0} onChange={e=>setF('mmHours',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                     <td><input className="apple-input" value={d.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם המורה" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.monthlyExtras??0} onChange={e=>setF('monthlyExtras',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:70, textAlign:'center' }} /></td>
-                    {isPrincipal
-                    ? <td style={{ textAlign:'center' }} title="נקבע בסימולציה אצל חשבת השכר">
-                        {d._officialGross
-                          ? <span style={{ fontWeight:700, color:'var(--text)' }}>{Number(d._officialGross).toLocaleString('he-IL')}</span>
-                          : <span className="apple-badge badge-orange" style={{ fontWeight:600 }}>נדרשת סימולציה</span>}
-                      </td>
-                    : <td><input type="number" className="apple-input" dir="ltr" value={d._officialGross||''} onChange={e=>setF('_officialGross',e.target.value?Number(e.target.value):null)} placeholder="—" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>}
-                    {!isPrincipal && <td><input type="number" className="apple-input" dir="ltr" value={d._officialGrossPre||''} onChange={e=>setF('_officialGrossPre',e.target.value?Number(e.target.value):null)} placeholder="—" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>}
-                    {!isPrincipal && <td style={{ textAlign:'center', color:'var(--apple-purple)', fontWeight:700 }}>
-                      {d._officialGross && d._officialGrossPre ? (Number(d._officialGross)-Number(d._officialGrossPre)).toLocaleString()+' ₪' : '—'}
-                    </td>}
-                    {!isPrincipal && <td style={{ color:'var(--apple-text3)', textAlign:'center' }}>—</td>}
-                    {!isPrincipal && <td style={{ color:'var(--apple-text3)', textAlign:'center' }}>—</td>}
+                    {moneyEditCells(d)}
                     <td>
                       <div style={{ display:'flex', gap:4 }}>
                         <button className="apple-btn apple-btn-blue" onClick={saveEdit} style={{ padding:'4px 10px', fontSize:12 }}>שמור</button>
@@ -2291,23 +2412,35 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td style={{ textAlign:'center', color: (t.monthlyExtras||0)>0 ? 'var(--text)' : 'var(--text3)', fontWeight: (t.monthlyExtras||0)>0 ? 700 : 400 }}>
                       {(t.monthlyExtras||0) > 0 ? Number(t.monthlyExtras).toLocaleString('he-IL')+' ₪' : '—'}
                     </td>
-                    <td style={{ textAlign:'center', fontWeight: t._officialGross ? 700 : 400, color: t._officialGross ? 'var(--text)' : 'var(--text3)' }}>
-                      {t._officialGross ? Number(t._officialGross).toLocaleString('he-IL') : '—'}
+                    {/* בסיס — מה שרץ במערכת התשלומים */}
+                    <td style={{ textAlign:'center', fontWeight: done ? 700 : 400, color: done ? 'var(--text)' : 'var(--text3)' }}>
+                      {emp.base ? emp.base.toLocaleString('he-IL') : '—'}
                     </td>
-                    {!isPrincipal && <td style={{ textAlign:'center', color:'var(--apple-text2)' }}>
-                      {t._officialGrossPre ? Number(t._officialGrossPre).toLocaleString() : '—'}
-                    </td>}
+                    {/* סימולציית אופק — רלוונטית רק למסלול אופק */}
+                    <td style={{ textAlign:'center', color:'var(--text2)' }}>
+                      {t.reform === 'ofek'
+                        ? (t._officialGross ? Number(t._officialGross).toLocaleString('he-IL') : '—')
+                        : <span style={{ color:'var(--text3)' }} title="עולם ישן — סימולציה אחת">—</span>}
+                    </td>
                     {!isPrincipal && <td style={{ textAlign:'center' }}>
-                      {chabadBonus != null
-                        ? <span className="apple-badge badge-purple">{chabadBonus.toLocaleString('he-IL')} ₪</span>
-                        : <span style={{ color:'var(--text3)' }}>—</span>}
+                      {emp.supplement > 0
+                        ? <span className="apple-badge badge-purple">{emp.supplement.toLocaleString('he-IL')} ₪</span>
+                        : done && t.reform === 'ofek'
+                          ? <span style={{ fontSize:11, color:'var(--text3)' }} title="שכר האופק אינו גבוה מהעולם הישן">0</span>
+                          : <span style={{ color:'var(--text3)' }}>—</span>}
                     </td>}
-                    {!isPrincipal && <td style={{ textAlign:'center', color:'var(--text2)' }}>
-                      {t._officialGross ? emp.social.toLocaleString('he-IL') : '—'}
+                    {!isPrincipal && <td style={{ textAlign:'center', fontWeight: done ? 700 : 400, color: done ? 'var(--text)' : 'var(--text3)' }}>
+                      {done ? emp.gross.toLocaleString('he-IL') : '—'}
                     </td>}
-                    {!isPrincipal && <td style={{ textAlign:'center', fontWeight:800, color: t._officialGross ? 'var(--purple)' : 'var(--text3)' }}>
-                      {t._officialGross ? emp.total.toLocaleString('he-IL')+' ₪'
-                        : <span className="apple-badge badge-orange" style={{ fontWeight:600 }}>נדרשת סימולציה</span>}
+                    {!isPrincipal && <td style={{ textAlign:'center', color:'var(--text2)' }}
+                      title={done ? `${emp.employerBase.toLocaleString('he-IL')} על הבסיס · ${emp.employerSupp.toLocaleString('he-IL')} על התוספת` : undefined}>
+                      {done ? emp.social.toLocaleString('he-IL') : '—'}
+                    </td>}
+                    {!isPrincipal && <td style={{ textAlign:'center', fontWeight:800, color: done ? 'var(--purple)' : 'var(--text3)' }}>
+                      {done ? emp.total.toLocaleString('he-IL')+' ₪'
+                        : <span className="apple-badge badge-orange" style={{ fontWeight:600 }}>
+                            {t.reform === 'ofek' && t._officialGross && !t._officialGrossPre ? 'חסרה סימולציית עולם ישן' : 'נדרשת סימולציה'}
+                          </span>}
                     </td>}
                     <td>
                       <div style={{ display:'flex', gap:4 }}>
@@ -2329,11 +2462,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
             {tsOfficial.length > 0 && !isPrincipal && (
               <tfoot>
                 <tr>
-                  <td colSpan={14} style={{ fontWeight:700 }}>סה״כ ({tsOfficial.length} מורות עם שכר רשמי)</td>
+                  <td colSpan={14} style={{ fontWeight:700 }}>סה״כ ({tsOfficial.length} מורות עם סימולציה מלאה)</td>
                   <td style={{ textAlign:'center', fontWeight:700 }}>{totMonthly > 0 ? totMonthly.toLocaleString('he-IL') + ' ₪' : '—'}</td>
+                  <td style={{ textAlign:'center', fontWeight:700 }}>{totBase.toLocaleString('he-IL')} ₪</td>
+                  <td></td>
+                  <td style={{ textAlign:'center', fontWeight:700, color:'var(--purple)' }}>{totChabad.toLocaleString('he-IL')} ₪</td>
                   <td style={{ textAlign:'center', fontWeight:700 }}>{totGross.toLocaleString('he-IL')} ₪</td>
-                  <td></td>
-                  <td></td>
                   <td style={{ textAlign:'center', fontWeight:700 }}>{totExtras.toLocaleString('he-IL')} ₪</td>
                   <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>{totEmp.toLocaleString('he-IL')} ₪</td>
                   <td></td>
@@ -2350,7 +2484,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
           teacher={fullEdit}
           schools={[school]}
           userRole={userRole}
-          onSave={t2 => { onSaveTeacher(t2); setFullEdit(null); }}
+          onSave={t2 => {
+            const blocked = hoursBlock(t2);
+            if (blocked) return alert(blocked);
+            onSaveTeacher(t2);
+            setFullEdit(null);
+          }}
           onClose={() => setFullEdit(null)}
         />
       )}
@@ -2374,11 +2513,13 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 function ReportView({ schools, teachers }) {
   const rows = schools.map(s => {
     const ts       = teachers.filter(t => t.schoolId === s.id);
-    const tsOff    = ts.filter(t => t._officialGross);
-    const gross    = tsOff.reduce((sum, t) => sum + Number(t._officialGross), 0);
+    const tsOff    = ts.filter(simComplete);
+    const gross    = tsOff.reduce((sum, t) => sum + calcEmployer(t).gross, 0);
     const empTot   = tsOff.reduce((sum, t) => sum + calcEmployer(t).total, 0);
     const pending  = ts.filter(isPending).length;
-    return { ...s, count: ts.length, officialCount: tsOff.length, gross, empTot, annual: empTot * 12, pending };
+    const usedHours = ts.reduce((sum, t) => sum + (Number(t.frontalHours) || 0), 0);
+    return { ...s, count: ts.length, officialCount: tsOff.length, gross, empTot,
+             annual: empTot * 12, pending, usedHours, quota: Number(s.hoursQuota) || null };
   }).sort((a,b) => b.empTot - a.empTot);
 
   const totGross  = rows.reduce((s,r) => s + r.gross, 0);
@@ -2387,20 +2528,25 @@ function ReportView({ schools, teachers }) {
   const totCount  = rows.reduce((s,r) => s + r.count, 0);
   const totPending = rows.reduce((s,r) => s + r.pending, 0);
   const totOfficial = rows.reduce((s,r) => s + r.officialCount, 0);
+  const totUsedHours = rows.reduce((s,r) => s + r.usedHours, 0);
+  const totQuota     = rows.reduce((s,r) => s + (r.quota || 0), 0) || null;
 
   const exportCSV = () => {
     const headers = [
       { key:'name', label:'בית ספר' }, { key:'city', label:'עיר' },
-      { key:'count', label:'מורות' }, { key:'officialCount', label:'מתוכן עם שכר רשמי' },
+      { key:'count', label:'מורות' }, { key:'officialCount', label:'מתוכן עם סימולציה מלאה' },
+      { key:'usedHours', label:'שעות בשימוש' }, { key:'quota', label:'מכסת שעות' },
       { key:'gross', label:'ברוטו / חודש (₪)' }, { key:'empTot', label:'ברוטו למעסיק (₪)' },
       { key:'annual', label:'עלות שנתית (₪)' }, { key:'pending', label:'ממתינים לאישור' },
     ];
     const body = rows.map(r => ({
       name: r.name, city: r.city || '', count: r.count, officialCount: r.officialCount,
+      usedHours: r.usedHours, quota: r.quota || '',
       gross: r.gross || '', empTot: r.empTot || '', annual: r.annual || '', pending: r.pending,
     }));
     const footer = {
       name: 'סה"כ רשת', count: totCount, officialCount: totOfficial,
+      usedHours: totUsedHours, quota: totQuota || '',
       gross: totGross, empTot: totEmp, annual: totAnnual, pending: totPending,
     };
     downloadCSV(headers, body, `דוח_רשת_${stampToday()}.csv`, footer);
@@ -2451,6 +2597,7 @@ function ReportView({ schools, teachers }) {
                 <th>בית ספר</th>
                 <th>עיר</th>
                 <th style={{ textAlign:'center' }}>מורות</th>
+                <th style={{ textAlign:'center' }}>שעות / מכסה</th>
                 <th style={{ textAlign:'center' }}>ברוטו / חודש</th>
                 <th style={{ textAlign:'center' }}>ברוטו למעסיק</th>
                 <th style={{ textAlign:'center', color:'var(--apple-purple)' }}>עלות שנתית</th>
@@ -2470,6 +2617,11 @@ function ReportView({ schools, teachers }) {
                       </span>
                     )}
                   </td>
+                  <td style={{ textAlign:'center', fontWeight:600,
+                    color: r.quota && r.usedHours > r.quota ? 'var(--danger)'
+                         : r.quota && r.usedHours / r.quota >= 0.9 ? 'var(--warn)' : 'var(--text2)' }}>
+                    {r.quota ? `${r.usedHours} / ${r.quota}` : (r.usedHours || '—')}
+                  </td>
                   <td style={{ textAlign:'center', color:'var(--text)', fontWeight:600 }}>{r.gross>0 ? r.gross.toLocaleString('he-IL')+' ₪' : '—'}</td>
                   <td style={{ textAlign:'center', fontWeight:700, color:'var(--text)' }}>{r.empTot>0 ? r.empTot.toLocaleString('he-IL')+' ₪' : '—'}</td>
                   <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>{r.annual>0 ? r.annual.toLocaleString('he-IL')+' ₪' : '—'}</td>
@@ -2485,6 +2637,7 @@ function ReportView({ schools, teachers }) {
               <tr>
                 <td colSpan={2} style={{ fontWeight:800 }}>סה״כ רשת</td>
                 <td style={{ textAlign:'center', fontWeight:700 }}>{totCount}</td>
+                <td style={{ textAlign:'center', fontWeight:700 }}>{totUsedHours}{totQuota ? ` / ${totQuota}` : ''}</td>
                 <td style={{ textAlign:'center', fontWeight:700, color:'var(--text)' }}>{totGross.toLocaleString('he-IL')} ₪</td>
                 <td style={{ textAlign:'center', fontWeight:700, color:'var(--text)' }}>{totEmp.toLocaleString('he-IL')} ₪</td>
                 <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>{totAnnual.toLocaleString('he-IL')} ₪</td>
@@ -2494,8 +2647,9 @@ function ReportView({ schools, teachers }) {
           </table>
           </div>
         </div>
-        <p style={{ fontSize:11, color:'var(--text3)', marginTop:10, padding:'0 4px' }}>
-          ברוטו למעסיק = ברוטו + {EMPLOYER_PCT}% הוצאות מעביד · ביגוד והבראה כלולים בשיעור הזה
+        <p style={{ fontSize:11, color:'var(--text3)', marginTop:10, padding:'0 4px', lineHeight:1.7 }}>
+          התשלומים רצים במערכת של עולם ישן. הפער עד שכר האופק משולם כתוספת בית חב"ד.<br/>
+          ברוטו למעסיק = בסיס + {EMPLOYER_PCT}% · תוספת בית חב"ד + {CHABAD_PCT}% · ביגוד והבראה כלולים בשיעורים האלה
         </p>
       </div>
     </div>
@@ -2505,6 +2659,32 @@ function ReportView({ schools, teachers }) {
 /* ═══════════════════════════════════════════════════════════════
    SIMULATOR VIEW — חשבת שכר עורכת סימולציה
 ═══════════════════════════════════════════════════════════════ */
+// שלב הזנה אחד במסך החשבת. הקלקה על השדה מחליפה את המחשבון שמוצג לצידו,
+// כדי שהמספר יוקלד מהמסך הנכון.
+function SimStep({ n, label, calcLabel, active, onFocus, value, onChange, onEnter, autoFocus }) {
+  return (
+    <div style={{ marginBottom:8 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4 }}>
+        <span style={{
+          width:18, height:18, borderRadius:'50%', flexShrink:0, fontSize:11, fontWeight:800,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          background: value ? 'var(--ok)' : active ? 'var(--purple)' : 'var(--fill2)',
+          color: (value || active) ? '#fff' : 'var(--text3)',
+        }}>{value ? '✓' : n}</span>
+        <span style={{ fontSize:12, fontWeight:700, color:'var(--text2)' }}>{label}</span>
+        {active && <span style={{ fontSize:10.5, color:'var(--purple)' }}>← {calcLabel}</span>}
+      </div>
+      <input type="number" className="apple-input" dir="ltr" autoFocus={autoFocus}
+        placeholder={`שכר משולב מ${calcLabel}`}
+        value={value}
+        onFocus={onFocus}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onEnter(); } }}
+        style={{ fontSize:14, minHeight:38, borderColor: active ? 'var(--purple)' : undefined }} />
+    </div>
+  );
+}
+
 function SimulatorView({ teachers, schools, onSaveGross }) {
   const [calc, setCalc] = useState('ofek');
   const [filterSchool, setFilterSchool] = useState('all');
@@ -2540,9 +2720,11 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
   };
 
   const handleSave = (t) => {
-    const val = inputs[t.id];
+    const val = inputs[t.id] ?? t._officialGross;
     if (!val || isNaN(Number(val))) return;
-    const pre = preInputs[t.id];
+    const pre = preInputs[t.id] ?? t._officialGrossPre;
+    // מורת אופק לא נשמרת בלי שתי הסימולציות — הפער ביניהן הוא רכיב התשלום
+    if (t.reform === 'ofek' && (!pre || isNaN(Number(pre)))) return;
     onSaveGross(t.id, Number(val), pre && !isNaN(Number(pre)) ? Number(pre) : undefined);
     setSaved(prev => ({ ...prev, [t.id]: true }));
     setTimeout(() => setSaved(prev => { const n={...prev}; delete n[t.id]; return n; }), 1500);
@@ -2620,6 +2802,12 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                   const est = calcGross(t);
                   const isActive = activeId === t.id;
                   const wasSaved = saved[t.id];
+                  const isOfek   = t.reform === 'ofek';
+                  const preVal   = preInputs[t.id] ?? (t._officialGrossPre || '');
+                  const mainVal  = inputs[t.id] ?? (t._officialGross || '');
+                  // שלב 2 הוא המחשבון של המורה — למנהלת בית ספר זה אופק ניהול
+                  const step2Calc  = calcForTeacher(t);
+                  const step2Label = (CALCULATORS.find(c => c.id === step2Calc) || CALCULATORS[0]).label;
                   return (
                     <div key={t.id} onClick={() => selectTeacher(t)}
                       className="apple-card"
@@ -2638,39 +2826,66 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                       </div>
                       {isActive && (
                         <>
-                        {t.reform === 'ofek' && (
-                          <div style={{ marginBottom:8 }}>
-                            <p className="apple-label" style={{ marginBottom:4 }}>סימולציית עולם ישן (לא חובה)</p>
-                            <input type="number" className="apple-input" dir="ltr"
-                              placeholder="שכר באותם נתונים במחשבון העולם הישן"
-                              value={preInputs[t.id] ?? (t._officialGrossPre || '')}
-                              onChange={e => setPreInputs(prev => ({ ...prev, [t.id]: e.target.value }))}
-                              onKeyDown={e => e.key === 'Enter' && handleSave(t)}
-                              style={{ fontSize:13.5, minHeight:38 }}
+                        {isOfek ? (
+                          <>
+                            {/* שלב 1 — העולם הישן. זה מה שרץ במערכת התשלומים. */}
+                            <SimStep
+                              n={1} label="עולם ישן — בסיס" calcLabel="מחשבון העולם הישן"
+                              active={calc === 'old'} onFocus={() => setCalc('old')}
+                              value={preVal}
+                              onChange={v => setPreInputs(prev => ({ ...prev, [t.id]: v }))}
+                              onEnter={() => setCalc(step2Calc)}
+                              autoFocus={!preVal}
                             />
-                            <p style={{ fontSize:11, color:'var(--text3)', marginTop:4 }}>
-                              ההפרש בין השניים הוא תוספת בית חב"ד. בלי השדה הזה היא לא מחושבת.
-                            </p>
+                            {/* שלב 2 — האופק. הפער בין השניים הוא רכיב התוספת. */}
+                            <SimStep
+                              n={2} label={step2Label} calcLabel={`מחשבון ${step2Label}`}
+                              active={calc === step2Calc} onFocus={() => setCalc(step2Calc)}
+                              value={mainVal}
+                              onChange={v => setInputs(prev => ({ ...prev, [t.id]: v }))}
+                              onEnter={() => handleSave(t)}
+                              autoFocus={!!preVal && !mainVal}
+                            />
+                          </>
+                        ) : (
+                          <div style={{ marginBottom:8 }}>
+                            <p className="apple-label" style={{ marginBottom:4 }}>שכר משולב — מחשבון העולם הישן</p>
+                            <input type="number" className="apple-input" dir="ltr" autoFocus
+                              placeholder="שכר משולב מהסימולטור"
+                              value={mainVal}
+                              onChange={e => setInputs(prev => ({ ...prev, [t.id]: e.target.value }))}
+                              onKeyDown={e => e.key === 'Enter' && handleSave(t)}
+                              style={{ fontSize:14 }} />
                           </div>
                         )}
-                        <div style={{ display:'flex', gap:8 }}>
-                          <input type="number" className="apple-input" dir="ltr"
-                            placeholder="שכר משולב מהסימולטור"
-                            value={inputs[t.id] || ''}
-                            onChange={e => setInputs(prev => ({ ...prev, [t.id]: e.target.value }))}
-                            onKeyDown={e => e.key === 'Enter' && handleSave(t)}
-                            autoFocus
-                            style={{ fontSize:14 }}
-                          />
-                          <button className="apple-btn" onClick={() => handleSave(t)} disabled={!inputs[t.id]}
-                            style={{
-                              fontSize:13, padding:'8px 14px', flexShrink:0,
-                              background: wasSaved ? 'var(--apple-green)' : inputs[t.id] ? 'var(--apple-blue)' : 'var(--apple-fill2)',
-                              color: (wasSaved || inputs[t.id]) ? '#fff' : 'var(--apple-text3)',
-                            }}>
-                            {wasSaved ? <Check size={15} strokeWidth={2.8} /> : 'שמור'}
-                          </button>
-                        </div>
+
+                        {/* הפער מתעדכן חי מול מה שהוקלד */}
+                        {isOfek && preVal && mainVal && (
+                          <div style={{ background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:10, padding:'8px 11px', marginBottom:8, fontSize:12.5 }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)' }}>
+                              <span>תוספת בית חב"ד</span>
+                              <span className="num" style={{ fontWeight:800, color:'var(--purple)' }}>
+                                {Math.max(0, Number(mainVal) - Number(preVal)).toLocaleString('he-IL')} ₪
+                              </span>
+                            </div>
+                            {Number(mainVal) < Number(preVal) && (
+                              <p style={{ fontSize:11, color:'var(--warn)', marginTop:4 }}>
+                                האופק נמוך מהעולם הישן — התוספת 0, והעובדת נשארת עם שכר העולם הישן.
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <button className="apple-btn" onClick={() => handleSave(t)}
+                          disabled={!mainVal || (isOfek && !preVal)}
+                          title={isOfek && !preVal ? 'נדרשות שתי הסימולציות' : undefined}
+                          style={{
+                            width:'100%', fontSize:13.5, minHeight:38,
+                            background: wasSaved ? 'var(--ok)' : (mainVal && (!isOfek || preVal)) ? 'var(--purple)' : 'var(--fill2)',
+                            color: (wasSaved || (mainVal && (!isOfek || preVal))) ? '#fff' : 'var(--text3)',
+                          }}>
+                          {wasSaved ? <Check size={15} strokeWidth={2.8} /> : 'שמור'}
+                        </button>
                         </>
                       )}
                     </div>
@@ -2682,8 +2897,8 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
         </div>
 
         <div style={{ borderTop:'1px solid var(--apple-fill2)', background:'var(--apple-surface)', padding:'10px 16px' }}>
-          <p style={{ fontSize:12, color:'var(--apple-text3)', textAlign:'center' }}>
-            הזן "שכר משולב" מהסימולטור הרשמי · Enter לשמור ומעבר למורה הבא
+          <p style={{ fontSize:12, color:'var(--text3)', textAlign:'center', lineHeight:1.6 }}>
+            למורת אופק: קודם עולם ישן, אחריו אופק · Enter עובר לשלב הבא ומהשלב האחרון שומר
           </p>
         </div>
       </div>
@@ -3154,6 +3369,9 @@ export default function App() {
                   const empTot  = ts.reduce((sum, t) => sum + calcEmployer(t).total, 0);
                   const simN    = ts.filter(needsSim).length;
                   const apprN   = ts.filter(needsApproval).length;
+                  const used    = ts.reduce((sum, t) => sum + (Number(t.frontalHours) || 0), 0);
+                  const quota   = Number(s.hoursQuota) || null;
+                  const overQuota = quota ? used > quota : false;
                   return (
                     <div key={s.id} className="apple-card"
                       style={{ padding:20, cursor:'pointer', transition:'transform .18s var(--ease-out), box-shadow .18s',
@@ -3178,14 +3396,20 @@ export default function App() {
                           <button className="apple-btn apple-btn-ghost" title="מחיקה" onClick={() => { if(window.confirm(`למחוק את ${s.name}?`)) onDeleteSchool(s.id); }} style={{ padding:'0 10px', minHeight:32, color:'var(--danger)' }}><Trash2 size={14} strokeWidth={2.2} /></button>
                         </div>
                       </div>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
-                        <div style={{ background:'var(--apple-fill)', borderRadius:12, padding:'10px 12px', textAlign:'center' }}>
-                          <p style={{ fontSize:11, color:'var(--apple-text2)', marginBottom:2 }}>מורים</p>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
+                        <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
+                          <p style={{ fontSize:11, color:'var(--text2)', marginBottom:2 }}>מורים</p>
                           <p className="num" style={{ fontWeight:800, fontSize:22, color:'var(--text)', letterSpacing:'-0.02em' }}>{ts.length}</p>
                         </div>
-                        <div style={{ background:'var(--apple-fill)', borderRadius:12, padding:'10px 12px', textAlign:'center' }}>
-                          <p style={{ fontSize:11, color:'var(--apple-text2)', marginBottom:2 }}>למעסיק/חודש</p>
-                          <p style={{ fontWeight:700, fontSize:14, color:'var(--apple-text)', letterSpacing:'-0.01em' }}>{empTot > 0 ? empTot.toLocaleString()+' ₪' : '—'}</p>
+                        <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
+                          <p style={{ fontSize:11, color:'var(--text2)', marginBottom:2 }}>שעות</p>
+                          <p className="num" style={{ fontWeight:700, fontSize:14, color: overQuota ? 'var(--danger)' : 'var(--text)' }}>
+                            {quota ? `${used} / ${quota}` : used || '—'}
+                          </p>
+                        </div>
+                        <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
+                          <p style={{ fontSize:11, color:'var(--text2)', marginBottom:2 }}>למעסיק/חודש</p>
+                          <p className="num" style={{ fontWeight:700, fontSize:14, color:'var(--text)', letterSpacing:'-0.01em' }}>{empTot > 0 ? empTot.toLocaleString('he-IL')+' ₪' : '—'}</p>
                         </div>
                       </div>
                       <button className="apple-btn apple-btn-ghost" onClick={e => { e.stopPropagation(); setTeacherModal({ ...EMPTY_TEACHER, schoolId: s.id, reform: s.reform || 'ofek' }); }}

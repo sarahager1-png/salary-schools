@@ -6,7 +6,7 @@ const mk = (o) => ({
   grade: 5, degree: 'BA', seniority: 12, frontalHours: 26, scopePct: 100, scope: 100,
   role: 'none', ageGroup: 'none', isTemp: false, scopeChanges: [], childrenUnder18: 0,
   _files: [], sickFiles: [], absenceDays: 0, mmHours: 0, mmFor: '', monthlyExtras: 0,
-  _officialGross: 12500, _officialGrossPre: null, _changedAt: null, _approved: true,
+  _officialGross: 12500, _officialGrossPre: 11200, _changedAt: null, _approved: true,
   _approvedAt: '2026-08-20T10:00:00.000Z', _snapshot: null, ...o,
 });
 const T = [mk({ id: 't1', name: 'חנה לוי' }), mk({ id: 't2', name: 'מרים כהן' })];
@@ -35,7 +35,7 @@ await seed(T);
 
 // ══ 1. role / level / ageGroup — כולם משנים שכר וכולם היו חסרים מ-BASE_FIELDS ══
 for (const [label, apply] of [
-  ['תפקיד',      async () => { await p.locator('select').last().selectOption('vp'); }],
+  ['תפקיד',      async () => { await p.locator('select').last().selectOption('counselor2'); }],
   ['שלב',        async () => { await p.getByRole('button', { name: 'חטיבת ביניים' }).click(); }],
   ['קבוצת גיל',  async () => { await p.getByRole('button', { name: 'גיל 55+ (ותיק/ה)' }).click(); }],
 ]) {
@@ -81,7 +81,8 @@ check('עולם ישן — השינוי מופיע ב-diff', !!kidsPre._snapshot
 // עוד לא בתור האישורים. נזרע ישירות מורה שממתינה לאישור עם אותו שינוי.
 await seed([mk({
   id: 't1', name: 'ממתינה לאישור', childrenUnder18: 3, isTemp: true,
-  _changedAt: '2026-08-21T10:00:00.000Z', _approved: false, _officialGross: 12500,
+  _changedAt: '2026-08-21T10:00:00.000Z', _approved: false,
+  _officialGross: 12500, _officialGrossPre: 11200,
   _snapshot: { childrenUnder18: 0, isTemp: false, role: 'none' },
 })]);
 await p.locator('.nav-btn').filter({ hasText: /לאישור|אישורים/ }).first().click(); await p.waitForTimeout(600);
@@ -95,7 +96,7 @@ check('אין שורת diff בלי תווית', !(await p.getByText(/^undefined/
 
 // ══ 3. "אשר הכל" מאשר רק את מי שממתין לאישור ══
 await seed([
-  mk({ id: 't1', name: 'ממתינה לאישור', _changedAt: '2026-08-21T10:00:00.000Z', _approved: false, _officialGross: 12500, _snapshot: { seniority: 10 } }),
+  mk({ id: 't1', name: 'ממתינה לאישור', _changedAt: '2026-08-21T10:00:00.000Z', _approved: false, _officialGross: 12500, _officialGrossPre: 11200, _snapshot: { seniority: 10 } }),
   mk({ id: 't2', name: 'ממתינה לסימולציה', _changedAt: '2026-08-21T10:00:00.000Z', _approved: false, _officialGross: null, _snapshot: { seniority: 10 } }),
   mk({ id: 't3', name: 'לא שינתה כלום', _changedAt: null, _approved: false, _officialGross: null }),
 ]);

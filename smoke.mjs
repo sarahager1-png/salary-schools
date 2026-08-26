@@ -65,7 +65,8 @@ check('TeacherModal נפתח', await p.getByText('הוספת מורה').first().
 
 // ── the fields that only exist in TeacherModal ──
 const roleOpts = await p.locator('select').last().locator('option').allTextContents();
-check('בורר גמול התפקיד נגיש', roleOpts.some(o => o.includes('סגן/ית מנהל')), `${roleOpts.length} תפקידים`);
+check('בורר גמול התפקיד נגיש', roleOpts.some(o => o.includes('יועץ/ת (רישיון קבוע)')), `${roleOpts.length} תפקידים`);
+check('אין תפקיד סגנית — אין סגניות ברשת', !roleOpts.some(o => o.includes('סגן')), roleOpts.length + ' תפקידים');
 check('בורר קבוצת גיל נגיש', await p.getByRole('button', { name: 'גיל 50–55' }).isVisible().catch(() => false));
 check('בורר שלב חינוך נגיש', await p.getByRole('button', { name: 'חטיבת ביניים' }).isVisible().catch(() => false));
 check('כפתור פתיחת הסימולטור נגיש', await p.getByRole('button', { name: 'פתח סימולטור' }).isVisible().catch(() => false));

@@ -39,7 +39,7 @@ await p.evaluate(() => {
   const m = JSON.parse(localStorage.getItem('ss-months-v1'));
   const k = Object.keys(m).sort(); const cur = m[k[k.length - 1]];
   const sc = JSON.parse(localStorage.getItem('ss-schools-v2')).find(x => x.name === 'שלהבות אשקלון');
-  cur.filter(t => t.schoolId === sc.id).forEach(t => { t._officialGross = 10000; });
+  cur.filter(t => t.schoolId === sc.id).forEach(t => { t._officialGross = 10000; t._officialGrossPre = 10000; });
   localStorage.setItem('ss-months-v1', JSON.stringify(m));
 });
 await p.reload(); await p.waitForTimeout(400);
@@ -54,15 +54,21 @@ check('שכר המנהלת נכנס לעלות המעסיק', stats.includes('14
 await p.evaluate(() => {
   const m = JSON.parse(localStorage.getItem('ss-months-v1'));
   const k = Object.keys(m).sort(); const cur = m[k[k.length - 1]];
-  cur.forEach(t => { t._officialGross = null; t._changedAt = '2026-08-21T10:00:00.000Z'; t._approved = false; });
+  cur.forEach(t => { t._officialGross = null; t._officialGrossPre = null; t._changedAt = '2026-08-21T10:00:00.000Z'; t._approved = false; });
   localStorage.setItem('ss-months-v1', JSON.stringify(m));
 });
 await p.reload(); await p.waitForTimeout(500);
 await p.getByText('חשבת שכר').click(); await p.waitForTimeout(300);
 await p.getByText('כניסה למערכת').click(); await p.waitForTimeout(1200);
 await p.getByText('מנהלת בית הספר').first().click(); await p.waitForTimeout(600);
-const src = await p.locator('iframe').first().getAttribute('src');
-check('לחיצה על המנהלת פותחת את מחשבון אופק — ניהול', src.endsWith('OfekNihul'), src);
+const src1 = await p.locator('iframe').first().getAttribute('src');
+check('שלב 1 של המנהלת — מחשבון העולם הישן', src1.endsWith('OldWorld'), src1);
+// שלב 2 שלה הוא אופק ניהול, לא אופק חדש
+await p.getByPlaceholder('שכר משולב ממחשבון העולם הישן').fill('15000');
+await p.getByPlaceholder('שכר משולב ממחשבון העולם הישן').press('Enter');
+await p.waitForTimeout(500);
+const src2 = await p.locator('iframe').first().getAttribute('src');
+check('שלב 2 של המנהלת פותח את אופק — ניהול', src2.endsWith('OfekNihul'), src2);
 
 // ══ 5. a newly created school gets one too ══
 await p.getByRole('button', { name: 'יציאה' }).click(); await p.waitForTimeout(300);
