@@ -16,9 +16,16 @@
 const OFEK_DERUG = { intern: '100', BA: '101', MA: '102', senior: '104', unlicensed: '106' };
 const ofekDarga  = g => String(Math.max(1, Math.min(17, Math.round(Number(g) || 1) * 2 - 1)));
 
-// ── עולם ישן ─────────────────────────────────────────────────
-// אין באתר "מתמחה" ואין "לא מוסמך" — לכן הם אינם ממופים.
-const OLD_DARGA = { MA: '2', BA: '3', senior: '7' };
+/*
+  ── עולם ישן ─────────────────────────────────────────────────
+  רשימת הדרגות כאן היא בת 19 ערכים, ולא תשעה כפי שנראה בסריקה
+  חלקית: מתמחים ובלתי מוסמכים נמצאים בסופה. שלא כמו באופק, שבו
+  "בלתי מוסמכים" הוא ערך אחד, בעולם הישן הוא מפוצל לארבעה שלבים
+  שאינם משתלמים אותו דבר — ולכן אי אפשר לבחור אחד מהם באקראי.
+*/
+const OLD_DARGA = { MA: '2', BA: '3', senior: '7', intern: '18' };
+const OLD_UNLICENSED = { aa: '10', 'a+': '11', a: '12', b: '13' };
+const OLD_UNLICENSED_HE = 'שלב אא · שלב א+ · שלב א · שלב ב';
 
 // ── אופק ניהול ───────────────────────────────────────────────
 const NIHUL_DERUG = { BA: '110', MA: '110', senior: '111', unlicensed: '113' };
@@ -60,8 +67,18 @@ export function ofekRequest(t, monthKey) {
 }
 
 export function oldRequest(t, monthKey) {
-  const darga = OLD_DARGA[t.degree];
-  if (!darga) return { skip: `אין במחשבון העולם הישן תואר "${DEGREE_HE[t.degree] || t.degree}"` };
+  // בלתי מוסמך — ארבעה שלבים בשכר שונה. בלי לדעת באיזה היא, מספר
+  // השכר יהיה ניחוש, ולכן השורה חוזרת להזנה ידנית עם הסיבה.
+  const darga = t.degree === 'unlicensed'
+    ? OLD_UNLICENSED[t.unlicensedStage]
+    : OLD_DARGA[t.degree];
+  if (!darga) {
+    return {
+      skip: t.degree === 'unlicensed'
+        ? `בלתי מוסמך בעולם הישן מפוצל לארבעה שלבים — יש לבחור אחד: ${OLD_UNLICENSED_HE}`
+        : `אין במחשבון העולם הישן תואר "${DEGREE_HE[t.degree] || t.degree}"`,
+    };
+  }
   return {
     endpoint: 'old',
     body: {

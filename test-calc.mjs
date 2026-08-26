@@ -66,9 +66,14 @@ try{
 
   // ── מורה שאי אפשר לתרגם אינה מנוחשת ──
   const s1=oldRequest({...T,degree:'intern'},MONTH);
-  check('מתמחה בעולם ישן — לא מנוחשת', !!s1.skip, s1.skip||'עברה בטעות!');
+  check('מתמחה בעולם ישן -> דרגה 18', s1.body?.DARGA==='18', s1.skip||s1.body?.DARGA);
   const s2=oldRequest({...T,degree:'unlicensed'},MONTH);
-  check('לא מוסמכת בעולם ישן — לא מנוחשת', !!s2.skip, s2.skip||'עברה בטעות!');
+  check('בלתי מוסמכת בלי שלב — לא מנוחשת', !!s2.skip, s2.skip? '' : 'עברה בטעות!');
+  for (const [stage,val] of [['aa','10'],['a+','11'],['a','12'],['b','13']]) {
+    const r=oldRequest({...T,degree:'unlicensed',unlicensedStage:stage},MONTH);
+    check(`בלתי מוסמכת שלב ${stage} -> ${val}`, r.body?.DARGA===val, r.skip||r.body?.DARGA);
+  }
+  check('מתמחה באופק -> DERUG_OFEK=100', ofekRequest({...T,degree:'intern'},MONTH).body.DERUG_OFEK==='100');
 
   // ── דרגה 5 היא הערך 9 באתר ──
   check('דרגה 5 -> DARGA1=9', ofekRequest({...T,grade:5},MONTH).body.DARGA1==='9', ofekRequest({...T,grade:5},MONTH).body.DARGA1);
