@@ -15,7 +15,6 @@ const SCHOOLS = [
   { name: 'שלהבות ירושלים',     city: 'ירושלים',     reform: 'pre'  },
   { name: 'שלהבות גני תקוה',    city: 'גני תקוה',    reform: 'ofek' },
   { name: 'שלהבות רמת ישי',     city: 'רמת ישי',     reform: 'ofek' },
-  { name: 'שלהבות קרית ביאליק', city: 'קרית ביאליק', reform: 'ofek' },
   { name: 'בית חינוך עפולה',    city: 'עפולה',       reform: 'pre'  },
 ];
 

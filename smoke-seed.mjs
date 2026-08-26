@@ -7,10 +7,10 @@ await p.evaluate(() => localStorage.clear());
 await p.reload(); await p.waitForTimeout(500);
 await p.getByText('כניסה למערכת').click(); await p.waitForTimeout(600);
 const names = await p.evaluate(() => JSON.parse(localStorage.getItem('ss-schools-v2')).map(s=>s.name));
-const want = ['בית חינוך רעננה','שלהבות מזכרת בתיה','שלהבות אשקלון','שלהבות אור עקיבא','שלהבות ירושלים','שלהבות גני תקוה','שלהבות רמת ישי','שלהבות קרית ביאליק','בית חינוך עפולה'];
-check('נזרעו 9 בתי ספר', names.length===9, `${names.length}: ${names.join(', ')}`);
+const want = ['בית חינוך רעננה','שלהבות מזכרת בתיה','שלהבות אשקלון','שלהבות אור עקיבא','שלהבות ירושלים','שלהבות גני תקוה','שלהבות רמת ישי','בית חינוך עפולה'];
+check('נזרעו 8 בתי ספר', names.length===8, `${names.length}: ${names.join(', ')}`);
 check('כל השמות תואמים לרשימה', want.every(w=>names.includes(w)), names.filter(n=>!want.includes(n)).join(', ')||'—');
-check('אין הרצליה/חיפה/באר שבע', !names.some(n=>/הרצליה|חיפה|באר שבע/.test(n)));
+check('אין הרצליה/חיפה/באר שבע/קרית ביאליק', !names.some(n=>/הרצליה|חיפה|באר שבע|ביאליק/.test(n)));
 check('כולם מוצגים על המסך', (await p.getByText('שלהבות אשקלון').count())>0 && (await p.getByText('בית חינוך עפולה').count())>0);
 // מסלול: ירושלים ועפולה עולם ישן, השאר אופק
 const byName = await p.evaluate(() => Object.fromEntries(
