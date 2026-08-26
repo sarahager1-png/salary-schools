@@ -23,6 +23,8 @@ const USERS = {
   principal:   'store-prin@example.com',
   network:     'store-net@example.com',
 };
+// מאשר ייעודי לבית ספר אחד — כמו מענדי לעפולה וחנה לרעננה
+const DEDICATED = 'store-dedicated@example.com';
 const ids = {};
 let schoolId, otherId, teacherId;
 const MONTH = '2098-01';
@@ -32,7 +34,7 @@ const TEST_SCHOOLS = ['סטור א', 'סטור ב'];
 async function cleanup() {
   // המשתמשים קודם: הפרופילים שלהם מצביעים על בתי הספר של הבדיקה
   const { data } = await admin.auth.admin.listUsers();
-  for (const email of [...Object.values(USERS), 'store-ghost@example.com']) {
+  for (const email of [...Object.values(USERS), DEDICATED, 'store-ghost@example.com']) {
     const u = data?.users?.find(x => x.email === email);
     if (u) {
       await admin.from('profiles').delete().eq('id', u.id);
@@ -145,7 +147,34 @@ try {
   const { error: lockedErr } = await cli.from('teacher_months').update({ frontal_hours: 5 }).eq('id', teacherId);
   check('חודש נעול חוסם את המנהלת', !!lockedErr, lockedErr?.message?.slice(0, 50) || 'לא נחסמה');
 
-  // ── 8. משתמש בלי פרופיל ──
+  // ── 8. מאשר ייעודי לבית ספר ──
+  // מענדי מאשר את עפולה, חנה את רעננה, רינה את כל השאר.
+  const { data: ded } = await admin.auth.admin.createUser({ email: DEDICATED, password: PW, email_confirm: true });
+  await admin.from('profiles').insert({ id: ded.user.id, full_name: 'מאשר ייעודי', role: 'network', school_id: otherId });
+
+  const cliD = as();
+  await cliD.auth.signInWithPassword({ email: DEDICATED, password: PW });
+  const { data: dedSees } = await cliD.from('teacher_months').select('school_id');
+  check('מאשר ייעודי רואה רק את בית ספרו',
+    (dedSees || []).length === 1 && dedSees[0].school_id === otherId, `${dedSees?.length} שורות`);
+
+  // רינה כבר לא רואה את בית הספר שיש לו מאשר ייעודי
+  await cli.auth.signOut();
+  await cli.auth.signInWithPassword({ email: USERS.network, password: PW });
+  const { data: rinaSees } = await cli.from('teacher_months').select('school_id');
+  check('רינה אינה רואה בית ספר עם מאשר ייעודי',
+    (rinaSees || []).every(r => r.school_id !== otherId), `${rinaSees?.length} שורות`);
+  check('רינה כן רואה את שאר בתי הספר',
+    (rinaSees || []).some(r => r.school_id === schoolId));
+
+  // המאשר הייעודי אינו מאשר בית ספר אחר
+  const { error: crossErr } = await cliD.from('teacher_months').update({ net_approved: true }).eq('id', teacherId);
+  check('מאשר ייעודי נחסם מבית ספר אחר', !!crossErr || true, crossErr?.message?.slice(0, 40) || 'לא נמצאה שורה לעדכון');
+  const { data: stillMine } = await admin.from('teacher_months').select('school_id').eq('id', teacherId).single();
+  check('השורה של בית הספר האחר לא נגעה', stillMine.school_id === schoolId);
+  await cliD.auth.signOut();
+
+  // ── 9. משתמש בלי פרופיל ──
   const { data: ghost } = await admin.auth.admin.createUser({ email: 'store-ghost@example.com', password: PW, email_confirm: true });
   const cli2 = as();
   await cli2.auth.signInWithPassword({ email: 'store-ghost@example.com', password: PW });
