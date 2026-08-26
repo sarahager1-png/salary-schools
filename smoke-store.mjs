@@ -27,15 +27,29 @@ const ids = {};
 let schoolId, otherId, teacherId;
 const MONTH = '2098-01';
 
+const TEST_SCHOOLS = ['סטור א', 'סטור ב'];
+
 async function cleanup() {
+  // המשתמשים קודם: הפרופילים שלהם מצביעים על בתי הספר של הבדיקה
+  const { data } = await admin.auth.admin.listUsers();
+  for (const email of [...Object.values(USERS), 'store-ghost@example.com']) {
+    const u = data?.users?.find(x => x.email === email);
+    if (u) {
+      await admin.from('profiles').delete().eq('id', u.id);
+      await admin.auth.admin.deleteUser(u.id);
+    }
+  }
   await admin.from('teacher_months').delete().eq('month_key', MONTH);
   await admin.from('months').delete().eq('key', MONTH);
-  await admin.from('schools').delete().like('name', 'סטור%');
-  for (const email of Object.values(USERS)) {
-    const { data } = await admin.auth.admin.listUsers();
-    const u = data?.users?.find(x => x.email === email);
-    if (u) await admin.auth.admin.deleteUser(u.id);
-  }
+  const { error } = await admin.from('schools').delete().in('name', TEST_SCHOOLS);
+  if (error) console.error('ניקוי בתי הספר נכשל:', error.message);
+}
+
+// הבדיקה לא משאירה זבל אחריה — וזה נבדק, לא מונח
+async function assertClean() {
+  const { data } = await admin.from('schools').select('name').in('name', TEST_SCHOOLS);
+  check('הבדיקה ניקתה אחריה', (data || []).length === 0,
+    (data || []).map(s => s.name).join(', ') || '');
 }
 
 try {
@@ -144,6 +158,7 @@ try {
   check('הרצה ללא חריגה', false, e.message?.slice(0, 160));
 } finally {
   await cleanup();
+  await assertClean();
 }
 
 console.log(fails.length ? `\n${fails.length} כשלונות` : '\nהכול עבר');
