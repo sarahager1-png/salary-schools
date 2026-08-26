@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Briefcase, Calculator, School, Check, ArrowLeft, ArrowRight,
   ChevronLeft, ChevronRight, Plus, LogOut, BarChart3, ClipboardCheck,
@@ -7,6 +7,7 @@ import {
   CalendarClock, Bell, Users, FolderOpen, Database, FileSpreadsheet, ShieldAlert,
   ExternalLink, ShieldCheck,
 } from 'lucide-react';
+import * as store from './lib/store.js';
 import './index.css';
 // v3 — רשת חינוך חב"ד design system
 
@@ -352,18 +353,6 @@ const DEFAULT_SCHOOLS = [
 const OLD_WORLD_NAMES = DEFAULT_SCHOOLS.filter(s => s.reform === 'pre').map(s => s.name);
 const LS_TEACHERS = 'ss-teachers-v2';   // legacy
 const LS_MONTHS   = 'ss-months-v1';
-const load  = k => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; } };
-const loadObj = k => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; } };
-const save  = (k, d) => {
-  try {
-    localStorage.setItem(k, JSON.stringify(d));
-    return true;
-  } catch (e) {
-    // QuotaExceededError או מצב פרטי — עד היום זה נבלע והמסך הציג "נשמר" בזמן שהדיסק לא עודכן.
-    alert('השמירה נכשלה — ייתכן שאחסון הדפדפן מלא.\n\nאל תסגרי את החלון לפני שייצאת גיבוי.\n\n(' + (e && e.name ? e.name : 'שגיאה לא ידועה') + ')');
-    return false;
-  }
-};
 const uid   = () => Math.random().toString(36).slice(2, 10);
 
 // Month helpers
@@ -405,7 +394,6 @@ const PRINCIPAL_PLACEHOLDER = 'מנהלת בית הספר';
 function makePrincipalRow(school) {
   return {
     ...EMPTY_TEACHER,
-    id: uid(),
     schoolId: school.id,
     name: PRINCIPAL_PLACEHOLDER,
     role: PRINCIPAL_ROLE,
@@ -414,12 +402,6 @@ function makePrincipalRow(school) {
     _approved: false,
   };
 }
-// משלים שורת מנהלת לכל בית ספר שאין לו אחת בחודש הנתון
-function withPrincipalRows(schools, teachers) {
-  const missing = schools.filter(s => !teachers.some(t => t.schoolId === s.id && isPrincipalRow(t)));
-  return missing.length ? [...teachers, ...missing.map(makePrincipalRow)] : teachers;
-}
-
 /* ═══════════════════════════════════════════════════════════════
    BACKUP — כל המצב חי ב-localStorage בלבד, ולכן חייב לצאת החוצה
 ═══════════════════════════════════════════════════════════════ */
@@ -437,23 +419,6 @@ function exportBackup(schools, months) {
   };
   downloadBlob(JSON.stringify(payload, null, 2), `גיבוי_שכר_${stampToday()}.json`, 'application/json;charset=utf-8;');
   return payload.counts;
-}
-
-// מחזיר { schools, months } או זורק שגיאה עם הסבר בעברית
-function parseBackup(text) {
-  let d;
-  try { d = JSON.parse(text); }
-  catch { throw new Error('הקובץ אינו JSON תקין. ודאי שבחרת קובץ גיבוי שיצא מהמערכת.'); }
-  if (!d || typeof d !== 'object') throw new Error('הקובץ ריק או פגום.');
-  if (d.app !== 'salary-schools') throw new Error('זה לא קובץ גיבוי של מערכת השכר.');
-  if (d.version > BACKUP_VERSION) throw new Error(`הגיבוי נוצר בגרסה חדשה יותר (${d.version}). עדכני את המערכת לפני השחזור.`);
-  if (!Array.isArray(d.schools)) throw new Error('חסרה רשימת בתי הספר בקובץ.');
-  if (!d.months || typeof d.months !== 'object' || Array.isArray(d.months)) throw new Error('חסרים נתוני החודשים בקובץ.');
-  for (const [k, v] of Object.entries(d.months)) {
-    if (!/^\d{4}-\d{2}$/.test(k)) throw new Error(`מפתח חודש לא תקין בקובץ: "${k}"`);
-    if (!Array.isArray(v)) throw new Error(`נתוני החודש ${k} פגומים.`);
-  }
-  return { schools: d.schools, months: d.months, exportedAt: d.exportedAt };
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -515,21 +480,28 @@ function CalculatorFrame({ calcId, style }) {
   );
 }
 
-function LoginScreen({ schools, onLogin }) {
-  const [role, setRole] = useState('coordinator');
-  const [schoolId, setSchoolId] = useState('');
-  const canLogin = role !== 'principal' || schoolId;
+function LoginScreen({ onSignedIn }) {
+  const [email, setEmail]   = useState('');
+  const [password, setPass] = useState('');
+  const [busy, setBusy]     = useState(false);
+  const [error, setError]   = useState('');
 
-  const ROLES_INFO = [
-    { v: 'coordinator', Icon: Briefcase,  label: 'שליח / מנהל רשת', desc: 'אישור שינויים ודוחות' },
-    { v: 'clerk',       Icon: Calculator, label: 'חשבת שכר',        desc: 'סימולציה והכנת שכר' },
-    { v: 'principal',   Icon: School,     label: 'מנהלת בית ספר',   desc: 'עדכון נתוני מורים' },
-    { v: 'network',     Icon: ShieldCheck, label: NETWORK_APPROVER,  desc: 'אישור רשתי בחודש הראשון' },
-  ];
+  const submit = async (e) => {
+    e?.preventDefault();
+    if (!email.trim() || !password) return;
+    setBusy(true); setError('');
+    try {
+      const profile = await store.signIn(email, password);
+      onSignedIn(profile);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
 
   return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'32px 18px' }} dir="rtl">
-      <div style={{ width:'100%', maxWidth:440 }} className="spring-enter">
+      <form onSubmit={submit} style={{ width:'100%', maxWidth:400 }} className="spring-enter">
 
         <div style={{ textAlign:'center', marginBottom:26 }}>
           <img src="/logo-chabad.png" alt="רשת חינוך חב״ד"
@@ -539,60 +511,39 @@ function LoginScreen({ schools, onLogin }) {
         </div>
 
         <div className="apple-card" style={{ padding:'24px 22px' }}>
-          <p className="apple-label" style={{ marginBottom:10 }}>כניסה בתור</p>
-
-          <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:18 }}>
-            {ROLES_INFO.map(({ v, Icon, label, desc }) => {
-              const isActive = role === v;
-              return (
-                <button key={v} onClick={() => { setRole(v); setSchoolId(''); }}
-                  style={{
-                    display:'flex', alignItems:'center', gap:13, padding:'13px 14px',
-                    borderRadius:14, cursor:'pointer', textAlign:'right', width:'100%',
-                    fontFamily:'inherit',
-                    transition:'background .15s, border-color .15s, box-shadow .15s',
-                    border: isActive ? '1.5px solid var(--purple)' : '1px solid var(--line)',
-                    background: isActive ? 'var(--purple-100)' : 'var(--surface)',
-                    boxShadow: isActive ? '0 2px 10px rgba(75,46,131,.12)' : 'none',
-                  }}>
-                  <span style={{
-                    width:38, height:38, borderRadius:11, flexShrink:0,
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                    background: isActive ? 'var(--purple)' : 'var(--fill)',
-                    color: isActive ? '#fff' : 'var(--text3)', transition:'background .15s',
-                  }}>
-                    <Icon size={18} strokeWidth={2} />
-                  </span>
-                  <span style={{ flex:1, minWidth:0 }}>
-                    <span style={{ display:'block', fontWeight:700, fontSize:15, color:'var(--text)', marginBottom:1 }}>{label}</span>
-                    <span style={{ display:'block', fontSize:12.5, color:'var(--text3)' }}>{desc}</span>
-                  </span>
-                  {isActive && <Check size={17} strokeWidth={3} color="var(--purple)" />}
-                </button>
-              );
-            })}
+          <div style={{ marginBottom:14 }}>
+            <p className="apple-label">כתובת מייל</p>
+            <input className="apple-input" type="email" dir="ltr" autoComplete="username"
+              value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="name@reshetch.org.il" autoFocus />
           </div>
 
-          {role === 'principal' && (
-            <div style={{ marginBottom:16 }} className="fade-in">
-              <p className="apple-label">בית הספר שלי</p>
-              <select value={schoolId} onChange={e => setSchoolId(e.target.value)} className="apple-select">
-                <option value="">— בחרי בית ספר —</option>
-                {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+          <div style={{ marginBottom:18 }}>
+            <p className="apple-label">סיסמה</p>
+            <input className="apple-input" type="password" autoComplete="current-password"
+              value={password} onChange={e => setPass(e.target.value)} />
+          </div>
+
+          {error && (
+            <div style={{ background:'var(--danger-bg)', border:'1px solid var(--danger-line)', borderRadius:12,
+              padding:'10px 13px', marginBottom:14, fontSize:13, color:'var(--danger)', fontWeight:600 }}>
+              {error}
             </div>
           )}
 
-          <button disabled={!canLogin} onClick={() => onLogin({ role, schoolId })}
+          <button type="submit" disabled={busy || !email.trim() || !password}
             className="apple-btn apple-btn-blue"
             style={{ width:'100%', minHeight:48, fontSize:15.5, fontWeight:700 }}>
-            כניסה למערכת
-            <ArrowLeft size={17} strokeWidth={2.5} />
+            {busy ? 'מתחברת…' : 'כניסה למערכת'}
+            {!busy && <ArrowLeft size={17} strokeWidth={2.5} />}
           </button>
         </div>
 
-        <p style={{ textAlign:'center', fontSize:12, color:'var(--text3)', marginTop:18 }}>רשת חינוך חב״ד</p>
-      </div>
+        <p style={{ textAlign:'center', fontSize:12, color:'var(--text3)', marginTop:18, lineHeight:1.7 }}>
+          מנהלות בית ספר נכנסות דרך הקישור האישי שנשלח אליהן.<br/>
+          רשת חינוך חב״ד
+        </p>
+      </form>
     </div>
   );
 }
@@ -3298,46 +3249,16 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
 /* ═══════════════════════════════════════════════════════════════
    APP
 ═══════════════════════════════════════════════════════════════ */
-function BackupModal({ schools, months, onRestore, onClose }) {
-  const [busy, setBusy]   = useState(false);
-  const [error, setError] = useState('');
-  const [done, setDone]   = useState('');
+function BackupModal({ schools, months, onClose }) {
+  const [done, setDone] = useState('');
 
   const teacherRecords = Object.values(months).reduce((s, ts) => s + ts.length, 0);
   const monthKeys = Object.keys(months).sort();
 
   const handleExport = () => {
-    setError(''); setDone('');
+    setDone('');
     const c = exportBackup(schools, months);
     setDone(`הגיבוי ירד — ${c.schools} בתי ספר, ${c.months} חודשים, ${c.teacherRecords} רשומות מורים.`);
-  };
-
-  const handleFile = e => {
-    const f = e.target.files?.[0];
-    e.target.value = '';           // כדי שבחירת אותו קובץ שוב תפעיל onChange
-    if (!f) return;
-    setError(''); setDone(''); setBusy(true);
-    const r = new FileReader();
-    r.onerror = () => { setBusy(false); setError('קריאת הקובץ נכשלה.'); };
-    r.onload = () => {
-      setBusy(false);
-      let parsed;
-      try { parsed = parseBackup(String(r.result)); }
-      catch (err) { setError(err.message); return; }
-
-      const nTeachers = Object.values(parsed.months).reduce((s, ts) => s + ts.length, 0);
-      const when = parsed.exportedAt ? new Date(parsed.exportedAt).toLocaleString('he-IL') : 'לא ידוע';
-      const ok = window.confirm(
-        `שחזור יחליף את כל הנתונים הקיימים במערכת.\n\n` +
-        `הגיבוי: ${parsed.schools.length} בתי ספר · ${Object.keys(parsed.months).length} חודשים · ${nTeachers} רשומות מורים\n` +
-        `נוצר ב: ${when}\n\n` +
-        `הנתונים הנוכחיים (${schools.length} בתי ספר, ${teacherRecords} רשומות) יימחקו.\n\n` +
-        `להמשיך?`
-      );
-      if (!ok) return;
-      onRestore(parsed.schools, parsed.months);
-    };
-    r.readAsText(f, 'utf-8');
   };
 
   return (
@@ -3374,25 +3295,6 @@ function BackupModal({ schools, months, onRestore, onClose }) {
         </button>
       </div>
 
-      <div className="apple-section">
-        <p className="apple-label">שחזור מקובץ גיבוי</p>
-        <label style={{ cursor: busy ? 'wait' : 'pointer', display:'block' }}>
-          <span className="apple-btn apple-btn-ghost" style={{ width:'100%' }}>
-            <Upload size={15} strokeWidth={2.2} />
-            {busy ? 'קורא קובץ…' : 'בחרי קובץ גיבוי'}
-          </span>
-          <input type="file" accept=".json,application/json" onChange={handleFile} style={{ display:'none' }} disabled={busy} />
-        </label>
-        <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:8, lineHeight:1.6 }}>
-          השחזור מחליף את כל הנתונים הקיימים. תוצג אזהרה לפני הביצוע.
-        </p>
-      </div>
-
-      {error && (
-        <div style={{ background:'var(--danger-bg)', border:'1px solid var(--danger-line)', borderRadius:12, padding:'10px 13px', marginTop:14, fontSize:13, color:'var(--danger)', fontWeight:600 }}>
-          {error}
-        </div>
-      )}
       {done && (
         <div style={{ background:'var(--ok-bg)', border:'1px solid var(--ok-line)', borderRadius:12, padding:'10px 13px', marginTop:14, fontSize:13, color:'var(--ok)', fontWeight:600, display:'flex', gap:7, alignItems:'center' }}>
           <Check size={15} strokeWidth={2.6} />
@@ -3407,59 +3309,14 @@ function BackupModal({ schools, months, onRestore, onClose }) {
 }
 
 export default function App() {
-  const [schools,  setSchools]  = useState(() => {
-    const saved = load(LS_SCHOOLS);
-    if (saved.length > 0) {
-      if (localStorage.getItem(LS_REFORM_FIX)) return saved;
-      const fixed = saved.map(s => (OLD_WORLD_NAMES.includes(s.name) && s.reform !== 'pre')
-        ? { ...s, reform: 'pre' } : s);
-      try { localStorage.setItem(LS_REFORM_FIX, '1'); } catch { /* לא קריטי */ }
-      if (fixed.some((s, i) => s !== saved[i])) { save(LS_SCHOOLS, fixed); return fixed; }
-      return saved;
-    }
-    // זריעה חד-פעמית בלבד — אם מחקת את כולם, הם לא יחזרו
-    if (localStorage.getItem(LS_SEEDED)) return saved;
-    const seeded = DEFAULT_SCHOOLS.map(s => ({ ...s, id: uid() }));
-    if (save(LS_SCHOOLS, seeded)) {
-      try { localStorage.setItem(LS_SEEDED, '1'); localStorage.setItem(LS_REFORM_FIX, '1'); } catch { /* לא קריטי */ }
-      return seeded;
-    }
-    return saved;
-  });
-  // months: { '2025-09': [teacher,...], ... }  — migrate from legacy if needed
-  const [months, setMonths] = useState(() => {
-    const saved = loadObj(LS_MONTHS);
-    let base = (saved && Object.keys(saved).length > 0) ? saved : null;
-    if (!base) {
-      // migrate legacy flat teachers
-      const legacy = load(LS_TEACHERS);
-      base = legacy.length > 0 ? { [nowMonthKey()]: legacy } : {};
-    }
-    // השלמה חד-פעמית: בית ספר שאין לו שורת מנהלת בחודש האחרון מקבל אחת.
-    // רץ כאן ולא ב-effect כדי לא לגרום לרינדור נוסף מיד אחרי הטעינה.
-    if (!localStorage.getItem(LS_PRINCIPAL_ROWS)) {
-      const allSchools = load(LS_SCHOOLS);
-      if (allSchools.length) {
-        const keys = Object.keys(base).sort();
-        const mk = keys.length ? keys[keys.length - 1] : nowMonthKey();
-        const filled = withPrincipalRows(allSchools, base[mk] || []);
-        if (filled !== (base[mk] || [])) {
-          base = { ...base, [mk]: filled };
-          save(LS_MONTHS, base);
-        }
-        try { localStorage.setItem(LS_PRINCIPAL_ROWS, '1'); } catch { /* לא קריטי */ }
-      }
-    }
-    return base;
-  });
+  const [user,    setUser]    = useState(null);   // הפרופיל: תפקיד, שם, בית ספר
+  const [schools, setSchools] = useState([]);
+  const [months,  setMonths]  = useState({});
+  const [activeMonth, setActiveMonth] = useState(nowMonthKey());
+  const [booting, setBooting] = useState(true);
+  const [error,   setError]   = useState('');
+  const [busy,    setBusy]    = useState(false);
 
-  const [activeMonth, setActiveMonth] = useState(() => {
-    const saved = loadObj(LS_MONTHS);
-    const keys = Object.keys(saved || {}).sort();
-    return keys.length > 0 ? keys[keys.length - 1] : nowMonthKey();
-  });
-
-  const [user,          setUser]          = useState(null);
   const [view,          setView]          = useState('schools');
   const [activeSchool,  setActiveSchool]  = useState(null);
   const [schoolModal,   setSchoolModal]   = useState(null);
@@ -3467,20 +3324,147 @@ export default function App() {
   const [showApproval,  setShowApproval]  = useState(false);
   const [showBackup,    setShowBackup]    = useState(false);
 
+  // כל שינוי נשמר בשרת ואז נטען מחדש. פשוט, ותמיד מסונכרן עם מה שבאמת נשמר.
+  const refresh = useCallback(async () => {
+    const data = await store.loadAll();
+    setSchools(data.schools);
+    setMonths(data.months);
+    setActiveMonth(prev => {
+      const keys = Object.keys(data.months).sort();
+      if (keys.includes(prev)) return prev;
+      return keys.length ? keys[keys.length - 1] : nowMonthKey();
+    });
+    return data;
+  }, []);
+
+  // פעולה מול השרת: חוסמת כפילויות, מרעננת, ומציגה שגיאה בעברית
+  const run = useCallback(async (fn) => {
+    setBusy(true); setError('');
+    try {
+      await fn();
+      await refresh();
+      return true;
+    } catch (e) {
+      setError(e.message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [refresh]);
+
+  // התחברות קיימת מהפעם הקודמת
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const session = await store.getSession();
+        if (!session) { if (alive) setBooting(false); return; }
+        const profile = await store.getProfile();
+        if (!alive) return;
+        setUser(profile);
+        setView(profile.role === 'clerk' ? 'calc' : profile.role === 'network' ? 'netapprove' : 'schools');
+        await refresh();
+      } catch (e) {
+        if (alive) setError(e.message);
+      } finally {
+        if (alive) setBooting(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [refresh]);
+
+  const onSignedIn = async (profile) => {
+    setUser(profile);
+    setView(profile.role === 'clerk' ? 'calc' : profile.role === 'network' ? 'netapprove' : 'schools');
+    await run(async () => {});
+  };
+
+  const onSignOut = async () => {
+    await store.signOut();
+    setUser(null); setSchools([]); setMonths({}); setActiveSchool(null);
+  };
+
+  if (booting) {
+    return (
+      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center' }} dir="rtl">
+        <p style={{ fontSize:14, color:'var(--text3)', fontWeight:600 }}>טוען…</p>
+      </div>
+    );
+  }
+
+  if (!user) return <LoginScreen onSignedIn={onSignedIn} />;
+
   const teachers = months[activeMonth] || [];
 
-  // שומרים קודם, ורק אם הכתיבה הצליחה מעדכנים את ה-state.
-  const persistS  = s  => { if (save(LS_SCHOOLS, s)) setSchools(s); };
-  const persistMT = (mk, ts) => {
-    const newMonths = { ...months, [mk]: ts };
-    if (save(LS_MONTHS, newMonths)) setMonths(newMonths);
-  };
-  const persistT  = ts => persistMT(activeMonth, ts);
+  const onNetApprove = (ids) => run(() => store.netApprove(ids));
 
-  if (!user) return <LoginScreen schools={schools} onLogin={u => {
-    setUser(u);
-    setView(u.role === 'clerk' ? 'calc' : 'schools');
-  }} />;
+  // ── חודש חדש ──
+  const openNewMonth = () => {
+    const nextKey = nextMonthKey(activeMonth);
+    if (months[nextKey]) { setActiveMonth(nextKey); return; }
+    // השדות החודשיים מתאפסים; פרטי המורה נגררים
+    const carried = teachers.map(t => ({
+      ...t,
+      absenceDays: 0, mmHours: 0, mmFor: '', monthlyExtras: 0,
+      _officialGross: null, _officialGrossPre: null, _agreedGross: null,
+      _actualEmployerCost: null, _approved: false, _approvedAt: null,
+      _netApproved: false, _netApprovedAt: null, _snapshot: null,
+      _changedAt: new Date().toISOString(),
+    }));
+    run(async () => { await store.openMonth(nextKey, carried); }).then(ok => { if (ok) setActiveMonth(nextKey); });
+  };
+
+  const onSaveSchool = (s) => {
+    run(async () => {
+      const saved = await store.saveSchool(s);
+      if (!s.id) await store.saveTeacher(makePrincipalRow(saved), activeMonth);
+    }).then(ok => { if (ok) setSchoolModal(null); });
+  };
+
+  const onDeleteSchool = (id) => run(() => store.deleteSchool(id));
+
+  // שינוי בשדה שמשפיע על השכר מבטל את הסימולציה ואת האישור, ושומר
+  // צילום "לפני" לשליח. הלוגיקה הזו נשארת בצד הלקוח כי היא נגזרת
+  // מהשוואה בין הישן לחדש, והשרת רואה רק את התוצאה.
+  const onSaveTeacher = (t) => {
+    const now = new Date().toISOString();
+    const old = teachers.find(x => x.id === t.id);
+    let next = { ...t };
+    if (old) {
+      if (baseFieldsChanged(t, old)) {
+        next._officialGross    = null;
+        next._officialGrossPre = null;
+        next._changedAt        = now;
+        next._approved         = false;
+        next._netApproved      = false;
+        if (!old._snapshot) next._snapshot = snapT(old);
+      }
+    } else {
+      next._changedAt = now;
+      next._approved  = false;
+    }
+    return run(() => store.saveTeacher(next, activeMonth))
+      .then(ok => { if (ok) setTeacherModal(null); return ok; });
+  };
+  const onDeleteTeacher = (id) => run(() => store.deleteTeacher(id));
+
+  const onImportTeachers = (ts) => run(async () => {
+    for (const x of ts) await store.saveTeacher({ ...x, id: null, _changedAt: new Date().toISOString() }, activeMonth);
+  });
+
+  const onApproveTeacher = (id) => run(async () => {
+    await store.approve([id]);
+    // האישור סוגר את מחזור השינוי: אין עוד "ממתין", ואין diff להציג
+    await store.saveTeacher({ id, _snapshot: null, _changedAt: null }, activeMonth);
+  });
+  const onApproveAll = () => {
+    const ids = teachers.filter(needsApproval).map(t => t.id);
+    if (!ids.length) { setShowApproval(false); return; }
+    run(async () => {
+      await store.approve(ids);
+      for (const id of ids) await store.saveTeacher({ id, _snapshot: null, _changedAt: null }, activeMonth);
+    }).then(ok => { if (ok) setShowApproval(false); });
+  };
 
   const isCoord = user.role === 'coordinator';
   const isClerk = user.role === 'clerk';
@@ -3490,115 +3474,9 @@ export default function App() {
   const isFirstMonth  = activeMonth === firstMonthKey;
   const netPendingCount = teachers.filter(t => needsNetApproval(t, isFirstMonth)).length;
 
-  const onNetApprove = (ids) => {
-    const now = new Date().toISOString();
-    const set = new Set(ids);
-    persistT(teachers.map(t => set.has(t.id) ? { ...t, _netApproved: true, _netApprovedAt: now } : t));
-  };
   const needsSimCount      = teachers.filter(needsSim).length;
   const needsApprovalCount = teachers.filter(needsApproval).length;
-  const sortedMonthKeys = Object.keys(months).sort();
-
-  // Open a new month — copy teachers from current, reset monthly fields
-  const openNewMonth = () => {
-    const now = new Date().toISOString();
-    const nextKey = nextMonthKey(activeMonth);
-    if (months[nextKey]) { setActiveMonth(nextKey); return; }
-    // _files חייב להתאפס יחד עם sickFiles — אחרת כל קובץ base64 מועתק לכל חודש חדש
-    // ומכסת ה-localStorage נגמרת תוך שנה.
-    // חודש חדש מתחיל בלי שכר רשמי: בלי איפוס _officialGross הטבלה הציגה את
-    // שכר החודש הקודם כשכר החודש הזה, והמורים לא הופיעו באף רשימת עבודה.
-    const MONTHLY_RESET = { absenceDays:0, sickFiles:[], _files:[], mmHours:0, mmFor:'', monthlyExtras:0,
-                             _officialGross:null, _officialGrossPre:null, _agreedGross:null,
-                             _actualEmployerCost:null, _netApproved:false, _netApprovedAt:null,
-                             _approved:false, _approvedAt:null, _snapshot:null };
-    const nextTeachers = teachers.map(t => ({ ...t, ...MONTHLY_RESET, _changedAt: now }));
-    persistMT(nextKey, nextTeachers);
-    setActiveMonth(nextKey);
-  };
-
-  const onSaveSchool = s => {
-    if (s.id) {
-      persistS(schools.map(x => x.id === s.id ? s : x));
-    } else {
-      const created = { ...s, id: uid() };
-      persistS([...schools, created]);
-      persistT([...teachers, makePrincipalRow(created)]);
-    }
-    setSchoolModal(null);
-  };
-  const onDeleteSchool = id => {
-    persistS(schools.filter(s => s.id !== id));
-    persistT(teachers.filter(t => t.schoolId !== id));
-  };
-
-  const onSaveTeacher = t => {
-    const now = new Date().toISOString();
-    const old = teachers.find(x => x.id === t.id);
-    let updated = { ...t };
-
-    if (old) {
-      // If base salary fields changed → clear simulation for this month
-      const baseChanged = baseFieldsChanged(t, old);
-      if (baseChanged) {
-        updated._officialGross    = null;
-        updated._officialGrossPre = null;
-        updated._changedAt        = now;
-        updated._approved         = false;
-        if (!old._snapshot) updated._snapshot = snapT(old);
-      }
-    } else {
-      updated._changedAt = now;
-      updated._approved  = false;
-    }
-
-    // startNew מקצה id מראש, ולכן אי אפשר להסתמך על t.id כדי לזהות רשומה חדשה —
-    // חייבים לבדוק אם היא באמת קיימת ברשימה, אחרת ה-map מחזיר עותק זהה והמורה נעלמת בשקט.
-    const exists = teachers.some(x => x.id === t.id);
-    persistT(exists
-      ? teachers.map(x => x.id === t.id ? updated : x)
-      : [...teachers, { ...updated, id: t.id || uid() }]
-    );
-    setTeacherModal(null);
-  };
-
-  const onDeleteTeacher  = id => persistT(teachers.filter(t => t.id !== id));
-  const onImportTeachers = ts => {
-    const now = new Date().toISOString();
-    const withIds = ts.map(t => ({ ...t, id: uid(), _changedAt: now, _approved: false }));
-    persistT([...teachers, ...withIds]);
-  };
-
-  const onApproveTeacher = id => {
-    const now = new Date().toISOString();
-    persistT(teachers.map(t => t.id === id
-      ? { ...t, _snapshot: null, _changedAt: null, _approved: true, _approvedAt: now }
-      : t
-    ));
-  };
-  // רק מורות שיש להן שכר רשמי וממתינות לאישור. קודם זה עבר על כל מורי
-  // הרשת — כולל מי שלא שינה דבר וכולל מי שטרם עברה סימולציה, שנעלמה
-  // אחרי הפעולה מכל רשימות העבודה.
-  const onApproveAll = () => {
-    const now = new Date().toISOString();
-    persistT(teachers.map(t => needsApproval(t)
-      ? { ...t, _snapshot: null, _changedAt: null, _approved: true, _approvedAt: now }
-      : t));
-    setShowApproval(false);
-  };
-
-  const onRestoreBackup = (nextSchools, nextMonths) => {
-    if (!save(LS_SCHOOLS, nextSchools)) return;
-    if (!save(LS_MONTHS, nextMonths)) return;
-    setSchools(nextSchools);
-    setMonths(nextMonths);
-    const keys = Object.keys(nextMonths).sort();
-    setActiveMonth(keys.length ? keys[keys.length - 1] : nowMonthKey());
-    setActiveSchool(null);
-    setView(user.role === 'clerk' ? 'calc' : 'schools');
-    setShowBackup(false);
-    alert('השחזור הושלם.');
-  };
+  const sortedMonthKeys    = Object.keys(months).sort();
 
   // Principal goes directly to their school
   const principalSchool = user.role === 'principal' ? schools.find(s => s.id === user.schoolId) : null;
@@ -3694,13 +3572,29 @@ export default function App() {
               גיבוי
             </button>
 
-            <button className="nav-btn danger" onClick={() => setUser(null)} title="יציאה">
+            <button className="nav-btn danger" onClick={onSignOut} title="יציאה">
               <LogOut size={15} strokeWidth={2.2} />
               יציאה
             </button>
           </div>
         </div>
       </header>
+
+      {(busy || error) && (
+        <div className="no-print" style={{
+          position:'sticky', top:62, zIndex:39, padding:'8px 16px', fontSize:13, fontWeight:600,
+          display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+          background: error ? 'var(--danger-bg)' : 'var(--teal-100)',
+          color: error ? 'var(--danger)' : 'var(--teal-700)',
+          borderBottom: `1px solid ${error ? 'var(--danger-line)' : '#B8EAF2'}`,
+        }}>
+          {error
+            ? <><AlertTriangle size={14} strokeWidth={2.3} />{error}
+                <button onClick={() => setError('')} className="apple-btn apple-btn-ghost"
+                  style={{ minHeight:26, padding:'0 9px', fontSize:12, marginInlineStart:6 }}>סגירה</button></>
+            : <>שומר…</>}
+        </div>
+      )}
 
       <div className="flex-1">
         {/* Clerk: only SimulatorView */}
@@ -3716,9 +3610,7 @@ export default function App() {
           <SimulatorView
             teachers={teachers}
             schools={schools}
-            onSaveGross={(id, gross, grossPre) => persistT(teachers.map(t => t.id === id
-              ? { ...t, _officialGross: gross, ...(grossPre === undefined ? {} : { _officialGrossPre: grossPre }) }
-              : t))}
+            onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
           />
         ) : /* Principal: see only their school */
         !isCoord && principalSchool ? (
@@ -3739,9 +3631,7 @@ export default function App() {
           <SimulatorView
             teachers={teachers}
             schools={schools}
-            onSaveGross={(id, gross, grossPre) => persistT(teachers.map(t => t.id === id
-              ? { ...t, _officialGross: gross, ...(grossPre === undefined ? {} : { _officialGrossPre: grossPre }) }
-              : t))}
+            onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
           />
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} />
@@ -3856,7 +3746,7 @@ export default function App() {
         />
       )}
       {schoolModal  && <SchoolModal  school={schoolModal}  onSave={onSaveSchool}  onClose={() => setSchoolModal(null)} />}
-      {showBackup && <BackupModal schools={schools} months={months} onRestore={onRestoreBackup} onClose={() => setShowBackup(false)} />}
+      {showBackup && <BackupModal schools={schools} months={months} onClose={() => setShowBackup(false)} />}
       {teacherModal && <TeacherModal teacher={teacherModal} schools={schools} userRole={user.role} onSave={onSaveTeacher} onClose={() => setTeacherModal(null)} />}
     </div>
   );
