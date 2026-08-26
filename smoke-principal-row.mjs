@@ -11,6 +11,15 @@ const teachers = () => p.evaluate(() => {
   return m[k[k.length - 1]] || [];
 });
 
+const waitSrc = async (want) => {
+  // המסגרת נטענת קודם ברשימת המחשבונים ורק אז מנווטת ליעד
+  for (let i = 0; i < 14; i++) {
+    const s = await p.locator('iframe').first().getAttribute('src');
+    if ((s || '').endsWith(want)) return s;
+    await p.waitForTimeout(700);
+  }
+  return await p.locator('iframe').first().getAttribute('src');
+};
 await p.goto('http://localhost:5190/');
 await p.evaluate(() => localStorage.clear());
 await p.reload(); await p.waitForTimeout(500);
@@ -61,13 +70,13 @@ await p.reload(); await p.waitForTimeout(500);
 await p.getByText('חשבת שכר').click(); await p.waitForTimeout(300);
 await p.getByText('כניסה למערכת').click(); await p.waitForTimeout(1200);
 await p.getByText('מנהלת בית הספר').first().click(); await p.waitForTimeout(600);
-const src1 = await p.locator('iframe').first().getAttribute('src');
+const src1 = await waitSrc('OldWorld');
 check('שלב 1 של המנהלת — מחשבון העולם הישן', src1.endsWith('OldWorld'), src1);
 // שלב 2 שלה הוא אופק ניהול, לא אופק חדש
 await p.getByPlaceholder('שכר משולב ממחשבון העולם הישן').fill('15000');
 await p.getByPlaceholder('שכר משולב ממחשבון העולם הישן').press('Enter');
 await p.waitForTimeout(500);
-const src2 = await p.locator('iframe').first().getAttribute('src');
+const src2 = await waitSrc('OfekNihul');
 check('שלב 2 של המנהלת פותח את אופק — ניהול', src2.endsWith('OfekNihul'), src2);
 
 // ══ 5. a newly created school gets one too ══

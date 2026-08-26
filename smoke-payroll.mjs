@@ -32,6 +32,15 @@ const seed = async (schools, ts, role) => {
 const OFEK = [{ id: 's1', name: 'שלהבות אשקלון', city: 'אשקלון', reform: 'ofek' }];
 const OLD  = [{ id: 's1', name: 'שלהבות ירושלים', city: 'ירושלים', reform: 'pre' }];
 
+const waitSrc = async (want) => {
+  // המסגרת נטענת קודם ברשימת המחשבונים ורק אז מנווטת ליעד
+  for (let i = 0; i < 14; i++) {
+    const s = await p.locator('iframe').first().getAttribute('src');
+    if ((s || '').endsWith(want)) return s;
+    await p.waitForTimeout(700);
+  }
+  return await p.locator('iframe').first().getAttribute('src');
+};
 await p.goto('http://localhost:5190/');
 
 // ══════════ מודל התשלום ══════════
@@ -82,11 +91,11 @@ check('אופק עם סימולציה אחת — לא נספר לאישור', !/
 await seed(OFEK, [mk({ id: 't1', name: 'חנה לוי' })], 'חשבת שכר');
 await p.getByText('חנה לוי').click(); await p.waitForTimeout(600);
 const src = () => p.locator('iframe').first().getAttribute('src');
-check('שלב 1 פותח את מחשבון העולם הישן', (await src()).endsWith('OldWorld'), await src());
+check('שלב 1 פותח את מחשבון העולם הישן', (await waitSrc('OldWorld')).endsWith('OldWorld'), await src());
 await p.getByPlaceholder('שכר משולב ממחשבון העולם הישן').fill('11200');
 await p.getByPlaceholder('שכר משולב ממחשבון העולם הישן').press('Enter');
 await p.waitForTimeout(400);
-check('Enter מעביר לשלב 2 — מחשבון אופק', (await src()).endsWith('OfekHadash'), await src());
+check('Enter מעביר לשלב 2 — מחשבון אופק', (await waitSrc('OfekHadash')).endsWith('OfekHadash'), await src());
 await p.getByPlaceholder('שכר משולב ממחשבון אופק חדש').fill('12500');
 await p.waitForTimeout(300);
 check('הפער מוצג חי לפני השמירה',

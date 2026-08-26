@@ -21,7 +21,15 @@ const ctx = await b.newContext({ viewport: { width: 1500, height: 1000 }, locale
 const p = await ctx.newPage();
 const fails = [];
 const check = (n, ok, extra = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${extra ? ' — ' + extra : ''}`); if (!ok) fails.push(n); };
-const frameSrc = () => p.locator('iframe').first().getAttribute('src');
+const frameSrc = async (want) => {
+  // המסגרת נטענת קודם ברשימת המחשבונים ורק אז מנווטת ליעד
+  for (let i = 0; i < 14; i++) {
+    const s = await p.locator('iframe').first().getAttribute('src');
+    if (!want || (s || '').endsWith(want)) return s;
+    await p.waitForTimeout(700);
+  }
+  return await p.locator('iframe').first().getAttribute('src');
+};
 
 await p.goto('http://localhost:5190/');
 await p.evaluate(([s, ts]) => {
@@ -35,21 +43,20 @@ await p.getByText('חשבת שכר').click(); await p.waitForTimeout(200);
 await p.getByText('כניסה למערכת').click(); await p.waitForTimeout(800);
 
 // ══ 1. named routes, not the numeric ones that redirect ══
-const src0 = await frameSrc();
+const src0 = await frameSrc('OfekHadash');
 check('הראוט שמי ולא מספרי', /Calculators\/[A-Za-z]/.test(src0), src0);
 check('ברירת המחדל היא אופק חדש', src0.endsWith('OfekHadash'), src0);
 
 // ══ 2. picking a teacher picks her calculator ══
 await p.getByText('חנה לוי').click(); await p.waitForTimeout(500);
-check('מורת אופק → שלב 1 הוא מחשבון העולם הישן', (await frameSrc()).endsWith('OldWorld'), await frameSrc());
+check('מורת אופק → שלב 1 הוא מחשבון העולם הישן', (await frameSrc('OldWorld')).endsWith('OldWorld'), await frameSrc());
 await p.getByText('מרים כהן').click(); await p.waitForTimeout(500);
-check('מורת עולם ישן → מחשבון OldWorld', (await frameSrc()).endsWith('OldWorld'), await frameSrc());
+check('מורת עולם ישן → מחשבון OldWorld', (await frameSrc('OldWorld')).endsWith('OldWorld'), await frameSrc());
 
 // ══ 3. all four calculators reachable and named ══
 for (const [label, route] of [['עוז לתמורה','OzLetmura'], ['אופק — ניהול','OfekNihul'], ['עולם ישן','OldWorld'], ['אופק חדש','OfekHadash']]) {
   await p.getByRole('button', { name: label, exact: true }).first().click();
-  await p.waitForTimeout(300);
-  check(`מחשבון "${label}" → ${route}`, (await frameSrc()).endsWith(route), await frameSrc());
+  check(`מחשבון "${label}" → ${route}`, (await frameSrc(route)).endsWith(route), await frameSrc());
 }
 
 // ══ 4. the official calculator really loads inside the frame ══
@@ -61,6 +68,24 @@ for (let i = 0; i < 12; i++) {
   await p.waitForTimeout(1500);
 }
 check('המחשבון הרשמי נטען בתוך המסגרת', loaded);
+
+// ══ 4ב. המחשבון שנטען הוא באמת זה שנבחר, לא רק ה-src ══
+// קישור עמוק ל-OfekNihul נופל חזרה לרשימה ומציג את אופק חדש
+const calcSignature = async () => {
+  const f = p.frames().find(fr => fr.url().includes('educalc'));
+  if (!f) return { url:'', opts:[] };
+  const opts = await f.evaluate(() =>
+    [...document.querySelectorAll('select')].filter(s => s.offsetParent).map(s => s.options[1]?.text.trim() || '')
+  ).catch(() => []);
+  return { url: f.url(), opts };
+};
+for (const [label, marker] of [['אופק — ניהול', 'מנהלים'], ['עולם ישן', 'דוקטור'], ['אופק חדש', 'מתמחים']]) {
+  await p.getByRole('button', { name: label, exact: true }).first().click();
+  let sig = { url:'', opts:[] };
+  for (let i = 0; i < 12; i++) { await p.waitForTimeout(1500); sig = await calcSignature(); if (sig.opts.some(o => o.includes(marker))) break; }
+  check(`"${label}" — נטען המחשבון הנכון בפועל`, sig.opts.some(o => o.includes(marker)),
+    `${sig.url.split('#')[1] || '?'} :: ${sig.opts.join(' | ').slice(0, 60)}`);
+}
 check('מסך ה-fallback לא מוצג כשהטעינה הצליחה',
   !(await p.getByText('המחשבון הרשמי לא נטען').isVisible().catch(() => false)));
 

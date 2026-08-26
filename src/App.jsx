@@ -434,19 +434,26 @@ function parseBackup(text) {
 function CalculatorFrame({ calcId, style }) {
   const url = calcUrl(calcId);
   const [state, setState] = useState('loading');   // loading | ready | slow
+  // האתר הוא SPA, וקישור עמוק ישיר ל-OfekNihul נופל חזרה לרשימת המחשבונים
+  // ומציג את מחשבון אופק חדש. לכן טוענים קודם את הרשימה ורק אז מנווטים
+  // ב-hash — בדיוק כמו לחיצה על הקישור בתוך האתר.
+  const [src, setSrc] = useState(CALC_BASE);
 
   // הקומפוננטה ממופתחת ב-key לפי calcId בצד הקורא, ולכן החלפת מחשבון
   // מרכיבה אותה מחדש והמצב חוזר ל-loading בלי setState בתוך effect.
   useEffect(() => {
-    const timer = setTimeout(() => setState(s => (s === 'loading' ? 'slow' : s)), 8000);
-    return () => clearTimeout(timer);
-  }, []);
+    // האתר מפנה את עצמו לרשימת המחשבונים בסיום האתחול, ולכן ניווט מוקדם
+    // מדי נדרס. ממתינים שיתייצב ורק אז משנים את ה-hash.
+    const route = setTimeout(() => { setSrc(url); setState('ready'); }, 3500);
+    const slow  = setTimeout(() => setState(s => (s === 'loading' ? 'slow' : s)), 14000);
+    return () => { clearTimeout(route); clearTimeout(slow); };
+  }, [url]);
 
   return (
     <div style={{ position:'relative', flex:1, minHeight:0, ...style }}>
       <iframe
-        src={url}
-        onLoad={() => setState('ready')}
+        src={src}
+        onLoad={() => { if (src !== CALC_BASE) setState('ready'); }}
         style={{ width:'100%', height:'100%', border:'none', display:'block' }}
         title="מחשבון שכר רשמי — משרד החינוך"
         allow="fullscreen"
