@@ -1721,7 +1721,12 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 <span style={{ fontSize:13, color:'var(--apple-text2)' }}>אחוז משרה</span>
                 <span style={{ fontWeight:700, color:'var(--apple-blue)' }}>{t.scope}%</span>
               </div>
-              <input type="range" min={1} max={140} value={t.scope} onChange={e => set('scope', +e.target.value)} style={{ accentColor:'var(--apple-blue)' }} />
+              {/* scope ו-scopePct הם אותו נתון בשני שמות. רק scope_pct
+                  נשמר במסד, ולכן כתיבה ל-scope בלבד לא הגיעה לשרת:
+                  המשרה שנבחרה נעלמה, והמסמך לחתימה הודפס עם 100%. */}
+              <input type="range" min={1} max={140} value={t.scope}
+                onChange={e => { const v = +e.target.value; set('scope', v); set('scopePct', v); }}
+                style={{ accentColor:'var(--apple-blue)' }} />
             </div>
           </>)}
 
@@ -1782,7 +1787,20 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             )}
           </div>
 
-          {/* שכר מהסימולטור הרשמי */}
+          {/* מנהלת בית ספר אינה מזינה שכר, והשרת אוסר עליה את העמודות
+              האלה. כשהשדות הוצגו לה בכל זאת, שמירה שכללה גם שינוי בשדה
+              בסיס בלעה בשקט את הסכום שהקלידה: הוותק נשמר, השכר נעלם,
+              והחלון נסגר בלי הודעה. */}
+          {userRole === 'principal' ? (
+            <div style={{ background:'var(--fill2)', borderRadius:14, padding:16 }}>
+              <p style={{ fontSize:13, fontWeight:600, color:'var(--text2)', marginBottom:4 }}>שכר</p>
+              <p style={{ fontSize:12, color:'var(--text3)' }}>
+                {simComplete(t)
+                  ? 'הוזן על ידי חשבת השכר. שינוי בוותק, בדרגה, בתואר או בשעות יחזיר את המורה לחישוב מחדש.'
+                  : 'ממתין לחשבת השכר.'}
+              </p>
+            </div>
+          ) : (
           <div style={{ background:'rgba(52,199,89,0.08)', borderRadius:14, padding:16 }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
               <p style={{ fontSize:13, fontWeight:600, color:'#1a7a38' }}>שכר משולב מהסימולטור</p>
@@ -1888,6 +1906,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               </div>
             )}
           </div>
+          )}
 
           {/* פירוק התשלום — נתון רשמי בלבד */}
           {simComplete(t) ? (
@@ -3472,7 +3491,10 @@ function LinkCard({ teacher, locked, onSave }) {
   const save = async () => {
     setState('saving');
     try {
-      await onSave(draft);
+      // צילום "לפני" — בלעדיו השליח מתבקש לאשר שכר בלי לראות מה זז.
+      // במסלול המחובר הצילום נלקח ב-onSaveTeacher; כאן הוא נשכח, ושורה
+      // ששונתה דרך הקישור הופיעה אצלו בלי שום סימן שינוי.
+      await onSave({ ...draft, _snapshot: teacher._snapshot || snapT(teacher) });
       setState('saved');
       setTimeout(() => setState(x => (x === 'saved' ? '' : x)), 2500);
     } catch (e) { setState(e.message); }
@@ -3488,7 +3510,16 @@ function LinkCard({ teacher, locked, onSave }) {
       </div>
 
       <div style={{ display:'flex', flexWrap:'wrap', gap:9 }}>
-        <LinkField label="שעות פרונטליות" value={draft.frontalHours}  onChange={v => set('frontalHours', v)} />
+        {/* אחוז המשרה נגזר מהשעות, מהשלב ומקבוצת הגיל. במסך המחובר
+            הגזירה קורית בזמן ההקלדה; כאן היא נשכחה, והשעות התעדכנו
+            בזמן שהאחוז נשאר על ערכו הישן — ומהאחוז נגזרים ביגוד,
+            הבראה והמסמך שהמורה חותמת עליו. */}
+        <LinkField label="שעות פרונטליות" value={draft.frontalHours}
+          onChange={v => {
+            const pct = scopeFromFrontal({ ...draft, frontalHours: v }, v);
+            setDraft(prev => ({ ...prev, frontalHours: v, scopePct: pct, scope: pct }));
+            setState('');
+          }} />
         <LinkField label="ימי היעדרות"    value={draft.absenceDays}   onChange={v => set('absenceDays', v)} />
         <LinkField label={'שעות ממ' + '"' + 'מ'} value={draft.mmHours} onChange={v => set('mmHours', v)} />
         <LinkField label="במקום מי" type="text" value={draft.mmFor}   onChange={v => set('mmFor', v)} hint="שם המורה" />
