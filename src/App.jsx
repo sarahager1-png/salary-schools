@@ -73,6 +73,8 @@ const AGE_RED = {
    בזמן שהמסך שלפניה היה מסך אחר לגמרי.
 ═══════════════════════════════════════════════════════════════ */
 const CALC_BASE = 'https://educalc.unq.co.il/#/Calculators/';
+// דף רשימת המחשבונים — בלי לוכסן בסוף, אחרת זה אינו ראוט תקין באתר
+const CALC_HOME = 'https://educalc.unq.co.il/#/Calculators';
 const CALCULATORS = [
   { id: 'ofek', route: 'OfekHadash', label: 'אופק חדש' },
   { id: 'oz',   route: 'OzLetmura',  label: 'עוז לתמורה' },
@@ -93,6 +95,8 @@ const reformLabel = r => (REFORMS.find(x => x.id === r) || REFORMS[0]).label;
 
 // שורת המנהלת מזוהה לפי התפקיד, שכבר קיים ב-ROLES
 const PRINCIPAL_ROLE = 'principal';
+// שכר הבסיס של מנהלת. כל מה שמעליו משולם כתוספת בית חב"ד.
+const PRINCIPAL_BASE = 14400;
 const isPrincipalRow = t => t?.role === PRINCIPAL_ROLE;
 
 const REASON_TYPES = [
@@ -207,11 +211,14 @@ const CHABAD_PCT     = Math.round(CHABAD_RATE * 100);
 function payBreakdown(t) {
   const ofek = Number(t._officialGross) || 0;
   const old  = Number(t._officialGrossPre) || 0;
-  // שכר מוסכם למנהלת — מחליף את הברוטו ואת הסימולציה
+  // מנהלת: שכר הבסיס קבוע, וכל מה שמעליו הוא תוספת בית חב"ד.
+  // הברוטו מגיע מסימולציית הניהול, או מהשכר המוסכם אם נקבע לה כזה.
   const agreed = Number(t._agreedGross) || 0;
-  if (isPrincipalRow(t) && agreed) return { base: agreed, supplement: 0, gross: agreed, agreed: true };
-  // מנהלת — סימולציית ניהול בלבד. הסכום הוא הבסיס במלואו, בלי רכיב תוספת.
-  if (isPrincipalRow(t)) return { base: ofek, supplement: 0, gross: ofek };
+  if (isPrincipalRow(t)) {
+    const gross = agreed || ofek;
+    const base  = Math.min(PRINCIPAL_BASE, gross);
+    return { base, supplement: gross - base, gross, agreed: !!agreed };
+  }
   // בית ספר עולם ישן — סימולציה אחת, אין רכיב תוספת
   if (t.reform !== 'ofek') return { base: ofek, supplement: 0, gross: ofek };
   // אם האופק יוצא נמוך מהעולם הישן, העובדת נשארת עם העולם הישן
@@ -219,14 +226,18 @@ function payBreakdown(t) {
   return { base: old, supplement, gross: old + supplement };
 }
 
-// ברוטו למעסיק = בסיס + 40% · תוספת + 30%
+// ברוטו למעסיק = בסיס + 40% · תוספת + 30%.
+// זהו אומדן. כשהנהלת החשבונות מזינה את עלות המעביד בפועל, היא גוברת.
 function calcEmployer(t) {
   const { base, supplement, gross } = payBreakdown(t);
   const employerBase = Math.round(base * EMPLOYER_RATE);
   const employerSupp = Math.round(supplement * CHABAD_RATE);
-  const social = employerBase + employerSupp;
+  const estimate = employerBase + employerSupp;
+  const actual   = Number(t._actualEmployerCost) || 0;
+  const social   = actual || estimate;
   return {
     gross, base, supplement, employerBase, employerSupp, social,
+    estimate, isEstimate: !actual,
     total: gross + social,
     // לצורכי מידע בלבד — כמה מתוך העלות הם ביגוד והבראה. לא מתווסף לסכום.
     extras: calcExtras(t),
@@ -365,7 +376,8 @@ const EMPTY_TEACHER = {
   isTemp: false, startDate: '', endDate: '', scopeChanges: [],
   childrenUnder18: 0,
   _officialGrossPre: null,
-  _agreedGross: null,      // שכר מוסכם למנהלת — מחליף את הסימולציה
+  _agreedGross: null,          // שכר מוסכם למנהלת — מחליף את הסימולציה
+  _actualEmployerCost: null,   // עלות מעביד בפועל מהנהלת החשבונות — גוברת על האומדן
   _snapshot: null, _changedAt: null, _approved: false, _approvedAt: null,
   _files: [],
   // ─── Monthly fields (reset each month) ───
@@ -447,7 +459,7 @@ function CalculatorFrame({ calcId, style }) {
   // האתר הוא SPA, וקישור עמוק ישיר ל-OfekNihul נופל חזרה לרשימת המחשבונים
   // ומציג את מחשבון אופק חדש. לכן טוענים קודם את הרשימה ורק אז מנווטים
   // ב-hash — בדיוק כמו לחיצה על הקישור בתוך האתר.
-  const [src, setSrc] = useState(CALC_BASE);
+  const [src, setSrc] = useState(CALC_HOME);
 
   // הקומפוננטה ממופתחת ב-key לפי calcId בצד הקורא, ולכן החלפת מחשבון
   // מרכיבה אותה מחדש והמצב חוזר ל-loading בלי setState בתוך effect.
@@ -463,7 +475,7 @@ function CalculatorFrame({ calcId, style }) {
     <div style={{ position:'relative', flex:1, minHeight:0, ...style }}>
       <iframe
         src={src}
-        onLoad={() => { if (src !== CALC_BASE) setState('ready'); }}
+        onLoad={() => { if (src !== CALC_HOME) setState('ready'); }}
         style={{ width:'100%', height:'100%', border:'none', display:'block' }}
         title="מחשבון שכר רשמי — משרד החינוך"
         allow="fullscreen"
@@ -1503,6 +1515,25 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             </div>
             <p style={{ fontSize:12, color:'var(--ok)', marginBottom:10 }}>הריצי את הסימולטור → הכניסי כאן את "השכר המשולב"</p>
 
+            {/* עלות מעביד בפועל — הנהלת החשבונות מחליפה את האומדן */}
+            {userRole !== 'principal' && simComplete(t) && (
+              <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:12, padding:12, marginBottom:10 }}>
+                <p className="apple-label" style={{ marginBottom:4 }}>עלות מעביד בפועל — הנהלת חשבונות</p>
+                <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                  <input type="number" className="apple-input" dir="ltr" style={{ fontSize:13.5 }}
+                    value={t._actualEmployerCost || ''}
+                    onChange={e => set('_actualEmployerCost', e.target.value ? Number(e.target.value) : null)}
+                    placeholder={`אומדן: ${emp.estimate.toLocaleString('he-IL')} ₪`} />
+                  {t._actualEmployerCost && <button onClick={() => set('_actualEmployerCost', null)}
+                    style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer' }}><X size={15} strokeWidth={2.4} /></button>}
+                </div>
+                <p style={{ fontSize:11, color:'var(--text3)', marginTop:6, lineHeight:1.6 }}>
+                  בחודש הראשון העלות היא אומדן לפי {EMPLOYER_PCT}% על הבסיס ו-{CHABAD_PCT}% על התוספת.
+                  משהוזן כאן סכום, הוא גובר עליו בכל הדוחות.
+                </p>
+              </div>
+            )}
+
             {/* שכר מוסכם — למנהלת בלבד, ולא בידי המנהלת עצמה */}
             {isPrincipalRow(t) && userRole !== 'principal' && (
               <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:12, padding:12, marginBottom:10 }}>
@@ -1591,7 +1622,9 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 ['עולם ישן — בסיס', emp.base, 'מה שרץ במערכת התשלומים'],
                 ...(t.reform === 'ofek' ? [['תוספת בית חב"ד', emp.supplement, 'הפער עד שכר האופק']] : []),
                 ['ברוטו לעובדת', emp.gross, null],
-                [`הוצאות מעביד`, emp.social, `${EMPLOYER_PCT}% על הבסיס${emp.supplement ? ` · ${CHABAD_PCT}% על התוספת` : ''}`],
+                [`הוצאות מעביד`, emp.social, emp.isEstimate
+                  ? `אומדן — ${EMPLOYER_PCT}% על הבסיס${emp.supplement ? ` · ${CHABAD_PCT}% על התוספת` : ''}`
+                  : 'סכום בפועל מהנהלת החשבונות'],
               ].map(([label, val, note]) => (
                 <div key={label} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10, padding:'5px 0' }}>
                   <span style={{ fontSize:12.5, color:'var(--text2)' }}>
@@ -2011,7 +2044,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
       { key:'base', label:'עולם ישן — בסיס (₪)' }, { key:'ofek', label:'אופק חדש (₪)' },
       ...(isPrincipal ? [] : [
         { key:'chabad', label:'תוספת בית חב"ד (₪)' }, { key:'gross', label:'ברוטו (₪)' },
-        { key:'social', label:`הוצאות מעביד (${EMPLOYER_PCT}% בסיס · ${CHABAD_PCT}% תוספת) (₪)` },
+        { key:'social', label:'הוצאות מעביד (₪)' }, { key:'costSource', label:'מקור עלות המעביד' },
         { key:'employer', label:'סה"כ למעסיק (₪)' },
       ]),
       { key:'source', label:'מקור הנתון' },
@@ -2041,6 +2074,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         chabad: done ? emp.supplement : '',
         gross: done ? emp.gross : '',
         social: done ? emp.social : '',
+        costSource: done ? (emp.isEstimate ? `אומדן ${EMPLOYER_PCT}%/${CHABAD_PCT}%` : 'בפועל — הנהלת חשבונות') : '',
         employer: done ? emp.total : '',
         // הדוח לא מסתיר שהמספר של מי שטרם עבר סימולציה הוא אומדן פנימי
         source: done ? 'רשמי'
@@ -2270,7 +2304,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <th style={{ textAlign:'center' }} title="סימולציית אופק חדש — רק למורות אופק">אופק חדש (₪)</th>
                 {!isPrincipal && <th style={{ textAlign:'center' }} title="הפער בין אופק לעולם הישן">תוספת בית חב"ד</th>}
                 {!isPrincipal && <th style={{ textAlign:'center' }}>ברוטו</th>}
-                {!isPrincipal && <th style={{ textAlign:'center' }} title={`${EMPLOYER_PCT}% על הבסיס · ${CHABAD_PCT}% על התוספת`}>הוצאות מעביד</th>}
+                {!isPrincipal && <th style={{ textAlign:'center' }} title={`${EMPLOYER_PCT}% על הבסיס · ${CHABAD_PCT}% על התוספת · ~ = אומדן שממתין לסכום מהנהלת החשבונות`}>הוצאות מעביד</th>}
                 {!isPrincipal && <th style={{ textAlign:'center', color:'var(--purple)' }}>סה״כ למעסיק</th>}
                 <th style={{ width:92 }}></th>
               </tr>
@@ -2488,8 +2522,17 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       {done ? emp.gross.toLocaleString('he-IL') : '—'}
                     </td>}
                     {!isPrincipal && <td style={{ textAlign:'center', color:'var(--text2)' }}
-                      title={done ? `${emp.employerBase.toLocaleString('he-IL')} על הבסיס · ${emp.employerSupp.toLocaleString('he-IL')} על התוספת` : undefined}>
-                      {done ? emp.social.toLocaleString('he-IL') : '—'}
+                      title={done
+                        ? (emp.isEstimate
+                            ? `אומדן: ${emp.employerBase.toLocaleString('he-IL')} על הבסיס · ${emp.employerSupp.toLocaleString('he-IL')} על התוספת. ממתין לסכום מהנהלת החשבונות.`
+                            : `סכום בפועל מהנהלת החשבונות (האומדן היה ${emp.estimate.toLocaleString('he-IL')})`)
+                        : undefined}>
+                      {done
+                        ? <>
+                            {emp.isEstimate && <span style={{ color:'var(--warn)', marginInlineEnd:2 }}>~</span>}
+                            {emp.social.toLocaleString('he-IL')}
+                          </>
+                        : '—'}
                     </td>}
                     {!isPrincipal && <td style={{ textAlign:'center', fontWeight:800, color: done ? 'var(--purple)' : 'var(--text3)' }}>
                       {done ? emp.total.toLocaleString('he-IL')+' ₪'
@@ -3168,6 +3211,7 @@ export default function App() {
     // שכר החודש הקודם כשכר החודש הזה, והמורים לא הופיעו באף רשימת עבודה.
     const MONTHLY_RESET = { absenceDays:0, sickFiles:[], _files:[], mmHours:0, mmFor:'', monthlyExtras:0,
                              _officialGross:null, _officialGrossPre:null, _agreedGross:null,
+                             _actualEmployerCost:null,
                              _approved:false, _approvedAt:null, _snapshot:null };
     const nextTeachers = teachers.map(t => ({ ...t, ...MONTHLY_RESET, _changedAt: now }));
     persistMT(nextKey, nextTeachers);

@@ -71,13 +71,14 @@ check('המחשבון הרשמי נטען בתוך המסגרת', loaded);
 
 // ══ 4ב. המחשבון שנטען הוא באמת זה שנבחר, לא רק ה-src ══
 // קישור עמוק ל-OfekNihul נופל חזרה לרשימה ומציג את אופק חדש
+// frameLocator עמיד לניתוק וחיבור מחדש של המסגרת בזמן החלפת מחשבון
 const calcSignature = async () => {
-  const f = p.frames().find(fr => fr.url().includes('educalc'));
-  if (!f) return { url:'', opts:[] };
-  const opts = await f.evaluate(() =>
-    [...document.querySelectorAll('select')].filter(s => s.offsetParent).map(s => s.options[1]?.text.trim() || '')
+  const fl = p.frameLocator('iframe').first();
+  const opts = await fl.locator('select').evaluateAll(
+    els => els.filter(s => s.offsetParent).map(s => s.options[1]?.text.trim() || '')
   ).catch(() => []);
-  return { url: f.url(), opts };
+  const f = p.frames().find(fr => fr.url().includes('educalc'));
+  return { url: f ? f.url() : '(אין מסגרת)', opts };
 };
 for (const [label, marker] of [['אופק — ניהול', 'מנהלים'], ['עולם ישן', 'דוקטור'], ['אופק חדש', 'מתמחים']]) {
   await p.getByRole('button', { name: label, exact: true }).first().click();

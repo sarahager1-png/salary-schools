@@ -159,10 +159,12 @@ const PR = mk({ id:'p1', name:'רבקה שטיינר', role:'principal', frontal
 await seed(OFEK, [PR]);
 await p.getByText('שלהבות אשקלון').first().click(); await p.waitForTimeout(700);
 r = await row();
-check('מנהלת — הבסיס הוא סימולציית הניהול במלואה', r.includes('18,400'), r.match(/[\d,]{4,}/g)?.join(' ') || '');
-check('מנהלת — אין רכיב תוספת בית חב"ד', !r.includes('1,600'));
-// 18,400 + 40% = 25,760
-check('מנהלת — סה"כ למעסיק 25,760 (40% על הכל)', r.includes('25,760'), r.match(/[\d,]{4,}/g)?.join(' ') || '');
+// בסיס 14,400 · תוספת 4,000 · מעביד 5,760+1,200 = 6,960 · סה"כ 25,360
+check('מנהלת — שכר בסיס 14,400', r.includes('14,400'), r.match(/[\d,]{4,}/g)?.join(' ') || '');
+check('מנהלת — היתר תוספת בית חב"ד 4,000', r.includes('4,000'));
+check('מנהלת — ברוטו 18,400', r.includes('18,400'));
+check('מנהלת — הוצאות מעביד 6,960', r.includes('6,960'), r.match(/[\d,]{4,}/g)?.join(' ') || '');
+check('מנהלת — סה"כ למעסיק 25,360', r.includes('25,360'));
 check('מנהלת — סימולציה אחת נחשבת מלאה', !r.includes('נדרשת סימולציה') && !r.includes('חסרה'));
 
 // שכר מוסכם מחליף את הברוטו
@@ -175,10 +177,25 @@ await p.getByRole('button', { name: /^שמור/ }).last().click(); await p.waitF
 const pr2 = (await read())[0];
 check('השכר המוסכם נשמר', pr2._agreedGross === 19500, String(pr2._agreedGross));
 r = await row();
+// 19,500: בסיס 14,400 · תוספת 5,100 · מעביד 5,760+1,530 = 7,290 · סה"כ 26,790
 check('שכר מוסכם מחליף את הברוטו — 19,500', r.includes('19,500'), r.match(/[\d,]{4,}/g)?.join(' ') || '');
-// 19,500 + 40% = 27,300
-check('שכר מוסכם — סה"כ למעסיק 27,300', r.includes('27,300'));
+check('שכר מוסכם — הבסיס נשאר 14,400', r.includes('14,400'));
+check('שכר מוסכם — סה"כ למעסיק 26,790', r.includes('26,790'));
 check('השורה מסומנת "שכר מוסכם"', r.includes('שכר מוסכם'));
+
+// ══════════ עלות מעביד: אומדן עד שהנה"ח מזינה ══════════
+check('העלות מסומנת כאומדן', r.includes('~'), r.slice(-70));
+await p.getByTitle(/פרטים מלאים/).first().click(); await p.waitForTimeout(600);
+check('שדה עלות מעביד בפועל קיים',
+  await p.getByPlaceholder(/אומדן: 7,290/).isVisible().catch(() => false));
+await p.getByPlaceholder(/אומדן: 7,290/).fill('7150');
+await p.getByRole('button', { name: /^שמור/ }).last().click(); await p.waitForTimeout(700);
+check('הסכום בפועל נשמר', (await read())[0]._actualEmployerCost === 7150, String((await read())[0]._actualEmployerCost));
+r = await row();
+check('הסכום בפועל גובר על האומדן', r.includes('7,150') && !r.includes('7,290'), r.match(/[\d,]{4,}/g)?.join(' ') || '');
+check('סימון האומדן נעלם', !r.includes('~'), r.slice(-60));
+// 19,500 + 7,150 = 26,650
+check('סה"כ למעסיק לפי הסכום בפועל — 26,650', r.includes('26,650'));
 
 // מורה רגילה אינה מקבלת את הבורר
 await seed(OFEK, [mk({ id:'t1', name:'חנה לוי', _officialGrossPre:11200, _officialGross:12500 })]);
