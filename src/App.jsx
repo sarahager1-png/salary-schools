@@ -3441,8 +3441,90 @@ function PrincipalLinkModal({ school, onClose }) {
   );
 }
 
-function SimulatorView({ teachers, schools, onSaveGross, activeMonth, userRole, userId }) {
+
+/* ═══════════════════════════════════════════════════════════════
+   עלות מעביד בפועל — חשבת השכר מקלידה
+
+   האומדן הוא שש שורות לפי החוק; המספר האמיתי מגיע מהנהלת החשבונות
+   אחרי שהשכר רץ. עד עכשיו רק השליח יכול היה להקליד אותו, מתוך כרטיס
+   המורה — מסך שלחשבת השכר אין. השרת התיר לה את העמודה מההתחלה.
+═══════════════════════════════════════════════════════════════ */
+function ActualCostPanel({ teachers, schools, onSave }) {
+  const [vals,  setVals]  = useState({});   // teacherId → מה שמוקלד
+  const [flash, setFlash] = useState({});   // teacherId → נשמר הרגע
+  const rows = teachers.filter(simComplete);
+  const bySchool = schools
+    .map(sc => ({ school: sc, list: rows.filter(t => t.schoolId === sc.id) }))
+    .filter(g => g.list.length);
+  const missing = rows.filter(t => !t._actualEmployerCost).length;
+
+  const save = async (t) => {
+    const raw = vals[t.id] ?? (t._actualEmployerCost || '');
+    const n = String(raw).trim() === '' ? null : Math.round(Number(raw));
+    if (n !== null && (isNaN(n) || n <= 0)) return alert('עלות המעביד חייבת להיות מספר חיובי');
+    const ok = await onSave(t.id, n);
+    if (ok) {
+      setVals(v => { const x = { ...v }; delete x[t.id]; return x; });
+      setFlash(f => ({ ...f, [t.id]: true }));
+      setTimeout(() => setFlash(f => { const x = { ...f }; delete x[t.id]; return x; }), 1500);
+    }
+  };
+
+  if (!rows.length) return (
+    <div style={{ textAlign:'center', padding:'48px 16px' }}>
+      <p style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>אין עדיין מורות עם סימולציה בחודש הזה</p>
+      <p style={{ fontSize:12.5, color:'var(--text3)', marginTop:4 }}>עלות בפועל מוזנת אחרי שהשכר חושב.</p>
+    </div>
+  );
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+      <p style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6 }}>
+        הסכום מהנהלת החשבונות מחליף את האומדן בכל מקום — בדוחות, אצל השליח ואצל המאשרת.
+        ריק = חזרה לאומדן. {missing > 0 ? `${missing} ללא עלות בפועל.` : 'לכולן יש עלות בפועל.'}
+      </p>
+      {bySchool.map(({ school, list }) => (
+        <div key={school.id}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
+            <School size={13} strokeWidth={2.2} />
+            {school.name}
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {list.map(t => {
+              const emp = calcEmployer(t);
+              const cur = vals[t.id] ?? (t._actualEmployerCost || '');
+              const diff = t._actualEmployerCost ? Math.round((t._actualEmployerCost - emp.estimate) / emp.estimate * 1000) / 10 : null;
+              return (
+                <div key={t.id} className="apple-card" style={{ padding:'10px 12px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                  <div style={{ flex:'1 1 150px', minWidth:0 }}>
+                    <p style={{ fontSize:13.5, fontWeight:600, color:'var(--text)' }}>{t.name}</p>
+                    <p style={{ fontSize:11.5, color:'var(--text3)' }}>
+                      אומדן {emp.estimate.toLocaleString('he-IL')} ₪ ({emp.pct}%)
+                      {diff !== null && <span style={{ marginInlineStart:6, color: Math.abs(diff) > 10 ? 'var(--warn)' : 'var(--text3)' }}>· בפועל {diff > 0 ? '+' : ''}{diff}%</span>}
+                    </p>
+                  </div>
+                  <input type="number" inputMode="numeric" className="apple-input" dir="ltr" placeholder="עלות בפועל"
+                    value={cur}
+                    onChange={e => setVals(v => ({ ...v, [t.id]: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(t); } }}
+                    style={{ width:130, fontSize:14, minHeight:38, textAlign:'center' }} />
+                  <button className="apple-btn apple-btn-blue" onClick={() => save(t)} style={{ minHeight:38, padding:'0 14px' }}>
+                    {flash[t.id] ? '✓' : 'שמור'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMonth, userRole, userId }) {
   const [calc, setCalc] = useState('ofek');
+  const [tab, setTab]   = useState('sim');   // 'sim' | 'cost'
+  const costMissing = teachers.filter(t => simComplete(t) && !t._actualEmployerCost).length;
   const [filterSchool, setFilterSchool] = useState('all');
   const [inputs, setInputs] = useState({});    // teacherId → string
   const [saved, setSaved]   = useState({});    // teacherId → true (just saved flash)
@@ -3533,25 +3615,35 @@ function SimulatorView({ teachers, schools, onSaveGross, activeMonth, userRole, 
         {/* Header */}
         <div style={{ background:'var(--apple-surface)', borderBottom:'1px solid var(--apple-fill2)', padding:'14px 16px', display:'flex', flexDirection:'column', gap:10 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <h2 style={{ fontWeight:700, fontSize:15, color:'var(--apple-text)', letterSpacing:'-0.01em' }}>הזנת שכר רשמי</h2>
-            <span style={{ fontSize:12, color:'var(--apple-text2)' }}>{total ? `${done} / ${total} הושלמו` : 'אין ממתינות'}</span>
+            <div className="apple-seg">
+              <button onClick={() => setTab('sim')} className={['apple-seg-item', tab === 'sim' ? 'active' : ''].join(' ')} style={{ padding:'5px 11px', fontSize:12.5 }}>
+                הזנת שכר רשמי
+              </button>
+              <button onClick={() => setTab('cost')} className={['apple-seg-item', tab === 'cost' ? 'active' : ''].join(' ')} style={{ padding:'5px 11px', fontSize:12.5 }}>
+                עלות מעביד בפועל{costMissing > 0 ? ` (${costMissing})` : ''}
+              </button>
+            </div>
+            {tab === 'sim' && <span style={{ fontSize:12, color:'var(--apple-text2)' }}>{total ? `${done} / ${total} הושלמו` : 'אין ממתינות'}</span>}
           </div>
           {/* Progress bar */}
           <div style={{ background:'var(--fill2)', borderRadius:999, height:6, overflow:'hidden' }}>
             <div style={{ width: pct+'%', background:'linear-gradient(to left, var(--purple), var(--teal))', borderRadius:999, height:6, transition:'width .45s var(--ease-out)' }} />
           </div>
-          <select className="apple-select" style={{ fontSize:13 }}
-            value={filterSchool} onChange={e => setFilterSchool(e.target.value)}>
-            <option value="all">כל בתי הספר ({allMissing.length} ממתינים)</option>
-            {schools.filter(s => missingSchoolIds.includes(s.id)).map(s => (
-              <option key={s.id} value={s.id}>{s.name} ({allMissing.filter(t => t.schoolId === s.id).length})</option>
-            ))}
-          </select>
+          {tab === 'sim' && (
+            <select className="apple-select" style={{ fontSize:13 }}
+              value={filterSchool} onChange={e => setFilterSchool(e.target.value)}>
+              <option value="all">כל בתי הספר ({allMissing.length} ממתינים)</option>
+              {schools.filter(s => missingSchoolIds.includes(s.id)).map(s => (
+                <option key={s.id} value={s.id}>{s.name} ({allMissing.filter(t => t.schoolId === s.id).length})</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Teacher rows */}
         <div style={{ flex:1, overflowY:'auto', padding:'12px 12px', display:'flex', flexDirection:'column', gap:16 }}>
-          {grouped.length === 0 && (
+          {tab === 'cost' && <ActualCostPanel teachers={teachers} schools={schools} onSave={onSaveActual} />}
+          {tab === 'sim' && grouped.length === 0 && (
             <div style={{ textAlign:'center', padding:'48px 16px' }}>
               <div style={{ width:56, height:56, borderRadius:17, background:'var(--ok-bg)', margin:'0 auto 14px', display:'flex', alignItems:'center', justifyContent:'center' }}>
                 <Check size={26} strokeWidth={2.4} color="var(--ok)" />
@@ -3560,7 +3652,7 @@ function SimulatorView({ teachers, schools, onSaveGross, activeMonth, userRole, 
               <p style={{ fontSize:13, color:'var(--text3)', marginTop:3 }}>אין שכר שממתין לסימולציה</p>
             </div>
           )}
-          {grouped.map(({ school, teachers: gTeachers }) => (
+          {tab === 'sim' && grouped.map(({ school, teachers: gTeachers }) => (
             <div key={school.id}>
               <div style={{ fontSize:12, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
                 <School size={13} strokeWidth={2.2} />
@@ -4345,6 +4437,7 @@ export default function App() {
             userRole={user.role}
             userId={user.id}
             onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
+            onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
           />
         ) : /* Principal: see only their school */
         !isCoord && principalSchool ? (
@@ -4369,6 +4462,7 @@ export default function App() {
             userRole={user.role}
             userId={user.id}
             onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
+            onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
           />
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} />

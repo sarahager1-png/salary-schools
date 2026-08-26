@@ -238,6 +238,16 @@ export async function saveSimulation(id, gross, grossPre) {
   return rowToTeacher(data);
 }
 
+// עלות המעביד בפועל, מהנהלת החשבונות. null מחזיר את השורה לאומדן.
+// חשבת השכר רשאית לכתוב בדיוק את העמודה הזו — הטריגר בשרת מתיר לה
+// official_gross, official_gross_pre ו-actual_employer_cost בלבד.
+export async function saveActualCost(id, amount) {
+  const { data, error } = await supabase.from('teacher_months')
+    .update({ actual_employer_cost: amount ?? null }).eq('id', id).select().single();
+  raise(error, 'שמירת עלות המעביד נכשלה');
+  return rowToTeacher(data);
+}
+
 export async function approve(ids) {
   const { error } = await supabase.from('teacher_months').update({ approved: true }).in('id', ids);
   raise(error, 'האישור נכשל');
