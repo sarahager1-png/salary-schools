@@ -496,14 +496,28 @@ function CalculatorFrame({ calcId, style }) {
   }, [url]);
 
   return (
-    <div style={{ position:'relative', flex:1, minHeight:0, ...style }}>
+    // הטופס של משרד החינוך גבוה מ-1,200 פיקסלים, וכפתור "חשב" בתחתיתו.
+    // כשהמסגרת בגובה הפאנל הכפתור נופל מתחת לקצה, והגלילה היחידה שמגיעה
+    // אליו היא גלילה *בתוך* המסגרת — שאין לה סימן ואיש אינו מנחש אותה.
+    // לכן המסגרת נפרשת למלוא גובה הטופס, והפאנל עצמו הוא שנגלל.
+    <div style={{ position:'relative', flex:1, minHeight:0, overflowY:'auto', ...style }}>
       <iframe
         src={src}
         onLoad={() => { if (src !== CALC_HOME) setState('ready'); }}
-        style={{ width:'100%', height:'100%', border:'none', display:'block' }}
+        style={{ width:'100%', height:'100%', minHeight:1320, border:'none', display:'block' }}
         title="מחשבון שכר רשמי — משרד החינוך"
         allow="fullscreen"
       />
+      {state === 'ready' && (
+        // הכפתור "חשב" נמצא בתחתית טופס ארוך. בלי המשפט הזה אפשר למלא
+        // את כל השדות ולא למצוא איפה מחשבים.
+        <div style={{ position:'sticky', bottom:0, insetInline:0, padding:'7px 12px', background:'rgba(255,255,255,0.94)',
+          borderTop:'1px solid var(--line)', backdropFilter:'blur(6px)', pointerEvents:'none' }}>
+          <p style={{ fontSize:11.5, color:'var(--text3)', textAlign:'center' }}>
+            מלאי את השדות וגללי מטה — הכפתור <b style={{ color:'var(--text2)' }}>חשב</b> בתחתית הטופס
+          </p>
+        </div>
+      )}
       {state !== 'ready' && (
         <div style={{ position:'absolute', inset:0, background:'var(--bg)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, padding:24, textAlign:'center' }}>
           {state === 'loading' ? (
