@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Briefcase, Calculator, School, Check, ArrowLeft, ArrowRight,
   ChevronLeft, ChevronRight, Plus, LogOut, BarChart3, ClipboardCheck,
@@ -2309,7 +2309,9 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   };
 
   const startEdit = t => { setEditingId(t.id); setEditData({ ...t }); };
-  const startNew  = () => { setEditingId('new'); setEditData({ ...EMPTY_TEACHER, schoolId: school.id, reform: school.reform || 'ofek', id: uid() }); };
+  // בלי id. store.saveTeacher בוחר INSERT או UPDATE לפי קיומו, ומזהה
+  // מקומי היה שולח אותה למסלול העדכון — על שורה שעוד לא קיימת.
+  const startNew  = () => { setEditingId('new'); setEditData({ ...EMPTY_TEACHER, schoolId: school.id, reform: school.reform || 'ofek' }); };
   const cancelEdit = () => { setEditingId(null); setEditData(null); };
   const saveEdit = () => {
     if (!editData.name.trim()) return alert('יש למלא שם');
@@ -2380,7 +2382,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <h1 style={{ fontSize:23, fontWeight:800, color:'var(--text)', letterSpacing:'-0.025em', lineHeight:1.2 }}>{school.name}</h1>
               </div>
               <p style={{ fontSize:13, color:'var(--text3)', marginInlineStart:13 }}>
-                {school.city}{school.city ? ' · ' : ''}מסלול {reformLabel(school.reform)}
+                {school.city}{school.city ? ' · ' : ''}מסלול ברירת מחדל למורה חדשה: {reformLabel(school.reform)}
               </p>
               {hoursQuota && (
                 <div style={{ marginInlineStart:13, marginTop:8, maxWidth:320 }}>
@@ -2998,7 +3000,7 @@ function ReportView({ schools, teachers }) {
 ═══════════════════════════════════════════════════════════════ */
 // שלב הזנה אחד במסך החשבת. הקלקה על השדה מחליפה את המחשבון שמוצג לצידו,
 // כדי שהמספר יוקלד מהמסך הנכון.
-function SimStep({ n, label, calcLabel, active, onFocus, value, onChange, onEnter, autoFocus }) {
+function SimStep({ n, label, calcLabel, active, onFocus, value, onChange, onEnter, autoFocus, inputRef }) {
   return (
     <div style={{ marginBottom:8 }}>
       <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4 }}>
@@ -3011,7 +3013,7 @@ function SimStep({ n, label, calcLabel, active, onFocus, value, onChange, onEnte
         <span style={{ fontSize:12, fontWeight:700, color:'var(--text2)' }}>{label}</span>
         {active && <span style={{ fontSize:10.5, color:'var(--purple)' }}>← {calcLabel}</span>}
       </div>
-      <input type="number" className="apple-input" dir="ltr" autoFocus={autoFocus}
+      <input type="number" className="apple-input" dir="ltr" autoFocus={autoFocus} ref={inputRef}
         placeholder={`שכר משולב מ${calcLabel}`}
         value={value}
         onFocus={onFocus}
@@ -3028,6 +3030,11 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
   const [inputs, setInputs] = useState({});    // teacherId → string
   const [saved, setSaved]   = useState({});    // teacherId → true (just saved flash)
   const [preInputs, setPreInputs] = useState({});   // סימולציית עולם ישן, לחישוב תוספת בית חב"ד
+  // Enter בשלב 1 החליף את המחשבון אבל השאיר את הסמן במקום, וההקלדה
+  // הבאה נדבקה לסוף המספר הראשון. autoFocus אינו עוזר — הוא פועל רק
+  // ברגע ההרכבה, והשדה השני כבר מורכב. לכן מעבירים את הסמן במפורש.
+  const step1Ref = useRef(null);
+  const step2Ref = useRef(null);
   const [activeId, setActiveId] = useState(null);
 
 
@@ -3166,6 +3173,29 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                       </div>
                       {isActive && (
                         <>
+                        {/* מה שהמחשבון הרשמי שואל. בלי זה אין לחשבת מסך אחר
+                            לפתוח — אין לה גישה לכרטיס המורה ולא לבית הספר. */}
+                        <div style={{
+                          display:'flex', flexWrap:'wrap', gap:'5px 7px', marginBottom:10, paddingBottom:10,
+                          borderBottom:'1px solid var(--line-soft, #EDE8F8)',
+                        }}>
+                          {[
+                            ['% משרה',   `${t.scopePct ?? t.scope ?? 100}%`],
+                            ['פרונטלי',  `${t.frontalHours ?? 0} ש'`],
+                            ['שלב',      LEVELS[t.level]?.label],
+                            ['גיל',      t.ageGroup && t.ageGroup !== 'none' ? AGE_RED[t.ageGroup]?.label : null],
+                            ['גמול',     t.role && t.role !== 'none' ? ROLES.find(r => r.id === t.role)?.label.split('(')[0].trim() : null],
+                            ['ילדים<18', t.reform === 'pre' ? String(t.childrenUnder18 ?? 0) : null],
+                          ].filter(([, v]) => v).map(([k, v]) => (
+                            <span key={k} style={{
+                              fontSize:11, padding:'3px 8px', borderRadius:999,
+                              background:'var(--fill2, #F0EDF8)', color:'var(--text2, #4A3F6B)',
+                              whiteSpace:'nowrap',
+                            }}>
+                              <span style={{ opacity:.65 }}>{k} </span><b style={{ fontWeight:700 }}>{v}</b>
+                            </span>
+                          ))}
+                        </div>
                         {needsTwo ? (
                           <>
                             {/* שלב 1 — העולם הישן. זה מה שרץ במערכת התשלומים. */}
@@ -3174,8 +3204,9 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                               active={calc === 'old'} onFocus={() => setCalc('old')}
                               value={preVal}
                               onChange={v => setPreInputs(prev => ({ ...prev, [t.id]: v }))}
-                              onEnter={() => setCalc(step2Calc)}
+                              onEnter={() => { setCalc(step2Calc); step2Ref.current?.focus(); step2Ref.current?.select(); }}
                               autoFocus={!preVal}
+                              inputRef={step1Ref}
                             />
                             {/* שלב 2 — האופק. הפער בין השניים הוא רכיב התוספת. */}
                             <SimStep
@@ -3185,6 +3216,7 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                               onChange={v => setInputs(prev => ({ ...prev, [t.id]: v }))}
                               onEnter={() => handleSave(t)}
                               autoFocus={!!preVal && !mainVal}
+                              inputRef={step2Ref}
                             />
                           </>
                         ) : (
@@ -3698,9 +3730,24 @@ export default function App() {
                           <h3 style={{ fontWeight:700, fontSize:16, color:'var(--apple-text)', marginBottom:2, letterSpacing:'-0.01em' }}>{s.name}</h3>
                           {s.city && <p style={{ fontSize:13, color:'var(--apple-text2)' }}>{s.city}</p>}
                           <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
-                            <span className={`apple-badge ${(s.reform || 'ofek') === 'ofek' ? 'badge-blue' : 'badge-gray'}`}>
-                              {reformLabel(s.reform)}
-                            </span>
+                            {/* המסלול הוא של המורה, לא של בית הספר. בבית ספר
+                                אופק יש גם מורות בעולם ישן, ולכן מוצג התמהיל
+                                בפועל; מסלול בית הספר הוא ברירת מחדל בלבד. */}
+                            {(() => {
+                              const nOfek = ts.filter(t => t.reform === 'ofek').length;
+                              const nPre  = ts.length - nOfek;
+                              if (!ts.length) return (
+                                <span className={`apple-badge ${(s.reform || 'ofek') === 'ofek' ? 'badge-blue' : 'badge-gray'}`}>
+                                  ברירת מחדל: {reformLabel(s.reform)}
+                                </span>
+                              );
+                              return (
+                                <>
+                                  {nOfek > 0 && <span className="apple-badge badge-blue">{nOfek} אופק חדש</span>}
+                                  {nPre  > 0 && <span className="apple-badge badge-gray">{nPre} עולם ישן</span>}
+                                </>
+                              );
+                            })()}
                             {simN > 0 && <span className="apple-badge badge-orange">{simN} לסימולציה</span>}
                             {apprN > 0 && <span className="apple-badge badge-teal">{apprN} לאישור</span>}
                           </div>

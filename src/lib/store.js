@@ -201,7 +201,9 @@ export async function saveTeacher(t, monthKey) {
     raise(error, 'שמירת המורה נכשלה');
     return rowToTeacher(data);
   }
-  const { data, error } = await supabase.from('teacher_months').insert(teacherToRow(t, monthKey)).select().single();
+  const row = teacherToRow(t, monthKey);
+  delete row.id;   // המזהה נקבע במסד, לא אצלנו
+  const { data, error } = await supabase.from('teacher_months').insert(row).select().single();
   raise(error, 'הוספת המורה נכשלה');
   return rowToTeacher(data);
 }
