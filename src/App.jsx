@@ -207,6 +207,11 @@ const CHABAD_PCT     = Math.round(CHABAD_RATE * 100);
 function payBreakdown(t) {
   const ofek = Number(t._officialGross) || 0;
   const old  = Number(t._officialGrossPre) || 0;
+  // שכר מוסכם למנהלת — מחליף את הברוטו ואת הסימולציה
+  const agreed = Number(t._agreedGross) || 0;
+  if (isPrincipalRow(t) && agreed) return { base: agreed, supplement: 0, gross: agreed, agreed: true };
+  // מנהלת — סימולציית ניהול בלבד. הסכום הוא הבסיס במלואו, בלי רכיב תוספת.
+  if (isPrincipalRow(t)) return { base: ofek, supplement: 0, gross: ofek };
   // בית ספר עולם ישן — סימולציה אחת, אין רכיב תוספת
   if (t.reform !== 'ofek') return { base: ofek, supplement: 0, gross: ofek };
   // אם האופק יוצא נמוך מהעולם הישן, העובדת נשארת עם העולם הישן
@@ -280,9 +285,13 @@ function baseFieldsChanged(next, prev) {
 }
 // מורת אופק דורשת שתי סימולציות — עולם ישן ואופק — כי הפער ביניהן הוא
 // רכיב התשלום. מורת עולם ישן דורשת אחת.
-const simComplete = t => Boolean(t.reform === 'ofek'
-  ? (t._officialGross && t._officialGrossPre)
-  : t._officialGross);
+const simComplete = t => {
+  if (t._agreedGross) return true;               // שכר מוסכם — אין צורך בסימולציה
+  if (isPrincipalRow(t)) return Boolean(t._officialGross);   // ניהול — סימולציה אחת
+  return Boolean(t.reform === 'ofek'
+    ? (t._officialGross && t._officialGrossPre)
+    : t._officialGross);
+};
 
 // סטטוס מורה בזרימת העבודה:
 // needs_sim: מנהלת שמרה שינויים, ממתין לסימולציה אצל חשבת שכר
@@ -356,6 +365,7 @@ const EMPTY_TEACHER = {
   isTemp: false, startDate: '', endDate: '', scopeChanges: [],
   childrenUnder18: 0,
   _officialGrossPre: null,
+  _agreedGross: null,      // שכר מוסכם למנהלת — מחליף את הסימולציה
   _snapshot: null, _changedAt: null, _approved: false, _approvedAt: null,
   _files: [],
   // ─── Monthly fields (reset each month) ───
@@ -1493,8 +1503,45 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             </div>
             <p style={{ fontSize:12, color:'var(--ok)', marginBottom:10 }}>הריצי את הסימולטור → הכניסי כאן את "השכר המשולב"</p>
 
-            {/* אופק חדש — שני שדות */}
-            {t.reform === 'ofek' ? (<>
+            {/* שכר מוסכם — למנהלת בלבד, ולא בידי המנהלת עצמה */}
+            {isPrincipalRow(t) && userRole !== 'principal' && (
+              <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:12, padding:12, marginBottom:10 }}>
+                <div className="apple-seg" style={{ width:'100%', marginBottom: t._agreedGross ? 10 : 0 }}>
+                  <button className={['apple-seg-item', !t._agreedGross ? 'active' : ''].join(' ')}
+                    onClick={() => set('_agreedGross', null)}>לפי סימולציית ניהול</button>
+                  <button className={['apple-seg-item', t._agreedGross ? 'active' : ''].join(' ')}
+                    onClick={() => set('_agreedGross', t._agreedGross || t._officialGross || '')}>שכר מוסכם</button>
+                </div>
+                {t._agreedGross !== null && t._agreedGross !== undefined && (
+                  <>
+                    <input type="number" className="apple-input" dir="ltr" autoFocus
+                      value={t._agreedGross || ''}
+                      onChange={e => set('_agreedGross', e.target.value ? Number(e.target.value) : '')}
+                      placeholder="ברוטו מוסכם" style={{ fontSize:14 }} />
+                    <p style={{ fontSize:11, color:'var(--text3)', marginTop:6, lineHeight:1.6 }}>
+                      מחליף את הברוטו ואת הסימולציה. השורה לא תמתין לחשבת השכר.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* אופק חדש — שני שדות. למנהלת סימולציית ניהול אחת. */}
+            {isPrincipalRow(t) ? (
+              <div>
+                <p style={{ fontSize:11, fontWeight:700, color:'var(--purple)', marginBottom:4 }}>סימולציית אופק — ניהול</p>
+                <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                  <input type="number" className="apple-input" dir="ltr" style={{ fontSize:13 }}
+                    value={t._officialGross || ''}
+                    onChange={e => set('_officialGross', e.target.value ? Number(e.target.value) : null)}
+                    placeholder="שכר ניהול..." disabled={!!t._agreedGross} />
+                  {t._officialGross && <button onClick={() => set('_officialGross', null)} style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer' }}><X size={15} strokeWidth={2.4} /></button>}
+                </div>
+                <p style={{ fontSize:11, color:'var(--text3)', marginTop:5 }}>
+                  הסכום הזה הוא הבסיס במלואו — אין למנהלת רכיב תוספת בית חב"ד.
+                </p>
+              </div>
+            ) : t.reform === 'ofek' ? (<>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
                 <div>
                   <p style={{ fontSize:11, fontWeight:700, color:'#1a7a38', marginBottom:4 }}>סימולציית אופק חדש</p>
@@ -2381,6 +2428,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         {isAppr && <ClipboardCheck size={13} strokeWidth={2.4} color="var(--teal-700)" aria-label="ממתין לאישור" />}
                         <span style={{ color: t.name === PRINCIPAL_PLACEHOLDER ? 'var(--text3)' : undefined }}>{t.name}</span>
                         {isPrincipalRow(t) && <span className="apple-badge badge-purple" style={{ fontSize:10.5, padding:'2px 8px' }}>מנהלת</span>}
+                        {t._agreedGross && <span className="apple-badge badge-teal" style={{ fontSize:10.5, padding:'2px 8px' }} title="ברוטו מוסכם — לא מסימולציה">שכר מוסכם</span>}
                       </div>
                     </td>
                     <td style={{ textAlign:'center', fontFamily:'monospace', fontSize:12, color:'var(--apple-text2)' }}>{t.tzId||'—'}</td>
@@ -2730,8 +2778,9 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
     const val = inputs[t.id] ?? t._officialGross;
     if (!val || isNaN(Number(val))) return;
     const pre = preInputs[t.id] ?? t._officialGrossPre;
-    // מורת אופק לא נשמרת בלי שתי הסימולציות — הפער ביניהן הוא רכיב התשלום
-    if (t.reform === 'ofek' && (!pre || isNaN(Number(pre)))) return;
+    // מורת אופק לא נשמרת בלי שתי הסימולציות — הפער ביניהן הוא רכיב התשלום.
+    // מנהלת פטורה: לה יש סימולציית ניהול אחת שהיא הבסיס במלואו.
+    if (t.reform === 'ofek' && !isPrincipalRow(t) && (!pre || isNaN(Number(pre)))) return;
     onSaveGross(t.id, Number(val), pre && !isNaN(Number(pre)) ? Number(pre) : undefined);
     setSaved(prev => ({ ...prev, [t.id]: true }));
     setTimeout(() => setSaved(prev => { const n={...prev}; delete n[t.id]; return n; }), 1500);
@@ -2810,6 +2859,8 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                   const isActive = activeId === t.id;
                   const wasSaved = saved[t.id];
                   const isOfek   = t.reform === 'ofek';
+                  // רק מורת אופק שאינה מנהלת דורשת שתי סימולציות
+                  const needsTwo = isOfek && !isPrincipalRow(t);
                   const preVal   = preInputs[t.id] ?? (t._officialGrossPre || '');
                   const mainVal  = inputs[t.id] ?? (t._officialGross || '');
                   // שלב 2 הוא המחשבון של המורה — למנהלת בית ספר זה אופק ניהול
@@ -2833,7 +2884,7 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                       </div>
                       {isActive && (
                         <>
-                        {isOfek ? (
+                        {needsTwo ? (
                           <>
                             {/* שלב 1 — העולם הישן. זה מה שרץ במערכת התשלומים. */}
                             <SimStep
@@ -2856,9 +2907,9 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                           </>
                         ) : (
                           <div style={{ marginBottom:8 }}>
-                            <p className="apple-label" style={{ marginBottom:4 }}>שכר משולב — מחשבון העולם הישן</p>
+                            <p className="apple-label" style={{ marginBottom:4 }}>שכר משולב — מחשבון {step2Label}</p>
                             <input type="number" className="apple-input" dir="ltr" autoFocus
-                              placeholder="שכר משולב מהסימולטור"
+                              placeholder={`שכר משולב ממחשבון ${step2Label}`}
                               value={mainVal}
                               onChange={e => setInputs(prev => ({ ...prev, [t.id]: e.target.value }))}
                               onKeyDown={e => e.key === 'Enter' && handleSave(t)}
@@ -2867,7 +2918,7 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                         )}
 
                         {/* הפער מתעדכן חי מול מה שהוקלד */}
-                        {isOfek && preVal && mainVal && (
+                        {needsTwo && preVal && mainVal && (
                           <div style={{ background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:10, padding:'8px 11px', marginBottom:8, fontSize:12.5 }}>
                             <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)' }}>
                               <span>תוספת בית חב"ד</span>
@@ -2884,12 +2935,12 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                         )}
 
                         <button className="apple-btn" onClick={() => handleSave(t)}
-                          disabled={!mainVal || (isOfek && !preVal)}
-                          title={isOfek && !preVal ? 'נדרשות שתי הסימולציות' : undefined}
+                          disabled={!mainVal || (needsTwo && !preVal)}
+                          title={needsTwo && !preVal ? 'נדרשות שתי הסימולציות' : undefined}
                           style={{
                             width:'100%', fontSize:13.5, minHeight:38,
-                            background: wasSaved ? 'var(--ok)' : (mainVal && (!isOfek || preVal)) ? 'var(--purple)' : 'var(--fill2)',
-                            color: (wasSaved || (mainVal && (!isOfek || preVal))) ? '#fff' : 'var(--text3)',
+                            background: wasSaved ? 'var(--ok)' : (mainVal && (!needsTwo || preVal)) ? 'var(--purple)' : 'var(--fill2)',
+                            color: (wasSaved || (mainVal && (!needsTwo || preVal))) ? '#fff' : 'var(--text3)',
                           }}>
                           {wasSaved ? <Check size={15} strokeWidth={2.8} /> : 'שמור'}
                         </button>
@@ -3116,7 +3167,7 @@ export default function App() {
     // חודש חדש מתחיל בלי שכר רשמי: בלי איפוס _officialGross הטבלה הציגה את
     // שכר החודש הקודם כשכר החודש הזה, והמורים לא הופיעו באף רשימת עבודה.
     const MONTHLY_RESET = { absenceDays:0, sickFiles:[], _files:[], mmHours:0, mmFor:'', monthlyExtras:0,
-                             _officialGross:null, _officialGrossPre:null,
+                             _officialGross:null, _officialGrossPre:null, _agreedGross:null,
                              _approved:false, _approvedAt:null, _snapshot:null };
     const nextTeachers = teachers.map(t => ({ ...t, ...MONTHLY_RESET, _changedAt: now }));
     persistMT(nextKey, nextTeachers);

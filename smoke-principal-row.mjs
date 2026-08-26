@@ -70,14 +70,17 @@ await p.reload(); await p.waitForTimeout(500);
 await p.getByText('חשבת שכר').click(); await p.waitForTimeout(300);
 await p.getByText('כניסה למערכת').click(); await p.waitForTimeout(1200);
 await p.getByText('מנהלת בית הספר').first().click(); await p.waitForTimeout(600);
-const src1 = await waitSrc('OldWorld');
-check('שלב 1 של המנהלת — מחשבון העולם הישן', src1.endsWith('OldWorld'), src1);
-// שלב 2 שלה הוא אופק ניהול, לא אופק חדש
-await p.getByPlaceholder('שכר משולב ממחשבון העולם הישן').fill('15000');
-await p.getByPlaceholder('שכר משולב ממחשבון העולם הישן').press('Enter');
-await p.waitForTimeout(500);
-const src2 = await waitSrc('OfekNihul');
-check('שלב 2 של המנהלת פותח את אופק — ניהול', src2.endsWith('OfekNihul'), src2);
+// למנהלת סימולציית ניהול אחת — לא שני שלבים
+const src1 = await waitSrc('OfekNihul');
+check('המנהלת מקבלת את מחשבון אופק — ניהול', src1.endsWith('OfekNihul'), src1);
+check('למנהלת שדה אחד, בלי שלב עולם ישן',
+  !(await p.getByPlaceholder('שכר משולב ממחשבון העולם הישן').isVisible().catch(() => false)));
+await p.getByPlaceholder('שכר משולב ממחשבון אופק — ניהול').fill('18400');
+await p.getByPlaceholder('שכר משולב ממחשבון אופק — ניהול').press('Enter');
+await p.waitForTimeout(700);
+const pr = (await teachers()).find(x => x.role === 'principal');
+check('הסימולציה נשמרה למנהלת', pr._officialGross === 18400, String(pr._officialGross));
+check('למנהלת אין רכיב תוספת — הבסיס מלא', !pr._officialGrossPre, String(pr._officialGrossPre));
 
 // ══ 5. a newly created school gets one too ══
 await p.getByRole('button', { name: 'יציאה' }).click(); await p.waitForTimeout(300);

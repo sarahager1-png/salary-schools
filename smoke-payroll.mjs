@@ -154,6 +154,39 @@ await p.getByRole('button', { name: 'שמור' }).click(); await p.waitForTimeou
 check('בלי מכסה — שום חסימה', !alertText && (await read())[0].frontalHours === 300,
   `alert=${alertText} hours=${(await read())[0].frontalHours}`);
 
+// ══════════ מנהלת: סימולציית ניהול אחת, או שכר מוסכם ══════════
+const PR = mk({ id:'p1', name:'רבקה שטיינר', role:'principal', frontalHours:12, _officialGross:18400 });
+await seed(OFEK, [PR]);
+await p.getByText('שלהבות אשקלון').first().click(); await p.waitForTimeout(700);
+r = await row();
+check('מנהלת — הבסיס הוא סימולציית הניהול במלואה', r.includes('18,400'), r.match(/[\d,]{4,}/g)?.join(' ') || '');
+check('מנהלת — אין רכיב תוספת בית חב"ד', !r.includes('1,600'));
+// 18,400 + 40% = 25,760
+check('מנהלת — סה"כ למעסיק 25,760 (40% על הכל)', r.includes('25,760'), r.match(/[\d,]{4,}/g)?.join(' ') || '');
+check('מנהלת — סימולציה אחת נחשבת מלאה', !r.includes('נדרשת סימולציה') && !r.includes('חסרה'));
+
+// שכר מוסכם מחליף את הברוטו
+await p.getByTitle(/פרטים מלאים/).first().click(); await p.waitForTimeout(600);
+check('בורר "שכר מוסכם" קיים למנהלת',
+  await p.getByRole('button', { name: 'שכר מוסכם' }).isVisible().catch(() => false));
+await p.getByRole('button', { name: 'שכר מוסכם' }).click(); await p.waitForTimeout(300);
+await p.getByPlaceholder('ברוטו מוסכם').fill('19500');
+await p.getByRole('button', { name: /^שמור/ }).last().click(); await p.waitForTimeout(700);
+const pr2 = (await read())[0];
+check('השכר המוסכם נשמר', pr2._agreedGross === 19500, String(pr2._agreedGross));
+r = await row();
+check('שכר מוסכם מחליף את הברוטו — 19,500', r.includes('19,500'), r.match(/[\d,]{4,}/g)?.join(' ') || '');
+// 19,500 + 40% = 27,300
+check('שכר מוסכם — סה"כ למעסיק 27,300', r.includes('27,300'));
+check('השורה מסומנת "שכר מוסכם"', r.includes('שכר מוסכם'));
+
+// מורה רגילה אינה מקבלת את הבורר
+await seed(OFEK, [mk({ id:'t1', name:'חנה לוי', _officialGrossPre:11200, _officialGross:12500 })]);
+await p.getByText('שלהבות אשקלון').first().click(); await p.waitForTimeout(600);
+await p.getByTitle(/פרטים מלאים/).first().click(); await p.waitForTimeout(600);
+check('למורה רגילה אין בורר שכר מוסכם',
+  !(await p.getByRole('button', { name: 'שכר מוסכם' }).isVisible().catch(() => false)));
+
 await b.close();
 console.log(fails.length ? `\n${fails.length} כשלונות` : '\nהכול עבר');
 process.exit(fails.length ? 1 : 0);
