@@ -86,7 +86,13 @@ const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULA
 // מסלול המורה -> המחשבון שמתאים לו
 const calcForReform = reform => (reform === 'pre' ? 'old' : 'ofek');
 // למנהלת בית ספר יש מחשבון נפרד — אופק ניהול
-const calcForTeacher = t => (isPrincipalRow(t) ? 'mgmt' : calcForReform(t?.reform));
+// מורת רפורמה בחטיבה העליונה היא עוז לתמורה, לא אופק חדש — שני
+// מחשבונים שונים באתר. קודם כולן נותבו לאופק, והכותרת אישרה לחשבת
+// בחירה שגויה.
+const calcForTeacher = t => (
+  isPrincipalRow(t) ? 'mgmt'
+  : t?.reform === 'ofek' && t?.level === 'high' ? 'oz'
+  : calcForReform(t?.reform));
 
 const REFORMS = [
   { id: 'ofek', label: 'אופק חדש' },
@@ -1131,9 +1137,10 @@ function ScopeChangeModal({ teacher, onSave, onClose }) {
 /* ═══════════════════════════════════════════════════════════════
    EMAIL REPORT HELPER
 ═══════════════════════════════════════════════════════════════ */
-function buildEmailBody(school, teachers) {
+function buildEmailBody(school, teachers, monthLabel) {
   const ts  = teachers.filter(t => t.schoolId === school.id);
-  const now = new Date().toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+  // החודש הפעיל, לא הקלנדרי — הדוח הוא על חודש השכר שעובדים עליו
+  const now = monthLabel || new Date().toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
   const totGross = ts.reduce((s,t) => s + calcGross(t), 0);
   const totEmp   = ts.reduce((s,t) => s + calcEmployer(t).total, 0);
   const pending  = ts.filter(isPending);
@@ -1154,12 +1161,23 @@ function buildEmailBody(school, teachers) {
   return body;
 }
 
-function sendMonthlyEmail(school, teachers) {
-  const subject = encodeURIComponent(`דוח שכר חודשי — ${school.name}`);
-  const body    = encodeURIComponent(buildEmailBody(school, teachers));
-  const to      = school.principalEmail || '';
-  const cc      = school.coordinatorEmail ? `&cc=${encodeURIComponent(school.coordinatorEmail)}` : '';
-  window.open(`mailto:${to}?subject=${subject}${cc}&body=${body}`);
+// מחזירה הודעת שגיאה בעברית, או null כשהמייל נפתח.
+// קודם הנמען היה תמיד המנהלת — גם כשהמנהלת עצמה לחצה "שלח לשליח" —
+// ובלי כתובת נפתח mailto עם נמען ריק ושום דבר לא קרה על המסך.
+function sendMonthlyEmail(school, teachers, { userRole, monthLabel } = {}) {
+  const toCoordinator = userRole === 'principal';
+  const to = toCoordinator ? school.coordinatorEmail : school.principalEmail;
+  const cc = toCoordinator ? school.principalEmail   : school.coordinatorEmail;
+  if (!to) {
+    return toCoordinator
+      ? 'לא הוגדר מייל שליח לבית הספר. בקשי מהרשת להגדיר אותו בכרטיס בית הספר.'
+      : 'לא הוגדר מייל מנהלת לבית הספר. הגדירי אותו בעריכת בית הספר.';
+  }
+  const subject = encodeURIComponent(`דוח שכר ${monthLabel || ''} — ${school.name}`.replace(/\s+/g, ' '));
+  const body    = encodeURIComponent(buildEmailBody(school, teachers, monthLabel));
+  const ccPart  = cc ? `&cc=${encodeURIComponent(cc)}` : '';
+  window.open(`mailto:${encodeURIComponent(to)}?subject=${subject}${ccPart}&body=${body}`);
+  return null;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -2041,6 +2059,8 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
 ═══════════════════════════════════════════════════════════════ */
 function SchoolModal({ school, onSave, onClose }) {
   const [s, setS] = useState({ ...school });
+  // לחיצה כפולה יצרה שני בתי ספר זהים. הכפתור נעול עד שהשמירה חוזרת.
+  const [saving, setSaving] = useState(false);
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(6px)' }}>
       <div className="apple-card" style={{ width:'100%', maxWidth:360, padding:24 }}>
@@ -2082,7 +2102,13 @@ function SchoolModal({ school, onSave, onClose }) {
         </div>
         <div style={{ display:'flex', gap:8 }}>
           <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ flex:1 }}>ביטול</button>
-          <button className="apple-btn apple-btn-blue" onClick={() => { if (!s.name?.trim()) return; onSave({ ...s, reform: s.reform || 'ofek' }); }} style={{ flex:1 }}>שמור</button>
+          <button className="apple-btn apple-btn-blue" disabled={saving}
+            onClick={async () => {
+              if (!s.name?.trim()) return alert('יש למלא שם בית ספר');
+              setSaving(true);
+              try { await onSave({ ...s, reform: s.reform || 'ofek' }); } finally { setSaving(false); }
+            }}
+            style={{ flex:1, opacity: saving ? .6 : 1 }}>{saving ? 'שומר…' : 'שמור'}</button>
         </div>
       </div>
     </div>
@@ -2159,7 +2185,7 @@ function SchoolReport({ school, teachers, onClose }) {
                   <td style={{ textAlign:'center', fontWeight:700 }}>{grade}</td>
                   <td style={{ textAlign:'center' }}>{t.seniority}</td>
                   <td style={{ textAlign:'center', fontWeight:600, color:'var(--apple-blue)' }}>{scope}%</td>
-                  <td style={{ textAlign:'center' }}>{derived ? derived.frontal : '—'}</td>
+                  <td style={{ textAlign:'center' }}>{derived ? derived.frontal : (t.frontalHours ?? '—')}</td>
                   <td style={{ textAlign:'center' }}>{derived ? derived.individual : '—'}</td>
                   <td style={{ textAlign:'center' }}>{derived ? derived.presence : '—'}</td>
                   <td style={{ fontSize:11 }}>{t.role!=='none' ? ROLES.find(r=>r.id===t.role)?.label.split('(')[0].trim() : '—'}</td>
@@ -2431,7 +2457,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         degree: DEGREE_LABELS[t.degree] || t.degree || '',
         grade: t.reform === 'ofek' ? (t.grade === 'intern' ? 'מתמחה' : t.grade) : '',
         seniority: t.seniority ?? '',
-        frontal: derived ? derived.frontal : '',
+        // עולם ישן: אין נגזרת, אבל השעות קיימות ונספרות במכסה
+        frontal: derived ? derived.frontal : (t.frontalHours ?? ''),
         temp: t.isTemp ? 'זמני' : 'קבוע',
         children: t.childrenUnder18 || 0,
         absence: t.absenceDays || 0,
@@ -2583,8 +2610,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               <Plus size={15} strokeWidth={2.6} />
               הוסף מורה
             </button>
-            <button className="apple-btn apple-btn-ghost" onClick={() => sendMonthlyEmail(school, teachers)}
-              title={school.principalEmail ? `שלח ל: ${school.principalEmail}` : 'הגדר מייל מנהלת'}
+            <button className="apple-btn apple-btn-ghost"
+              onClick={() => {
+                const err = sendMonthlyEmail(school, teachers, { userRole, monthLabel: fmtMonthFn ? fmtMonthFn(activeMonth) : activeMonth });
+                if (err) alert(err);
+              }}
+              title={(isCoord ? school.principalEmail : school.coordinatorEmail)
+                ? `שלח ל: ${isCoord ? school.principalEmail : school.coordinatorEmail}`
+                : (isCoord ? 'לא הוגדר מייל מנהלת' : 'לא הוגדר מייל שליח')}
               style={{ minHeight:38, fontSize:13.5 }}>
               <Send size={14} strokeWidth={2.2} />
               {isCoord ? 'שלח לאישור' : 'שלח לשליח'}
@@ -2832,7 +2865,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         {isSim  && <Calculator size={13} strokeWidth={2.4} color="var(--warn)" aria-label="נדרשת סימולציה" />}
                         {isAppr && <ClipboardCheck size={13} strokeWidth={2.4} color="var(--teal-700)" aria-label="ממתין לאישור" />}
                         <span style={{ color: t.name === PRINCIPAL_PLACEHOLDER ? 'var(--text3)' : undefined }}>{t.name}</span>
-                        {isPrincipalRow(t) && <span className="apple-badge badge-purple" style={{ fontSize:10.5, padding:'2px 8px' }}>מנהלת</span>}
+                        {isPrincipalRow(t) && (
+                          <span className="apple-badge badge-purple" style={{ fontSize:10.5, padding:'2px 8px', cursor:'help' }}
+                            title="נוצרה אוטומטית עם פתיחת בית הספר, עם 26 שעות כברירת מחדל — השעות נספרות במכסה. עדכני את שעותיה ואת פרטיה.">
+                            מנהלת
+                          </span>
+                        )}
                         {t._agreedGross && <span className="apple-badge badge-teal" style={{ fontSize:10.5, padding:'2px 8px' }} title="ברוטו מוסכם — לא מסימולציה">שכר מוסכם</span>}
                         {needsNetApproval(t, isFirstMonth) && (
                           <span className="apple-badge badge-orange" style={{ fontSize:10.5, padding:'2px 8px' }}
@@ -2861,7 +2899,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td style={{ textAlign:'center' }}>{degreeLabel}</td>
                     <td style={{ textAlign:'center', fontWeight:700, color: t.reform==='ofek' ? 'var(--apple-text)' : 'var(--apple-text3)' }}>{gradeLabel}</td>
                     <td style={{ textAlign:'center', color:'var(--apple-text2)' }}>{t.seniority}</td>
-                    <td style={{ textAlign:'center' }}>{derived ? derived.frontal : '—'}</td>
+                    <td style={{ textAlign:'center' }}>{derived ? derived.frontal : (t.frontalHours ?? '—')}</td>
                     <td style={{ textAlign:'center' }}>
                       {t.isTemp
                         ? <span className="apple-badge badge-orange">שיבוץ זמני</span>
@@ -3195,7 +3233,9 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
 
   // כל המורים שממתינים לסימולציה (שינוי נתונים, אין עדיין שכר רשמי)
   const allMissing = teachers.filter(needsSim);
-  const total = teachers.filter(isPending).length || teachers.length;
+  // רק מה שממתין החודש. קודם, כשלא נשאר דבר, המונה נפל על כל המורות
+  // והציג "0 / 5 הושלמו" רגע אחרי שהחשבת סיימה 5 / 5.
+  const total = teachers.filter(isPending).length;
   const done  = teachers.filter(needsApproval).length;
 
   // Schools that have at least one missing teacher
@@ -3218,14 +3258,19 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
     setCalc(calcForTeacher(t));
   };
 
+  // 8100.75 החזיר "invalid input syntax for type integer" גולמי מהמסד,
+  // ומינוס — check constraint. אגורות מתעגלות; מינוס נעצר בעברית.
+  const clean = v => (v === '' || v == null || isNaN(Number(v))) ? null : Math.round(Number(v));
   const handleSave = (t) => {
-    const val = inputs[t.id] ?? t._officialGross;
-    if (!val || isNaN(Number(val))) return;
-    const pre = preInputs[t.id] ?? t._officialGrossPre;
+    const val = clean(inputs[t.id] ?? t._officialGross);
+    if (val === null) return;
+    if (val <= 0) return alert('השכר חייב להיות מספר חיובי');
+    const pre = clean(preInputs[t.id] ?? t._officialGrossPre);
+    if (pre !== null && pre <= 0) return alert('שכר העולם הישן חייב להיות מספר חיובי');
     // מורת אופק לא נשמרת בלי שתי הסימולציות — הפער ביניהן הוא רכיב התשלום.
     // מנהלת פטורה: לה יש סימולציית ניהול אחת שהיא הבסיס במלואו.
-    if (t.reform === 'ofek' && !isPrincipalRow(t) && (!pre || isNaN(Number(pre)))) return;
-    onSaveGross(t.id, Number(val), pre && !isNaN(Number(pre)) ? Number(pre) : undefined);
+    if (t.reform === 'ofek' && !isPrincipalRow(t) && pre === null) return;
+    onSaveGross(t.id, val, pre ?? undefined);
     setSaved(prev => ({ ...prev, [t.id]: true }));
     setTimeout(() => setSaved(prev => { const n={...prev}; delete n[t.id]; return n; }), 1500);
     // advance to next in list
@@ -3234,7 +3279,7 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
     if (idx !== -1 && idx + 1 < flat.length) selectTeacher(flat[idx + 1]);
   };
 
-  const pct = total > 0 ? Math.round(done / total * 100) : 100;
+  const pct = total ? Math.round(done / total * 100) : 100;
 
   return (
     <div className="sim-split">
@@ -3265,7 +3310,7 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
         <div style={{ background:'var(--apple-surface)', borderBottom:'1px solid var(--apple-fill2)', padding:'14px 16px', display:'flex', flexDirection:'column', gap:10 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <h2 style={{ fontWeight:700, fontSize:15, color:'var(--apple-text)', letterSpacing:'-0.01em' }}>הזנת שכר רשמי</h2>
-            <span style={{ fontSize:12, color:'var(--apple-text2)' }}>{done} / {total} הושלמו</span>
+            <span style={{ fontSize:12, color:'var(--apple-text2)' }}>{total ? `${done} / ${total} הושלמו` : 'אין ממתינות'}</span>
           </div>
           {/* Progress bar */}
           <div style={{ background:'var(--fill2)', borderRadius:999, height:6, overflow:'hidden' }}>
@@ -3311,8 +3356,12 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                   // שלב 2 הוא המחשבון של המורה — למנהלת בית ספר זה אופק ניהול
                   const step2Calc  = calcForTeacher(t);
                   const step2Label = (CALCULATORS.find(c => c.id === step2Calc) || CALCULATORS[0]).label;
+                  // בכרטיס פעיל הלחיצה אינה בוחרת מחדש: focus על שדה "עולם
+                  // ישן" מגיע לפני click, ו-selectTeacher היה דורס אותו ומחזיר
+                  // את המחשבון לאופק — בדיוק השדה שזקוק למחשבון האחר היה
+                  // היחיד שאי אפשר להגיע אליו בעכבר.
                   return (
-                    <div key={t.id} onClick={() => selectTeacher(t)}
+                    <div key={t.id} onClick={() => { if (activeId !== t.id) selectTeacher(t); }}
                       className="apple-card"
                       style={{ padding:'12px 14px', cursor:'pointer', borderRight: isActive ? '3px solid var(--apple-blue)' : '3px solid transparent', boxShadow: isActive ? '0 4px 20px rgba(0,122,255,0.12)' : '' }}>
                       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8, marginBottom: isActive ? 10 : 0 }}>
@@ -3463,8 +3512,8 @@ function BackupModal({ schools, months, onClose }) {
 
         <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, marginBottom:18 }}>
           <div>
-            <h2 style={{ fontSize:18, fontWeight:800, letterSpacing:'-0.02em', color:'var(--text)', marginBottom:3 }}>גיבוי ושחזור</h2>
-            <p style={{ fontSize:12.5, color:'var(--text3)', lineHeight:1.5 }}>כל נתוני המערכת שמורים בדפדפן הזה בלבד — ייצאי גיבוי באופן קבוע</p>
+            <h2 style={{ fontSize:18, fontWeight:800, letterSpacing:'-0.02em', color:'var(--text)', marginBottom:3 }}>ייצוא נתונים</h2>
+            <p style={{ fontSize:12.5, color:'var(--text3)', lineHeight:1.5 }}>הנתונים שמורים בשרת ומשותפים לכל המשתמשות. הייצוא כאן הוא עותק לעיון — לא נדרש לגיבוי.</p>
           </div>
           <button onClick={onClose} title="סגירה" style={{ background:'var(--fill)', border:'none', borderRadius:'50%', width:30, height:30, cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
             <X size={15} strokeWidth={2.4} />
@@ -3827,10 +3876,17 @@ export default function App() {
   };
 
   const onSaveSchool = (s) => {
-    run(async () => {
+    // בית ספר חדש נוצר עם שורת מנהלת בחודש הפעיל. בלי חודש, בית הספר
+    // נכתב והשורה נכשלה — בית ספר יתום שלא הופיע ברשימה, ועוד אחד
+    // בכל לחיצה נוספת.
+    if (!s.id && !Object.keys(months).length) {
+      setError('לפני הוספת בית ספר יש ללחוץ "פתיחת המערכת" — בית ספר חדש נוצר עם שורת מנהלת בחודש הפעיל.');
+      return Promise.resolve(false);
+    }
+    return run(async () => {
       const saved = await store.saveSchool(s);
       if (!s.id) await store.saveTeacher(makePrincipalRow(saved), activeMonth);
-    }).then(ok => { if (ok) setSchoolModal(null); });
+    }).then(ok => { if (ok) setSchoolModal(null); return ok; });
   };
 
   const onDeleteSchool = (id) => run(() => store.deleteSchool(id));

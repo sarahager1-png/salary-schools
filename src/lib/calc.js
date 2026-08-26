@@ -42,6 +42,8 @@ export const dateSachar = monthKey => {
   בעברית — הסיבה מוצגת לחשבת השכר כדי שתדע למה השורה נשארה לה.
 */
 export function ofekRequest(t, monthKey) {
+  // חטיבה עליונה היא עוז לתמורה — מחשבון אחר, שלא אותר לו endpoint.
+  if (t.level === 'high') return { skip: 'חטיבה עליונה — עוז לתמורה. המחשבון הזה אינו ממופה עדיין; הזנה ידנית.' };
   const derug = OFEK_DERUG[t.degree];
   if (!derug) return { skip: `אין במחשבון אופק תואר "${t.degree}"` };
   return {

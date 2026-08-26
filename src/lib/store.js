@@ -167,12 +167,18 @@ export async function loadAll() {
 
 // ── בתי ספר ───────────────────────────────────────────────────
 export async function saveSchool(s) {
+  // שני בתי ספר באותו שם — המסד מסרב (אינדקס ייחודי), וכאן זה נאמר בעברית
+  const dup = (error) => {
+    if (/duplicate key/i.test(error?.message || '')) throw new Error(`בית ספר בשם "${s.name}" כבר קיים`);
+  };
   if (s.id) {
     const { data, error } = await supabase.from('schools').update(schoolToRow(s)).eq('id', s.id).select().single();
+    dup(error);
     raise(error, 'שמירת בית הספר נכשלה');
     return rowToSchool(data);
   }
   const { data, error } = await supabase.from('schools').insert(schoolToRow(s)).select().single();
+  dup(error);
   raise(error, 'הוספת בית הספר נכשלה');
   return rowToSchool(data);
 }
