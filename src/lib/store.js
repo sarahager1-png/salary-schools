@@ -92,7 +92,14 @@ function raise(error, fallback) {
   if (/row-level security|violates row-level/i.test(m)) {
     throw new Error('אין לך הרשאה לפעולה הזו');
   }
+  // סינון תוכן (נטו/נטספארק וכדומה) מחזיר דף HTML במקום התשובה מהשרת.
+  // בלי הזיהוי הזה ההודעה שהמשתמשת רואה היא קוד HTML גולמי, והיא מחפשת
+  // את התקלה במערכת במקום ברשת שממנה היא מחוברת.
+  if (/^\s*<(!doctype|html)/i.test(m) || /safepage|netspark|neto\.net\.il|blocked/i.test(m)) {
+    throw new Error('החיבור לשרת נחסם על ידי סינון התוכן של הרשת. יש לאשר את הכתובת supabase.co בסינון, או להתחבר מרשת אחרת.');
+  }
   if (/duplicate key/i.test(m)) throw new Error('הרשומה כבר קיימת');
+  if (/failed to fetch|network|load failed/i.test(m)) throw new Error('אין חיבור לשרת. בדקי את האינטרנט ונסי שוב.');
   if (/JWT|not authenticated/i.test(m)) throw new Error('פג תוקף ההתחברות — התחברי מחדש');
   throw new Error(m || fallback || 'הפעולה נכשלה');
 }
@@ -201,9 +208,8 @@ export async function saveTeacher(t, monthKey) {
     raise(error, 'שמירת המורה נכשלה');
     return rowToTeacher(data);
   }
-  const row = teacherToRow(t, monthKey);
-  delete row.id;   // המזהה נקבע במסד, לא אצלנו
-  const { data, error } = await supabase.from('teacher_months').insert(row).select().single();
+  // teacherToRow אינו מעביר מזהה — הוא נקבע במסד
+  const { data, error } = await supabase.from('teacher_months').insert(teacherToRow(t, monthKey)).select().single();
   raise(error, 'הוספת המורה נכשלה');
   return rowToTeacher(data);
 }
@@ -241,3 +247,38 @@ export async function loadAudit(rowId) {
 }
 
 export const _internals = { rowToTeacher, teacherToRow, rowToSchool, schoolToRow };
+
+/* ── כניסה בקישור אישי ──────────────────────────────────────────
+   למי שנכנס בקישור אין session ואין auth.uid(). הטבלאות סגורות בפניו
+   לחלוטין, וכל גישה עוברת דרך שלוש פונקציות שמקבלות את הקוד ומאמתות
+   אותו בעצמן. הקוד הוא כל ההגנה, ולכן הוא לעולם לא נשמר בדפדפן —
+   הוא חי בכתובת בלבד.
+*/
+export async function linkWhoami(code) {
+  const { data, error } = await supabase.rpc('link_whoami', { p_code: code });
+  raise(error, 'הקישור אינו תקף');
+  const me = data?.[0];
+  if (!me) throw new Error('הקישור אינו תקף. ייתכן שהוחלף בקישור חדש.');
+  return { fullName: me.full_name, role: me.role, schoolId: me.school_id, schoolName: me.school_name };
+}
+
+export async function linkMonths(code) {
+  const { data, error } = await supabase.rpc('link_months', { p_code: code });
+  raise(error, 'טעינת החודשים נכשלה');
+  return (data || []).map(m => ({ key: m.key, locked: m.locked }));
+}
+
+export async function linkRows(code, monthKey) {
+  const { data, error } = await supabase.rpc('link_rows', { p_code: code, p_month: monthKey });
+  raise(error, 'טעינת המורות נכשלה');
+  return (data || []).map(rowToTeacher);
+}
+
+export async function linkSaveRow(code, teacher) {
+  // teacherToRow אינו כולל את המזהה — הוא נגזר מהמסד ואינו שדה עריכה.
+  // link_save_row מאתרת לפיו את השורה, ולכן כאן הוא נוסף במפורש.
+  const row = { ...teacherToRow(teacher), id: teacher.id };
+  const { data, error } = await supabase.rpc('link_save_row', { p_code: code, p_row: row });
+  raise(error, 'השמירה נכשלה');
+  return data ? rowToTeacher(data) : null;
+}

@@ -3415,7 +3415,191 @@ function BackupModal({ schools, months, onClose }) {
   );
 }
 
+
+/* ═════════════════════════════════════════════════════════════
+   מסך הקישור האישי
+
+   מנהלת שנכנסת בקישור אינה מחוברת: אין לה session, אין auth.uid(),
+   והטבלאות סגורות בפניה. כל מה שהמסך הזה רואה ושומר עובר דרך ארבע
+   פונקציות שמאמתות את הקוד בעצמן, ולכן הוא נבנה בנפרד ולא כווריאציה
+   של מסך בית הספר — אין לו את מה שמסך בית הספר נשען עליו.
+
+   הקוד חי בכתובת בלבד ואינו נשמר בדפדפן: מי שסוגר את הלשונית צריך
+   את הקישור מחדש. זה מכוון — הקישור הוא כל ההגנה.
+═════════════════════════════════════════════════════════════ */
+function LinkField({ label, value, onChange, type = 'number', hint }) {
+  return (
+    <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 96px', minWidth:96 }}>
+      <span style={{ fontSize:11, fontWeight:600, color:'var(--text3)' }}>{label}</span>
+      <input
+        type={type} inputMode={type === 'number' ? 'numeric' : undefined}
+        className="apple-input" dir={type === 'number' ? 'ltr' : 'rtl'}
+        value={value ?? ''} placeholder={hint}
+        onChange={e => onChange(type === 'number'
+          ? (e.target.value === '' ? null : Number(e.target.value))
+          : e.target.value)}
+        style={{ fontSize:15, minHeight:42, textAlign: type === 'number' ? 'center' : 'right' }} />
+    </label>
+  );
+}
+
+function LinkCard({ teacher, locked, onSave }) {
+  const [draft, setDraft] = useState(teacher);
+  const [state, setState] = useState('');   // '' | 'saving' | 'saved' | הודעת שגיאה
+  useEffect(() => { setDraft(teacher); }, [teacher]);
+
+  const set = (k, v) => { setDraft(p => ({ ...p, [k]: v })); setState(''); };
+  const dirty = JSON.stringify(draft) !== JSON.stringify(teacher);
+
+  const save = async () => {
+    setState('saving');
+    try {
+      await onSave(draft);
+      setState('saved');
+      setTimeout(() => setState(x => (x === 'saved' ? '' : x)), 2500);
+    } catch (e) { setState(e.message); }
+  };
+
+  return (
+    <div className="apple-card" style={{ padding:'14px 15px' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, marginBottom:10 }}>
+        <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>{teacher.name}</p>
+        <span style={{ fontSize:11.5, color:'var(--text3)' }}>
+          {reformLabel(teacher.reform)}{teacher.scopePct ? ` · ${teacher.scopePct}% משרה` : ''}
+        </span>
+      </div>
+
+      <div style={{ display:'flex', flexWrap:'wrap', gap:9 }}>
+        <LinkField label="שעות פרונטליות" value={draft.frontalHours}  onChange={v => set('frontalHours', v)} />
+        <LinkField label="ימי היעדרות"    value={draft.absenceDays}   onChange={v => set('absenceDays', v)} />
+        <LinkField label={'שעות ממ' + '"' + 'מ'} value={draft.mmHours} onChange={v => set('mmHours', v)} />
+        <LinkField label="במקום מי" type="text" value={draft.mmFor}   onChange={v => set('mmFor', v)} hint="שם המורה" />
+        <LinkField label="תוספות החודש"   value={draft.monthlyExtras} onChange={v => set('monthlyExtras', v)} />
+      </div>
+
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:11 }}>
+        <button className="apple-btn apple-btn-blue" disabled={!dirty || locked || state === 'saving'}
+          onClick={save} style={{ minHeight:40, paddingInline:20, opacity: (!dirty || locked) ? .45 : 1 }}>
+          {state === 'saving' ? 'שומר…' : 'שמירה'}
+        </button>
+        {state === 'saved' && <span style={{ fontSize:12.5, color:'var(--ok)', fontWeight:600 }}>✓ נשמר</span>}
+        {state && state !== 'saving' && state !== 'saved' &&
+          <span style={{ fontSize:12, color:'var(--danger)' }}>{state}</span>}
+        {!dirty && !state && <span style={{ fontSize:11.5, color:'var(--text3)' }}>אין שינוי</span>}
+      </div>
+    </div>
+  );
+}
+
+function LinkView({ code }) {
+  const [me,      setMe]      = useState(null);
+  const [months,  setMonths]  = useState([]);
+  const [month,   setMonth]   = useState('');
+  const [rows,    setRows]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fatal,   setFatal]   = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const who = await store.linkWhoami(code);
+        const ms  = await store.linkMonths(code);
+        if (!alive) return;
+        setMe(who);
+        setMonths(ms);
+        setMonth(ms.length ? ms[ms.length - 1].key : '');
+        if (!ms.length) setLoading(false);
+      } catch (e) { if (alive) { setFatal(e.message); setLoading(false); } }
+    })();
+    return () => { alive = false; };
+  }, [code]);
+
+  useEffect(() => {
+    if (!month) return undefined;
+    let alive = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await store.linkRows(code, month);
+        if (alive) setRows(r);
+      } catch (e) {
+        if (alive) setFatal(e.message);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [code, month]);
+
+  const locked = months.find(m => m.key === month)?.locked;
+
+  const onSave = async (draft) => {
+    const saved = await store.linkSaveRow(code, draft);
+    if (saved) setRows(rs => rs.map(r => (r.id === saved.id ? saved : r)));
+  };
+
+  if (fatal) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }} dir="rtl">
+      <div className="apple-card" style={{ padding:26, maxWidth:380, textAlign:'center' }}>
+        <p style={{ fontSize:16, fontWeight:700, color:'var(--danger)', marginBottom:8 }}>{fatal}</p>
+        <p style={{ fontSize:13, color:'var(--text3)' }}>פנו לרשת לקבלת קישור חדש.</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight:'100vh', background:'var(--bg)' }} dir="rtl">
+      <header style={{ background:'#fff', borderBottom:'1px solid var(--line)', position:'sticky', top:0, zIndex:20 }}>
+        <div style={{ maxWidth:760, margin:'0 auto', padding:'13px 16px' }}>
+          <p style={{ fontSize:16, fontWeight:800, color:'var(--text)' }}>{me?.schoolName || 'טוען…'}</p>
+          <p style={{ fontSize:12.5, color:'var(--text3)', marginTop:1 }}>
+            {me?.fullName}{me ? ' · הזנת נתוני העסקה' : ''}
+          </p>
+          {months.length > 1 && (
+            <select className="apple-select" value={month} onChange={e => setMonth(e.target.value)}
+              style={{ marginTop:9, fontSize:13, minHeight:38 }}>
+              {months.map(m => (
+                <option key={m.key} value={m.key}>{fmtMonth(m.key)}{m.locked ? ' (נעול)' : ''}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      </header>
+
+      <main style={{ maxWidth:760, margin:'0 auto', padding:'16px 16px 40px' }}>
+        {locked && (
+          <div style={{ background:'var(--warn-bg)', border:'1px solid var(--warn)', borderRadius:12, padding:'11px 14px', marginBottom:14 }}>
+            <p style={{ fontSize:13, fontWeight:600, color:'var(--warn)' }}>החודש נעול — אי אפשר לשנות נתונים.</p>
+          </div>
+        )}
+
+        {loading ? (
+          <p style={{ fontSize:14, color:'var(--text3)', textAlign:'center', padding:'40px 0' }}>טוען…</p>
+        ) : !rows.length ? (
+          <div className="apple-card" style={{ padding:28, textAlign:'center' }}>
+            <p style={{ fontSize:15, fontWeight:700, color:'var(--text)', marginBottom:6 }}>אין עדיין מורות בחודש הזה</p>
+            <p style={{ fontSize:13, color:'var(--text3)' }}>הרשת מוסיפה את המורות, ואז תוכלי להזין להן נתונים כאן.</p>
+          </div>
+        ) : (
+          <>
+            <p style={{ fontSize:12.5, color:'var(--text3)', marginBottom:11 }}>
+              {rows.length} מורות · שינוי שעות מחזיר את המורה לחישוב שכר מחדש
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:11 }}>
+              {rows.map(t => <LinkCard key={t.id} teacher={t} locked={locked} onSave={onSave} />)}
+            </div>
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
+
 export default function App() {
+  // ?k=<קוד> — מנהלת שנכנסה מהקישור שנשלח אליה בוואטסאפ. נקרא פעם אחת,
+  // לפני כל אתחול אחר: המסלול הזה אינו עובר דרך התחברות כלל.
+  const [linkCode] = useState(() => new URLSearchParams(window.location.search).get('k') || '');
   const [user,    setUser]    = useState(null);   // הפרופיל: תפקיד, שם, בית ספר
   const [schools, setSchools] = useState([]);
   const [months,  setMonths]  = useState({});
@@ -3490,6 +3674,9 @@ export default function App() {
     await store.signOut();
     setUser(null); setSchools([]); setMonths({}); setActiveSchool(null);
   };
+
+  // הקישור עוקף את מסך ההתחברות לגמרי — אין למחזיקה בו session להמתין לו
+  if (linkCode) return <LinkView code={linkCode} />;
 
   if (booting) {
     return (
