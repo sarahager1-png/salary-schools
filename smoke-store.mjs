@@ -32,17 +32,20 @@ const MONTH = '2098-01';
 const TEST_SCHOOLS = ['סטור א', 'סטור ב'];
 
 async function cleanup() {
-  // המשתמשים קודם: הפרופילים שלהם מצביעים על בתי הספר של הבדיקה
+  // שורות השכר קודם: approved_by ו-net_approved_by מצביעים על המשתמשים,
+  // ומחיקת משתמש שעדיין מוצבע נכשלת — ו-deleteUser אינו זורק, הוא מחזיר
+  // error. כך נשארו אחרי כל ריצה שני משתמשי auth יתומים בלי פרופיל.
+  await admin.from('teacher_months').delete().eq('month_key', MONTH);
+  await admin.from('months').delete().eq('key', MONTH);
   const { data } = await admin.auth.admin.listUsers();
   for (const email of [...Object.values(USERS), DEDICATED, 'store-ghost@example.com']) {
     const u = data?.users?.find(x => x.email === email);
     if (u) {
       await admin.from('profiles').delete().eq('id', u.id);
-      await admin.auth.admin.deleteUser(u.id);
+      const { error } = await admin.auth.admin.deleteUser(u.id);
+      if (error) console.error(`מחיקת ${email} נכשלה:`, error.message);
     }
   }
-  await admin.from('teacher_months').delete().eq('month_key', MONTH);
-  await admin.from('months').delete().eq('key', MONTH);
   const { error } = await admin.from('schools').delete().in('name', TEST_SCHOOLS);
   if (error) console.error('ניקוי בתי הספר נכשל:', error.message);
 }
