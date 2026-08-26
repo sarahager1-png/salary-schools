@@ -5,7 +5,7 @@ import {
   Printer, Download, Upload, Send, Pencil, Trash2, X, Search,
   Paperclip, Image as ImageIcon, FileText, AlertTriangle, Lightbulb,
   CalendarClock, Bell, Users, FolderOpen, Database, FileSpreadsheet, ShieldAlert,
-  ExternalLink,
+  ExternalLink, ShieldCheck,
 } from 'lucide-react';
 import './index.css';
 // v3 — רשת חינוך חב"ד design system
@@ -312,6 +312,14 @@ const needsSim      = t => Boolean(t._changedAt && !t._approved && !simComplete(
 const needsApproval = t => Boolean(t._changedAt && !t._approved && simComplete(t));
 const isPending     = t => Boolean(t._changedAt && !t._approved); // = needsSim || needsApproval
 
+// בחודש הראשון נדרש אישור רשתי נוסף אחרי אישור השליח. רק אחריו נשלחים
+// למורות נתוני ההעסקה לחתימה.
+const NETWORK_APPROVER = 'רינה אלהרר';
+const needsNetApproval = (t, isFirstMonth) =>
+  Boolean(isFirstMonth && t._approved && !t._netApproved);
+const fullyApproved = (t, isFirstMonth) =>
+  Boolean(t._approved && (!isFirstMonth || t._netApproved));
+
 function readableVal(field, val) {
   if (val === undefined || val === null || val === '') return '—';
   if (typeof val === 'boolean') return FIELD_FMT[field] ? FIELD_FMT[field](val) : (val ? 'כן' : 'לא');
@@ -378,6 +386,8 @@ const EMPTY_TEACHER = {
   _officialGrossPre: null,
   _agreedGross: null,          // שכר מוסכם למנהלת — מחליף את הסימולציה
   _actualEmployerCost: null,   // עלות מעביד בפועל מהנהלת החשבונות — גוברת על האומדן
+  _netApproved: false,         // אישור רשתי — נדרש בחודש הראשון בלבד
+  _netApprovedAt: null,
   _snapshot: null, _changedAt: null, _approved: false, _approvedAt: null,
   _files: [],
   // ─── Monthly fields (reset each month) ───
@@ -515,6 +525,7 @@ function LoginScreen({ schools, onLogin }) {
     { v: 'coordinator', Icon: Briefcase,  label: 'שליח / מנהל רשת', desc: 'אישור שינויים ודוחות' },
     { v: 'clerk',       Icon: Calculator, label: 'חשבת שכר',        desc: 'סימולציה והכנת שכר' },
     { v: 'principal',   Icon: School,     label: 'מנהלת בית ספר',   desc: 'עדכון נתוני מורים' },
+    { v: 'network',     Icon: ShieldCheck, label: NETWORK_APPROVER,  desc: 'אישור רשתי בחודש הראשון' },
   ];
 
   return (
@@ -608,6 +619,160 @@ function TeacherDiff({ t }) {
           <span style={{ fontWeight:600, color:'var(--apple-green)' }}>{readableVal(k, t[k])}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NETWORK APPROVAL — אישור רשתי בחודש הראשון
+═══════════════════════════════════════════════════════════════ */
+function NetworkApprovalView({ schools, teachers, isFirstMonth, monthLabel, onApprove }) {
+  const [openSchool, setOpenSchool] = useState(null);
+
+  const waiting = teachers.filter(t => needsNetApproval(t, isFirstMonth));
+  const grouped = schools
+    .map(s => ({ school: s, list: waiting.filter(t => t.schoolId === s.id) }))
+    .filter(g => g.list.length > 0);
+  const totalCost = waiting.reduce((s, t) => s + calcEmployer(t).total, 0);
+
+  const confirmAnd = (list, what) => {
+    if (!list.length) return;
+    const cost = list.reduce((s, t) => s + calcEmployer(t).total, 0);
+    const ok = window.confirm(
+      `אישור ${what}\n\n${list.length} עובדות · עלות מעסיק ${cost.toLocaleString('he-IL')} ₪ לחודש\n\n`
+      + `לאחר האישור אפשר להפיק למורות את נתוני ההעסקה לחתימה.\n\nלאשר?`
+    );
+    if (ok) onApprove(list.map(t => t.id));
+  };
+
+  if (!isFirstMonth) {
+    return (
+      <div style={{ maxWidth:640, margin:'0 auto', padding:'60px 20px', textAlign:'center' }} dir="rtl">
+        <div style={{ width:56, height:56, borderRadius:17, background:'var(--ok-bg)', margin:'0 auto 14px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <ShieldCheck size={26} strokeWidth={2.2} color="var(--ok)" />
+        </div>
+        <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>אין צורך באישור רשתי ב{monthLabel}</p>
+        <p style={{ fontSize:13, color:'var(--text3)', marginTop:4, lineHeight:1.7 }}>
+          האישור הרשתי נדרש בחודש הראשון בלבד. בחודשים שאחריו האישור של השליח מספיק.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight:'100vh' }} dir="rtl">
+      <div className="no-print" style={{ background:'var(--surface)', borderBottom:'1px solid var(--line)', padding:'18px 20px' }}>
+        <div style={{ maxWidth:1100, margin:'0 auto', display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
+          <div style={{ flex:1, minWidth:200 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:9 }}>
+              <span className="title-bar" />
+              <h1 style={{ fontSize:23, fontWeight:800, color:'var(--text)', letterSpacing:'-0.025em' }}>אישור רשתי — {monthLabel}</h1>
+            </div>
+            <p style={{ fontSize:13, color:'var(--text3)', marginTop:2, marginInlineStart:13 }}>
+              {waiting.length > 0
+                ? `${waiting.length} עובדות ממתינות · עלות מעסיק ${totalCost.toLocaleString('he-IL')} ₪ לחודש`
+                : 'הכול מאושר'}
+            </p>
+          </div>
+          {waiting.length > 0 && (
+            <button className="apple-btn apple-btn-blue" onClick={() => confirmAnd(waiting, 'כל הרשת')}>
+              <ShieldCheck size={15} strokeWidth={2.3} />
+              אישור כל הרשת
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div style={{ maxWidth:1100, margin:'0 auto', padding:'20px 20px 40px' }}>
+        {grouped.length === 0 ? (
+          <div className="apple-card" style={{ textAlign:'center', padding:'64px 20px' }}>
+            <div style={{ width:56, height:56, borderRadius:17, background:'var(--ok-bg)', margin:'0 auto 14px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <Check size={26} strokeWidth={2.4} color="var(--ok)" />
+            </div>
+            <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>אין מה לאשר כרגע</p>
+            <p style={{ fontSize:13, color:'var(--text3)', marginTop:4 }}>
+              עובדות מגיעות לכאן אחרי שהשליח אישר אותן.
+            </p>
+          </div>
+        ) : grouped.map(({ school, list }, i) => {
+          const open = openSchool === school.id;
+          const cost = list.reduce((s, x) => s + calcEmployer(x).total, 0);
+          return (
+            <div key={school.id} className="apple-card spring-enter" style={{ marginBottom:12, animationDelay:`${i*50}ms` }}>
+              <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 18px', flexWrap:'wrap' }}>
+                <button onClick={() => setOpenSchool(open ? null : school.id)}
+                  style={{ flex:1, minWidth:180, textAlign:'right', background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:'inherit' }}>
+                  <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)' }}>{school.name}</p>
+                  <p style={{ fontSize:12.5, color:'var(--text3)', marginTop:2 }}>
+                    {list.length} עובדות · {cost.toLocaleString('he-IL')} ₪ לחודש · {open ? 'הסתר' : 'הצג פירוט'}
+                  </p>
+                </button>
+                <button className="apple-btn apple-btn-ghost" onClick={() => confirmAnd(list, school.name)}>
+                  <ShieldCheck size={14} strokeWidth={2.3} />
+                  אישור בית הספר
+                </button>
+              </div>
+
+              {open && (
+                <div className="sheet-scroll" style={{ maxHeight:'none', borderTop:'1px solid var(--line)' }}>
+                  <table className="apple-table" style={{ fontSize:13 }}>
+                    <thead>
+                      <tr>
+                        <th>שם עובדת</th>
+                        <th style={{ textAlign:'center' }}>מסלול</th>
+                        <th style={{ textAlign:'center' }}>% משרה</th>
+                        <th style={{ textAlign:'center' }}>פרונטלי</th>
+                        <th style={{ textAlign:'center' }}>בסיס</th>
+                        <th style={{ textAlign:'center' }}>תוספת בית חב"ד</th>
+                        <th style={{ textAlign:'center' }}>ברוטו</th>
+                        <th style={{ textAlign:'center', color:'var(--purple)' }}>סה״כ למעסיק</th>
+                        <th style={{ width:110 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.map(x => {
+                        const emp = calcEmployer(x);
+                        const d   = deriveHours(x);
+                        return (
+                          <tr key={x.id}>
+                            <td style={{ fontWeight:600, color:'var(--text)' }}>
+                              {x.name}
+                              {isPrincipalRow(x) && <span className="apple-badge badge-purple" style={{ fontSize:10.5, padding:'2px 8px', marginInlineStart:6 }}>מנהלת</span>}
+                            </td>
+                            <td style={{ textAlign:'center' }}>{reformLabel(x.reform)}</td>
+                            <td style={{ textAlign:'center' }}>{effectiveScope(x)}%</td>
+                            <td style={{ textAlign:'center' }}>{d ? d.frontal : (x.frontalHours || '—')}</td>
+                            <td style={{ textAlign:'center' }}>{emp.base.toLocaleString('he-IL')}</td>
+                            <td style={{ textAlign:'center', color:'var(--purple)', fontWeight:600 }}>
+                              {emp.supplement ? emp.supplement.toLocaleString('he-IL') : '—'}
+                            </td>
+                            <td style={{ textAlign:'center', fontWeight:700, color:'var(--text)' }}>{emp.gross.toLocaleString('he-IL')}</td>
+                            <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>
+                              {emp.isEstimate && <span style={{ color:'var(--warn)' }}>~</span>}
+                              {emp.total.toLocaleString('he-IL')} ₪
+                            </td>
+                            <td>
+                              <button className="apple-btn apple-btn-green" style={{ padding:'0 11px', minHeight:30, fontSize:12.5 }}
+                                onClick={() => confirmAnd([x], x.name)}>
+                                <Check size={13} strokeWidth={2.8} />
+                                אישור
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:14, lineHeight:1.7 }}>
+          הסימון ~ מציין שעלות המעסיק היא אומדן שממתין לסכום מהנהלת החשבונות.
+        </p>
+      </div>
     </div>
   );
 }
@@ -1987,7 +2152,7 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
 /* ═══════════════════════════════════════════════════════════════
    SCHOOL DETAIL
 ═══════════════════════════════════════════════════════════════ */
-function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn }) {
+function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn, isFirstMonth }) {
   const [search, setSearch]           = useState('');
   const [showReport, setShowReport]   = useState(false);
   const [showAbsence, setShowAbsence] = useState(false);
@@ -2463,6 +2628,20 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         <span style={{ color: t.name === PRINCIPAL_PLACEHOLDER ? 'var(--text3)' : undefined }}>{t.name}</span>
                         {isPrincipalRow(t) && <span className="apple-badge badge-purple" style={{ fontSize:10.5, padding:'2px 8px' }}>מנהלת</span>}
                         {t._agreedGross && <span className="apple-badge badge-teal" style={{ fontSize:10.5, padding:'2px 8px' }} title="ברוטו מוסכם — לא מסימולציה">שכר מוסכם</span>}
+                        {needsNetApproval(t, isFirstMonth) && (
+                          <span className="apple-badge badge-orange" style={{ fontSize:10.5, padding:'2px 8px' }}
+                            title={`אושר בידי השליח, ממתין לאישור של ${NETWORK_APPROVER}`}>
+                            <ShieldCheck size={10} strokeWidth={2.5} />
+                            אצל {NETWORK_APPROVER}
+                          </span>
+                        )}
+                        {fullyApproved(t, isFirstMonth) && (
+                          <span className="apple-badge badge-green" style={{ fontSize:10.5, padding:'2px 8px' }}
+                            title="מאושר סופית — אפשר להפיק לה נתוני העסקה לחתימה">
+                            <Check size={10} strokeWidth={3} />
+                            מאושר
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td style={{ textAlign:'center', fontFamily:'monospace', fontSize:12, color:'var(--apple-text2)' }}>{t.tzId||'—'}</td>
@@ -3196,6 +3375,17 @@ export default function App() {
 
   const isCoord = user.role === 'coordinator';
   const isClerk = user.role === 'clerk';
+  const isNetApprover = user.role === 'network';
+  // האישור הרשתי נדרש בחודש הראשון שנפתח במערכת
+  const firstMonthKey = Object.keys(months).sort()[0] || activeMonth;
+  const isFirstMonth  = activeMonth === firstMonthKey;
+  const netPendingCount = teachers.filter(t => needsNetApproval(t, isFirstMonth)).length;
+
+  const onNetApprove = (ids) => {
+    const now = new Date().toISOString();
+    const set = new Set(ids);
+    persistT(teachers.map(t => set.has(t.id) ? { ...t, _netApproved: true, _netApprovedAt: now } : t));
+  };
   const needsSimCount      = teachers.filter(needsSim).length;
   const needsApprovalCount = teachers.filter(needsApproval).length;
   const sortedMonthKeys = Object.keys(months).sort();
@@ -3211,7 +3401,7 @@ export default function App() {
     // שכר החודש הקודם כשכר החודש הזה, והמורים לא הופיעו באף רשימת עבודה.
     const MONTHLY_RESET = { absenceDays:0, sickFiles:[], _files:[], mmHours:0, mmFor:'', monthlyExtras:0,
                              _officialGross:null, _officialGrossPre:null, _agreedGross:null,
-                             _actualEmployerCost:null,
+                             _actualEmployerCost:null, _netApproved:false, _netApprovedAt:null,
                              _approved:false, _approvedAt:null, _snapshot:null };
     const nextTeachers = teachers.map(t => ({ ...t, ...MONTHLY_RESET, _changedAt: now }));
     persistMT(nextKey, nextTeachers);
@@ -3316,7 +3506,7 @@ export default function App() {
             <div>
               <p style={{ fontWeight:700, fontSize:14.5, color:'var(--text)', letterSpacing:'-0.01em', lineHeight:1.25 }}>מערכת שכר מורים</p>
               <p style={{ fontSize:11.5, color:'var(--text3)', lineHeight:1.3 }}>
-                {isCoord ? 'שליח / מנהל רשת' : isClerk ? 'חשבת שכר' : `מנהלת: ${principalSchool?.name || ''}`}
+                {isCoord ? 'שליח / מנהל רשת' : isClerk ? 'חשבת שכר' : isNetApprover ? `${NETWORK_APPROVER} · אישור רשתי` : `מנהלת: ${principalSchool?.name || ''}`}
               </p>
             </div>
           </div>
@@ -3382,6 +3572,14 @@ export default function App() {
               )}
             </div>
 
+            {isCoord && netPendingCount > 0 && (
+              <span className="apple-badge badge-orange" title={`ממתינות לאישור של ${NETWORK_APPROVER}`}
+                style={{ whiteSpace:'nowrap' }}>
+                <ShieldCheck size={12} strokeWidth={2.3} />
+                {netPendingCount} אצל {NETWORK_APPROVER}
+              </span>
+            )}
+
             <button className="nav-btn" onClick={() => setShowBackup(true)} title="גיבוי ושחזור">
               <Database size={15} strokeWidth={2.2} />
               גיבוי
@@ -3397,7 +3595,15 @@ export default function App() {
 
       <div className="flex-1">
         {/* Clerk: only SimulatorView */}
-        {isClerk ? (
+        {isNetApprover ? (
+          <NetworkApprovalView
+            schools={schools}
+            teachers={teachers}
+            isFirstMonth={isFirstMonth}
+            monthLabel={fmtMonth(activeMonth)}
+            onApprove={onNetApprove}
+          />
+        ) : isClerk ? (
           <SimulatorView
             teachers={teachers}
             schools={schools}
@@ -3418,6 +3624,7 @@ export default function App() {
             onImportTeachers={onImportTeachers}
             activeMonth={activeMonth}
             fmtMonthFn={fmtMonth}
+            isFirstMonth={isFirstMonth}
           />
         ) : view === 'calc' ? (
           <SimulatorView
@@ -3439,6 +3646,9 @@ export default function App() {
             onDeleteTeacher={onDeleteTeacher}
             onApproveTeacher={onApproveTeacher}
             onImportTeachers={onImportTeachers}
+            activeMonth={activeMonth}
+            fmtMonthFn={fmtMonth}
+            isFirstMonth={isFirstMonth}
           />
         ) : (
           /* Coordinator: schools list */
