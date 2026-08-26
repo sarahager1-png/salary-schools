@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+import { createClient } from '@supabase/supabase-js';
+const env=Object.fromEntries(fs.readFileSync('.env.local','utf8').split('\n').filter(Boolean).map(l=>{const i=l.indexOf('=');return[l.slice(0,i),l.slice(i+1)];}));
+const admin=createClient(env.VITE_SUPABASE_URL,env.SUPABASE_SECRET_KEY,{auth:{persistSession:false}});
+const {data:months}=await admin.from('months').select('key,locked').order('key');
+console.log('חודשים:', months.map(m=>m.key).join(', ')||'(אין)');
+const {data:tm}=await admin.from('teacher_months').select('month_key, name, schools(name)');
+const byMonth={}; for(const r of tm||[]){(byMonth[r.month_key]??=[]).push(`${r.name} @ ${r.schools?.name}`);}
+for(const [k,v] of Object.entries(byMonth)) console.log(`  ${k}: ${v.length} שורות — ${v.slice(0,6).join(' | ')}${v.length>6?' …':''}`);
+const {data:schools}=await admin.from('schools').select('name').order('name');
+console.log('בתי ספר ('+schools.length+'):', schools.map(s=>s.name).join(' · '));
+const {data:profiles}=await admin.from('profiles').select('full_name, role, schools(name)').order('full_name');
+console.log('פרופילים ('+profiles.length+'):'); for(const p of profiles) console.log(`  ${p.role.padEnd(12)} ${p.full_name}${p.schools?.name?'  ('+p.schools.name+')':''}`);
+const {data:us}=await admin.auth.admin.listUsers();
+const orphans=(us?.users||[]).filter(u=>!profiles.length || !(profiles.some(p=>p.full_name) )).length;
+const {data:pids}=await admin.from('profiles').select('id');
+const idset=new Set((pids||[]).map(x=>x.id));
+const noProfile=(us?.users||[]).filter(u=>!idset.has(u.id)).map(u=>u.email);
+console.log('משתמשי auth בלי פרופיל ('+noProfile.length+'):', noProfile.join(', ')||'(אין)');
+const {data:links}=await admin.from('access_links').select('code, revoked, profiles(full_name)');
+console.log('קישורים:', (links||[]).map(l=>`${l.profiles?.full_name}${l.revoked?' (מבוטל)':''}`).join(' · ')||'(אין)');

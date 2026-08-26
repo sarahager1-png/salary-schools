@@ -139,10 +139,13 @@ export async function getProfile() {
 
 // ── טעינת כל המצב ─────────────────────────────────────────────
 export async function loadAll() {
-  const [schoolsRes, monthsRes, teachersRes] = await Promise.all([
+  const [schoolsRes, monthsRes, teachersRes, approversRes] = await Promise.all([
     supabase.from('schools').select('*').order('name'),
     supabase.from('months').select('*').order('key'),
     supabase.from('teacher_months').select('*'),
+    // מי מאשרת כל בית ספר — כדי שהתג "אצל …" יציג את השם הנכון ולא
+    // שם מקודד קשיח. כשלון כאן אינו עוצר את הטעינה: יוצג השם הכללי.
+    supabase.rpc('school_approvers'),
   ]);
   raise(schoolsRes.error,  'טעינת בתי הספר נכשלה');
   raise(monthsRes.error,   'טעינת החודשים נכשלה');
@@ -158,6 +161,7 @@ export async function loadAll() {
     schools: schoolsRes.data.map(rowToSchool),
     months,
     locked: Object.fromEntries(monthsRes.data.map(m => [m.key, m.locked])),
+    approvers: (approversRes.data || []).map(a => ({ schoolId: a.school_id, name: a.full_name })),
   };
 }
 
