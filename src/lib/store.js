@@ -292,3 +292,80 @@ export async function linkSaveRow(code, teacher) {
   raise(error, 'השמירה נכשלה');
   return data ? rowToTeacher(data) : null;
 }
+
+/* ── מסמכים מהנהלת החשבונות ────────────────────────────────────
+   הקבצים בדלי פרטי. הנתיב הוא מזהה אקראי בלבד — השם המקורי נשמר
+   בטבלה לתצוגה, כדי ששמות בעברית ורווחים לא ייכנסו למפתח ב-Storage.
+*/
+const DOCS_BUCKET = 'payroll-docs';
+const rowToDoc = (r) => ({
+  id: r.id, monthKey: r.month_key, schoolId: r.school_id, path: r.path,
+  fileName: r.file_name, size: r.size_bytes, note: r.note,
+  uploadedBy: r.uploaded_by, uploadedAt: r.uploaded_at,
+});
+
+export async function listDocuments(monthKey) {
+  const { data, error } = await supabase.from('month_documents')
+    .select('*').eq('month_key', monthKey).order('uploaded_at', { ascending: false });
+  raise(error, 'טעינת המסמכים נכשלה');
+  return (data || []).map(rowToDoc);
+}
+
+export async function uploadDocument({ monthKey, schoolId, note, file }) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('פג תוקף ההתחברות — התחברי מחדש');
+  const ext  = (file.name.match(/\.([A-Za-z0-9]{1,6})$/)?.[1] || 'bin').toLowerCase();
+  const path = `${monthKey}/${crypto.randomUUID()}.${ext}`;
+  const up = await supabase.storage.from(DOCS_BUCKET)
+    .upload(path, file, { upsert: false, contentType: file.type || undefined });
+  raise(up.error, 'העלאת הקובץ נכשלה');
+  const { data, error } = await supabase.from('month_documents').insert({
+    month_key: monthKey, school_id: schoolId || null, path,
+    file_name: file.name, size_bytes: file.size, note: note || null, uploaded_by: user.id,
+  }).select().single();
+  if (error) {
+    // הקובץ עלה אבל הרישום נכשל — לא משאירים קובץ יתום בדלי
+    await supabase.storage.from(DOCS_BUCKET).remove([path]).catch(() => {});
+    raise(error, 'רישום הקובץ נכשל');
+  }
+  return rowToDoc(data);
+}
+
+export async function deleteDocument(doc) {
+  const { error: se } = await supabase.storage.from(DOCS_BUCKET).remove([doc.path]);
+  raise(se, 'מחיקת הקובץ נכשלה');
+  const { error } = await supabase.from('month_documents').delete().eq('id', doc.id);
+  raise(error, 'מחיקת הרישום נכשלה');
+}
+
+// כתובת חד-פעמית לעשר דקות. אין לקבצים כתובת קבועה.
+export async function documentUrl(doc) {
+  const { data, error } = await supabase.storage.from(DOCS_BUCKET).createSignedUrl(doc.path, 600);
+  raise(error, 'פתיחת הקובץ נכשלה');
+  return data.signedUrl;
+}
+
+/* ── קישור אישי מהממשק ───────────────────────────────────────
+   השליח מנפיק קישור למנהלת קיימת בלי טרמינל. יצירת פרופיל חדש עדיין
+   דורשת את מפתח השרת (scripts/make-link.mjs) — הדפדפן אינו רשאי.
+*/
+export async function principalsOfSchool(schoolId) {
+  const { data, error } = await supabase.from('profiles')
+    .select('id, full_name, phone').eq('role', 'principal').eq('school_id', schoolId);
+  raise(error, 'טעינת המנהלת נכשלה');
+  return (data || []).map(p => ({ id: p.id, fullName: p.full_name, phone: p.phone }));
+}
+
+const LINK_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';   // כמו בסקריפט: בלי תווים שמתבלבלים
+const makeCode = () => Array.from(crypto.getRandomValues(new Uint8Array(20)))
+  .map(b => LINK_ALPHABET[b % LINK_ALPHABET.length]).join('');
+
+export async function issueLink(profileId) {
+  // הקישור הקודם מתבטל — לא נשארים שני קישורים פעילים לאותה מנהלת
+  const { error: re } = await supabase.from('access_links').update({ revoked: true }).eq('profile_id', profileId);
+  raise(re, 'ביטול הקישור הקודם נכשל');
+  const code = makeCode();
+  const { error } = await supabase.from('access_links').insert({ code, profile_id: profileId, revoked: false });
+  raise(error, 'יצירת הקישור נכשלה');
+  return code;
+}

@@ -1,6 +1,6 @@
 // יצירת קישור אישי למנהלת בית ספר — נכנסת בלי מייל ובלי סיסמה.
 //
-//   node scripts/make-link.mjs "<שם מלא>" "<בית ספר>" [--base https://...]
+//   node scripts/make-link.mjs "<שם מלא>" "<בית ספר>" [--phone 05x-xxxxxxx] [--base https://...]
 //   node scripts/make-link.mjs --list
 //   node scripts/make-link.mjs --revoke <קוד>
 //
@@ -26,17 +26,29 @@ const baseIdx = args.indexOf('--base');
 const BASE = baseIdx !== -1 ? args[baseIdx + 1] : (env.VITE_APP_URL || 'http://localhost:5190');
 // כש---base אינו נתון, baseIdx הוא -1 ו-baseIdx+1 הוא 0 — מה שסינן בטעות
 // את הארגומנט הראשון. הסינון תקף רק כשהדגל באמת קיים.
-const clean = baseIdx === -1 ? args : args.filter((_, i) => i !== baseIdx && i !== baseIdx + 1);
+const clean0 = baseIdx === -1 ? args : args.filter((_, i) => i !== baseIdx && i !== baseIdx + 1);
+// --phone: הטלפון נשמר על הפרופיל ומאפשר להדפיס קישור וואטסאפ מוכן לשליחה
+const phoneIdx = clean0.indexOf('--phone');
+const PHONE = phoneIdx !== -1 ? clean0[phoneIdx + 1] : null;
+const clean = phoneIdx === -1 ? clean0 : clean0.filter((_, i) => i !== phoneIdx && i !== phoneIdx + 1);
+const e164 = local => '+972' + String(local).replace(/\D/g, '').replace(/^0/, '');
+// הודעה מוכנה. "המערכת מפיקה, את שולחת" — הסקריפט אינו שולח דבר.
+const waLink = (phone, name, school, link) => {
+  const first = (name || '').split(' ')[0];
+  const msg = `שלום ${first}, זה הקישור האישי שלך למערכת שכר המורים — ${school}:\n${link}\n\nהקישור אישי; לא להעביר הלאה.`;
+  return `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
+};
 
 // ── רשימה ──
 if (clean.includes('--list')) {
   const { data } = await admin.from('access_links')
-    .select('code, revoked, last_used_at, profiles(full_name, role, schools(name))');
+    .select('code, revoked, last_used_at, profiles(full_name, role, phone, schools(name))');
   if (!data?.length) { console.log('אין קישורים.'); process.exit(0); }
   for (const l of data) {
     const p = l.profiles || {};
     console.log(`${l.revoked ? '✗' : '✓'} ${(p.full_name || '').padEnd(18)} ${(p.schools?.name || '').padEnd(20)}`);
     console.log(`   ${BASE}/?k=${l.code}`);
+    if (!l.revoked && p.phone) console.log(`   וואטסאפ: ${waLink(p.phone, p.full_name, p.schools?.name || '', `${BASE}/?k=${l.code}`)}`);
     console.log(`   ${l.last_used_at ? 'נכנסה לאחרונה: ' + new Date(l.last_used_at).toLocaleString('he-IL') : 'טרם נכנסה'}\n`);
   }
   process.exit(0);
@@ -75,10 +87,11 @@ if (!school) {
 const localId = 'link-' + crypto.randomBytes(6).toString('hex') + '@link.local';
 
 const { data: list } = await admin.auth.admin.listUsers();
-const existingProfile = (await admin.from('profiles').select('id, full_name, school_id')
+const existingProfile = (await admin.from('profiles').select('id, full_name, school_id, phone')
   .eq('full_name', fullName).eq('school_id', school.id).maybeSingle()).data;
 
 let profileId;
+let phone = existingProfile?.phone || null;
 if (existingProfile) {
   profileId = existingProfile.id;
   console.log(`${fullName} כבר במערכת — מנפיק לה קישור חדש.`);
@@ -90,6 +103,11 @@ if (existingProfile) {
     .insert({ id: profileId, full_name: fullName, role: 'principal', school_id: school.id });
   if (pErr) { console.error('יצירת הפרופיל נכשלה:', pErr.message); process.exit(1); }
 }
+if (PHONE) {
+  phone = e164(PHONE);
+  const { error: phErr } = await admin.from('profiles').update({ phone }).eq('id', profileId);
+  if (phErr) { console.error('שמירת הטלפון נכשלה:', phErr.message); process.exit(1); }
+}
 
 // קישור קודם מתבטל, כדי שלא יישארו שני קישורים פעילים לאותה מנהלת
 await admin.from('access_links').update({ revoked: true }).eq('profile_id', profileId);
@@ -99,6 +117,13 @@ const { error: lErr } = await admin.from('access_links').insert({ code, profile_
 if (lErr) { console.error('יצירת הקישור נכשלה:', lErr.message); process.exit(1); }
 
 console.log(`\n✓ ${fullName} — ${school.name}\n`);
-console.log(`${BASE}/?k=${code}\n`);
-console.log('שלחי לה את הקישור בוואטסאפ. הוא אישי — מי שמחזיק בו נכנס בשמה.');
+const link = `${BASE}/?k=${code}`;
+console.log(`${link}\n`);
+if (phone) {
+  console.log('לשליחה בוואטסאפ — לחצי, בדקי את ההודעה, ושלחי:');
+  console.log(waLink(phone, fullName, school.name, link) + '\n');
+} else {
+  console.log('אין טלפון על הפרופיל. הוסיפי --phone 05x-xxxxxxx כדי לקבל קישור וואטסאפ מוכן.');
+}
+console.log('הקישור אישי — מי שמחזיק בו נכנס בשמה.');
 if (!existingProfile) console.log('אם היה לה קישור קודם, הוא בוטל.');

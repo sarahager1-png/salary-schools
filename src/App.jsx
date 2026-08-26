@@ -5,7 +5,7 @@ import {
   Printer, Download, Upload, Send, Pencil, Trash2, X, Search,
   Paperclip, Image as ImageIcon, FileText, AlertTriangle, Lightbulb,
   CalendarClock, Bell, Users, FolderOpen, Database, FileSpreadsheet, ShieldAlert,
-  ExternalLink, ShieldCheck,
+  ExternalLink, ShieldCheck, MessageCircle,
 } from 'lucide-react';
 import * as store from './lib/store.js';
 import './index.css';
@@ -2380,13 +2380,14 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
 /* ═══════════════════════════════════════════════════════════════
    SCHOOL DETAIL
 ═══════════════════════════════════════════════════════════════ */
-function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn, isFirstMonth, approvers = [] }) {
+function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn, isFirstMonth, approvers = [], userId }) {
   const [search, setSearch]           = useState('');
   const [showReport, setShowReport]   = useState(false);
   const [showAbsence, setShowAbsence] = useState(false);
   const [showImport, setShowImport]   = useState(false);
   const [fullEdit, setFullEdit]      = useState(null);   // מורה בעריכת פרטים מלאים
   const [details, setDetails]        = useState(null);   // נתוני העסקה לחתימה
+  const [linkModal, setLinkModal]    = useState(false);  // קישור אישי למנהלת
   const schoolReform = school.reform || 'ofek';
   const approverName = approverFor(approvers, school.id).name;
   const [editingId, setEditingId]   = useState(null);   // teacher id or 'new'
@@ -2622,6 +2623,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               <Send size={14} strokeWidth={2.2} />
               {isCoord ? 'שלח לאישור' : 'שלח לשליח'}
             </button>
+            {isCoord && (
+              <button className="apple-btn apple-btn-ghost" onClick={() => setLinkModal(true)}
+                title="מנפיק למנהלת קישור אישי חדש ופותח וואטסאפ עם ההודעה מוכנה"
+                style={{ minHeight:38, fontSize:13.5 }}>
+                <MessageCircle size={14} strokeWidth={2.2} />
+                קישור למנהלת
+              </button>
+            )}
 
             <span aria-hidden style={{ width:1, height:22, background:'var(--line)', marginInline:2 }} />
 
@@ -3004,8 +3013,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
             </table>
           </div>
         </div>
+        {isCoord && (
+          <MonthDocuments monthKey={activeMonth} schools={[school]} schoolId={school.id}
+            userRole={userRole} userId={userId}
+            title={`מסמכים מהנהלת החשבונות — ${school.name} · ${fmtMonthFn ? fmtMonthFn(activeMonth) : activeMonth}`} />
+        )}
       </div>
 
+      {linkModal && <PrincipalLinkModal school={school} onClose={() => setLinkModal(false)} />}
       {fullEdit && (
         <TeacherModal
           teacher={fullEdit}
@@ -3217,7 +3232,216 @@ function SimStep({ n, label, calcLabel, active, onFocus, value, onChange, onEnte
   );
 }
 
-function SimulatorView({ teachers, schools, onSaveGross }) {
+
+/* ═══════════════════════════════════════════════════════════════
+   מסמכים מהנהלת החשבונות
+
+   השכר בפועל רץ במערכת של משרד הנהלת החשבונות, לא כאן. מה שיוצא משם —
+   דוח שכר, סיכום עלות מעביד, תלושים — מצורף לחודש שהוא שייך לו, ואם
+   הוא של בית ספר אחד, גם לבית הספר. הקבצים בדלי פרטי; כל פתיחה היא
+   כתובת חד-פעמית לעשר דקות.
+
+   מנהלות בית ספר אינן רואות את הפאנל: המסמכים מכילים שכר של עובדות
+   בשמן, וזה מה שמוסתר מהן בכל מקום אחר.
+═══════════════════════════════════════════════════════════════ */
+function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, userId, title }) {
+  const [docs, setDocs] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err,  setErr]  = useState('');
+  const [note, setNote] = useState('');
+  const [pickSchool, setPickSchool] = useState(schoolId || '');
+  const fileRef = useRef(null);
+  const canWrite = userRole === 'coordinator' || userRole === 'clerk';
+
+  const load = useCallback(async () => {
+    if (!monthKey) return;
+    try {
+      const all = await store.listDocuments(monthKey);
+      // במסך בית ספר: המסמכים שלו, וגם אלה שלא שויכו לאף בית ספר
+      setDocs(schoolId ? all.filter(d => !d.schoolId || d.schoolId === schoolId) : all);
+    } catch (e) { setErr(e.message); }
+  }, [monthKey, schoolId]);
+  useEffect(() => { load(); }, [load]);
+
+  const onPick = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true); setErr('');
+    try {
+      await store.uploadDocument({ monthKey, schoolId: pickSchool || null, note, file });
+      setNote('');
+      await load();
+    } catch (ex) { setErr(ex.message); }
+    finally { setBusy(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
+  const open = async (d) => { try { window.open(await store.documentUrl(d), '_blank'); } catch (e) { setErr(e.message); } };
+  const del  = async (d) => {
+    if (!window.confirm(`למחוק את "${d.fileName}"?`)) return;
+    try { await store.deleteDocument(d); await load(); } catch (e) { setErr(e.message); }
+  };
+
+  if (!monthKey) return null;
+  const schoolName = id => schools.find(x => x.id === id)?.name || '';
+  const fmtSize = n => (!n ? '' : n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+  const fmtWhen = iso => new Date(iso).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
+
+  return (
+    <div className="apple-card" style={{ padding: '14px 16px', marginTop: 14 }} dir="rtl">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <Paperclip size={15} strokeWidth={2.3} color="var(--purple)" />
+        <p style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
+          {title || `מסמכים מהנהלת החשבונות — ${fmtMonth(monthKey)}`}
+        </p>
+        {docs.length > 0 && <span className="apple-badge badge-purple" style={{ fontSize: 10.5, padding: '2px 8px' }}>{docs.length}</span>}
+      </div>
+      <p style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.6 }}>
+        דוח השכר, סיכום עלות מעביד או כל קובץ שיצא ממערכת השכר. גלוי לרשת, לחשבת השכר ולמאשרות — לא למנהלות.
+      </p>
+
+      {canWrite && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+          {!schoolId && (
+            <select className="apple-select" value={pickSchool} onChange={e => setPickSchool(e.target.value)} style={{ fontSize: 12.5, minHeight: 36 }}>
+              <option value="">כל בתי הספר</option>
+              {schools.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+          )}
+          <input className="apple-input" value={note} onChange={e => setNote(e.target.value)}
+            placeholder="הערה (לא חובה)" style={{ fontSize: 12.5, minHeight: 36, flex: '1 1 160px' }} />
+          <label className="apple-btn apple-btn-blue" style={{ minHeight: 36, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1 }}>
+            <Upload size={14} strokeWidth={2.3} />
+            {busy ? 'מעלה…' : 'העלאת קובץ'}
+            <input ref={fileRef} type="file" onChange={onPick} disabled={busy} style={{ display: 'none' }}
+              accept=".pdf,.xlsx,.xls,.csv,.docx,.doc,.png,.jpg,.jpeg" />
+          </label>
+        </div>
+      )}
+      {err && <p style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 8 }}>{err}</p>}
+
+      {docs.length === 0 ? (
+        <p style={{ fontSize: 12.5, color: 'var(--text3)' }}>אין עדיין מסמכים לחודש הזה.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {docs.map(d => (
+            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', background: 'var(--fill)', borderRadius: 10 }}>
+              <FileText size={15} strokeWidth={2.2} color="var(--text3)" />
+              <button onClick={() => open(d)} title="פתיחה"
+                style={{ flex: 1, minWidth: 0, textAlign: 'right', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fileName}</p>
+                <p style={{ fontSize: 11, color: 'var(--text3)' }}>
+                  {[d.schoolId ? schoolName(d.schoolId) : 'כל בתי הספר', fmtSize(d.size), fmtWhen(d.uploadedAt), d.note].filter(Boolean).join(' · ')}
+                </p>
+              </button>
+              <button onClick={() => open(d)} title="פתיחה" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal)', display: 'flex', padding: 4 }}>
+                <Download size={15} strokeWidth={2.3} />
+              </button>
+              {(userRole === 'coordinator' || d.uploadedBy === userId) && (
+                <button onClick={() => del(d)} title="מחיקה" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex', padding: 4 }}>
+                  <Trash2 size={15} strokeWidth={2.2} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   קישור אישי למנהלת — מהממשק, לוואטסאפ
+
+   "המערכת מפיקה, את שולחת": הכפתור מנפיק קישור חדש (הקודם מתבטל)
+   ופותח וואטסאפ עם ההודעה מוכנה. השליחה עצמה — בלחיצה של שרה, לא של
+   המערכת. מנהלת בלי פרופיל עדיין דורשת את scripts/make-link.mjs, כי
+   יצירת משתמש דורשת את מפתח השרת שאין לדפדפן.
+═══════════════════════════════════════════════════════════════ */
+function PrincipalLinkModal({ school, onClose }) {
+  const [pr, setPr]   = useState(null);      // המנהלת של בית הספר
+  const [st, setSt]   = useState({});        // { loading | error | link, wa }
+  const [copied, setCopied] = useState(false);
+
+  // בטעינה — קריאה בלבד. ההנפקה עצמה היא פעולה מפורשת של שרה, לא תוצר
+  // לוואי של פתיחת החלון: אפקט שמנפיק קישור רץ פעמיים ב-StrictMode
+  // ויצר שני קישורים פעילים, וגם ביטל את הקודם רק מפני שהחלון נפתח.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const ps = await store.principalsOfSchool(school.id);
+        if (!alive) return;
+        if (!ps.length) setSt({ error: 'למנהלת אין עדיין פרופיל במערכת. צרי לה אחד עם scripts/make-link.mjs — ומכאן והלאה הכפתור הזה ינפיק לה קישורים.' });
+        else setPr(ps[0]);
+      } catch (e) { if (alive) setSt({ error: e.message }); }
+    })();
+    return () => { alive = false; };
+  }, [school]);
+
+  const issue = async () => {
+    setSt({ loading: true });
+    try {
+      const code = await store.issueLink(pr.id);
+      const link = `${window.location.origin}/?k=${code}`;
+      const first = (pr.fullName || '').split(' ')[0];
+      const msg = `שלום ${first}, זה הקישור האישי שלך למערכת שכר המורים — ${school.name}:\n${link}\n\nהקישור אישי; לא להעביר הלאה.`;
+      const wa  = pr.phone ? `https://wa.me/${pr.phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}` : null;
+      setSt({ link, wa });
+    } catch (e) { setSt({ error: e.message }); }
+  };
+
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(st.link); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { window.prompt('העתיקי את הקישור:', st.link); }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,11,53,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, backdropFilter: 'blur(6px)' }} dir="rtl" onClick={onClose}>
+      <div className="apple-card" style={{ width: '100%', maxWidth: 420, padding: 24 }} onClick={e => e.stopPropagation()}>
+        <h2 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>קישור אישי — {school.name}</h2>
+        {st.error && <p style={{ fontSize: 13, color: 'var(--danger)', lineHeight: 1.6 }}>{st.error}</p>}
+        {pr && (
+          <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 12 }}>
+            {pr.fullName}{pr.phone ? ` · ${pr.phone.replace('+972', '0')}` : ' · אין טלפון על הפרופיל'}
+          </p>
+        )}
+        {pr && !st.link && (
+          <>
+            <button className="apple-btn apple-btn-blue" onClick={issue} disabled={st.loading} style={{ width: '100%', minHeight: 42 }}>
+              <MessageCircle size={15} strokeWidth={2.3} />
+              {st.loading ? 'מנפיק…' : 'הנפקת קישור חדש'}
+            </button>
+            <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 10, lineHeight: 1.6 }}>
+              הקישור הקודם שלה יבוטל. מי שמחזיק בקישור נכנס בשמה — לשלוח רק לה.
+            </p>
+          </>
+        )}
+        {st.link && (
+          <>
+            <input readOnly value={st.link} dir="ltr" className="apple-input" onFocus={e => e.target.select()}
+              style={{ fontSize: 12, marginBottom: 12, fontFamily: 'monospace' }} />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {st.wa && (
+                <a href={st.wa} target="_blank" rel="noreferrer" className="apple-btn apple-btn-green" style={{ flex: 1, minHeight: 40, textDecoration: 'none' }}>
+                  <MessageCircle size={15} strokeWidth={2.3} />
+                  פתיחה בוואטסאפ
+                </a>
+              )}
+              <button className="apple-btn apple-btn-ghost" onClick={copy} style={{ flex: 1, minHeight: 40 }}>
+                {copied ? '✓ הועתק' : 'העתקת הקישור'}
+              </button>
+            </div>
+            <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 12, lineHeight: 1.6 }}>
+              הקישור הקודם בוטל. {!st.wa && 'כדי לקבל כפתור וואטסאפ, שמרי לה טלפון בפרופיל.'}
+            </p>
+          </>
+        )}
+        <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ width: '100%', marginTop: 12 }}>סגירה</button>
+      </div>
+    </div>
+  );
+}
+
+function SimulatorView({ teachers, schools, onSaveGross, activeMonth, userRole, userId }) {
   const [calc, setCalc] = useState('ofek');
   const [filterSchool, setFilterSchool] = useState('all');
   const [inputs, setInputs] = useState({});    // teacherId → string
@@ -3479,6 +3703,10 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
               </div>
             </div>
           ))}
+        </div>
+
+        <div style={{ padding:'0 16px 12px' }}>
+          <MonthDocuments monthKey={activeMonth} schools={schools} userRole={userRole} userId={userId} />
         </div>
 
         <div style={{ borderTop:'1px solid var(--apple-fill2)', background:'var(--apple-surface)', padding:'10px 16px' }}>
@@ -4113,11 +4341,14 @@ export default function App() {
           <SimulatorView
             teachers={teachers}
             schools={schools}
+            activeMonth={activeMonth}
+            userRole={user.role}
+            userId={user.id}
             onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
           />
         ) : /* Principal: see only their school */
         !isCoord && principalSchool ? (
-          <SchoolView approvers={approvers}
+          <SchoolView approvers={approvers} userId={user.id}
             school={principalSchool}
             teachers={teachers}
             userRole={user.role}
@@ -4134,12 +4365,15 @@ export default function App() {
           <SimulatorView
             teachers={teachers}
             schools={schools}
+            activeMonth={activeMonth}
+            userRole={user.role}
+            userId={user.id}
             onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
           />
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} />
         ) : view === 'school' && activeSchool ? (
-          <SchoolView approvers={approvers}
+          <SchoolView approvers={approvers} userId={user.id}
             school={activeSchool}
             teachers={teachers}
             userRole={user.role}
