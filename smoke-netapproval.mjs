@@ -101,6 +101,24 @@ await p.getByText('שלהבות אשקלון').first().click(); await p.waitForT
 check('אחרי האישור הרשתי מסומן "מאושר"',
   await p.getByText('מאושר', { exact: true }).first().isVisible().catch(() => false));
 
+// ══ 8. נתוני העסקה לחתימה — רק אחרי האישור הרשתי ══
+await seed({ '2026-08': THREE });
+await p.getByText('שלהבות אשקלון').first().click(); await p.waitForTimeout(600);
+check('לפני האישור הרשתי אין כפתור נתוני העסקה',
+  (await p.getByTitle('נתוני העסקה לחתימת העובדת').count()) === 0);
+
+await seed({ '2026-08': THREE.map(x => ({ ...x, _netApproved: true })) });
+await p.getByText('שלהבות אשקלון').first().click(); await p.waitForTimeout(600);
+check('אחרי האישור הכפתור מופיע', (await p.getByTitle('נתוני העסקה לחתימת העובדת').count()) > 0);
+await p.getByTitle('נתוני העסקה לחתימת העובדת').first().click(); await p.waitForTimeout(500);
+const doc = await p.locator('.apple-card').filter({ hasText: 'נתוני העסקה' }).first().innerText();
+check('המסמך נושא את שם העובדת ות.ז.', doc.includes('חנה לוי') && doc.includes('039485712'), doc.slice(0, 60));
+check('מציג שעות ואחוז משרה', doc.includes('26') && doc.includes('100%'));
+check('מציג בסיס, תוספת וברוטו', doc.includes('11,200') && doc.includes('1,300') && doc.includes('12,500'));
+check('אין בו עלות מעסיק — זה לא עניינה של העובדת', !doc.includes('17,370') && !doc.includes('למעסיק'));
+check('יש הצהרה ומקום חתימה', doc.includes('אני החתומה מטה') && doc.includes('חתימת העובדת'));
+check('מסויג מפורשות מטופס 101', doc.includes('אינו מחליף טופס 101'));
+
 await b.close();
 console.log(fails.length ? `\n${fails.length} כשלונות` : '\nהכול עבר');
 process.exit(fails.length ? 1 : 0);

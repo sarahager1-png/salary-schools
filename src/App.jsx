@@ -624,6 +624,104 @@ function TeacherDiff({ t }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   EMPLOYMENT DETAILS — נתוני העסקה לחתימת העובדת
+═══════════════════════════════════════════════════════════════ */
+function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
+  const emp = calcEmployer(x);
+  const d   = deriveHours(x);
+  const rows = [
+    ['שם העובדת',        x.name],
+    ['תעודת זהות',       x.tzId || '—'],
+    ['בית הספר',         school?.name || '—'],
+    ['מסלול',            reformLabel(x.reform)],
+    ...(x.reform === 'ofek' && !isPrincipalRow(x)
+      ? [['דרגה באופק', x.grade === 'intern' ? 'מתמחה' : `דרגה ${x.grade}`]] : []),
+    ...(isPrincipalRow(x) ? [['תפקיד', 'מנהלת בית ספר']] : []),
+    ['תואר',             DEGREE_LABELS[x.degree] || x.degree || '—'],
+    ['ותק בהוראה',       `${x.seniority || 0} שנים`],
+    ['שלב חינוך',        LEVELS[x.level]?.label || '—'],
+    ['שעות פרונטליות',   d ? d.frontal : (x.frontalHours || '—')],
+    ...(d ? [['שעות פרטניות', d.individual], ['שעות שהייה', d.presence]] : []),
+    ['אחוז משרה',        `${effectiveScope(x)}%`],
+    ...(x.isTemp ? [['שיבוץ', `זמני${x.endDate ? ` · עד ${fmt(x.endDate)}` : ''}`]] : []),
+  ];
+  const pay = [
+    ['שכר בסיס',           emp.base],
+    ...(emp.supplement ? [['תוספת בית חב"ד', emp.supplement]] : []),
+    ['ברוטו חודשי',        emp.gross],
+  ];
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:100, overflowY:'auto', padding:'24px 16px' }} dir="rtl">
+      <div className="apple-card" style={{ maxWidth:640, margin:'0 auto', padding:0 }}>
+        <div className="no-print" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'14px 20px', borderBottom:'1px solid var(--line)' }}>
+          <h2 style={{ fontSize:17, fontWeight:800, color:'var(--text)' }}>נתוני העסקה לחתימה</h2>
+          <div style={{ display:'flex', gap:8 }}>
+            <button className="apple-btn apple-btn-blue" onClick={() => window.print()} style={{ minHeight:36, fontSize:13 }}>
+              <Printer size={14} strokeWidth={2.2} />
+              הדפסה / PDF
+            </button>
+            <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ minHeight:36, fontSize:13 }}>סגירה</button>
+          </div>
+        </div>
+
+        <div style={{ padding:'24px 28px 28px' }}>
+          <div style={{ textAlign:'center', marginBottom:20 }}>
+            <img src="/logo-chabad.png" alt="רשת חינוך חב״ד" style={{ height:46, margin:'0 auto 10px', display:'block' }} />
+            <h3 style={{ fontSize:19, fontWeight:800, color:'var(--text)', letterSpacing:'-0.02em' }}>נתוני העסקה</h3>
+            <p style={{ fontSize:13, color:'var(--text3)', marginTop:3 }}>{school?.name} · {monthLabel}</p>
+          </div>
+
+          <table className="apple-table" style={{ marginBottom:18 }}>
+            <tbody>
+              {rows.map(([k, v]) => (
+                <tr key={k}>
+                  <td style={{ color:'var(--text3)', width:'45%' }}>{k}</td>
+                  <td style={{ fontWeight:600, color:'var(--text)' }}>{v}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="apple-section" style={{ marginBottom:18 }}>
+            {pay.map(([k, v], i) => (
+              <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0',
+                borderTop: i === pay.length - 1 ? '1px solid var(--line)' : undefined,
+                marginTop: i === pay.length - 1 ? 6 : 0, paddingTop: i === pay.length - 1 ? 10 : 5 }}>
+                <span style={{ fontSize:13.5, color:'var(--text2)', fontWeight: i === pay.length - 1 ? 700 : 400 }}>{k}</span>
+                <span className="num" style={{ fontSize: i === pay.length - 1 ? 17 : 14,
+                  fontWeight: i === pay.length - 1 ? 800 : 600,
+                  color: i === pay.length - 1 ? 'var(--purple)' : 'var(--text)' }}>
+                  {v.toLocaleString('he-IL')} ₪
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <p style={{ fontSize:12.5, color:'var(--text2)', lineHeight:1.8, marginBottom:20 }}>
+            אני החתומה מטה מאשרת שנתוני ההעסקה המפורטים לעיל נכונים, ושהם משקפים את
+            תנאי העסקתי ברשת חינוך חב״ד.
+          </p>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
+            {['חתימת העובדת', 'תאריך'].map(l => (
+              <div key={l}>
+                <div style={{ borderBottom:'1px solid var(--text3)', height:44 }} />
+                <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:5 }}>{l}</p>
+              </div>
+            ))}
+          </div>
+
+          <p style={{ fontSize:10.5, color:'var(--text3)', marginTop:22, lineHeight:1.7, textAlign:'center' }}>
+            מסמך פנימי של רשת חינוך חב״ד. אינו מחליף טופס 101.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    NETWORK APPROVAL — אישור רשתי בחודש הראשון
 ═══════════════════════════════════════════════════════════════ */
 function NetworkApprovalView({ schools, teachers, isFirstMonth, monthLabel, onApprove }) {
@@ -2158,6 +2256,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   const [showAbsence, setShowAbsence] = useState(false);
   const [showImport, setShowImport]   = useState(false);
   const [fullEdit, setFullEdit]      = useState(null);   // מורה בעריכת פרטים מלאים
+  const [details, setDetails]        = useState(null);   // נתוני העסקה לחתימה
   const schoolReform = school.reform || 'ofek';
   const [editingId, setEditingId]   = useState(null);   // teacher id or 'new'
   const [editData,  setEditData]    = useState(null);
@@ -2723,6 +2822,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       <div style={{ display:'flex', gap:4 }}>
                         <button className="apple-btn apple-btn-ghost" title="עריכה מהירה בשורה" onClick={() => startEdit(t)} style={{ padding:'0 9px', minHeight:30 }}><Pencil size={13} strokeWidth={2.2} /></button>
                         <button className="apple-btn apple-btn-ghost" title="פרטים מלאים — תפקיד, שלב, קבוצת גיל, שינויי משרה וקבצים" onClick={() => setFullEdit(t)} style={{ padding:'0 9px', minHeight:30 }}><Users size={13} strokeWidth={2.2} /></button>
+                        {fullyApproved(t, isFirstMonth) && (
+                          <button className="apple-btn apple-btn-ghost" title="נתוני העסקה לחתימת העובדת"
+                            onClick={() => setDetails(t)} style={{ padding:'0 9px', minHeight:30 }}>
+                            <FileText size={13} strokeWidth={2.2} />
+                          </button>
+                        )}
                         {isCoord && isAppr && onApproveTeacher && (
                           <button className="apple-btn apple-btn-green" title="אישור" onClick={() => onApproveTeacher(t.id)} style={{ padding:'0 9px', minHeight:30 }}><Check size={14} strokeWidth={2.8} /></button>
                         )}
@@ -2769,6 +2874,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
           }}
           onClose={() => setFullEdit(null)}
         />
+      )}
+      {details && (
+        <EmploymentDetails teacher={details} school={school}
+          monthLabel={fmtMonthFn ? fmtMonthFn(activeMonth) : activeMonth}
+          onClose={() => setDetails(null)} />
       )}
       {showReport  && <SchoolReport   school={school} teachers={teachers} onClose={() => setShowReport(false)} />}
       {showAbsence && <AbsenceReport school={school} teachers={teachers} monthLabel={fmtMonthFn ? fmtMonthFn(activeMonth) : activeMonth} onClose={() => setShowAbsence(false)} />}
