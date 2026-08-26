@@ -25,7 +25,7 @@ const ofekDarga  = g => String(Math.max(1, Math.min(17, Math.round(Number(g) || 
 */
 const OLD_DARGA = { MA: '2', BA: '3', senior: '7', intern: '18' };
 const OLD_UNLICENSED = { aa: '10', 'a+': '11', a: '12', b: '13' };
-const OLD_UNLICENSED_HE = 'שלב אא · שלב א+ · שלב א · שלב ב';
+const OLD_UNLICENSED_DEFAULT = OLD_UNLICENSED.a;   // שלב א — כל הבלתי מוסמכות ברשת
 
 // ── אופק ניהול ───────────────────────────────────────────────
 const NIHUL_DERUG = { BA: '110', MA: '110', senior: '111', unlicensed: '113' };
@@ -67,18 +67,13 @@ export function ofekRequest(t, monthKey) {
 }
 
 export function oldRequest(t, monthKey) {
-  // בלתי מוסמך — ארבעה שלבים בשכר שונה. בלי לדעת באיזה היא, מספר
-  // השכר יהיה ניחוש, ולכן השורה חוזרת להזנה ידנית עם הסיבה.
+  // בלתי מוסמך מפוצל בעולם הישן לארבעה שלבים בשכר שונה. ברשת כולן
+  // בשלב א, ולכן זו ברירת המחדל; unlicensedStage גובר עליה אם ייקבע
+  // אחרת למורה מסוימת.
   const darga = t.degree === 'unlicensed'
-    ? OLD_UNLICENSED[t.unlicensedStage]
+    ? (OLD_UNLICENSED[t.unlicensedStage] || OLD_UNLICENSED_DEFAULT)
     : OLD_DARGA[t.degree];
-  if (!darga) {
-    return {
-      skip: t.degree === 'unlicensed'
-        ? `בלתי מוסמך בעולם הישן מפוצל לארבעה שלבים — יש לבחור אחד: ${OLD_UNLICENSED_HE}`
-        : `אין במחשבון העולם הישן תואר "${DEGREE_HE[t.degree] || t.degree}"`,
-    };
-  }
+  if (!darga) return { skip: `אין במחשבון העולם הישן תואר "${DEGREE_HE[t.degree] || t.degree}"` };
   return {
     endpoint: 'old',
     body: {

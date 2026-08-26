@@ -68,7 +68,7 @@ try{
   const s1=oldRequest({...T,degree:'intern'},MONTH);
   check('מתמחה בעולם ישן -> דרגה 18', s1.body?.DARGA==='18', s1.skip||s1.body?.DARGA);
   const s2=oldRequest({...T,degree:'unlicensed'},MONTH);
-  check('בלתי מוסמכת בלי שלב — לא מנוחשת', !!s2.skip, s2.skip? '' : 'עברה בטעות!');
+  check('בלתי מוסמכת -> שלב א (12) כברירת מחדל', s2.body?.DARGA==='12', s2.skip||s2.body?.DARGA);
   for (const [stage,val] of [['aa','10'],['a+','11'],['a','12'],['b','13']]) {
     const r=oldRequest({...T,degree:'unlicensed',unlicensedStage:stage},MONTH);
     check(`בלתי מוסמכת שלב ${stage} -> ${val}`, r.body?.DARGA===val, r.skip||r.body?.DARGA);
