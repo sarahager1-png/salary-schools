@@ -3148,6 +3148,7 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                   const isActive = activeId === t.id;
                   const wasSaved = saved[t.id];
                   const isOfek   = t.reform === 'ofek';
+                  const dh       = deriveHours(t);   // פרונטלי/פרטני/שהייה — אופק בלבד
                   // רק מורת אופק שאינה מנהלת דורשת שתי סימולציות
                   const needsTwo = isOfek && !isPrincipalRow(t);
                   const preVal   = preInputs[t.id] ?? (t._officialGrossPre || '');
@@ -3180,8 +3181,12 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                           borderBottom:'1px solid var(--line-soft, #EDE8F8)',
                         }}>
                           {[
-                            ['% משרה',   `${t.scopePct ?? t.scope ?? 100}%`],
-                            ['פרונטלי',  `${t.frontalHours ?? 0} ש'`],
+                            ['% משרה',   `${(isOfek ? dh?.scopePct : null) ?? t.scopePct ?? t.scope ?? 100}%`],
+                            ['פרונטלי',  `${dh?.frontal ?? t.frontalHours ?? 0} ש'`],
+                            // פרטני ושהייה נגזרים מהשלב, מקבוצת הגיל ומאחוז
+                            // המשרה — המחשבון של אופק שואל את שניהם.
+                            ['פרטני',    dh ? `${dh.individual} ש'` : null],
+                            ['שהייה',    dh ? `${dh.presence} ש'`   : null],
                             ['שלב',      LEVELS[t.level]?.label],
                             ['גיל',      t.ageGroup && t.ageGroup !== 'none' ? AGE_RED[t.ageGroup]?.label : null],
                             ['גמול',     t.role && t.role !== 'none' ? ROLES.find(r => r.id === t.role)?.label.split('(')[0].trim() : null],
