@@ -3234,7 +3234,11 @@ function SimulatorView({ teachers, schools, onSaveGross }) {
                         <div>
                           <p style={{ fontWeight:600, fontSize:14, color:'var(--apple-text)', marginBottom:2 }}>{t.name}</p>
                           <p style={{ fontSize:12, color:'var(--apple-text2)' }}>
-                            {reformLabel(t.reform)} · {t.reform === 'ofek' ? `דרגה ${t.grade}` : (DEGREE_LABELS[t.degree] || t.degree)} · {t.seniority} שנות ותק
+                            {/* המחשבון של אופק שואל גם דרגת השכלה וגם דרגה
+                                באופק, והדרגה שם אפילו נעולה עד שנבחר תואר.
+                                קודם הוצגה למורת אופק הדרגה בלבד. */}
+                            {reformLabel(t.reform)} · {DEGREE_LABELS[t.degree] || t.degree}
+                            {t.reform === 'ofek' ? ` · דרגה ${t.grade}` : ''} · {t.seniority} שנות ותק
                           </p>
                         </div>
                         <div style={{ textAlign:'left', flexShrink:0 }}>
