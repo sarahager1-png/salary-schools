@@ -3400,7 +3400,10 @@ export default function App() {
 
   // ── חודש חדש ──
   const openNewMonth = () => {
-    const nextKey = nextMonthKey(activeMonth);
+    // כשאין עדיין אף חודש, פותחים את החודש הנוכחי ולא את הבא אחריו —
+    // אחרת החודש הראשון במערכת מדלג על עצמו.
+    const hasAny  = Object.keys(months).length > 0;
+    const nextKey = hasAny ? nextMonthKey(activeMonth) : nowMonthKey();
     if (months[nextKey]) { setActiveMonth(nextKey); return; }
     // השדות החודשיים מתאפסים; פרטי המורה נגררים
     const carried = teachers.map(t => ({
@@ -3554,7 +3557,7 @@ export default function App() {
                   style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11.5, padding:'4px 9px', background:'var(--teal)',
                     border:'none', borderRadius:8, color:'#fff', cursor:'pointer', fontWeight:700, fontFamily:'inherit', marginInlineStart:2 }}>
                   <Plus size={12} strokeWidth={3} />
-                  חודש
+                  {Object.keys(months).length ? 'חודש' : 'פתיחת המערכת'}
                 </button>
               )}
             </div>
