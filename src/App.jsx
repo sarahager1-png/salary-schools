@@ -211,9 +211,6 @@ function baseFrontalFor(t) {
 const HOMEROOM_HOURS_PRE = 3;
 const homeroomHours = t =>
   (t?.reform === 'pre' && /^homeroom/.test(t?.role || t?.gamulRole || '') ? HOMEROOM_HOURS_PRE : 0);
-// השעות שהשכר משולם עליהן. שונה מ-frontalHours, שהוא מה שהיא מלמדת
-// בפועל וממנו נגזרת המכסה של בית הספר.
-const paidFrontal = t => (Number(t?.frontalHours) || 0) + homeroomHours(t);
 
 // אחוז המשרה מוזן ביד ואינו נגזר. הנוסחה שהייתה כאן שגתה שלוש פעמים:
 // בסיס 30 בעולם ישן ולא 26, שלוש שעות גמול חינוך למחנכת, ועשר נקודות
@@ -3160,6 +3157,21 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td style={{ textAlign:'center', fontWeight:700, color: t.reform==='ofek' ? 'var(--apple-text)' : 'var(--apple-text3)' }}>{gradeLabel}</td>
                     <td style={{ textAlign:'center', color:'var(--apple-text2)' }}>{t.seniority}</td>
                     <td style={{ textAlign:'center' }}>{derived ? derived.frontal : (t.frontalHours ?? '—')}</td>
+                    <td style={{ textAlign:'center', fontSize:12 }}>
+                      {t.role && t.role !== 'none'
+                        ? <span>{ROLES.find(r => r.id === t.role)?.label.split('(')[0].trim()}
+                            <span style={{ color:'var(--text3)' }}>
+                              {ROLES.find(r => r.id === t.role)?.pct ? ` ${ROLES.find(r => r.id === t.role).pct}%` : ''}
+                            </span>
+                          </span>
+                        : <span style={{ color:'var(--text3)' }}>—</span>}
+                    </td>
+                    <td style={{ textAlign:'center', fontSize:12 }}>{LEVELS[t.level]?.label || '—'}</td>
+                    <td style={{ textAlign:'center', fontSize:12 }}>
+                      {t.ageGroup && t.ageGroup !== 'none'
+                        ? (AGE_RED[t.ageGroup]?.label || t.ageGroup)
+                        : <span style={{ color:'var(--text3)' }}>—</span>}
+                    </td>
                     <td style={{ textAlign:'center' }}>
                       {t.isTemp
                         ? <span className="apple-badge badge-orange">שיבוץ זמני</span>
@@ -4072,7 +4084,7 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKid
                             // שהיא מלמדת. בלי לומר זאת, המספר במחשבון אינו
                             // מסתדר עם מה שהמנהלת הזינה.
                             ['פרונטלי',  homeroomHours(t)
-                              ? `${t.frontalHours ?? 0} + ${homeroomHours(t)} גמול חינוך = ${paidFrontal(t)} ש'`
+                              ? `${t.frontalHours ?? 0} ש' + ${homeroomHours(t)} למחנכת`
                               : `${dh?.frontal ?? t.frontalHours ?? 0} ש'`],
                             // פרטני ושהייה נגזרים מהשלב, מקבוצת הגיל ומאחוז
                             // המשרה — המחשבון של אופק שואל את שניהם.
@@ -4088,7 +4100,13 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKid
 
                             // מחנכת בעולם ישן: המחשבון מטפל בגמול דרך השדה
                             // "כיתת חינוך (תוספת חינוך)", בשווי 3 שעות.
-                            ['כיתת חינוך', t.reform === 'pre' && /^homeroom/.test(t.role || '') ? 'כן — גמול 3 ש׳' : null],
+                            // שני דברים נפרדים שמצטברים: שלוש השעות שנכנסות
+                            // לאחוז המשרה, וגמול החינוך שנקבע בטופס עצמו —
+                            // במקטע "חינוך כיתה", שמקופל בברירת מחדל ומי
+                            // שאינו יודע שהוא שם אינו פותח אותו.
+                            ['גמול חינוך', t.reform === 'pre' && /^homeroom/.test(t.role || '')
+                              ? `${ROLES.find(r => r.id === t.role)?.pct}% — לפתוח "חינוך כיתה" בטופס ולסמן כיתה`
+                              : null],
                             // תוספת אם אינה קיימת במחשבון. היא מתווספת
                             // אצלנו על התוצאה, ואין מה להקליד עבורה.
                             ['תוספת אם', momBonusEligible(t)
