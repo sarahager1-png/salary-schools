@@ -512,8 +512,6 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .compact-cols th:nth-child(13), .compact-cols td:nth-child(13),
 .compact-cols th:nth-child(14), .compact-cols td:nth-child(14),
 .compact-cols th:nth-child(16), .compact-cols td:nth-child(16),
-.compact-cols th:nth-child(17), .compact-cols td:nth-child(17),
-.compact-cols th:nth-child(18), .compact-cols td:nth-child(18),
 .compact-cols th:nth-child(19), .compact-cols td:nth-child(19),
 .compact-cols th:nth-child(24), .compact-cols td:nth-child(24) { display:none; }
 

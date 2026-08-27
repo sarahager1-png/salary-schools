@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 25;
+const BUILD = 26;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -3258,8 +3258,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           </span>
                         )}
                         {onLeave(t) && (
-                          <span className="apple-badge badge-orange" style={{ fontSize:10.5, padding:'2px 8px' }} title={leaveText(t)}>
+                          <span className={`apple-badge ${t.leaveType === 'maternity' && hasSubstitute(t) ? 'badge-teal' : 'badge-orange'}`}
+                            style={{ fontSize:10.5, padding:'2px 8px' }} title={leaveText(t)}>
                             {leaveLabel(t.leaveType)}{t.leaveFrom ? ` ${fmtDay(t.leaveFrom)}` : ''}
+                            {t.leaveType === 'maternity'
+                              ? (hasSubstitute(t) ? ' · שובצה מחליפה — הפרשות בלבד' : ' · השכר נשמר עד שיבוץ')
+                              : ''}
                           </span>
                         )}
                         {isPrincipalRow(t) && (
@@ -3382,7 +3386,22 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td style={{ textAlign:'center', color: (t.mmHours||0)>0 ? 'var(--text)' : 'var(--text3)', fontWeight: (t.mmHours||0)>0 ? 700 : 400 }}>
                       {(t.mmHours||0) > 0 ? t.mmHours : '—'}
                     </td>
-                    <td style={{ fontSize:12, color:'var(--apple-text2)' }}>{t.mmFor||'—'}</td>
+                    <td style={{ textAlign:'center' }}>
+                      <input type="text" key={`mmf-${t.id}`}
+                        defaultValue={t.mmFor || ''}
+                        placeholder="במקום מי"
+                        title='שם העובדת שממלאים את מקומה — מפעיל את מצב החל"ד שלה'
+                        onClick={e => e.stopPropagation()}
+                        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                        onBlur={e => {
+                          const v2 = e.target.value.trim();
+                          if (v2 === (t.mmFor || '')) return;
+                          saveRow({ ...t, mmFor: v2 });
+                        }}
+                        style={{ width:110, textAlign:'center', fontSize:12,
+                          border:'1px solid var(--line)', borderRadius:7, padding:'3px 5px',
+                          background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
+                    </td>
                     <td style={{ textAlign:'center', color: (t.monthlyExtras||0)>0 ? 'var(--text)' : 'var(--text3)', fontWeight: (t.monthlyExtras||0)>0 ? 700 : 400 }}>
                       {(t.monthlyExtras||0) > 0 ? Number(t.monthlyExtras).toLocaleString('he-IL')+' ₪' : '—'}
                     </td>
