@@ -4,7 +4,11 @@ const env=Object.fromEntries(fs.readFileSync('.env.local','utf8').split(/\r?\n/)
   .filter(l=>!l.trimStart().startsWith('#')).map(l=>{const i=l.indexOf('=');return[l.slice(0,i).trim(),l.slice(i+1).trim()];}));
 const admin=createClient(env.VITE_SUPABASE_URL,env.SUPABASE_SECRET_KEY,{auth:{persistSession:false}});
 const REAL=['בית חינוך עפולה','בית חינוך רעננה','שלהבות אור עקיבא','שלהבות אשקלון','שלהבות גני תקוה','שלהבות ירושלים','שלהבות מזכרת בתיה','שלהבות רמת ישי'];
-const KEEP='2026-08';
+// חודש העבודה נשמר; כל השאר, אם הוא ריק, הוא שריד בדיקה.
+// בלי פרמטר אין ברירת מחדל: חודש מקודד קשיח מחק פעם אחת את חודש
+// העבודה עצמו, כי הוא כבר לא היה זה שנרשם כאן.
+const KEEP=process.argv[2];
+if(!KEEP){ console.error('שימוש: node scripts/tidy.mjs <חודש-לשמור>   (למשל 2026-09)'); process.exit(1); }
 const {data:schools}=await admin.from('schools').select('id,name');
 for(const s of (schools||[]).filter(x=>!REAL.includes(x.name))){
   await admin.from('teacher_months').delete().eq('school_id',s.id);
