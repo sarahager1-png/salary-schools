@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 20;
+const BUILD = 21;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -378,11 +378,25 @@ function payBreakdown(t) {
 // ברוטו למעסיק = בסיס + 40% · תוספת + 30%.
 // זהו אומדן. כשהנהלת החשבונות מזינה את עלות המעביד בפועל, היא גוברת.
 function calcEmployer(t) {
-  // בחל"ד ובחל"ת אין שכר החודש — השורה קיימת, הכסף אפס.
-  if (unpaidThisMonth(t)) {
+  // חל"ת: איפוס מלא — אין שכר ואין חובת הפרשות.
+  if (t.leaveType === 'unpaid') {
     return { gross:0, base:0, mom:0, supplement:0, employerBase:0, employerSupp:0,
              social:0, estimate:0, isEstimate:false, total:0, parts:[], pct:0,
              extras:{ biguud:0, havraah:0, total:0 }, unpaidLeave:true };
+  }
+  // חל"ד: אין שכר מהרשת — המוסד לביטוח לאומי משלם — אבל חובת המעסיק
+  // להמשיך את ההפרשות הסוציאליות נשארת: פנסיה ופיצויים וקרן השתלמות
+  // על הבסיס הרגיל. יורדים: השכר, מס שכר, ביטוח לאומי, הבראה וביגוד.
+  if (t.leaveType === 'maternity') {
+    const bd = payBreakdown(t);
+    const parts = [
+      { key:'pension', label:'פנסיה ופיצויים (חל"ד)', rate:PENSION_RATE, on:bd.base, amount: Math.round(bd.base * PENSION_RATE) },
+      { key:'keren',   label:'קרן השתלמות (חל"ד)',    rate:KEREN_RATE,   on:bd.base, amount: Math.round(bd.base * KEREN_RATE) },
+    ];
+    const social = parts.reduce((x, y) => x + y.amount, 0);
+    return { gross:0, base:0, mom:0, supplement:0, employerBase:social, employerSupp:0,
+             social, estimate:social, isEstimate:true, total:social, parts, pct:0,
+             extras:{ biguud:0, havraah:0, total:0 }, unpaidLeave:true, maternity:true };
   }
   const { base, mom, supplement, gross } = payBreakdown(t);
   const extras = calcExtras(t);
