@@ -85,7 +85,7 @@ try {
   await p.waitForTimeout(4000);
   const body = await p.locator('body').innerText();
   check('נאמר איזה חשבון נכנס', body.includes(GHOST), body.match(/[^\n]*אינו משויך[^\n]*/)?.[0] || body.slice(0, 100));
-  check('ונאמר למי לפנות', body.includes('פני לשרה'));
+  check('ונאמר למי לפנות', body.includes('פני לשרה הגר'));
   check('והיא נשארת במסך ההתחברות', body.includes('כניסה למערכת'));
   // ולא נשאר session תקוע
   const stuck = await p.evaluate(() => Object.keys(localStorage).some(k => /auth-token/.test(k) && localStorage.getItem(k)?.includes('access_token')));

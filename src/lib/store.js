@@ -184,7 +184,7 @@ export async function sendLoginLink(email) {
   });
   if (error) {
     if (/not found|Signups not allowed|not authorized/i.test(error.message)) {
-      throw new Error('הכתובת אינה מוגדרת במערכת. פני לשרה.');
+      throw new Error('הכתובת אינה מוגדרת במערכת. פני לשרה הגר.');
     }
     if (/rate|too many|seconds/i.test(error.message)) {
       throw new Error('נשלח קישור לאחרונה. בדקי במייל, ואם לא הגיע — נסי שוב בעוד דקה.');
@@ -205,7 +205,7 @@ export async function getProfile() {
   // התחברות הצליחה אבל אין פרופיל — קורה בעיקר בכניסה עם גוגל, כשהמייל
   // של חשבון הגוגל אינו זה שהוגדר במערכת. אומרים איזה מייל נכנס, אחרת
   // אי אפשר לנחש מה השתבש.
-  if (!data) throw new Error(`החשבון ${auth.user.email} התחבר, אך אינו משויך לתפקיד במערכת. פני לשרה כדי שתשייך אותו.`);
+  if (!data) throw new Error(`החשבון ${auth.user.email} התחבר, אך אינו משויך לתפקיד במערכת. פני לשרה הגר כדי שתשייך אותו.`);
   return { id: data.id, name: data.full_name, role: data.role, schoolId: data.school_id, email: auth.user.email };
 }
 
