@@ -114,7 +114,14 @@ export async function signIn(email, password) {
     if (/invalid login/i.test(error.message)) throw new Error('מייל או סיסמה שגויים');
     raise(error, 'ההתחברות נכשלה');
   }
-  return getProfile();
+  // הסיסמה נכונה אבל אין פרופיל — לא משאירים חיבור תקוע בדפדפן, אחרת
+  // הרענון הבא נכנס שוב לאותו מבוי סתום.
+  try {
+    return await getProfile();
+  } catch (e) {
+    await supabase.auth.signOut().catch(() => {});
+    throw e;
+  }
 }
 
 export async function signOut() {
@@ -127,6 +134,43 @@ export async function getSession() {
 }
 
 // מי אני: תפקיד, שם, ובית ספר אם מנהלת
+/*
+  אילו ספקי התחברות מופעלים בפרויקט. נשאל מהשרת ולא נקבע בקוד, כך
+  שברגע שגוגל יופעל בלוח הבקרה הכפתור יופיע — בלי פריסה מחדש. כתובת
+  ההגדרות פתוחה למפתח הציבורי ואינה חושפת דבר.
+*/
+let providersCache = null;
+export async function authProviders() {
+  if (providersCache) return providersCache;
+  try {
+    const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/settings`, {
+      headers: { apikey: import.meta.env.VITE_SUPABASE_ANON_KEY },
+    });
+    if (!r.ok) return (providersCache = []);
+    const j = await r.json();
+    providersCache = Object.entries(j.external || {}).filter(([, on]) => on === true).map(([k]) => k);
+  } catch { providersCache = []; }
+  return providersCache;
+}
+
+export async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin,
+      // בוחרת חשבון בכל כניסה: לרבות מהמשתמשות יש יותר מחשבון גוגל אחד,
+      // וכניסה שקטה לחשבון הלא נכון נראית כמו "אין לי הרשאה".
+      queryParams: { prompt: 'select_account' },
+    },
+  });
+  if (error) {
+    if (/not enabled|Unsupported provider/i.test(error.message)) {
+      throw new Error('כניסה עם גוגל אינה מופעלת בשרת. יש להפעיל אותה בהגדרות הפרויקט.');
+    }
+    raise(error, 'הכניסה עם גוגל נכשלה');
+  }
+}
+
 export async function getProfile() {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return null;
@@ -136,7 +180,10 @@ export async function getProfile() {
     .eq('id', auth.user.id)
     .maybeSingle();
   raise(error, 'טעינת הפרופיל נכשלה');
-  if (!data) throw new Error('המשתמש אינו משויך לתפקיד במערכת. פני לשליח.');
+  // התחברות הצליחה אבל אין פרופיל — קורה בעיקר בכניסה עם גוגל, כשהמייל
+  // של חשבון הגוגל אינו זה שהוגדר במערכת. אומרים איזה מייל נכנס, אחרת
+  // אי אפשר לנחש מה השתבש.
+  if (!data) throw new Error(`החשבון ${auth.user.email} התחבר, אך אינו משויך לתפקיד במערכת. פני לשרה כדי שתשייך אותו.`);
   return { id: data.id, name: data.full_name, role: data.role, schoolId: data.school_id, email: auth.user.email };
 }
 

@@ -9,5 +9,10 @@ if (!url || !key) {
 }
 
 export const supabase = createClient(url, key, {
-  auth: { persistSession: true, autoRefreshToken: true },
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    // החזרה מגוגל מגיעה עם הטוקן בכתובת; בלי זה הכניסה פשוט לא נתפסת
+    detectSessionInUrl: true,
+  },
 });

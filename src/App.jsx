@@ -583,11 +583,25 @@ function CalculatorFrame({ calcId, style }) {
   );
 }
 
-function LoginScreen({ onSignedIn }) {
+function LoginScreen({ onSignedIn, initialError = '' }) {
   const [email, setEmail]   = useState('');
   const [password, setPass] = useState('');
   const [busy, setBusy]     = useState(false);
-  const [error, setError]   = useState('');
+  const [error, setError]   = useState(initialError);
+  // הכפתור מופיע רק אם הספק באמת מופעל בשרת. כפתור שנכשל בלחיצה גרוע
+  // מכפתור שאינו קיים, וברגע שגוגל יופעל בלוח הבקרה הוא יופיע לבד.
+  const [hasGoogle, setHasGoogle] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    store.authProviders().then(ps => { if (alive) setHasGoogle(ps.includes('google')); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const google = async () => {
+    setBusy(true); setError('');
+    try { await store.signInWithGoogle(); }   // מפנה לגוגל; החזרה מטופלת באתחול
+    catch (err) { setError(err.message); setBusy(false); }
+  };
 
   const submit = async (e) => {
     e?.preventDefault();
@@ -640,10 +654,32 @@ function LoginScreen({ onSignedIn }) {
             {busy ? 'מתחברת…' : 'כניסה למערכת'}
             {!busy && <ArrowLeft size={17} strokeWidth={2.5} />}
           </button>
+
+          {hasGoogle && (
+            <>
+              <div style={{ display:'flex', alignItems:'center', gap:10, margin:'16px 0 14px' }}>
+                <div style={{ flex:1, height:1, background:'var(--line)' }} />
+                <span style={{ fontSize:11.5, color:'var(--text3)' }}>או</span>
+                <div style={{ flex:1, height:1, background:'var(--line)' }} />
+              </div>
+              <button type="button" onClick={google} disabled={busy}
+                className="apple-btn apple-btn-ghost"
+                style={{ width:'100%', minHeight:48, fontSize:15, fontWeight:600, gap:10 }}>
+                <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                  <path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.8-2.1 5.1-4.4 6.7v5.5h7.1c4.2-3.8 6.6-9.5 6.6-16.2z"/>
+                  <path fill="#34A853" d="M24 46c6 0 11-2 14.6-5.3l-7.1-5.5c-2 1.3-4.5 2.1-7.5 2.1-5.8 0-10.7-3.9-12.4-9.1H4.3v5.7C7.9 41.1 15.4 46 24 46z"/>
+                  <path fill="#FBBC05" d="M11.6 28.2c-.4-1.3-.7-2.7-.7-4.2s.2-2.9.7-4.2v-5.7H4.3C2.8 17 2 20.4 2 24s.8 7 2.3 9.9l7.3-5.7z"/>
+                  <path fill="#EA4335" d="M24 10.7c3.3 0 6.2 1.1 8.5 3.3l6.3-6.3C35 4.1 30 2 24 2 15.4 2 7.9 6.9 4.3 14.1l7.3 5.7c1.7-5.2 6.6-9.1 12.4-9.1z"/>
+                </svg>
+                כניסה עם גוגל
+              </button>
+            </>
+          )}
         </div>
 
         <p style={{ textAlign:'center', fontSize:12, color:'var(--text3)', marginTop:18, lineHeight:1.7 }}>
           מנהלות בית ספר נכנסות דרך הקישור האישי שנשלח אליהן.<br/>
+          {hasGoogle && <>הכניסה עם גוגל היא לחשבון שהוגדר לך במערכת.<br/></>}
           רשת חינוך חב״ד
         </p>
       </form>
@@ -4336,6 +4372,10 @@ export default function App() {
         const data = await refresh();
         landOnFirstMonth(profile, data);
       } catch (e) {
+        // התחברות שהצליחה אבל אין לה פרופיל (בעיקר חשבון גוגל שאינו
+        // מוגדר) הותירה session תקוע והחזירה למסך ההתחברות בלי מילה.
+        // מנתקים, ומעבירים את ההסבר למסך עצמו.
+        await store.signOut().catch(() => {});
         if (alive) setError(e.message);
       } finally {
         if (alive) setBooting(false);
@@ -4369,7 +4409,7 @@ export default function App() {
     );
   }
 
-  if (!user) return <LoginScreen onSignedIn={onSignedIn} />;
+  if (!user) return <LoginScreen onSignedIn={onSignedIn} initialError={error} />;
 
   const teachers = months[activeMonth] || [];
 
