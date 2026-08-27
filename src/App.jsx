@@ -3152,7 +3152,22 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         {reformLabel(t.reform)}
                       </span>
                     </td>
-                    <td style={{ textAlign:'center', fontWeight:600, color:'var(--text)' }}>{scope}%</td>
+                    <td style={{ textAlign:'center' }}>
+                      <input type="number" min="0" max="200" dir="ltr"
+                        key={`pct-${t.id}-${scope}`}
+                        defaultValue={scope}
+                        title="אחוז משרה — הקלדה ישירה, נשמר ביציאה מהשדה"
+                        onClick={e => e.stopPropagation()}
+                        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                        onBlur={e => {
+                          const pct = Number(e.target.value);
+                          if (!Number.isFinite(pct) || pct === scope) return;
+                          onSaveTeacher({ ...t, scopePct: pct, scope: pct });
+                        }}
+                        style={{ width:56, textAlign:'center', fontWeight:700, fontSize:13,
+                          border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
+                          background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
+                    </td>
                     <td style={{ textAlign:'center' }}>{degreeLabel}</td>
                     <td style={{ textAlign:'center', fontWeight:700, color: t.reform==='ofek' ? 'var(--apple-text)' : 'var(--apple-text3)' }}>{gradeLabel}</td>
                     <td style={{ textAlign:'center', color:'var(--apple-text2)' }}>{t.seniority}</td>
