@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 12;
+const BUILD = 13;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -665,6 +665,39 @@ function CalculatorFrame({ calcId, style }) {
         </div>
       )}
     </div>
+  );
+}
+
+// פס "גרסה חדשה" — משווה את הבנדל שבאוויר לזה שנטען
+function UpdateBanner() {
+  const [stale, setStale] = useState(false);
+  useEffect(() => {
+    const current = document.querySelector('script[src*="assets/index-"]')?.getAttribute('src');
+    if (!current) return;
+    let stop = false;
+    const check = async () => {
+      try {
+        const html = await fetch('/?u=' + Date.now(), { cache: 'no-store' }).then(r => r.text());
+        const m = html.match(/assets\/index-[^"']+\.js/);
+        if (!stop && m && !current.includes(m[0])) setStale(true);
+      } catch { /* אין רשת — ננסה שוב */ }
+    };
+    const iv = setInterval(check, 60000);
+    window.addEventListener('focus', check);
+    return () => { stop = true; clearInterval(iv); window.removeEventListener('focus', check); };
+  }, []);
+  if (!stale) return null;
+  return (
+    <button onClick={() => {
+        if (document.activeElement?.tagName === 'INPUT') document.activeElement.blur();
+        setTimeout(() => window.location.reload(), 400);
+      }}
+      style={{ position:'fixed', bottom:16, insetInlineStart:16, zIndex:99,
+        background:'var(--teal)', color:'#fff', border:'none', borderRadius:12,
+        padding:'10px 18px', fontSize:13.5, fontWeight:700, fontFamily:'inherit',
+        cursor:'pointer', boxShadow:'0 4px 14px rgba(0,180,204,.35)' }}>
+      יש גרסה חדשה — לחצי לרענון
+    </button>
   );
 }
 
@@ -4989,6 +5022,7 @@ export default function App() {
 
   return (
     <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column' }} dir="rtl">
+      <UpdateBanner />
 
       <header className="app-header no-print">
         <div style={{ maxWidth:1152, margin:'0 auto', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, minHeight:60, flexWrap:'wrap' }}>
