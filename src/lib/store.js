@@ -357,7 +357,7 @@ export async function linkWhoami(code) {
   raise(error, 'הקישור אינו תקף');
   const me = data?.[0];
   if (!me) throw new Error('הקישור אינו תקף. ייתכן שהוחלף בקישור חדש.');
-  return { fullName: me.full_name, role: me.role, schoolId: me.school_id, schoolName: me.school_name };
+  return { fullName: me.full_name, role: me.role, schoolId: me.school_id, schoolName: me.school_name, gender: me.gender };
 }
 
 export async function linkMonths(code) {

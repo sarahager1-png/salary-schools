@@ -41,18 +41,24 @@ const makeCode = () => Array.from(crypto.randomBytes(20)).map(b => ALPHABET[b % 
 const chatId   = phone => `${String(phone).replace(/\D/g, '')}@c.us`;
 const local    = phone => String(phone).replace(/\D/g, '').replace(/^972/, '0');
 
-/* ההודעה. בגוף ראשון בשמה של שרה, כי היא זו שנשלחת ממנה. */
-const message = (name, school, link) => {
+/*
+  ההודעה, בגוף ראשון בשמה של שרה.
+
+  מה שמופנה אל המקבל/ת — לפי המין שרשום בפרופיל. בעפולה המנהל גבר,
+  והודעה שכתובה כולה בנקבה אומרת לו, בלי לומר זאת, שהיא לא נכתבה
+  בשבילו. מה שמתאר את הצוות נשאר בשם עצם או בצורה כפולה: הוא מעורב.
+*/
+const message = (name, school, link, male) => {
   const first = (name || '').split(' ')[0];
   return `שלום ${first},
 
-הרשת עוברת למערכת אחת לניהול שכר עובדות ההוראה במוכש"ר, וזה הקישור האישי שלך ל${school}.
+הרשת עוברת למערכת אחת לניהול שכר עובדי ההוראה במוכש"ר, וזה הקישור האישי שלך ל${school}.
 
 *מה צריך למלא:*
-לכל עובדת הוראה — *כולל אותך* — שם, ת.ז., מסלול (אופק חדש / עולם ישן), תואר, דרגה, ותק ושעות פרונטליות. אחוז המשרה מחושב לבד.
-אם עובדת יצאה לחל"ד — יש בורר סטטוס עם תאריך.
+לכל עובד/ת הוראה — *כולל אותך* — שם, ת.ז., מסלול (אופק חדש / עולם ישן), תואר, דרגה, ותק ושעות פרונטליות. אחוז המשרה מחושב לבד.
+יציאה לחל"ד — יש בורר סטטוס עם תאריך.
 
-*חשוב:* הצמדי למספר השעות שאושר בבניית התקציב.
+*חשוב:* ${male ? 'הצמד' : 'הצמדי'} למספר השעות שאושר בבניית התקציב.
 
 *הקישור:*
 ${link}
@@ -78,7 +84,7 @@ const post = async (path, body) => {
 // ── מי מקבלת ──────────────────────────────────────────────────
 const { data: principals, error } = await admin
   .from('profiles')
-  .select('id, full_name, phone, schools(name)')
+  .select('id, full_name, phone, gender, schools(name)')
   .eq('role', 'principal')
   .order('full_name');
 if (error) { console.error('טעינת המנהלות נכשלה:', error.message); process.exit(1); }
@@ -88,7 +94,9 @@ if (ONLY) list = list.filter(p => p.full_name?.includes(ONLY));
 if (!list.length) { console.error(ONLY ? `לא נמצאה מנהלת בשם "${ONLY}"` : 'אין מנהלות'); process.exit(1); }
 
 const noPhone = list.filter(p => !p.phone);
-list = list.filter(p => p.phone);
+// בשליחה בפועל מדלגים על מי שאין לו טלפון; בהרצה יבשה מציגים גם אותו,
+// אחרת אי אפשר לראות את הנוסח שהוא היה מקבל.
+if (SEND) list = list.filter(p => p.phone);
 
 console.log(SEND ? '── שליחה בפועל ──\n' : '── הרצה יבשה (בלי --send לא נשלח דבר) ──\n');
 if (noPhone.length) {
@@ -115,11 +123,11 @@ if (SEND) {
 const log = [];
 for (const [i, p] of list.entries()) {
   const school = p.schools.name;
-  let line = `${p.full_name} · ${school} · ${local(p.phone)}`;
+  let line = `${p.full_name} · ${school} · ${p.phone ? local(p.phone) : '—'}`;
 
   if (!SEND) {
-    console.log(`${i + 1}. ${line}`);
-    if (i === 0) console.log('\n' + message(p.full_name, school, `${APP}/?k=<קוד אישי>`) + '\n');
+    console.log(`${i + 1}. ${line}${p.phone ? '' : '   ← אין טלפון, לא יקבל/ת'}`);
+    if (i === 0 || ONLY) console.log('\n' + message(p.full_name, school, `${APP}/?k=<קוד אישי>`, p.gender === 'm') + '\n');
     continue;
   }
 
@@ -132,7 +140,7 @@ for (const [i, p] of list.entries()) {
     const { error: le } = await admin.from('access_links').insert({ code, profile_id: p.id, revoked: false });
     if (le) { console.log(`✗ ${line} — יצירת הקישור נכשלה: ${le.message}`); continue; }
 
-    const res = await post('sendMessage', { chatId: chatId(p.phone), message: message(p.full_name, school, `${APP}/?k=${code}`) });
+    const res = await post('sendMessage', { chatId: chatId(p.phone), message: message(p.full_name, school, `${APP}/?k=${code}`, p.gender === 'm') });
     console.log(`✓ ${line} — נשלח (${res.idMessage})`);
     log.push({ at: new Date().toISOString(), name: p.full_name, school, phone: local(p.phone), idMessage: res.idMessage });
   } catch (e) {
@@ -146,5 +154,5 @@ if (SEND && log.length) {
   fs.appendFileSync('outgoing-links.log', log.map(x => JSON.stringify(x)).join('\n') + '\n', 'utf8');
   console.log(`\n${log.length} נשלחו. נרשם ל-outgoing-links.log`);
 } else if (!SEND) {
-  console.log(`\n${list.length} מנהלות יקבלו. להרצה אמיתית: node scripts/send-links.mjs --send`);
+  console.log(`\n${list.filter(p => p.phone).length} מקבלים/ות. להרצה אמיתית: node scripts/send-links.mjs --send`);
 }
