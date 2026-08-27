@@ -196,6 +196,16 @@ try {
   });
   check('חופשה בלי תאריך נחסמת', /תאריך יציאה/.test(noDate?.message || ''), noDate?.message?.slice(0, 60) || 'עבר!');
 
+  // ══ 4c. הקישור מציג חודש אחד בלבד ══
+  // חודש נוסף במסד — כולל חודשי בדיקה — לא אמור להופיע אצל המנהלת.
+  await admin.from('months').insert({ key: '2098-06' }).then(() => {});
+  await p.reload();
+  await p.getByText('חנה כהן').first().waitFor({ timeout: 20000 });
+  const hdr = await p.locator('header').innerText();
+  check('אין בורר חודשים בקישור', await p.locator('header select').count() === 0);
+  check('ומוצג רק החודש הפתוח האחרון', !hdr.includes('יוני 2098'), hdr.replace(/\s+/g, ' '));
+  await admin.from('months').delete().eq('key', '2098-06');
+
   // ══ 5. הגבולות ══
   const { error: moneyErr } = await anon.rpc('link_add_row', {
     p_code: CODE, p_month: MONTH,

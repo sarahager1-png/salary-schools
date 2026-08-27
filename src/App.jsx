@@ -4417,13 +4417,14 @@ function LinkView({ code }) {
           <p style={{ fontSize:12.5, color:'var(--text3)', marginTop:1 }}>
             {me?.fullName}{me ? ' · הזנת נתוני העסקה' : ''}
           </p>
-          {months.length > 1 && (
-            <select className="apple-select" value={month} onChange={e => setMonth(e.target.value)}
-              style={{ marginTop:9, fontSize:13, minHeight:38 }}>
-              {months.map(m => (
-                <option key={m.key} value={m.key}>{fmtMonth(m.key)}{m.locked ? ' (נעול)' : ''}</option>
-              ))}
-            </select>
+          {/* חודש אחד, כטקסט. בורר הזמין מילוי לחודש שכבר נסגר, וחשף
+              כל חודש שקיים במסד — כולל חודשי בדיקה. */}
+          {month && (
+            <p style={{ fontSize:12.5, fontWeight:700, color:'var(--purple)', marginTop:8,
+              background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999,
+              display:'inline-block', padding:'3px 12px' }}>
+              {fmtMonth(month)}
+            </p>
           )}
         </div>
       </header>
