@@ -82,6 +82,9 @@ const CALCULATORS = [
   { id: 'mgmt', route: 'OfekNihul',  label: 'אופק — ניהול' },
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
+// מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
+const BUILD = 3;
+
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
 const calcForReform = reform => (reform === 'pre' ? 'old' : 'ofek');
@@ -4895,6 +4898,7 @@ export default function App() {
               <p style={{ fontWeight:700, fontSize:14.5, color:'var(--text)', letterSpacing:'-0.01em', lineHeight:1.25 }}>מערכת שכר מורים</p>
               <p style={{ fontSize:11.5, color:'var(--text3)', lineHeight:1.3 }}>
                 {isCoord ? 'שליח / מנהל רשת' : isClerk ? 'חשבת שכר' : isNetApprover ? `${user.name} · אישור רשתי${user.schoolId ? ' — ' + (schools.find(s => s.id === user.schoolId)?.name || '') : ''}` : `מנהלת: ${principalSchool?.name || ''}`}
+                <span style={{ opacity:.55 }}>{` · גרסה ${BUILD}`}</span>
               </p>
             </div>
           </div>
