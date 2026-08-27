@@ -6,3 +6,9 @@ dist/
 .DS_Store
 *.log
 users-created.txt
+
+# Vercel
+.vercel
+
+.vercel
+.env*
