@@ -60,6 +60,21 @@ try {
     console.log('SKIP  הפניה לגוגל — הספק כבוי בפרויקט');
   }
 
+  // ── כניסה בקישור למייל ──
+  await p.goto(APP, { waitUntil: 'networkidle', timeout: 60000 });
+  const linkBtn = p.getByRole('button', { name: /קישור כניסה למייל/ });
+  check('כפתור הכניסה בלי סיסמה מוצג', await linkBtn.count() > 0);
+  check('והוא מנוטרל בלי מייל', await linkBtn.isDisabled());
+  // כתובת שאינה במערכת — לא נוצר משתמש חדש, ונאמר מה קרה
+  const { data: before } = await admin.auth.admin.listUsers();
+  await p.getByPlaceholder('name@reshetch.org.il').fill('לא-קיימת@example.com');
+  await linkBtn.click();
+  await p.waitForTimeout(4000);
+  let b1 = await p.locator('body').innerText();
+  check('כתובת שאינה במערכת מקבלת הסבר', b1.includes('אינה מוגדרת במערכת'), b1.slice(0, 140).replace(/\s+/g, ' '));
+  const { data: after } = await admin.auth.admin.listUsers();
+  check('ולא נוצר ממנה משתמש', after.users.length === before.users.length, `${before.users.length} → ${after.users.length}`);
+
   // ── חשבון שהתחבר אך אינו מוגדר: ההודעה חייבת להסביר ──
   const { data: g } = await admin.auth.admin.createUser({ email: GHOST, password: PW, email_confirm: true });
   check('נוצר משתמש בלי פרופיל', !!g?.user);

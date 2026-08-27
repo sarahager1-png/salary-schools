@@ -171,6 +171,28 @@ export async function signInWithGoogle() {
   }
 }
 
+/*
+  כניסה בקישור למייל, בלי סיסמה.
+  shouldCreateUser:false — רק מי שכבר מוגדרת במערכת מקבלת קישור. בלי
+  זה כל כתובת שתוקלד הייתה יוצרת משתמש חדש, והשולחת הייתה מגלה זאת
+  רק כשהיא נתקעת בלי הרשאות.
+*/
+export async function sendLoginLink(email) {
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: { emailRedirectTo: window.location.origin, shouldCreateUser: false },
+  });
+  if (error) {
+    if (/not found|Signups not allowed|not authorized/i.test(error.message)) {
+      throw new Error('הכתובת אינה מוגדרת במערכת. פני לשרה.');
+    }
+    if (/rate|too many|seconds/i.test(error.message)) {
+      throw new Error('נשלח קישור לאחרונה. בדקי במייל, ואם לא הגיע — נסי שוב בעוד דקה.');
+    }
+    raise(error, 'שליחת הקישור נכשלה');
+  }
+}
+
 export async function getProfile() {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return null;

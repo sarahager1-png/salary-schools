@@ -603,6 +603,16 @@ function LoginScreen({ onSignedIn, initialError = '' }) {
     catch (err) { setError(err.message); setBusy(false); }
   };
 
+  // כניסה בלי סיסמה: קישור למייל
+  const [linkSent, setLinkSent] = useState('');
+  const sendLink = async () => {
+    if (!email.trim()) { setError('יש למלא כתובת מייל'); return; }
+    setBusy(true); setError(''); setLinkSent('');
+    try { await store.sendLoginLink(email); setLinkSent(email.trim()); }
+    catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  };
+
   const submit = async (e) => {
     e?.preventDefault();
     if (!email.trim() || !password) return;
@@ -641,6 +651,14 @@ function LoginScreen({ onSignedIn, initialError = '' }) {
               value={password} onChange={e => setPass(e.target.value)} />
           </div>
 
+          {linkSent && (
+            <div style={{ background:'var(--ok-bg)', border:'1px solid var(--ok-line)', borderRadius:12,
+              padding:'11px 13px', marginBottom:14, fontSize:13, color:'var(--ok)', lineHeight:1.7 }}>
+              <b>נשלח קישור כניסה ל־{linkSent}</b><br/>
+              פתחי אותו <b>מהמכשיר הזה</b>. הקישור תקף לשעה.
+            </div>
+          )}
+
           {error && (
             <div style={{ background:'var(--danger-bg)', border:'1px solid var(--danger-line)', borderRadius:12,
               padding:'10px 13px', marginBottom:14, fontSize:13, color:'var(--danger)', fontWeight:600 }}>
@@ -655,13 +673,22 @@ function LoginScreen({ onSignedIn, initialError = '' }) {
             {!busy && <ArrowLeft size={17} strokeWidth={2.5} />}
           </button>
 
+          <div style={{ display:'flex', alignItems:'center', gap:10, margin:'16px 0 14px' }}>
+            <div style={{ flex:1, height:1, background:'var(--line)' }} />
+            <span style={{ fontSize:11.5, color:'var(--text3)' }}>או בלי סיסמה</span>
+            <div style={{ flex:1, height:1, background:'var(--line)' }} />
+          </div>
+
+          <button type="button" onClick={sendLink} disabled={busy || !email.trim()}
+            className="apple-btn apple-btn-ghost"
+            style={{ width:'100%', minHeight:46, fontSize:14.5, fontWeight:600, gap:8 }}>
+            <Send size={16} strokeWidth={2.3} />
+            שלחו לי קישור כניסה למייל
+          </button>
+
           {hasGoogle && (
             <>
-              <div style={{ display:'flex', alignItems:'center', gap:10, margin:'16px 0 14px' }}>
-                <div style={{ flex:1, height:1, background:'var(--line)' }} />
-                <span style={{ fontSize:11.5, color:'var(--text3)' }}>או</span>
-                <div style={{ flex:1, height:1, background:'var(--line)' }} />
-              </div>
+              <div style={{ height:10 }} />
               <button type="button" onClick={google} disabled={busy}
                 className="apple-btn apple-btn-ghost"
                 style={{ width:'100%', minHeight:48, fontSize:15, fontWeight:600, gap:10 }}>
