@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 18;
+const BUILD = 19;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -143,6 +143,9 @@ const LEAVE_TYPES = [
 ];
 const leaveLabel = id => (LEAVE_TYPES.find(x => x.id === id) || LEAVE_TYPES[0]).label;
 const onLeave = t => Boolean(t?.leaveType && t.leaveType !== 'none');
+// חופשה שאין בה שכר החודש: חל"ד — המוסד לביטוח לאומי משלם, לא הרשת;
+// חל"ת — ללא תשלום מהגדרתה. מחלה ממושכת וחופשה אחרת נשארות בשכר.
+const unpaidThisMonth = t => t?.leaveType === 'maternity' || t?.leaveType === 'unpaid';
 const fmtDay  = d => (d ? String(d).slice(0, 10).split('-').reverse().join('/') : '');
 // תיאור קצר לתג ולדוחות: "חל\"ד מ-01/09/2026" או "… עד 01/03/2027"
 const leaveText = t => !onLeave(t) ? '' :
@@ -365,6 +368,12 @@ function payBreakdown(t) {
 // ברוטו למעסיק = בסיס + 40% · תוספת + 30%.
 // זהו אומדן. כשהנהלת החשבונות מזינה את עלות המעביד בפועל, היא גוברת.
 function calcEmployer(t) {
+  // בחל"ד ובחל"ת אין שכר החודש — השורה קיימת, הכסף אפס.
+  if (unpaidThisMonth(t)) {
+    return { gross:0, base:0, mom:0, supplement:0, employerBase:0, employerSupp:0,
+             social:0, estimate:0, isEstimate:false, total:0, parts:[], pct:0,
+             extras:{ biguud:0, havraah:0, total:0 }, unpaidLeave:true };
+  }
   const { base, mom, supplement, gross } = payBreakdown(t);
   const extras = calcExtras(t);
   const { parts, total: estimate } = employerParts(t, base, supplement);
@@ -455,7 +464,7 @@ const simComplete = t => {
 // needs_sim: מנהלת שמרה שינויים, ממתין לסימולציה אצל חשבת שכר
 // needs_approval: הסימולציות הושלמו, ממתין לאישור שליח
 // approved: השליח אישר
-const needsSim      = t => Boolean(t._changedAt && !t._approved && !simComplete(t));
+const needsSim      = t => Boolean(!unpaidThisMonth(t) && t._changedAt && !t._approved && !simComplete(t));
 const needsApproval = t => Boolean(t._changedAt && !t._approved && simComplete(t));
 const isPending     = t => Boolean(t._changedAt && !t._approved); // = needsSim || needsApproval
 
