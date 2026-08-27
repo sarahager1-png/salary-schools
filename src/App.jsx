@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 28;
+const BUILD = 29;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -366,6 +366,8 @@ function payBreakdown(t) {
     return { base, supplement: gross - base, gross, agreed: !!agreed };
   }
   // בית ספר עולם ישן — סימולציה אחת, אין רכיב תוספת
+  // מנהלת: מספר אחד ממחשבון הניהול, תשלום ישיר — אין תוספת בית חב"ד.
+  if (isPrincipalRow(t)) return { base: ofek, mom: 0, supplement: 0, gross: ofek };
   const paysSupp = schoolPaysSupp(t.schoolId);
   if (t.reform !== 'ofek') {
     // עולם ישן: רכיב "ת.שכר מינימום" מהתלוש הוא תוספת בית חב"ד —
@@ -3400,8 +3402,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         בעולם ישן זו הסימולציה היחידה; באופק זו סימולציית
                         העולם הישן. */}
                     <td style={{ textAlign:'center' }}>
-                      {t.reform === 'ofek' && !schoolPaysSupp(t.schoolId)
-                        ? <span style={{ color:'var(--text3)' }} title="תשלום ישיר — אין צורך בסימולציית עולם ישן">—</span>
+                      {isPrincipalRow(t) || (t.reform === 'ofek' && !schoolPaysSupp(t.schoolId))
+                        ? <span style={{ color:'var(--text3)' }} title={isPrincipalRow(t) ? 'שכר ניהול — מספר אחד, בעמודת אופק חדש' : 'תשלום ישיר — אין צורך בסימולציית עולם ישן'}>—</span>
                         : <input type="number" min="0" dir="ltr"
                         key={`base-${t.id}`}
                         defaultValue={(t.reform === 'ofek' ? t._officialGrossPre : t._officialGross) || ''}
@@ -3440,7 +3442,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       ) : <span style={{ color:'var(--text3)' }} title="עולם ישן — סימולציה אחת">—</span>}
                     </td>
                     {!isPrincipal && <td style={{ textAlign:'center' }}>
-                      {t.reform !== 'ofek' && schoolPaysSupp(t.schoolId) ? (
+                      {isPrincipalRow(t) ? <span style={{ color:'var(--text3)' }} title='מנהלת — אין תוספת בית חב"ד'>—</span>
+                       : t.reform !== 'ofek' && schoolPaysSupp(t.schoolId) ? (
                         <span title='רכיב ת.שכר מינימום מהתלוש — משולם כתוספת בית חב"ד: מס שכר וביטוח לאומי בלבד'>
                           <input type="number" min="0" dir="ltr"
                             key={`mws-${t.id}`}
