@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 11;
+const BUILD = 12;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -2717,6 +2717,15 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 
   // תצוגת עמודות: מצומצמת כברירת מחדל — 26 עמודות לא נכנסות במסך
   const [allCols, setAllCols] = useState(false);
+  // חיווי שמירה: ההקלדות נשמרות ביציאה מכל שדה, אבל בלי סימן חי
+  // אי אפשר לדעת שהן נקלטו. saveRow עוטף כל שמירה ומדווח.
+  const [saveState, setSaveState] = useState(null);   // null | 'saving' | Date
+  const saveRow = async (patch) => {
+    setSaveState('saving');
+    const ok = await onSaveTeacher(patch);
+    setSaveState(ok === false ? null : new Date());
+    return ok;
+  };
   const startEdit = t => { setEditingId(t.id); setEditData({ ...t }); };
   // בלי id. store.saveTeacher בוחר INSERT או UPDATE לפי קיומו, ומזהה
   // מקומי היה שולח אותה למסלול העדכון — על שורה שעוד לא קיימת.
@@ -2921,7 +2930,22 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
       <div style={{ maxWidth:1400, margin:'0 auto', padding:'18px 20px 40px' }}>
         {/* 26 עמודות לא נכנסות במסך. בתצוגה המצומצמת נשארות רק אלה
             שההזנה השוטפת צריכה; ההסתרה ב-CSS לפי מיקום, כותרת ותא יחד. */}
-        <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:8 }}>
+        <div style={{ display:'flex', justifyContent:'flex-end', alignItems:'center', gap:10, marginBottom:8 }}>
+          {saveState === 'saving' ? (
+            <span style={{ fontSize:12.5, color:'var(--text3)', fontWeight:600 }}>שומר…</span>
+          ) : saveState ? (
+            <span style={{ fontSize:12.5, color:'var(--ok, #22C55E)', fontWeight:700 }}>
+              ✓ נשמר {saveState.toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit' })}
+            </span>
+          ) : null}
+          {/* סוגר שדה פתוח — ה-blur מפעיל את השמירה שלו — ומאשר */}
+          <button className="apple-btn apple-btn-blue" style={{ minHeight:32, padding:'0 16px', fontSize:12.5 }}
+            onClick={() => {
+              if (document.activeElement?.tagName === 'INPUT') document.activeElement.blur();
+              setSaveState(s2 => s2 === 'saving' ? s2 : new Date());
+            }}>
+            שמירה
+          </button>
           <button className="apple-btn apple-btn-ghost" onClick={() => setAllCols(v => !v)}
             style={{ minHeight:32, padding:'0 12px', fontSize:12.5 }}>
             {allCols ? 'תצוגה מצומצמת' : `כל העמודות (${26})`}
@@ -3204,7 +3228,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         onBlur={e => {
                           const pct = Number(e.target.value);
                           if (!Number.isFinite(pct) || pct === scope) return;
-                          onSaveTeacher({ ...t, scopePct: pct, scope: pct });
+                          saveRow({ ...t, scopePct: pct, scope: pct });
                         }}
                         style={{ width:56, textAlign:'center', fontWeight:700, fontSize:13,
                           border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
@@ -3214,7 +3238,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       {computedBaseScope(t) !== (t.scope ?? t.scopePct ?? 100) ? (
                         <button
                           title="לפי הנוסחה: שעות (ועוד 3 למחנכת בעולם ישן) חלקי 30, או 26 באופק. לחיצה מיישרת, ותוספת האם מעל."
-                          onClick={e => { e.stopPropagation(); onSaveTeacher({ ...t, scopePct: computedBaseScope(t), scope: computedBaseScope(t) }); }}
+                          onClick={e => { e.stopPropagation(); saveRow({ ...t, scopePct: computedBaseScope(t), scope: computedBaseScope(t) }); }}
                           style={{ display:'block', margin:'3px auto 0', fontSize:10.5, color:'#fff',
                             background:'var(--teal)', border:'none', cursor:'pointer', fontFamily:'inherit',
                             fontWeight:700, padding:'2px 8px', borderRadius:999, whiteSpace:'nowrap' }}>
@@ -3239,7 +3263,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       <select key={`role-${t.id}`} value={t.role || 'none'}
                         title="גמול תפקיד — נשמר מיד"
                         onClick={e => e.stopPropagation()}
-                        onChange={e => onSaveTeacher({ ...t, role: e.target.value })}
+                        onChange={e => saveRow({ ...t, role: e.target.value })}
                         className="apple-select"
                         style={{ fontSize:12, padding:'4px 6px', width:150,
                           fontWeight: t.role && t.role !== 'none' ? 700 : 400,
@@ -3268,7 +3292,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         onBlur={e => {
                           const n = Math.max(0, Number(e.target.value) || 0);
                           if (n === (t.childrenUnder18 ?? 0)) return;
-                          onSaveTeacher({ ...t, childrenUnder18: n });
+                          saveRow({ ...t, childrenUnder18: n });
                         }}
                         style={{ width:44, textAlign:'center', fontWeight:700, fontSize:13,
                           border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
