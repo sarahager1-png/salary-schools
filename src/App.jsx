@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 7;
+const BUILD = 8;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -179,6 +179,16 @@ function momBonusEligible(t) {
 // עשר נקודות על אחוז המשרה, אוטומטית — הוראה מפורשת של שרה מ-27.8.
 // האחוז שמוקלד הוא הבסיס; התוספת מוצגת לידו ואינה נבלעת בשקט.
 const MOM_SCOPE_BONUS = 10;
+// בסיס אחוז המשרה מהשעות: 30 שעות = משרה מלאה בעולם ישן, 26 באופק
+// (יסודי). מחנכת בעולם ישן מקבלת 3 שעות מעל מה שהיא מלמדת. תוספת
+// האם אינה כאן — היא מעל הבסיס, ב-effectiveScope.
+// אומת מול ההקלדות הידניות של שרה, 27.8: שבע מתוך תשע עד עיגול.
+function computedBaseScope(t) {
+  const hr = t.reform === 'pre' && /^homeroom/.test(t.role || t.gamulRole || '') ? HOMEROOM_HOURS_PRE : 0;
+  const full = t.reform === 'pre' ? PRE_FRONTAL : (LEVELS[t.level]?.frontal || 26);
+  const h = Number(t.frontalHours) || 0;
+  return full ? Math.round((h + hr) / full * 100) : 100;
+}
 const momScopeBonus = t => (momBonusEligible(t) ? MOM_SCOPE_BONUS : 0);
 function calcGross(t) {
   if (t._officialGross) return Number(t._officialGross);
@@ -3184,6 +3194,15 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           title="ילדים בעולם ישן — המערכת מוסיפה עשר נקודות על האחוז שהוקלד. מקלידים את הבסיס בלבד.">
                           {`+10 אם = ${effectiveScope(t)}%`}
                         </span>
+                      )}
+                      {computedBaseScope(t) !== (t.scope ?? t.scopePct ?? 100) && (
+                        <button
+                          title="הבסיס לפי הנוסחה: שעות (ועוד 3 למחנכת בעולם ישן) חלקי 30, או חלקי 26 באופק. לחיצה מיישרת את השדה."
+                          onClick={e => { e.stopPropagation(); onSaveTeacher({ ...t, scopePct: computedBaseScope(t), scope: computedBaseScope(t) }); }}
+                          style={{ display:'block', margin:'2px auto 0', fontSize:9.5, color:'var(--teal-700)',
+                            background:'none', border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, padding:0 }}>
+                          {`לפי השעות: ${computedBaseScope(t)}`}
+                        </button>
                       )}
                     </td>
                     <td style={{ textAlign:'center' }}>{degreeLabel}</td>
