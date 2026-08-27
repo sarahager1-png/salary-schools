@@ -93,16 +93,16 @@ try {
 
   // ══ 1. רשימה ריקה — המנהלת ממלאת אותה ══
   await p.goto(`http://localhost:5190/?k=${CODE}`);
-  await p.getByText('אין עדיין מורות').first().waitFor({ timeout: 20000 });
+  await p.getByText('אין עדיין עובדות הוראה').first().waitFor({ timeout: 20000 });
   let body = await p.locator('body').innerText();
-  check('רשימה ריקה מזמינה למלא, לא ממתינה לרשת', body.includes('הוסיפי את המורות'));
-  check('ויש כפתור הוספה', await p.getByRole('button', { name: /הוספת מורה/ }).count() > 0);
+  check('רשימה ריקה מזמינה למלא, כולל את עצמה', body.includes('כולל את עצמך'));
+  check('ויש כפתור הוספה', await p.getByRole('button', { name: /הוספת עובדת הוראה/ }).count() > 0);
 
   // ══ 2. מורת אופק — כל הפרטים ══
-  await p.getByRole('button', { name: /הוספת מורה/ }).click();
-  await p.getByText('מורה חדשה').first().waitFor({ timeout: 10000 });
-  const card = p.locator('.apple-card').filter({ hasText: 'מורה חדשה' }).first();
-  await fld(card, 'שם המורה').fill('חנה כהן');
+  await p.getByRole('button', { name: /הוספת עובדת הוראה/ }).click();
+  await p.getByText('עובדת הוראה חדשה').first().waitFor({ timeout: 10000 });
+  const card = p.locator('.apple-card').filter({ hasText: 'עובדת הוראה חדשה' }).first();
+  await fld(card, 'שם עובדת ההוראה').fill('חנה כהן');
   await fld(card, 'ת.ז.').fill('123456789');
   await sel(card, 'מסלול').selectOption('ofek');
   await sel(card, 'תואר').selectOption('MA');
@@ -127,9 +127,9 @@ try {
   }
 
   // ══ 3. מורת עולם ישן — ילדים עד 18 במקום דרגה ══
-  await p.getByRole('button', { name: /הוספת מורה/ }).click();
-  const card2 = p.locator('.apple-card').filter({ hasText: 'מורה חדשה' }).first();
-  await fld(card2, 'שם המורה').fill('מרים לוי');
+  await p.getByRole('button', { name: /הוספת עובדת הוראה/ }).click();
+  const card2 = p.locator('.apple-card').filter({ hasText: 'עובדת הוראה חדשה' }).first();
+  await fld(card2, 'שם עובדת ההוראה').fill('מרים לוי');
   await sel(card2, 'מסלול').selectOption('pre');
   await p.waitForTimeout(500);
   check('בעולם ישן אין בורר דרגת אופק', await card2.getByText('דרגה באופק').count() === 0);
@@ -207,7 +207,7 @@ try {
   check('חודש נעול חוסם הוספה', /נעול/.test(lockedErr?.message || ''), lockedErr?.message?.slice(0, 60) || 'עבר!');
   await p.reload();
   await p.getByText('נעול').first().waitFor({ timeout: 20000 });
-  check('ובמסך אין כפתור הוספה', await p.getByRole('button', { name: /הוספת מורה/ }).count() === 0);
+  check('ובמסך אין כפתור הוספה', await p.getByRole('button', { name: /הוספת עובדת הוראה/ }).count() === 0);
   await admin.from('months').update({ locked: false }).eq('key', MONTH);
 } catch (e) {
   check('הרצה ללא חריגה', false, e.message?.slice(0, 220));

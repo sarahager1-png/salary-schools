@@ -720,7 +720,7 @@ function LoginScreen({ onSignedIn, initialError = '' }) {
 function TeacherDiff({ t }) {
   const diffs = diffT(t);
   const isNew = !t._snapshot;
-  if (isNew) return <span className="apple-badge badge-blue">מורה חדש/ה</span>;
+  if (isNew) return <span className="apple-badge badge-blue">עובדת הוראה חדשה</span>;
   if (diffs.length === 0) {
     const hasScopeChanges = t.scopeChanges?.some(c => !c._approved);
     if (!hasScopeChanges) return <span className="apple-badge badge-orange">שינוי תוכן</span>;
@@ -1232,7 +1232,7 @@ function buildEmailBody(school, teachers, monthLabel) {
   const pending  = ts.filter(isPending);
 
   let body = `דוח שכר חודשי — ${school.name}\nתאריך: ${now}\n\n`;
-  body += `סה"כ מורים: ${ts.length}\nברוטו: ${totGross.toLocaleString()} ₪\nברוטו למעסיק: ${totEmp.toLocaleString()} ₪\n`;
+  body += `סה"כ עובדות הוראה: ${ts.length}\nברוטו: ${totGross.toLocaleString()} ₪\nברוטו למעסיק: ${totEmp.toLocaleString()} ₪\n`;
   body += `\n— רשימת מורים —\n`;
   ts.forEach(t => {
     const emp   = calcEmployer(t);
@@ -1428,7 +1428,7 @@ const stampToday = () => new Date().toISOString().slice(0, 10);
 function downloadTemplate(schoolName) {
   const BOM = '\uFEFF';
   // שורת הסבר (מתחילה ב-# — תדלג עליה המערכת)
-  const note1 = '# הנחיות מילוי: מלאי שורה אחת לכל מורה. אל תמחקי את שורת הכותרת.';
+  const note1 = '# הנחיות מילוי: מלאי שורה אחת לכל עובדת הוראה. אל תמחקי את שורת הכותרת.';
   const note2 = '# רפורמה: כתבי אופק או טרום  |  דרגה אופק: 1-9 או מתמחה  |  דרגה טרום: תואר-ראשון / תואר-שני / דוקטורט / מתמחה';
   const note3 = '# שיבוץ זמני: כתבי כן אם זו החלפה זמנית. תאריך סיום חובה לשיבוץ זמני.';
   const header = 'שם פרטי ומשפחה,תעודת זהות,מייל,רפורמה,דרגה,ותק (שנים),אחוז משרה (%),תפקיד,שיבוץ זמני (כן/לא),תאריך התחלה (DD/MM/YYYY),תאריך סיום (DD/MM/YYYY)';
@@ -1676,7 +1676,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
         ? { width:'45%', display:'flex', flexDirection:'column', background:'#fff', overflowY:'auto' }
         : { background:'#fff', borderRadius:18, width:'100%', maxWidth:520, margin:'24px auto', boxShadow:'var(--apple-shadow)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 24px', borderBottom:'0.5px solid var(--apple-fill2)' }}>
-          <h2 style={{ fontSize:17, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)' }}>{t.id ? 'עריכת מורה' : 'הוספת מורה'}</h2>
+          <h2 style={{ fontSize:17, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)' }}>{t.id ? 'עריכת עובדת הוראה' : 'הוספת עובדת הוראה'}</h2>
           <button onClick={onClose} style={{ background:'var(--apple-fill)', border:'none', borderRadius:'50%', width:28, height:28, fontSize:14, cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center' }}><X size={15} strokeWidth={2.4} /></button>
         </div>
         <div style={{ padding:'20px 24px', display:'flex', flexDirection:'column', gap:16 }}>
@@ -1684,7 +1684,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
           {/* שם + ת.ז */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             <div>
-              <p className="apple-label">שם המורה</p>
+              <p className="apple-label">שם עובדת ההוראה</p>
               <input value={t.name} onChange={e => set('name', e.target.value)} placeholder="שם מלא" className="apple-input" />
             </div>
             <div>
@@ -1695,7 +1695,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
 
           {/* מייל */}
           <div>
-            <p className="apple-label">מייל המורה</p>
+            <p className="apple-label">מייל</p>
             <input value={t.email || ''} onChange={e => set('email', e.target.value)} placeholder="teacher@school.edu" dir="ltr" className="apple-input" />
           </div>
 
@@ -1980,7 +1980,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               <p style={{ fontSize:13, fontWeight:600, color:'var(--text2)', marginBottom:4 }}>שכר</p>
               <p style={{ fontSize:12, color:'var(--text3)' }}>
                 {simComplete(t)
-                  ? 'הוזן על ידי חשבת השכר. שינוי בוותק, בדרגה, בתואר או בשעות יחזיר את המורה לחישוב מחדש.'
+                  ? 'הוזן על ידי חשבת השכר. שינוי בוותק, בדרגה, בתואר או בשעות יחזיר אותה לחישוב מחדש.'
                   : 'ממתין לחשבת השכר.'}
               </p>
             </div>
@@ -2158,7 +2158,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             if (!t.schoolId)    return alert('יש לבחור בית ספר');
             onSave(t);
           }} style={{ flex:2 }}>
-            {t.id ? 'שמור שינויים' : 'הוסף מורה'}
+            {t.id ? 'שמור שינויים' : 'הוספת עובדת הוראה'}
           </button>
         </div>
       </div>
@@ -2249,7 +2249,7 @@ function SchoolReport({ school, teachers, onClose }) {
         </div>
 
         <div style={{ borderBottom:'2px solid var(--apple-text)', paddingBottom:16, marginBottom:24 }}>
-          <h1 style={{ fontSize:24, fontWeight:800, letterSpacing:'-0.02em', color:'var(--apple-text)', marginBottom:4 }}>דוח שכר מורים</h1>
+          <h1 style={{ fontSize:24, fontWeight:800, letterSpacing:'-0.02em', color:'var(--apple-text)', marginBottom:4 }}>דוח שכר עובדות הוראה</h1>
           <h2 style={{ fontSize:17, fontWeight:600, color:'var(--apple-text2)', marginBottom:4 }}>{school.name}{school.city ? ` — ${school.city}` : ''}</h2>
           <p style={{ fontSize:13, color:'var(--apple-text3)' }}>הופק: {new Date().toLocaleDateString('he-IL')}</p>
           {pendingCount > 0 && (
@@ -2262,7 +2262,7 @@ function SchoolReport({ school, teachers, onClose }) {
 
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:24 }}>
           {[
-            { label: 'סה"כ מורים', val: ts.length },
+            { label: 'סה"כ עובדות הוראה', val: ts.length },
             { label: 'אופק חדש',   val: ts.filter(t=>t.reform==='ofek').length },
             { label: 'עולם ישן', val: ts.filter(t=>t.reform==='pre').length },
             { label: 'ברוטו למעסיק', val: totEmpGross.toLocaleString()+' ₪' },
@@ -2680,7 +2680,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <h1 style={{ fontSize:23, fontWeight:800, color:'var(--text)', letterSpacing:'-0.025em', lineHeight:1.2 }}>{school.name}</h1>
               </div>
               <p style={{ fontSize:13, color:'var(--text3)', marginInlineStart:13 }}>
-                {school.city}{school.city ? ' · ' : ''}מסלול ברירת מחדל למורה חדשה: {reformLabel(school.reform)}
+                {school.city}{school.city ? ' · ' : ''}מסלול ברירת מחדל לעובדת הוראה חדשה: {reformLabel(school.reform)}
               </p>
               {hoursQuota && (
                 <div style={{ marginInlineStart:13, marginTop:8, maxWidth:320 }}>
@@ -2724,7 +2724,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 
             <button className="apple-btn apple-btn-blue" onClick={startNew} style={{ minHeight:38, fontSize:13.5 }}>
               <Plus size={15} strokeWidth={2.6} />
-              הוסף מורה
+              הוספת עובדת הוראה
             </button>
             <button className="apple-btn apple-btn-ghost"
               onClick={() => {
@@ -2758,7 +2758,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               ממ"מ והעדרויות
             </button>
             <button className="apple-btn apple-btn-ghost" onClick={exportCSV} disabled={ts.length === 0}
-              title={ts.length === 0 ? 'אין מורות לייצוא' : 'ייצוא הטבלה לקובץ CSV'} style={{ minHeight:38, fontSize:13.5 }}>
+              title={ts.length === 0 ? 'אין עובדות הוראה לייצוא' : 'ייצוא הטבלה לקובץ CSV'} style={{ minHeight:38, fontSize:13.5 }}>
               <FileSpreadsheet size={14} strokeWidth={2.2} />
               ייצוא CSV
             </button>
@@ -2779,7 +2779,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         <div style={{ maxWidth:1400, margin:'0 auto', padding:'20px 20px 0' }}>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(155px, 1fr))', gap:12 }}>
             {[
-              { label:'מורות',          val: ts.length.toLocaleString('he-IL'), sub: `${tsOfficial.length} עם סימולציה מלאה` },
+              { label:'עובדות הוראה',   val: ts.length.toLocaleString('he-IL'), sub: `${tsOfficial.length} עם סימולציה מלאה` },
               { label:'ברוטו / חודש',   val: totGross.toLocaleString('he-IL') + ' ₪' },
               { label:'ברוטו למעסיק',   val: totEmp.toLocaleString('he-IL') + ' ₪', sub:'כולל תוספות מעסיק' },
               { label:'עלות שנתית',     val: (totEmp*12).toLocaleString('he-IL') + ' ₪', hero:true },
@@ -2829,7 +2829,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <th style={{ textAlign:'center' }}>במקום מי</th>
                 <th style={{ textAlign:'center' }}>תוספות (₪)</th>
                 <th style={{ textAlign:'center' }} title="השכר שרץ במערכת התשלומים">עולם ישן — בסיס (₪)</th>
-                <th style={{ textAlign:'center' }} title="סימולציית אופק חדש — רק למורות אופק">אופק חדש (₪)</th>
+                <th style={{ textAlign:'center' }} title="סימולציית אופק חדש — רק לעובדות הוראה במסלול אופק">אופק חדש (₪)</th>
                 {!isPrincipal && <th style={{ textAlign:'center' }} title="הפער בין אופק לעולם הישן">תוספת בית חב"ד</th>}
                 {!isPrincipal && <th style={{ textAlign:'center' }}>ברוטו</th>}
                 {!isPrincipal && <th style={{ textAlign:'center' }} title={`פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד · ~ = אומדן שממתין לסכום מהנהלת החשבונות`}>הוצאות מעביד</th>}
@@ -2890,7 +2890,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.childrenUnder18??0} onChange={e=>setF('childrenUnder18',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.absenceDays??0} onChange={e=>setF('absenceDays',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.mmHours??0} onChange={e=>setF('mmHours',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                  <td><input className="apple-input" value={editData.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם המורה" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
+                  <td><input className="apple-input" value={editData.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם עובדת ההוראה" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.monthlyExtras??0} onChange={e=>setF('monthlyExtras',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:70, textAlign:'center' }} /></td>
                   {moneyEditCells(editData)}
                   <td>
@@ -2904,7 +2904,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 
               {filtered.length === 0 && editingId !== 'new' ? (
                 <tr><td colSpan={15} style={{ textAlign:'center', padding:'40px', color:'var(--apple-text3)' }}>
-                  {ts.length === 0 ? 'אין מורות עדיין — לחצי על "+ הוסף מורה"' : 'לא נמצאו תוצאות'}
+                  {ts.length === 0 ? 'אין עדיין עובדות הוראה — לחצי על "+ הוספה"' : 'לא נמצאו תוצאות'}
                 </td></tr>
               ) : filtered.map(t => {
                 const isEditing = editingId === t.id;
@@ -2970,7 +2970,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td><input type="number" className="apple-input" dir="ltr" value={d.childrenUnder18??0} onChange={e=>setF('childrenUnder18',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.absenceDays??0} onChange={e=>setF('absenceDays',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.mmHours??0} onChange={e=>setF('mmHours',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                    <td><input className="apple-input" value={d.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם המורה" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
+                    <td><input className="apple-input" value={d.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם עובדת ההוראה" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.monthlyExtras??0} onChange={e=>setF('monthlyExtras',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:70, textAlign:'center' }} /></td>
                     {moneyEditCells(d)}
                     <td>
@@ -3201,7 +3201,7 @@ function ReportView({ schools, teachers }) {
   const exportCSV = () => {
     const headers = [
       { key:'name', label:'בית ספר' }, { key:'city', label:'עיר' },
-      { key:'count', label:'מורות' }, { key:'officialCount', label:'מתוכן עם סימולציה מלאה' },
+      { key:'count', label:'עובדות הוראה' }, { key:'officialCount', label:'מתוכן עם סימולציה מלאה' },
       { key:'usedHours', label:'שעות בשימוש' }, { key:'quota', label:'מכסת שעות' },
       { key:'gross', label:'ברוטו / חודש (₪)' }, { key:'empTot', label:'ברוטו למעסיק (₪)' },
       { key:'annual', label:'עלות שנתית (₪)' }, { key:'pending', label:'ממתינים לאישור' },
@@ -3242,7 +3242,7 @@ function ReportView({ schools, teachers }) {
       {/* Stat cards */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(155px, 1fr))', gap:12, padding:'20px 20px 0' }}>
         {[
-          { label:'סה״כ מורות',           val: totCount.toLocaleString('he-IL') },
+          { label:'סה״כ עובדות הוראה',           val: totCount.toLocaleString('he-IL') },
           { label:'בתי ספר פעילים',       val: rows.filter(r=>r.count>0).length.toLocaleString('he-IL') },
           { label:'ברוטו למעסיק / חודש',  val: totEmp.toLocaleString('he-IL')+' ₪' },
           { label:'עלות שנתית',           val: totAnnual.toLocaleString('he-IL')+' ₪', hero:true },
@@ -3279,7 +3279,7 @@ function ReportView({ schools, teachers }) {
                   <td style={{ textAlign:'center', fontWeight:600 }}>
                     {r.count}
                     {r.count > 0 && r.officialCount < r.count && (
-                      <span title="מספר המורות שכבר עברו סימולציה" style={{ fontSize:11, color:'var(--warn)', fontWeight:600, marginInlineStart:5 }}>
+                      <span title="מספר עובדות ההוראה שכבר עברו סימולציה" style={{ fontSize:11, color:'var(--warn)', fontWeight:600, marginInlineStart:5 }}>
                         ({r.officialCount} רשמי)
                       </span>
                     )}
@@ -3592,7 +3592,7 @@ function ActualCostPanel({ teachers, schools, onSave }) {
 
   if (!rows.length) return (
     <div style={{ textAlign:'center', padding:'48px 16px' }}>
-      <p style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>אין עדיין מורות עם סימולציה בחודש הזה</p>
+      <p style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>אין עדיין עובדות הוראה עם סימולציה בחודש הזה</p>
       <p style={{ fontSize:12.5, color:'var(--text3)', marginTop:4 }}>עלות בפועל מוזנת אחרי שהשכר חושב.</p>
     </div>
   );
@@ -3768,7 +3768,7 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMon
               <div style={{ width:56, height:56, borderRadius:17, background:'var(--ok-bg)', margin:'0 auto 14px', display:'flex', alignItems:'center', justifyContent:'center' }}>
                 <Check size={26} strokeWidth={2.4} color="var(--ok)" />
               </div>
-              <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>כל המורים הוזנו</p>
+              <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>כל עובדות ההוראה הוזנו</p>
               <p style={{ fontSize:13, color:'var(--text3)', marginTop:3 }}>אין שכר שממתין לסימולציה</p>
             </div>
           )}
@@ -3944,7 +3944,7 @@ function BackupModal({ schools, months, onClose }) {
   const handleExport = () => {
     setDone('');
     const c = exportBackup(schools, months);
-    setDone(`הגיבוי ירד — ${c.schools} בתי ספר, ${c.months} חודשים, ${c.teacherRecords} רשומות מורים.`);
+    setDone(`הגיבוי ירד — ${c.schools} בתי ספר, ${c.months} חודשים, ${c.teacherRecords} רשומות עובדות הוראה.`);
   };
 
   return (
@@ -3971,7 +3971,7 @@ function BackupModal({ schools, months, onClose }) {
       <div className="apple-section" style={{ marginBottom:14 }}>
         <p style={{ fontSize:12.5, color:'var(--text2)', marginBottom:10, lineHeight:1.6 }}>
           במערכת כרגע: <strong style={{ color:'var(--text)' }}>{schools.length}</strong> בתי ספר ·{' '}
-          <strong style={{ color:'var(--text)' }}>{teacherRecords}</strong> רשומות מורים ·{' '}
+          <strong style={{ color:'var(--text)' }}>{teacherRecords}</strong> רשומות עובדות הוראה ·{' '}
           <strong style={{ color:'var(--text)' }}>{monthKeys.length}</strong> חודשים
           {monthKeys.length > 0 && ` (${fmtMonth(monthKeys[0])} — ${fmtMonth(monthKeys[monthKeys.length-1])})`}
         </p>
@@ -4043,7 +4043,7 @@ function LinkTeacherFields({ draft, apply }) {
   return (
     <>
       <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginBottom:9 }}>
-        <LinkField label="שם המורה" type="text" value={draft.name} onChange={v => apply({ name: v })} hint="שם מלא" />
+        <LinkField label="שם עובדת ההוראה" type="text" value={draft.name} onChange={v => apply({ name: v })} hint="שם מלא" />
         <LinkField label="ת.ז." type="text" value={draft.tzId} onChange={v => apply({ tzId: v })} hint="9 ספרות" />
         <LinkField label="מייל" type="text" value={draft.email} onChange={v => apply({ email: v })} hint="לא חובה" />
       </div>
@@ -4085,7 +4085,7 @@ function LinkTeacherFields({ draft, apply }) {
   );
 }
 
-/* מורה חדשה — הרשימה מתמלאת בידי המנהלת, לא בידי הרשת */
+/* עובדת הוראה חדשה — הרשימה מתמלאת בידי המנהלת, לא בידי הרשת */
 function LinkNewCard({ schoolReform, onAdd }) {
   const blank = { ...EMPTY_TEACHER, reform: schoolReform || 'ofek', frontalHours: null, scopePct: 100, scope: 100 };
   const [open, setOpen]   = useState(false);
@@ -4107,7 +4107,7 @@ function LinkNewCard({ schoolReform, onAdd }) {
   };
 
   const add = async () => {
-    if (!String(draft.name || '').trim()) { setState('יש למלא שם מורה'); return; }
+    if (!String(draft.name || '').trim()) { setState('יש למלא שם'); return; }
     setState('saving');
     try { await onAdd(draft); setDraft(blank); setOpen(false); setState(''); }
     catch (e) { setState(e.message); }
@@ -4117,13 +4117,13 @@ function LinkNewCard({ schoolReform, onAdd }) {
     <button className="apple-btn apple-btn-ghost" onClick={() => setOpen(true)}
       style={{ width:'100%', minHeight:46, borderStyle:'dashed' }}>
       <Plus size={16} strokeWidth={2.5} />
-      הוספת מורה
+      הוספת עובדת הוראה
     </button>
   );
 
   return (
     <div className="apple-card" style={{ padding:'14px 15px', border:'1px dashed var(--purple)' }}>
-      <p style={{ fontSize:14, fontWeight:700, color:'var(--purple)', marginBottom:10 }}>מורה חדשה</p>
+      <p style={{ fontSize:14, fontWeight:700, color:'var(--purple)', marginBottom:10 }}>עובדת הוראה חדשה</p>
       <LinkTeacherFields draft={draft} apply={apply} />
       <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginTop:9 }}>
         <LinkField label="שעות פרונטליות" value={draft.frontalHours} onChange={v => apply({ frontalHours: v })} />
@@ -4196,7 +4196,7 @@ function LinkCard({ teacher, locked, onSave }) {
         <LinkField label="שעות פרונטליות" value={draft.frontalHours} onChange={v => apply({ frontalHours: v })} />
         <LinkField label="ימי היעדרות"    value={draft.absenceDays}   onChange={v => set('absenceDays', v)} />
         <LinkField label={'שעות ממ' + '"' + 'מ'} value={draft.mmHours} onChange={v => set('mmHours', v)} />
-        <LinkField label="במקום מי" type="text" value={draft.mmFor}   onChange={v => set('mmFor', v)} hint="שם המורה" />
+        <LinkField label="במקום מי" type="text" value={draft.mmFor}   onChange={v => set('mmFor', v)} hint="שם עובדת ההוראה" />
         <LinkField label="תוספות החודש"   value={draft.monthlyExtras} onChange={v => set('monthlyExtras', v)} />
       </div>
 
@@ -4307,8 +4307,8 @@ function LinkView({ code }) {
         ) : !rows.length ? (
           <>
             <div className="apple-card" style={{ padding:24, textAlign:'center', marginBottom:12 }}>
-              <p style={{ fontSize:15, fontWeight:700, color:'var(--text)', marginBottom:6 }}>אין עדיין מורות בחודש הזה</p>
-              <p style={{ fontSize:13, color:'var(--text3)' }}>הוסיפי את המורות של בית הספר — שם, ת.ז., מסלול, ותק ושעות.</p>
+              <p style={{ fontSize:15, fontWeight:700, color:'var(--text)', marginBottom:6 }}>אין עדיין עובדות הוראה בחודש הזה</p>
+              <p style={{ fontSize:13, color:'var(--text3)' }}>הוסיפי את עובדות ההוראה של בית הספר — כולל את עצמך. שם, ת.ז., מסלול, ותק ושעות.</p>
             </div>
             {!locked && <LinkNewCard schoolReform={me?.schoolReform} onAdd={onAdd} />}
           </>
@@ -4841,7 +4841,7 @@ export default function App() {
                       </div>
                       <button className="apple-btn apple-btn-ghost" onClick={e => { e.stopPropagation(); setTeacherModal({ ...EMPTY_TEACHER, schoolId: s.id, reform: s.reform || 'ofek' }); }}
                         style={{ width:'100%', fontSize:13, borderRadius:10, border:'1.5px dashed var(--apple-fill2)' }}>
-                        + הוסף מורה
+                        + הוספת עובדת הוראה
                       </button>
                     </div>
                   );

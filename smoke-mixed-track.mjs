@@ -52,10 +52,10 @@ try {
     (await p.locator('body').innerText()).includes('ברירת מחדל: אופק חדש'));
 
   await p.getByText(SCHOOL).first().click();
-  await p.getByRole('button', { name: /^הוסף מורה$/ }).waitFor({ timeout: 10000 });
+  await p.getByRole('button', { name: /^הוספת עובדת הוראה$/ }).first().waitFor({ timeout: 10000 });
 
   // ── הכפתור ששלח UPDATE במקום INSERT ──
-  await p.getByRole('button', { name: /^הוסף מורה$/ }).click();
+  await p.getByRole('button', { name: /^הוספת עובדת הוראה$/ }).first().click();
   await p.locator('tr:has(select)').first().locator('input').first().fill('מורת אופק');
   await p.getByRole('button', { name: /^שמור$/ }).click();
   await p.waitForTimeout(2500);
@@ -65,7 +65,7 @@ try {
   check('בלי שגיאת uuid בקונסול', !errors.some(e => /uuid/i.test(e)), errors.find(e => /uuid/i.test(e)) || '');
 
   // ── מורה בעולם ישן בתוך בית ספר אופק ──
-  await p.getByRole('button', { name: /^הוסף מורה$/ }).click();
+  await p.getByRole('button', { name: /^הוספת עובדת הוראה$/ }).first().click();
   const row = p.locator('tr:has(select)').first();
   await row.locator('input').first().fill('מורת עולם ישן');
   await row.locator('select').first().selectOption('pre');
