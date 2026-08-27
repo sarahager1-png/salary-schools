@@ -108,6 +108,12 @@ const isPrincipalRow = t => t?.role === PRINCIPAL_ROLE;
 // דרגת הניהול היא א..ד ואינה סולם המורים. נשמרת כמספר 1..4.
 const NIHUL_GRADES = [{ v:1, l:'א' }, { v:2, l:'ב' }, { v:3, l:'ג' }, { v:4, l:'ד' }];
 const nihulLabel = v => NIHUL_GRADES.find(g => g.v === Number(v))?.l || null;
+// בחירת תפקיד מנהל/ת גוררת את ברירות המחדל שלה: אופק חדש ודרגת ניהול א.
+// שתיהן ניתנות לשינוי ידני אחר כך — זו נקודת פתיחה, לא נעילה.
+const principalDefaults = draft => (
+  draft?.role === PRINCIPAL_ROLE || draft?.gamulRole === PRINCIPAL_ROLE
+    ? { reform: 'ofek', nihulGrade: draft.nihulGrade ?? 1 }
+    : {});
 
 
 /*
@@ -534,19 +540,34 @@ function exportBackup(schools, months) {
 function CalculatorFrame({ calcId, style }) {
   const url = calcUrl(calcId);
   const [state, setState] = useState('loading');   // loading | ready | slow
-  // האתר הוא SPA, וקישור עמוק ישיר ל-OfekNihul נופל חזרה לרשימת המחשבונים
-  // ומציג את מחשבון אופק חדש. לכן טוענים קודם את הרשימה ורק אז מנווטים
-  // ב-hash — בדיוק כמו לחיצה על הקישור בתוך האתר.
-  const [src, setSrc] = useState(CALC_HOME);
+  const frameRef = useRef(null);
 
+  // האתר הוא SPA, וקישור עמוק ישיר נופל חזרה לרשימת המחשבונים ומציג את
+  // אופק חדש. לכן נטענת הרשימה, ורק אחרי שהאתר מסיים את האתחול שלו —
+  // הוא מפנה את עצמו דרך /ClientPage — משנים את ה-hash.
+  //
+  // הניווט נעשה ב-contentWindow.location ולא בהחלפת src: החלפת src היא
+  // טעינה מחדש, והאתר בולע בה את הראוט שוב. ניווט על מסמך שכבר טעון הוא
+  // שינוי hash, והראוטר של האתר מגיב לו. כתיבה ל-location של מסגרת
+  // ממקור אחר מותרת — רק קריאה חסומה.
+  //
   // הקומפוננטה ממופתחת ב-key לפי calcId בצד הקורא, ולכן החלפת מחשבון
   // מרכיבה אותה מחדש והמצב חוזר ל-loading בלי setState בתוך effect.
   useEffect(() => {
-    // האתר מפנה את עצמו לרשימת המחשבונים בסיום האתחול, ולכן ניווט מוקדם
-    // מדי נדרס. ממתינים שיתייצב ורק אז משנים את ה-hash.
-    const route = setTimeout(() => { setSrc(url); setState('ready'); }, 3500);
-    const slow  = setTimeout(() => setState(s => (s === 'loading' ? 'slow' : s)), 14000);
-    return () => { clearTimeout(route); clearTimeout(slow); };
+    const nudge = () => {
+      try { frameRef.current?.contentWindow?.location.replace(url); }
+      catch { /* מקור אחר — הניווט עדיין נשלח */ }
+    };
+    // דחיפה אחת אינה מספיקה: כל עוד האתר מפנה את עצמו דרך /ClientPage
+    // הניווט נבלע. דוחפים שוב ושוב עד שהוא נתפס. ניווט חוזר לאותה
+    // כתובת בדיוק הוא no-op, ולכן אינו מאפס טופס שכבר מולא.
+    const nudges = [3000, 4500, 6000, 7500].map(ms => setTimeout(nudge, ms));
+    // הכיסוי יורד רק אחרי הדחיפה האחרונה. קודם הוא ירד ב-6 שניות, בעוד
+    // המסגרת עדיין הציגה את אופק חדש — והחשבת יכלה להקליד למחשבון הלא
+    // נכון בלי לדעת. ריק זה בלבול; מחשבון שגוי זה מספר שגוי.
+    const ok   = setTimeout(() => setState('ready'), 8500);
+    const slow = setTimeout(() => setState(s => (s === 'ready' ? s : 'slow')), 18000);
+    return () => { nudges.forEach(clearTimeout); clearTimeout(ok); clearTimeout(slow); };
   }, [url]);
 
   return (
@@ -556,8 +577,8 @@ function CalculatorFrame({ calcId, style }) {
     // לכן המסגרת נפרשת למלוא גובה הטופס, והפאנל עצמו הוא שנגלל.
     <div style={{ position:'relative', flex:1, minHeight:0, overflowY:'auto', ...style }}>
       <iframe
-        src={src}
-        onLoad={() => { if (src !== CALC_HOME) setState('ready'); }}
+        ref={frameRef}
+        src={CALC_HOME}
         style={{ width:'100%', height:'100%', minHeight:1320, border:'none', display:'block' }}
         title="מחשבון שכר רשמי — משרד החינוך"
         allow="fullscreen"
@@ -1640,7 +1661,11 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
   const [showScopeChange, setShowScopeChange] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
   const [simCalc, setSimCalc] = useState(calcForTeacher(teacher));
-  const set = (k, v) => setT(p => ({ ...p, [k]: v }));
+  const set = (k, v) => setT(p => {
+    const next = { ...p, [k]: v };
+    // תפקיד מנהל/ת גורר אופק חדש ודרגת ניהול א, כנקודת פתיחה
+    return k === 'role' ? { ...next, ...principalDefaults(next) } : next;
+  });
 
 
   const lvl = LEVELS[t.level] || LEVELS.elementary;
@@ -1955,6 +1980,17 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               ))}
             </select>
           </div>
+
+          {/* דרגת ניהול — ברירת המחדל א, ניתנת לשינוי ידני */}
+          {isPrincipalRow(t) && (
+            <div>
+              <p className="apple-label">דרגת ניהול</p>
+              <select value={String(t.nihulGrade ?? 1)}
+                onChange={e => set('nihulGrade', Number(e.target.value))} className="apple-select">
+                {NIHUL_GRADES.map(g => <option key={g.v} value={g.v}>דרגה {g.l}</option>)}
+              </select>
+            </div>
+          )}
 
           {/* קבצים מצורפים */}
           <FileAttachSection files={t._files} onChange={f => setT(p => ({...p, _files: f}))} />
@@ -4204,7 +4240,8 @@ function LinkTeacherFields({ draft, apply }) {
           options={Object.entries(LEVELS).map(([k, v]) => [k, v.label])} />
         <LinkSelect label="קבוצת גיל" value={draft.ageGroup || 'none'} onChange={v => apply({ ageGroup: v })}
           options={Object.entries(AGE_RED).map(([k, v]) => [k, v.label])} />
-        <LinkSelect label="גמול תפקיד" value={draft.gamulRole || draft.role || 'none'} onChange={v => apply({ role: v })}
+        <LinkSelect label="גמול תפקיד" value={draft.gamulRole || draft.role || 'none'}
+          onChange={v => apply({ role: v, ...principalDefaults({ ...draft, role: v }) })}
           options={ROLES.map(r => [r.id, r.label.split('(')[0].trim()])} />
         {/* תוספת אם — רכיב של העולם הישן בלבד */}
         {!isOfek && (

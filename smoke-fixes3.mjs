@@ -7,6 +7,16 @@ import fs from 'node:fs';
 import { ENV_FILE } from './test-env.mjs';
 import { chromium } from 'file:///C:/tmp/node_modules/playwright/index.mjs';
 import { createClient } from '@supabase/supabase-js';
+// המסגרת נטענת פעם אחת ומנווטת ב-hash, ולכן התכונה src קפואה על דף
+// הבית. הכתובת האמיתית היא זו של המסמך בתוך המסגרת.
+const frameUrl = async (page, tries = 14) => {
+  for (let i = 0; i < tries; i++) {
+    const f = page.frames().find(x => x.url().includes('educalc'));
+    if (f && /\/Calculators\/\w/.test(f.url())) return f.url();
+    await page.waitForTimeout(1200);
+  }
+  return page.frames().find(x => x.url().includes('educalc'))?.url() || '';
+};
 
 const env = Object.fromEntries(
   fs.readFileSync(ENV_FILE, 'utf8').split('\n').filter(Boolean)
@@ -171,7 +181,7 @@ try {
   const oldField = p.getByPlaceholder('שכר משולב ממחשבון העולם הישן');
   await oldField.click();
   await p.waitForTimeout(4500);   // המסגרת מנווטת אחרי שהאתר מתייצב
-  const src = await p.locator('iframe').first().getAttribute('src');
+  const src = await frameUrl(p);
   check('לחיצה על שדה "עולם ישן" משאירה את מחשבון העולם הישן', /OldWorld/.test(src || ''), src || '');
 
   // מינוס נעצר בעברית — בשמירה (Enter בשלב הראשון רק עובר לשלב השני)
