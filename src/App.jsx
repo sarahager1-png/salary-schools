@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 15;
+const BUILD = 16;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -2859,7 +2859,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
             </div>
             <div style={{ display:'flex', gap:7, alignItems:'center', flexWrap:'wrap' }}>
               {needsSimCount > 0 && (
-                <span className="apple-badge badge-orange"><Calculator size={12} strokeWidth={2.4} />{needsSimCount} לסימולציה</span>
+                <span className="apple-badge badge-gray" title="שורות שעדיין אין בהן ברוטו — מקלידים בעמודות הכסף">{needsSimCount} חסרות ברוטו</span>
               )}
               {needsApprCount > 0 && (
                 <span className="apple-badge badge-teal"><ClipboardCheck size={12} strokeWidth={2.4} />{needsApprCount} לאישור</span>
@@ -3410,8 +3410,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     </td>}
                     {!isPrincipal && <td style={{ textAlign:'center', fontWeight:800, color: done ? 'var(--purple)' : 'var(--text3)' }}>
                       {done ? emp.total.toLocaleString('he-IL')+' ₪'
-                        : <span className="apple-badge badge-orange" style={{ fontWeight:600 }}>
-                            {t.reform === 'ofek' && t._officialGross && !t._officialGrossPre ? 'חסרה סימולציית עולם ישן' : 'נדרשת סימולציה'}
+                        : <span style={{ fontSize:11.5, color:'var(--text3)' }}>
+                            {t.reform === 'ofek' && t._officialGross && !t._officialGrossPre ? 'חסר עולם ישן' : 'חסר ברוטו'}
                           </span>}
                     </td>}
                     <td>
