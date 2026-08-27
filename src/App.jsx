@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 14;
+const BUILD = 15;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -3344,15 +3344,46 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td style={{ textAlign:'center', color: (t.monthlyExtras||0)>0 ? 'var(--text)' : 'var(--text3)', fontWeight: (t.monthlyExtras||0)>0 ? 700 : 400 }}>
                       {(t.monthlyExtras||0) > 0 ? Number(t.monthlyExtras).toLocaleString('he-IL')+' ₪' : '—'}
                     </td>
-                    {/* בסיס — מה שרץ במערכת התשלומים */}
-                    <td style={{ textAlign:'center', fontWeight: done ? 700 : 400, color: done ? 'var(--text)' : 'var(--text3)' }}>
-                      {emp.base ? emp.base.toLocaleString('he-IL') : '—'}
+                    {/* בסיס — מה שרץ במערכת התשלומים. הקלדה ישירה:
+                        בעולם ישן זו הסימולציה היחידה; באופק זו סימולציית
+                        העולם הישן. */}
+                    <td style={{ textAlign:'center' }}>
+                      <input type="number" min="0" dir="ltr"
+                        key={`base-${t.id}`}
+                        defaultValue={(t.reform === 'ofek' ? t._officialGrossPre : t._officialGross) || ''}
+                        placeholder="₪"
+                        title="ברוטו עולם ישן מהמחשבון — נשמר ביציאה מהשדה"
+                        onClick={e => e.stopPropagation()}
+                        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                        onBlur={e => {
+                          const v2 = e.target.value === '' ? null : Number(e.target.value);
+                          const key = t.reform === 'ofek' ? '_officialGrossPre' : '_officialGross';
+                          if ((v2 ?? null) === (t[key] ?? null)) return;
+                          saveRow({ ...t, [key]: v2 });
+                        }}
+                        style={{ width:86, textAlign:'center', fontWeight:700, fontSize:13,
+                          border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
+                          background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
                     </td>
-                    {/* סימולציית אופק — רלוונטית רק למסלול אופק */}
-                    <td style={{ textAlign:'center', color:'var(--text2)' }}>
-                      {t.reform === 'ofek'
-                        ? (t._officialGross ? Number(t._officialGross).toLocaleString('he-IL') : '—')
-                        : <span style={{ color:'var(--text3)' }} title="עולם ישן — סימולציה אחת">—</span>}
+                    {/* סימולציית אופק — רק למסלול אופק */}
+                    <td style={{ textAlign:'center' }}>
+                      {t.reform === 'ofek' ? (
+                        <input type="number" min="0" dir="ltr"
+                          key={`ofek-${t.id}`}
+                          defaultValue={t._officialGross || ''}
+                          placeholder="₪"
+                          title="ברוטו אופק חדש מהמחשבון — נשמר ביציאה מהשדה"
+                          onClick={e => e.stopPropagation()}
+                          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                          onBlur={e => {
+                            const v2 = e.target.value === '' ? null : Number(e.target.value);
+                            if ((v2 ?? null) === (t._officialGross ?? null)) return;
+                            saveRow({ ...t, _officialGross: v2 });
+                          }}
+                          style={{ width:86, textAlign:'center', fontWeight:700, fontSize:13,
+                            border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
+                            background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
+                      ) : <span style={{ color:'var(--text3)' }} title="עולם ישן — סימולציה אחת">—</span>}
                     </td>
                     {!isPrincipal && <td style={{ textAlign:'center' }}>
                       {emp.supplement > 0
