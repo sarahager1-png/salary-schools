@@ -487,3 +487,71 @@ export async function issueLink(profileId) {
   raise(error, 'יצירת הקישור נכשלה');
   return code;
 }
+
+
+/* ═══ קליטת עובדת — טופס 101, מסמכים וחתימות דרך קישור אישי ═══ */
+
+export async function obWhoami(code) {
+  const { data, error } = await supabase.rpc('ob_whoami', { p_code: code });
+  raise(error, 'טעינת הקישור נכשלה');
+  return data?.[0] || null;
+}
+
+export async function obSave(code, patch) {
+  const { error } = await supabase.rpc('ob_save', { p_code: code, p_patch: patch });
+  raise(error, 'השמירה נכשלה');
+}
+
+// העלאת קובץ לתיקיית הקוד של העובדת; מחזירה את הנתיב לרישום
+export async function obUpload(code, slot, file) {
+  const ext = (file.name?.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+  const path = `${code}/${slot}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from('onboarding').upload(path, file, { upsert: true });
+  raise(error, 'העלאת הקובץ נכשלה');
+  return path;
+}
+
+export async function obDownload(path) {
+  const { data, error } = await supabase.storage.from('onboarding').download(path);
+  raise(error, 'הורדת הקובץ נכשלה');
+  return URL.createObjectURL(data);
+}
+
+// ─── צד הצוות ───
+export async function listOnboarding() {
+  const { data, error } = await supabase.from('teacher_onboarding')
+    .select('*, schools(name)').order('name');
+  raise(error, 'טעינת הקליטה נכשלה');
+  return data || [];
+}
+
+const OB_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+const obCode = () => Array.from(crypto.getRandomValues(new Uint8Array(20)))
+  .map(b => OB_ALPHABET[b % OB_ALPHABET.length]).join('');
+
+// קישור לכל עובדת בחודש הפעיל שאין לה עדיין — בכל בתי הספר
+export async function createOnboardingLinks(monthKey) {
+  const { data: rows, error } = await supabase.from('teacher_months')
+    .select('school_id, name, tz_id, phone').eq('month_key', monthKey);
+  raise(error, 'טעינת העובדות נכשלה');
+  const { data: existing } = await supabase.from('teacher_onboarding').select('tz_id, name');
+  const seen = new Set((existing || []).map(x => x.tz_id || x.name));
+  let made = 0;
+  for (const r of rows || []) {
+    const key = r.tz_id || r.name;
+    if (!r.name || seen.has(key)) continue;
+    seen.add(key);
+    const { error: e2 } = await supabase.from('teacher_onboarding').insert({
+      school_id: r.school_id, name: r.name, tz_id: r.tz_id, phone: r.phone, code: obCode(),
+    });
+    raise(e2, 'יצירת קישור נכשלה');
+    made++;
+  }
+  return made;
+}
+
+export async function uploadContract(file) {
+  const { error } = await supabase.storage.from('onboarding')
+    .upload('contract/contract.pdf', file, { upsert: true, contentType: 'application/pdf' });
+  raise(error, 'העלאת החוזה נכשלה');
+}

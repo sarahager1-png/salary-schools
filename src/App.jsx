@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 22;
+const BUILD = 23;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -4749,6 +4749,306 @@ function LinkCard({ teacher, locked, onSave }) {
   );
 }
 
+/* ═══ קליטת עובדת הוראה — קישור אישי ═══ */
+const OB_DEADLINE = 'יום ראשון, 6.9.2026';
+
+// חתימה מצוירת באצבע או בעכבר
+function SignaturePad({ onChange }) {
+  const ref = useRef(null);
+  const drawing = useRef(false);
+  const dirty = useRef(false);
+  const pos = e => {
+    const r = ref.current.getBoundingClientRect();
+    const p2 = e.touches ? e.touches[0] : e;
+    return { x: p2.clientX - r.left, y: p2.clientY - r.top };
+  };
+  const start = e => { drawing.current = true; const c = ref.current.getContext('2d'); const { x, y } = pos(e); c.beginPath(); c.moveTo(x, y); e.preventDefault(); };
+  const move  = e => { if (!drawing.current) return; const c = ref.current.getContext('2d');
+    c.lineWidth = 2.2; c.lineCap = 'round'; c.strokeStyle = '#1A0B35';
+    const { x, y } = pos(e); c.lineTo(x, y); c.stroke(); dirty.current = true; e.preventDefault(); };
+  const end = () => { if (drawing.current && dirty.current) ref.current.toBlob(b => onChange(b), 'image/png'); drawing.current = false; };
+  const clear = () => { const c = ref.current.getContext('2d'); c.clearRect(0, 0, 400, 140); dirty.current = false; onChange(null); };
+  return (
+    <div>
+      <canvas ref={ref} width={400} height={140}
+        onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
+        onTouchStart={start} onTouchMove={move} onTouchEnd={end}
+        style={{ width:'100%', maxWidth:400, height:140, background:'#fff', border:'2px dashed var(--line)', borderRadius:12, touchAction:'none', display:'block' }} />
+      <button type="button" onClick={clear} className="apple-btn apple-btn-ghost" style={{ marginTop:6, minHeight:30, padding:'0 12px', fontSize:12 }}>ניקוי חתימה</button>
+    </div>
+  );
+}
+
+function ObUpload({ label, hint, done, onFile }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <label className="apple-card" style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', cursor:'pointer', border: done ? '1.5px solid var(--ok)' : '1.5px dashed var(--line)' }}>
+      <input type="file" accept="image/*,.pdf" style={{ display:'none' }}
+        onChange={async e => { const f = e.target.files?.[0]; if (!f) return; setBusy(true); try { await onFile(f); } finally { setBusy(false); } }} />
+      <div style={{ width:40, height:40, borderRadius:12, background: done ? 'var(--ok-bg)' : 'var(--purple-100)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+        {done ? <Check size={20} strokeWidth={2.6} color="var(--ok)" /> : <Upload size={18} strokeWidth={2.2} color="var(--purple)" />}
+      </div>
+      <div style={{ flex:1 }}>
+        <p style={{ fontWeight:700, fontSize:14, color:'var(--text)' }}>{label}</p>
+        <p style={{ fontSize:12, color:'var(--text3)' }}>{busy ? 'מעלה…' : done ? 'הועלה ✓ — אפשר להחליף' : hint}</p>
+      </div>
+    </label>
+  );
+}
+
+function OnboardingView({ code }) {
+  const [me, setMe] = useState(null);
+  const [state, setState] = useState('loading');
+  const [form, setForm] = useState({});
+  const [sig, setSig] = useState(null);
+  const [contractSig, setContractSig] = useState(null);
+  const [contractUrl, setContractUrl] = useState(null);
+  const [msg, setMsg] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const d = await store.obWhoami(code);
+      if (!d) { setState('bad'); return; }
+      setMe(d); setForm(f => ({ ...(d.form101 || {}), ...f })); setState('ok');
+      if (d.contract_available) store.obDownload('contract/contract.pdf').then(setContractUrl).catch(() => {});
+    } catch { setState('bad'); }
+  }, [code]);
+  useEffect(() => { Promise.resolve().then(load); }, [load]);
+
+  if (state === 'loading') return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center' }} dir="rtl"><p style={{ color:'var(--text3)' }}>טוען…</p></div>;
+  if (state === 'bad') return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:24, textAlign:'center' }} dir="rtl"><p style={{ fontWeight:700 }}>הקישור אינו תקף. פני לשרה הגר.</p></div>;
+
+  const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const steps = [
+    me.form101_signed, me.has_id_doc, me.has_salary_form, me.has_ministry_file,
+    me.contract_available ? me.contract_signed : null,   // null = עוד לא זמין
+  ];
+  const doneCount = steps.filter(x => x === true).length;
+  const totalSteps = steps.filter(x => x !== null).length;
+
+  const sign101 = async () => {
+    for (const [k, l] of [['firstName','שם פרטי'], ['lastName','שם משפחה'], ['birth','תאריך לידה'], ['address','כתובת'], ['city','עיר'], ['marital','מצב משפחתי'], ['otherIncome','הכנסה נוספת']]) {
+      if (!String(form[k] ?? '').trim()) { setMsg(`יש למלא ${l}`); return; }
+    }
+    if (!form.declare) { setMsg('יש לאשר את ההצהרה'); return; }
+    if (!sig) { setMsg('יש לחתום במסגרת החתימה'); return; }
+    setMsg('');
+    const path = await store.obUpload(code, 'signature', new File([sig], 'signature.png', { type:'image/png' }));
+    await store.obSave(code, { form101: form, sign101: true, signature_path: path });
+    await load();
+  };
+  const upload = slotKey => async f => {
+    const path = await store.obUpload(code, slotKey, f);
+    await store.obSave(code, { [slotKey + '_path']: path });
+    await load();
+  };
+  const signContract = async () => {
+    if (!contractSig) { setMsg('יש לחתום במסגרת החתימה על החוזה'); return; }
+    const path = await store.obUpload(code, 'contract-signature', new File([contractSig], 'contract-sig.png', { type:'image/png' }));
+    await store.obSave(code, { contract_signature_path: path, sign_contract: true });
+    await load();
+  };
+
+  const field = (k, label, type = 'text', dir2) => (
+    <div key={k} style={{ flex:'1 1 150px' }}>
+      <p className="apple-label">{label}</p>
+      <input type={type} dir={dir2} value={form[k] || ''} onChange={e => setF(k, e.target.value)} className="apple-input" style={{ width:'100%' }} />
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight:'100vh', background:'var(--bg)', paddingBottom:60 }} dir="rtl">
+      <header className="app-header"><div style={{ maxWidth:640, margin:'0 auto', padding:'12px 16px', display:'flex', alignItems:'center', gap:11 }}>
+        <img src="/logo-chabad.png" alt="לוגו" style={{ height:34 }} />
+        <div><p style={{ fontWeight:700, fontSize:14.5 }}>קליטת עובדת הוראה</p>
+        <p style={{ fontSize:11.5, color:'var(--text3)' }}>{me.name} · {me.school_name}</p></div>
+      </div></header>
+
+      <div style={{ maxWidth:640, margin:'0 auto', padding:'14px 16px', display:'flex', flexDirection:'column', gap:14 }}>
+        {/* דדליין */}
+        <div style={{ background:'var(--warn-bg)', border:'1px solid #FFB74D', borderRadius:12, padding:'10px 14px' }}>
+          <p style={{ fontSize:13, fontWeight:700, color:'#E65100' }}>להשלמה עד {OB_DEADLINE}</p>
+          <p style={{ fontSize:12, color:'#E65100' }}>רק מי שתשלים את כל השלבים עד למועד תקבל משכורת על חודש ספטמבר.</p>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ flex:1, height:8, background:'var(--fill)', borderRadius:99 }}>
+            <div style={{ width:(totalSteps ? Math.round(doneCount / totalSteps * 100) : 0) + '%', height:'100%', background:'var(--teal)', borderRadius:99, transition:'width .3s' }} />
+          </div>
+          <span style={{ fontSize:12.5, fontWeight:700, color:'var(--text2)' }}>{doneCount} / {totalSteps}</span>
+        </div>
+
+        {/* ── שלב 1: טופס 101 ── */}
+        <div className="apple-card" style={{ padding:18 }}>
+          <p style={{ fontWeight:800, fontSize:16, marginBottom:2 }}>1 · טופס 101 — כרטיס עובד</p>
+          {me.form101_signed ? (
+            <p style={{ color:'var(--ok)', fontWeight:700, fontSize:13.5, marginTop:6 }}>✓ מולא ונחתם. תודה!</p>
+          ) : (<>
+            <p style={{ fontSize:12.5, color:'var(--text3)', marginBottom:12 }}>שנת המס 2026 · המעסיקה: רשת חינוך חב"ד</p>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+              {field('firstName','שם פרטי')}
+              {field('lastName','שם משפחה')}
+              <div style={{ flex:'1 1 150px' }}><p className="apple-label">ת.ז.</p>
+                <input value={me.tz_id || form.tz || ''} onChange={e => setF('tz', e.target.value)} className="apple-input" dir="ltr" style={{ width:'100%' }} /></div>
+              {field('birth','תאריך לידה','date')}
+              {field('address','רחוב ומספר')}
+              {field('city','עיר')}
+              <div style={{ flex:'1 1 150px' }}><p className="apple-label">מצב משפחתי</p>
+                <select value={form.marital || ''} onChange={e => setF('marital', e.target.value)} className="apple-select" style={{ width:'100%' }}>
+                  <option value="">בחרי</option><option>רווקה</option><option>נשואה</option><option>גרושה</option><option>אלמנה</option>
+                </select></div>
+              {field('kids','ילדים עד גיל 18','number','ltr')}
+              <div style={{ flex:'1 1 100%' }}><p className="apple-label">הכנסה נוספת ממעסיק אחר?</p>
+                <select value={form.otherIncome || ''} onChange={e => setF('otherIncome', e.target.value)} className="apple-select" style={{ width:'100%' }}>
+                  <option value="">בחרי</option>
+                  <option value="no">אין — זו הכנסתי היחידה, מבקשת חישוב מס רגיל</option>
+                  <option value="yes">יש — אמציא תיאום מס</option>
+                </select></div>
+            </div>
+            <label style={{ display:'flex', gap:8, alignItems:'flex-start', marginTop:12, fontSize:12.5, color:'var(--text2)' }}>
+              <input type="checkbox" checked={!!form.declare} onChange={e => setF('declare', e.target.checked)} style={{ marginTop:2 }} />
+              <span>אני מצהירה כי הפרטים שמסרתי בטופס זה מלאים ונכונים, וידוע לי שמסירת פרטים לא נכונים היא עבירה על פקודת מס הכנסה.</span>
+            </label>
+            <p className="apple-label" style={{ marginTop:12 }}>חתימה (בתוך המסגרת, באצבע או בעכבר)</p>
+            <SignaturePad onChange={setSig} />
+            {msg && <p style={{ color:'var(--danger)', fontSize:12.5, fontWeight:600, marginTop:8 }}>{msg}</p>}
+            <button className="apple-btn apple-btn-blue" onClick={() => sign101().catch(e => setMsg(e.message))} style={{ marginTop:12, width:'100%', minHeight:44 }}>
+              חתימה ושליחת טופס 101
+            </button>
+          </>)}
+        </div>
+
+        {/* ── שלבים 2–4: העלאות ── */}
+        <ObUpload label="2 · צילום תעודת זהות" hint="צלמי או העלי קובץ" done={me.has_id_doc} onFile={upload('id_doc')} />
+        <ObUpload label="3 · טופס נתוני שכר — משרד החינוך" hint="הטופס מהפורטל של משרד החינוך" done={me.has_salary_form} onFile={upload('salary_form')} />
+        <ObUpload label="4 · אסמכתת תיק במשרד החינוך (חובה)" hint="אישור קיום תיק עובד הוראה" done={me.has_ministry_file} onFile={upload('ministry_file')} />
+
+        {/* ── שלב 5: חוזה ── */}
+        <div className="apple-card" style={{ padding:18 }}>
+          <p style={{ fontWeight:800, fontSize:16 }}>5 · חוזה העסקה</p>
+          {!me.contract_available ? (
+            <p style={{ fontSize:13, color:'var(--text3)', marginTop:6 }}>החוזה יעלה בקרוב — תקבלי הודעה כשיהיה מוכן לחתימה.</p>
+          ) : me.contract_signed ? (
+            <p style={{ color:'var(--ok)', fontWeight:700, fontSize:13.5, marginTop:6 }}>✓ נחתם. תודה!</p>
+          ) : (<>
+            {contractUrl && <a href={contractUrl} target="_blank" rel="noreferrer" className="apple-btn apple-btn-ghost" style={{ margin:'10px 0', textDecoration:'none' }}>
+              <ExternalLink size={14} /> פתיחת החוזה לקריאה</a>}
+            <p className="apple-label">חתימה על החוזה</p>
+            <SignaturePad onChange={setContractSig} />
+            <button className="apple-btn apple-btn-blue" onClick={() => signContract().catch(e => setMsg(e.message))} style={{ marginTop:10, width:'100%', minHeight:44 }}>
+              קראתי ואני חותמת על החוזה
+            </button>
+          </>)}
+        </div>
+
+        <p style={{ fontSize:11.5, color:'var(--text3)', textAlign:'center' }}>שאלות? שרה הגר · רשת חינוך חב"ד</p>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ לוח קליטה — לשליחה: מי השלימה מה, קישורים וחוזה ═══ */
+function OnboardingAdmin({ activeMonth, onClose }) {
+  const [rows, setRows] = useState(null);
+  const [busy, setBusy] = useState('');
+  const [copied, setCopied] = useState('');
+
+  const load = useCallback(async () => setRows(await store.listOnboarding()), []);
+  useEffect(() => { Promise.resolve().then(load); }, [load]);
+
+  const makeLinks = async () => {
+    setBusy('יוצר קישורים…');
+    try { const n = await store.createOnboardingLinks(activeMonth); setBusy(''); await load();
+      alert(n ? `נוצרו ${n} קישורים חדשים` : 'לכל העובדות כבר יש קישור'); }
+    catch (e) { setBusy(''); alert(e.message); }
+  };
+  const uploadContract = async f => {
+    setBusy('מעלה חוזה…');
+    try { await store.uploadContract(f); setBusy(''); alert('החוזה הועלה — יופיע אצל כל העובדות לחתימה'); }
+    catch (e) { setBusy(''); alert(e.message); }
+  };
+  const copy = (code, name) => {
+    navigator.clipboard.writeText(`${window.location.origin}/?f=${code}`);
+    setCopied(name); setTimeout(() => setCopied(''), 1500);
+  };
+
+  const bySchool = {};
+  for (const r of rows || []) (bySchool[r.schools?.name || '—'] ??= []).push(r);
+  const doneOf = r => [r.form101_signed_at, r.id_doc_path, r.salary_form_path, r.ministry_file_path, r.contract_signed_at].filter(Boolean).length;
+  const total = (rows || []).length;
+  const complete = (rows || []).filter(r => doneOf(r) >= 5).length;
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:70, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:16, overflowY:'auto', backdropFilter:'blur(6px)' }} onClick={onClose}>
+      <div className="apple-card" onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:860, padding:22, marginTop:20 }} dir="rtl">
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:4 }}>
+          <div>
+            <p style={{ fontWeight:800, fontSize:18 }}>קליטת עובדות — טופס 101, מסמכים וחוזה</p>
+            <p style={{ fontSize:12.5, color:'var(--text3)' }}>דדליין: {OB_DEADLINE} · הושלמו {complete} / {total}</p>
+          </div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            <button className="apple-btn apple-btn-blue" onClick={makeLinks} style={{ minHeight:36, fontSize:12.5 }}>
+              יצירת קישורים לכל העובדות
+            </button>
+            <label className="apple-btn apple-btn-ghost" style={{ minHeight:36, fontSize:12.5, cursor:'pointer' }}>
+              <Upload size={14} /> העלאת החוזה (PDF)
+              <input type="file" accept="application/pdf" style={{ display:'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) uploadContract(f); }} />
+            </label>
+            <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ minHeight:36 }}>סגירה</button>
+          </div>
+        </div>
+        {busy && <p style={{ fontSize:12.5, color:'var(--text3)' }}>{busy}</p>}
+
+        {rows === null ? <p style={{ color:'var(--text3)', padding:20 }}>טוען…</p> :
+         !rows.length ? (
+          <div style={{ textAlign:'center', padding:'30px 10px' }}>
+            <p style={{ fontWeight:700 }}>אין עדיין קישורי קליטה</p>
+            <p style={{ fontSize:12.5, color:'var(--text3)' }}>לחיצה על "יצירת קישורים" תפיק קישור אישי לכל עובדת בכל בתי הספר, מתוך חודש {fmtMonth(activeMonth)}.</p>
+          </div>
+        ) : Object.entries(bySchool).map(([sn, list]) => (
+          <div key={sn} style={{ marginTop:14 }}>
+            <p style={{ fontSize:12, fontWeight:700, color:'var(--purple)', marginBottom:6 }}>{sn} · {list.filter(r => doneOf(r) >= 5).length}/{list.length} הושלמו</p>
+            <div style={{ overflowX:'auto' }}>
+              <table className="apple-table" style={{ fontSize:12 }}>
+                <thead><tr>
+                  <th>עובדת</th><th style={{ textAlign:'center' }}>101</th><th style={{ textAlign:'center' }}>ת.ז.</th>
+                  <th style={{ textAlign:'center' }}>נתוני שכר</th><th style={{ textAlign:'center' }}>תיק משה"ח</th>
+                  <th style={{ textAlign:'center' }}>חוזה</th><th style={{ textAlign:'center' }}>קישור</th>
+                </tr></thead>
+                <tbody>
+                  {list.map(r => {
+                    const C = ok => ok
+                      ? <Check size={15} strokeWidth={2.6} color="var(--ok)" />
+                      : <span style={{ color:'var(--text3)' }}>—</span>;
+                    return (
+                      <tr key={r.id}>
+                        <td style={{ fontWeight:600 }}>{r.name}<span style={{ color:'var(--text3)', fontWeight:400 }}>{r.phone ? ` · ${r.phone}` : ' · אין טלפון'}</span></td>
+                        <td style={{ textAlign:'center' }}>{C(r.form101_signed_at)}</td>
+                        <td style={{ textAlign:'center' }}>{C(r.id_doc_path)}</td>
+                        <td style={{ textAlign:'center' }}>{C(r.salary_form_path)}</td>
+                        <td style={{ textAlign:'center' }}>{C(r.ministry_file_path)}</td>
+                        <td style={{ textAlign:'center' }}>{C(r.contract_signed_at)}</td>
+                        <td style={{ textAlign:'center' }}>
+                          <button className="apple-btn apple-btn-ghost" onClick={() => copy(r.code, r.name)} style={{ minHeight:28, padding:'0 10px', fontSize:11.5 }}>
+                            {copied === r.name ? 'הועתק ✓' : 'העתקה'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
+        <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:14 }}>
+          השליחה בוואטסאפ נעשית דרך scripts/send-onboarding.mjs — הרצה יבשה קודם, שליחה רק באישורך.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function LinkView({ code }) {
   const [me,      setMe]      = useState(null);
   const male = me?.gender === 'm';
@@ -4882,6 +5182,7 @@ export default function App() {
   // ?k=<קוד> — מנהלת שנכנסה מהקישור שנשלח אליה בוואטסאפ. נקרא פעם אחת,
   // לפני כל אתחול אחר: המסלול הזה אינו עובר דרך התחברות כלל.
   const [linkCode] = useState(() => new URLSearchParams(window.location.search).get('k') || '');
+  const [obCode2] = useState(() => new URLSearchParams(window.location.search).get('f') || '');
   const [user,    setUser]    = useState(null);   // הפרופיל: תפקיד, שם, בית ספר
   const [schools, setSchools] = useState([]);
   const [approvers, setApprovers] = useState([]);   // מי מאשרת כל בית ספר
@@ -4897,6 +5198,7 @@ export default function App() {
   const [teacherModal,  setTeacherModal]  = useState(null);
   const [showApproval,  setShowApproval]  = useState(false);
   const [showBackup,    setShowBackup]    = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // כל שינוי נשמר בשרת ואז נטען מחדש. פשוט, ותמיד מסונכרן עם מה שבאמת נשמר.
   const refresh = useCallback(async () => {
@@ -4977,6 +5279,7 @@ export default function App() {
   };
 
   // הקישור עוקף את מסך ההתחברות לגמרי — אין למחזיקה בו session להמתין לו
+  if (obCode2) return <OnboardingView code={obCode2} />;
   if (linkCode) return <LinkView code={linkCode} />;
 
   if (booting) {
@@ -5161,6 +5464,12 @@ export default function App() {
                   : undefined}>
                 <ClipboardCheck size={15} strokeWidth={2.2} />
                 {needsApprovalCount > 0 ? `${needsApprovalCount} לאישור` : 'אישורים'}
+              </button>
+            )}
+            {isCoord && (
+              <button className="nav-btn" onClick={() => setShowOnboarding(true)}>
+                <FileText size={15} strokeWidth={2.2} />
+                קליטה
               </button>
             )}
 
@@ -5422,6 +5731,7 @@ export default function App() {
           onClose={() => setShowApproval(false)}
         />
       )}
+      {showOnboarding && <OnboardingAdmin activeMonth={activeMonth} onClose={() => setShowOnboarding(false)} />}
       {schoolModal  && <SchoolModal  school={schoolModal}  onSave={onSaveSchool}  onClose={() => setSchoolModal(null)} />}
       {showBackup && <BackupModal schools={schools} months={months} onClose={() => setShowBackup(false)} />}
       {teacherModal && <TeacherModal teacher={teacherModal} schools={schools} userRole={user.role} onSave={onSaveTeacher} onClose={() => setTeacherModal(null)} />}
