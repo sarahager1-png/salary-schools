@@ -193,8 +193,9 @@ function calcGross(t) {
 // כאילו זו העלות.
 const awaitingSim = t => isPrincipalRow(t) && !t._officialGross && !t._agreedGross;
 function calcNet(gross) { return Math.round(gross * 0.735); }
-// אחוז המשרה נגזר מהשעות הפרונטליות ומהשלב, אחרי הפחתת הגיל.
-// המנהלת מזינה שעות — האחוז מחושב, לא מוקלד.
+// אחוז המשרה והשעות הפרונטליות קשורים זה בזה דרך השלב והפחתת הגיל.
+// אפשר להזין כל אחד מהם, והשני נגזר — לפעמים השעות ידועות, ולפעמים
+// האחוז הוא מה שאושר בבניית התקציב והשעות נגזרות ממנו.
 function baseFrontalFor(t) {
   const lvl = LEVELS[t.level] || LEVELS.elementary;
   const agR = AGE_RED[t.ageGroup] || AGE_RED.none;
@@ -208,6 +209,14 @@ const homeroomHours = t =>
 // השעות שהשכר משולם עליהן. שונה מ-frontalHours, שהוא מה שהיא מלמדת
 // בפועל וממנו נגזרת המכסה של בית הספר.
 const paidFrontal = t => (Number(t?.frontalHours) || 0) + homeroomHours(t);
+
+// הכיוון ההפוך: מאחוז משרה לשעות פרונטליות. גמול החינוך של מחנכת
+// בעולם ישן נכלל באחוז ואינו שעה שהיא מלמדת, ולכן הוא יורד כאן.
+function frontalFromScope(t, pct) {
+  const bf = baseFrontalFor(t);
+  if (!bf) return Number(t.frontalHours) || 0;
+  return Math.max(0, Math.round((Number(pct) || 0) / 100 * bf) - homeroomHours(t));
+}
 
 function scopeFromFrontal(t, hours) {
   const bf = baseFrontalFor(t);
@@ -2931,9 +2940,16 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     </select>
                   </td>
                   <td style={{ textAlign:'center' }}>
-                    {/* נגזר מהשעות הפרונטליות — לא מוקלד */}
-                    <span style={{ fontWeight:700, color:'var(--text)' }}>{editData.scopePct ?? 100}%</span>
-                    <span style={{ display:'block', fontSize:10.5, color:'var(--text3)' }}>מחושב</span>
+                    {/* שני הכיוונים: שעות -> אחוז, ואחוז -> שעות. */}
+                    <input type="number" className="apple-input" dir="ltr" min="0" max="200"
+                      value={editData.scopePct ?? 100}
+                      onChange={e => {
+                        const pct = Number(e.target.value);
+                        const hrs = frontalFromScope(editData, pct);
+                        setEditData(p => ({ ...p, scopePct: pct, scope: pct, frontalHours: hrs }));
+                      }}
+                      style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:58, textAlign:'center', fontWeight:700 }} />
+                    <span style={{ display:'block', fontSize:10.5, color:'var(--text3)' }}>%  ·  גם משעות</span>
                   </td>
                   <td>
                     <select value={editData.degree||'BA'} onChange={e=>setF('degree',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
@@ -3012,10 +3028,17 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       </select>
                     </td>
                     <td style={{ textAlign:'center' }}>
-                    {/* נגזר מהשעות הפרונטליות — לא מוקלד */}
-                    <span style={{ fontWeight:700, color:'var(--text)' }}>{d.scopePct ?? 100}%</span>
-                    <span style={{ display:'block', fontSize:10.5, color:'var(--text3)' }}>מחושב</span>
-                  </td>
+                      {/* שני הכיוונים: שעות -> אחוז, ואחוז -> שעות. */}
+                      <input type="number" className="apple-input" dir="ltr" min="0" max="200"
+                        value={d.scopePct ?? 100}
+                        onChange={e => {
+                          const pct = Number(e.target.value);
+                          const hrs = frontalFromScope(d, pct);
+                          setEditData(p => ({ ...p, scopePct: pct, scope: pct, frontalHours: hrs }));
+                        }}
+                        style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:58, textAlign:'center', fontWeight:700 }} />
+                      <span style={{ display:'block', fontSize:10.5, color:'var(--text3)' }}>%  ·  גם משעות</span>
+                    </td>
                     <td>
                       <select value={d.degree||'BA'} onChange={e=>setF('degree',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
                         <option value="intern">מתמחה</option>
