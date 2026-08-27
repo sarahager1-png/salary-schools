@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 16;
+const BUILD = 17;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -4954,9 +4954,9 @@ export default function App() {
       ...t,
       absenceDays: 0, mmHours: 0, mmFor: '', monthlyExtras: 0,
       _actualEmployerCost: null,
-      _approved: false, _approvedAt: null,
-      _netApproved: false, _netApprovedAt: null, _snapshot: null,
-      _changedAt: new Date().toISOString(),
+      // האישור עובר עם השורה: מה שלא השתנה אינו חוזר לאישור.
+      // שינוי אמיתי מאפס אותו ממילא דרך מעקב השינויים.
+      _snapshot: null,
     }));
     run(async () => { await store.openMonth(nextKey, carried); }).then(ok => { if (ok) setActiveMonth(nextKey); });
   };
