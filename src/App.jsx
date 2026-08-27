@@ -83,11 +83,15 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 19;
+const BUILD = 20;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
 const calcForReform = reform => (reform === 'pre' ? 'old' : 'ofek');
+// אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
+// payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
+const CHABAD_SUPP = new Map();
+const schoolPaysSupp = id => CHABAD_SUPP.get(id) !== false;
 // למנהלת בית ספר יש מחשבון נפרד — אופק ניהול
 // מורת רפורמה בחטיבה העליונה היא עוז לתמורה, לא אופק חדש — שני
 // מחשבונים שונים באתר. קודם כולן נותבו לאופק, והכותרת אישרה לחשבת
@@ -357,9 +361,15 @@ function payBreakdown(t) {
     return { base, supplement: gross - base, gross, agreed: !!agreed };
   }
   // בית ספר עולם ישן — סימולציה אחת, אין רכיב תוספת
-  // תוספת אם אינה נוספת כאן: היא כבר בתוך אחוז המשרה שהוזן למחשבון,
-  // והמספר שחזר משם כולל אותה.
-  if (t.reform !== 'ofek') return { base: ofek, mom: 0, supplement: 0, gross: ofek };
+  const paysSupp = schoolPaysSupp(t.schoolId);
+  if (t.reform !== 'ofek') {
+    // עולם ישן: רכיב "ת.שכר מינימום" מהתלוש הוא תוספת בית חב"ד —
+    // לא פנסיוני ולא נושא קרן השתלמות. בבית ספר בלי תוספת (מזכרת
+    // בתיה) כל הברוטו הוא בסיס רגיל.
+    const minSupp = paysSupp ? Math.min(Number(t._minWageSupp) || 0, ofek) : 0;
+    return { base: ofek - minSupp, mom: 0, supplement: minSupp, gross: ofek };
+  }
+  if (!paysSupp) return { base: ofek, mom: 0, supplement: 0, gross: ofek };
   // אם האופק יוצא נמוך מהעולם הישן, העובדת נשארת עם העולם הישן
   const supplement = Math.max(0, ofek - old);
   return { base: old, mom: 0, supplement, gross: old + supplement };
@@ -3395,7 +3405,24 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       ) : <span style={{ color:'var(--text3)' }} title="עולם ישן — סימולציה אחת">—</span>}
                     </td>
                     {!isPrincipal && <td style={{ textAlign:'center' }}>
-                      {emp.supplement > 0
+                      {t.reform !== 'ofek' && schoolPaysSupp(t.schoolId) ? (
+                        <span title='רכיב ת.שכר מינימום מהתלוש — משולם כתוספת בית חב"ד: מס שכר וביטוח לאומי בלבד'>
+                          <input type="number" min="0" dir="ltr"
+                            key={`mws-${t.id}`}
+                            defaultValue={t._minWageSupp || ''}
+                            placeholder="שכר מינ׳"
+                            onClick={e => e.stopPropagation()}
+                            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                            onBlur={e => {
+                              const v2 = e.target.value === '' ? null : Number(e.target.value);
+                              if ((v2 ?? null) === (t._minWageSupp ?? null)) return;
+                              saveRow({ ...t, _minWageSupp: v2 });
+                            }}
+                            style={{ width:78, textAlign:'center', fontWeight:700, fontSize:12.5,
+                              border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
+                              background:'var(--purple-100)', color:'var(--text)', fontFamily:'inherit' }} />
+                        </span>
+                      ) : emp.supplement > 0
                         ? <span className="apple-badge badge-purple">{emp.supplement.toLocaleString('he-IL')} ₪</span>
                         : done && t.reform === 'ofek'
                           ? <span style={{ fontSize:11, color:'var(--text3)' }} title="שכר האופק אינו גבוה מהעולם הישן">0</span>
@@ -4857,6 +4884,7 @@ export default function App() {
   const refresh = useCallback(async () => {
     const data = await store.loadAll();
     setSchools(data.schools);
+    for (const sc of (data.schools || [])) CHABAD_SUPP.set(sc.id, sc.chabadSupp !== false);
     setApprovers(data.approvers || []);
     setMonths(data.months);
     setActiveMonth(prev => {

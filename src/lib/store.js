@@ -43,6 +43,7 @@ const TEACHER_FIELDS = [
   ['official_gross_pre',   '_officialGrossPre'],
   ['agreed_gross',         '_agreedGross'],
   ['actual_employer_cost', '_actualEmployerCost'],
+  ['min_wage_supp',        '_minWageSupp'],
   ['changed_at',           '_changedAt'],
   ['snapshot',             '_snapshot'],
   ['approved',             '_approved'],
@@ -76,6 +77,7 @@ const schoolToRow = (s) => ({
   reform: s.reform || 'ofek',
   hours_quota: s.hoursQuota ?? null,
   murkavut: s.murkavut ?? 1,
+  chabad_supp: s.chabadSupp !== false,
   principal_email: s.principalEmail ?? null,
   coordinator_email: s.coordinatorEmail ?? null,
 });
@@ -87,6 +89,7 @@ const rowToSchool = (r) => ({
   reform: r.reform,
   hoursQuota: r.hours_quota,
   murkavut: r.murkavut ?? 1,
+  chabadSupp: r.chabad_supp !== false,
   principalEmail: r.principal_email,
   coordinatorEmail: r.coordinator_email,
 });
