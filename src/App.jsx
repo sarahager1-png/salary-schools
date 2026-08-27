@@ -375,6 +375,10 @@ function baseFieldsChanged(next, prev) {
 }
 // מורת אופק דורשת שתי סימולציות — עולם ישן ואופק — כי הפער ביניהן הוא
 // רכיב התשלום. מורת עולם ישן דורשת אחת.
+// טלפון ומייל הם הדרך היחידה להעביר לעובד/ת את נתוני ההעסקה לחתימה.
+// שורה בלעדיהם נראית שלמה ומתגלה רק בשלב החתימה.
+const hasContact = t => Boolean(String(t?.phone || '').trim() && String(t?.email || '').trim());
+
 const simComplete = t => {
   if (t._agreedGross) return true;               // שכר מוסכם — אין צורך בסימולציה
   if (isPrincipalRow(t)) return Boolean(t._officialGross);   // ניהול — סימולציה אחת
@@ -453,7 +457,7 @@ const nextMonthKey = k => { const [y,m]=k.split('-').map(Number); return m===12 
 // Base fields — if changed, simulation clears for that month
 
 const EMPTY_TEACHER = {
-  id: '', schoolId: '', tzId: '', name: '', email: '',
+  id: '', schoolId: '', tzId: '', name: '', email: '', phone: '',
   reform: 'ofek', level: 'elementary', grade: 1, degree: 'BA',
   seniority: 0, frontalHours: 26, scopePct: 100, scope: 100,
   role: 'none', ageGroup: 'none',
@@ -1693,10 +1697,16 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             </div>
           </div>
 
-          {/* מייל */}
-          <div>
-            <p className="apple-label">מייל</p>
-            <input value={t.email || ''} onChange={e => set('email', e.target.value)} placeholder="teacher@school.edu" dir="ltr" className="apple-input" />
+          {/* דרכי קשר — לשליחת נתוני ההעסקה לחתימה ולכל בירור על התלוש */}
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+            <div style={{ flex:'1 1 150px' }}>
+              <p className="apple-label">טלפון *</p>
+              <input value={t.phone || ''} onChange={e => set('phone', e.target.value)} placeholder="05x-xxxxxxx" dir="ltr" className="apple-input" />
+            </div>
+            <div style={{ flex:'1 1 180px' }}>
+              <p className="apple-label">מייל *</p>
+              <input value={t.email || ''} onChange={e => set('email', e.target.value)} placeholder="teacher@school.edu" dir="ltr" className="apple-input" />
+            </div>
           </div>
 
           {/* בית ספר */}
@@ -2816,6 +2826,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <th>שם עובדת</th>
                 <th style={{ textAlign:'center' }}>ת.ז.</th>
                 <th>מייל</th>
+                <th>טלפון</th>
                 <th style={{ textAlign:'center' }}>רפורמה</th>
                 <th style={{ textAlign:'center' }}>% משרה</th>
                 <th style={{ textAlign:'center' }}>תואר</th>
@@ -2844,6 +2855,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                   <td><input className="apple-input" value={editData.name} onChange={e=>setF('name',e.target.value)} placeholder="שם מלא *" style={{ fontSize:12, padding:'4px 8px', borderRadius:6 }} /></td>
                   <td><input className="apple-input" dir="ltr" value={editData.tzId||''} onChange={e=>setF('tzId',e.target.value)} placeholder="ת.ז." style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>
                   <td><input className="apple-input" value={editData.email||''} onChange={e=>setF('email',e.target.value)} placeholder="מייל" dir="ltr" style={{ fontSize:12, padding:'4px 8px', borderRadius:6 }} /></td>
+                  <td><input className="apple-input" value={editData.phone||''} onChange={e=>setF('phone',e.target.value)} placeholder="טלפון" dir="ltr" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:110 }} /></td>
                   <td style={{ textAlign:'center' }}>
                     <select value={editData.reform} onChange={e=>setF('reform',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
                       {REFORMS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
@@ -2924,6 +2936,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td><input className="apple-input" value={d.name} onChange={e=>setF('name',e.target.value)} style={{ fontSize:12, padding:'4px 8px', borderRadius:6 }} /></td>
                     <td><input className="apple-input" dir="ltr" value={d.tzId||''} onChange={e=>setF('tzId',e.target.value)} placeholder="ת.ז." style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>
                     <td><input className="apple-input" value={d.email||''} onChange={e=>setF('email',e.target.value)} dir="ltr" placeholder="מייל" style={{ fontSize:12, padding:'4px 8px', borderRadius:6 }} /></td>
+                    <td><input className="apple-input" value={d.phone||''} onChange={e=>setF('phone',e.target.value)} dir="ltr" placeholder="טלפון" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:110 }} /></td>
                     <td style={{ textAlign:'center' }}>
                       <select value={d.reform} onChange={e=>setF('reform',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
                         {REFORMS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
@@ -2989,6 +3002,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         {isSim  && <Calculator size={13} strokeWidth={2.4} color="var(--warn)" aria-label="נדרשת סימולציה" />}
                         {isAppr && <ClipboardCheck size={13} strokeWidth={2.4} color="var(--teal-700)" aria-label="ממתין לאישור" />}
                         <span style={{ color: t.name === PRINCIPAL_PLACEHOLDER ? 'var(--text3)' : undefined }}>{t.name}</span>
+                        {!hasContact(t) && (
+                          <span className="apple-badge badge-orange" style={{ fontSize:10.5, padding:'2px 8px' }}
+                            title="בלי טלפון ומייל אי אפשר לשלוח את נתוני ההעסקה לחתימה">
+                            חסרים פרטי קשר
+                          </span>
+                        )}
                         {onLeave(t) && (
                           <span className="apple-badge badge-orange" style={{ fontSize:10.5, padding:'2px 8px' }} title={leaveText(t)}>
                             {leaveLabel(t.leaveType)}{t.leaveFrom ? ` ${fmtDay(t.leaveFrom)}` : ''}
@@ -3019,6 +3038,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     </td>
                     <td style={{ textAlign:'center', fontFamily:'monospace', fontSize:12, color:'var(--apple-text2)' }}>{t.tzId||'—'}</td>
                     <td style={{ fontSize:12, color:'var(--apple-text3)' }}>{t.email||'—'}</td>
+                    <td style={{ fontSize:12, color:'var(--apple-text3)', direction:'ltr', textAlign:'right' }}>{t.phone||'—'}</td>
                     <td style={{ textAlign:'center' }}>
                       <span className={`apple-badge ${t.reform==='ofek' ? 'badge-blue' : 'badge-gray'}`}>
                         {reformLabel(t.reform)}
@@ -3097,8 +3117,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         <button className="apple-btn apple-btn-ghost" title="עריכה מהירה בשורה" onClick={() => startEdit(t)} style={{ padding:'0 9px', minHeight:30 }}><Pencil size={13} strokeWidth={2.2} /></button>
                         <button className="apple-btn apple-btn-ghost" title="פרטים מלאים — תפקיד, שלב, קבוצת גיל, שינויי משרה וקבצים" onClick={() => setFullEdit(t)} style={{ padding:'0 9px', minHeight:30 }}><Users size={13} strokeWidth={2.2} /></button>
                         {fullyApproved(t, isFirstMonth) && (
-                          <button className="apple-btn apple-btn-ghost" title="נתוני העסקה לחתימת העובדת"
-                            onClick={() => setDetails(t)} style={{ padding:'0 9px', minHeight:30 }}>
+                          <button className="apple-btn apple-btn-ghost" disabled={!hasContact(t)}
+                            title={hasContact(t)
+                              ? 'נתוני העסקה לחתימת העובדת'
+                              : 'חסרים טלפון או מייל — אין לאן לשלוח את נתוני ההעסקה'}
+                            onClick={() => setDetails(t)}
+                            style={{ padding:'0 9px', minHeight:30, opacity: hasContact(t) ? 1 : .4 }}>
                             <FileText size={13} strokeWidth={2.2} />
                           </button>
                         )}
@@ -3364,6 +3388,96 @@ function SimStep({ n, label, calcLabel, active, onFocus, value, onChange, onEnte
    מנהלות בית ספר אינן רואות את הפאנל: המסמכים מכילים שכר של עובדות
    בשמן, וזה מה שמוסתר מהן בכל מקום אחר.
 ═══════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════
+   מעקב מילוי — מי נכנסה, ואצל מי תקוע
+
+   הקישורים נשלחו ואין דרך לדעת מי פתח אותם. בלי המסך הזה הדרך היחידה
+   לברר אצל מי תקוע היא לרדוף אחרי כולן בוואטסאפ, ולגלות שרובן כבר
+   סיימו. הסדר הוא לפי מי שצריכה תזכורת, לא לפי אלף-בית.
+═══════════════════════════════════════════════════════════════ */
+function FillProgress({ schools, month, onOpenSchool }) {
+  const [rows, setRows] = useState(null);
+  const [err,  setErr]  = useState('');
+
+  // ה-effect רק מפעיל; כל setState קורה בתוך הפונקציה האסינכרונית,
+  // אחרי await, ולא בגוף ה-effect עצמו.
+  const load = useCallback(async () => {
+    if (!month) return;
+    try {
+      // "לפני כמה זמן" מחושב פעם אחת, ברגע הטעינה. חישוב מחדש בכל
+      // רינדור הופך את הרינדור ללא-טהור והתצוגה זזה בלי שקרה דבר.
+      const at = Date.now();
+      const ago = (iso) => {
+        if (!iso) return null;
+        const mins = Math.round((at - new Date(iso).getTime()) / 60000);
+        if (mins < 1)    return 'עכשיו';
+        if (mins < 60)   return `לפני ${mins} דק׳`;
+        if (mins < 1440) return `לפני ${Math.round(mins / 60)} שע׳`;
+        return new Date(iso).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
+      };
+      setRows((await store.schoolProgress(month)).map(r => ({ ...r, ago: ago(r.lastSeen) })));
+    }
+    catch (e) { setErr(e.message); }
+  }, [month]);
+  useEffect(() => { let alive = true; (async () => { if (alive) await load(); })(); return () => { alive = false; }; }, [load]);
+
+  if (err)   return <p style={{ fontSize:12.5, color:'var(--danger)' }}>{err}</p>;
+  if (!rows) return null;
+
+  const name = id => schools.find(s => s.id === id)?.name || '';
+
+  // מצב לכל בית ספר, ומכאן גם הסדר: מה שדורש פעולה קודם
+  const state = (r) => {
+    if (!r.hasLink)                return { k: 0, label: 'אין קישור',        tone: 'gray'  };
+    if (!r.lastSeen)               return { k: 1, label: 'טרם נכנסה',        tone: 'orange'};
+    if (r.teachers === 0)          return { k: 2, label: 'נכנסה, לא הזינה',  tone: 'orange'};
+    if (r.missingContact > 0)      return { k: 3, label: `${r.missingContact} בלי פרטי קשר`, tone: 'orange' };
+    if (r.simulated < r.teachers)  return { k: 4, label: 'ממתין לחשבת השכר', tone: 'teal'  };
+    return                                { k: 5, label: 'מוכן',             tone: 'green' };
+  };
+  const list = rows.map(r => ({ ...r, st: state(r) })).sort((a, b) => a.st.k - b.st.k || name(a.schoolId).localeCompare(name(b.schoolId), 'he'));
+
+  const waiting = list.filter(r => r.st.k <= 3).length;
+  const totalT  = list.reduce((n, r) => n + r.teachers, 0);
+
+  return (
+    <div className="apple-card" style={{ padding:'14px 16px', marginBottom:14 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:3, flexWrap:'wrap' }}>
+        <ClipboardCheck size={15} strokeWidth={2.3} color="var(--purple)" />
+        <p style={{ fontSize:13.5, fontWeight:700, color:'var(--text)' }}>מעקב מילוי — {fmtMonth(month)}</p>
+        <button onClick={load} title="רענון" style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text3)', fontSize:11.5, padding:0 }}>
+          רענון
+        </button>
+      </div>
+      <p style={{ fontSize:11.5, color:'var(--text3)', marginBottom:11 }}>
+        {waiting ? `${waiting} בתי ספר ממתינים לך · ` : 'כל בתי הספר סיימו · '}
+        {totalT} עובדי הוראה הוזנו
+      </p>
+
+      <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+        {list.map(r => (
+          <button key={r.schoolId} onClick={() => onOpenSchool?.(r.schoolId)}
+            style={{ display:'flex', alignItems:'center', gap:9, padding:'7px 10px', background:'var(--fill)',
+              border:'none', borderRadius:10, cursor:'pointer', textAlign:'right', fontFamily:'inherit', width:'100%' }}>
+            <span className={`apple-badge badge-${r.st.tone}`} style={{ fontSize:10.5, padding:'2px 8px', flexShrink:0, minWidth:96, justifyContent:'center' }}>
+              {r.st.label}
+            </span>
+            <span style={{ flex:1, minWidth:0, fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              {name(r.schoolId)}
+              {r.principal && <span style={{ fontWeight:400, color:'var(--text3)' }}> · {r.principal}</span>}
+            </span>
+            <span style={{ fontSize:11.5, color:'var(--text3)', flexShrink:0 }}>
+              {r.teachers > 0 && `${r.teachers} עובדים`}
+              {r.ago && ` · ${r.ago}`}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, userId, title }) {
   const [docs, setDocs] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -4045,7 +4159,8 @@ function LinkTeacherFields({ draft, apply }) {
       <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginBottom:9 }}>
         <LinkField label="שם עובד/ת ההוראה" type="text" value={draft.name} onChange={v => apply({ name: v })} hint="שם מלא" />
         <LinkField label="ת.ז." type="text" value={draft.tzId} onChange={v => apply({ tzId: v })} hint="9 ספרות" />
-        <LinkField label="מייל" type="text" value={draft.email} onChange={v => apply({ email: v })} hint="לא חובה" />
+        <LinkField label="טלפון *" type="text" value={draft.phone} onChange={v => apply({ phone: v })} hint="05x-xxxxxxx" />
+        <LinkField label="מייל *" type="text" value={draft.email} onChange={v => apply({ email: v })} hint="name@example.com" />
       </div>
       <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginBottom:9 }}>
         <LinkSelect label="מסלול" value={draft.reform} onChange={v => apply({ reform: v })}
@@ -4111,6 +4226,8 @@ function LinkNewCard({ schoolReform, onAdd, male }) {
 
   const add = async () => {
     if (!String(draft.name || '').trim()) { setState('יש למלא שם'); return; }
+    if (!String(draft.phone || '').trim()) { setState('יש למלא טלפון — בלעדיו אי אפשר לשלוח את נתוני ההעסקה לחתימה'); return; }
+    if (!String(draft.email || '').trim()) { setState('יש למלא מייל — בלעדיו אי אפשר לשלוח את נתוני ההעסקה לחתימה'); return; }
     setState('saving');
     try { await onAdd(draft); setDraft(blank); setOpen(false); setState(''); }
     catch (e) { setState(e.message); }
@@ -4168,6 +4285,8 @@ function LinkCard({ teacher, locked, onSave }) {
   const dirty = JSON.stringify(draft) !== JSON.stringify(teacher);
 
   const save = async () => {
+    if (!String(draft.phone || '').trim()) { setState('יש למלא טלפון'); return; }
+    if (!String(draft.email || '').trim()) { setState('יש למלא מייל'); return; }
     setState('saving');
     try {
       // צילום "לפני" — בלעדיו השליח מתבקש לאשר שכר בלי לראות מה זז.
@@ -4773,6 +4892,12 @@ export default function App() {
                 הוסף בית ספר
               </button>
             </div>
+            {/* מעקב מילוי — ראשון, כי זו השאלה הראשונה של השליח בבוקר */}
+            {schools.length > 0 && (
+              <FillProgress schools={schools} month={activeMonth}
+                onOpenSchool={id => { const sc = schools.find(x => x.id === id); if (sc) { setActiveSchool(sc); setView('school'); } }} />
+            )}
+
             {schools.length === 0 ? (
               <div className="apple-card" style={{ textAlign:'center', padding:'80px 20px' }}>
                 <div style={{ width:64, height:64, borderRadius:18, background:'var(--purple-100)', margin:'0 auto 16px', display:'flex', alignItems:'center', justifyContent:'center' }}>

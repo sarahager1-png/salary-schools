@@ -161,8 +161,18 @@ try {
   await p.locator('button[title="מחיקה"]').first().click();
   await p.getByText('אין עדיין מסמכים').first().waitFor({ timeout: 15000 });
   const { data: after } = await admin.from('month_documents').select('id').eq('month_key', MONTH);
-  const { data: gone, error: ge } = await admin.storage.from('payroll-docs').download(rows[0].path);
-  check('מחיקה מסירה גם את הרישום וגם את הקובץ', (after || []).length === 0 && (!!ge || !gone));
+  check('מחיקה מסירה את הרישום', (after || []).length === 0, `${after?.length} שורות`);
+  // נשאלים הדלי עצמו ולא download: הורדה עשויה להיענות מהמטמון גם אחרי
+  // שהאובייקט נמחק, והבדיקה הייתה נכשלת על משהו שכבר לא קיים.
+  const folder = rows[0].path.split('/')[0];
+  const file   = rows[0].path.split('/').pop();
+  let stillThere = true;
+  for (let n = 0; n < 10 && stillThere; n++) {
+    const { data: ls } = await admin.storage.from('payroll-docs').list(folder, { limit: 100 });
+    stillThere = (ls || []).some(x => x.name === file);
+    if (stillThere) await new Promise(r => setTimeout(r, 500));
+  }
+  check('ומסירה גם את הקובץ מהדלי', !stillThere, 'הקובץ עדיין בדלי');
 } catch (e) {
   check('הרצה ללא חריגה', false, e.message?.slice(0, 220));
 } finally {

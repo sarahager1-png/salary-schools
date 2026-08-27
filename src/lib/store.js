@@ -17,6 +17,7 @@ const TEACHER_FIELDS = [
   ['name',                 'name'],
   ['tz_id',                'tzId'],
   ['email',                'email'],
+  ['phone',                'phone'],
   ['reform',               'reform'],
   ['level',                'level'],
   ['grade',                'grade'],
@@ -345,6 +346,20 @@ export async function loadAudit(rowId) {
 }
 
 export const _internals = { rowToTeacher, teacherToRow, rowToSchool, schoolToRow };
+
+/*
+  התקדמות המילוי לפי בית ספר: מי נכנסה, מתי, וכמה הזינה.
+  הקוד עצמו אינו מוחזר — הוא מפתח כניסה, ואין סיבה שיעבור ברשת שוב.
+*/
+export async function schoolProgress(monthKey) {
+  const { data, error } = await supabase.rpc('school_progress', { p_month: monthKey });
+  raise(error, 'טעינת ההתקדמות נכשלה');
+  return (data || []).map(r => ({
+    schoolId: r.school_id, principal: r.principal, hasLink: r.has_link,
+    lastSeen: r.last_seen, teachers: r.teachers,
+    missingContact: r.missing_contact, simulated: r.simulated,
+  }));
+}
 
 /* ── כניסה בקישור אישי ──────────────────────────────────────────
    למי שנכנס בקישור אין session ואין auth.uid(). הטבלאות סגורות בפניו

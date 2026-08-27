@@ -23,6 +23,8 @@ async function cleanup() {
   const { data } = await admin.auth.admin.listUsers();
   const u = data?.users?.find(x => x.email === EMAIL);
   if (u) { await admin.from('profiles').delete().eq('id', u.id); await admin.auth.admin.deleteUser(u.id); }
+  const { data: scs } = await admin.from('schools').select('id').eq('name', SCHOOL);
+  for (const x of scs || []) await admin.from('teacher_months').delete().eq('school_id', x.id);
   await admin.from('teacher_months').delete().eq('month_key', MONTH);
   await admin.from('months').delete().eq('key', MONTH);
   await admin.from('schools').delete().eq('name', SCHOOL);
@@ -46,6 +48,8 @@ try {
   await p.getByPlaceholder('name@reshetch.org.il').fill(EMAIL);
   await p.locator('input[type="password"]').fill(PW);
   await p.getByRole('button', { name: /כניסה למערכת/ }).click();
+  await p.selectOption('select[title="בחירת חודש"]', MONTH).catch(() => {});
+  await p.waitForTimeout(600);
   await p.getByText(SCHOOL).first().waitFor({ timeout: 15000 });
 
   check('בית ספר ריק מוצג כברירת מחדל, לא כעובדה',
@@ -78,6 +82,9 @@ try {
   await p.getByRole('button', { name: /בתי הספר|חזרה/ }).first().click().catch(() => {});
   await p.goto('http://localhost:5190/');
   await p.getByText(SCHOOL).first().waitFor({ timeout: 15000 });
+  // גם כאן: אחרי רענון האפליקציה חוזרת לחודש הקלנדרי אם הוא קיים
+  await p.selectOption('select[title="בחירת חודש"]', MONTH).catch(() => {});
+  await p.waitForTimeout(800);
   const body = await p.locator('body').innerText();
   check('כרטיס בית הספר מציג "1 אופק חדש"', body.includes('1 אופק חדש'));
   check('וגם "1 עולם ישן"',                  body.includes('1 עולם ישן'));

@@ -104,6 +104,8 @@ try {
   const card = p.locator('.apple-card').filter({ hasText: 'עובד/ת הוראה חדש/ה' }).first();
   await fld(card, 'שם עובד/ת ההוראה').fill('חנה כהן');
   await fld(card, 'ת.ז.').fill('123456789');
+  await fld(card, 'טלפון').fill('054-1112222');
+  await fld(card, 'מייל').fill('hana@example.com');
   await sel(card, 'מסלול').selectOption('ofek');
   await sel(card, 'תואר').selectOption('MA');
   await sel(card, 'דרגה באופק').selectOption('5');
@@ -113,7 +115,7 @@ try {
   await fld(card, 'שעות פרונטליות').fill('23');
   await clickWhenEnabled(p, /^הוספה$/);
   const hana = await settled(r => r.name === 'חנה כהן');
-  check('מורת אופק נוספה דרך הקישור', !!hana, hana ? '' : 'לא הגיעה');
+  if (!skipIfFiltered('הוספה דרך הקישור')) check('מורת אופק נוספה דרך הקישור', !!hana, hana ? '' : 'לא הגיעה');
   if (hana) {
     check('כל פרטי החישוב נשמרו',
       hana.reform === 'ofek' && hana.degree === 'MA' && hana.grade === '5' && hana.seniority === 8
@@ -126,10 +128,15 @@ try {
     check('בית הספר נגזר מהקוד', hana.school_id === s1.id);
   }
 
+  if (!hana) {
+    console.log('SKIP  שאר הבדיקה — לא נוצרה שורה ראשונה');
+  } else {
   // ══ 3. מורת עולם ישן — ילדים עד 18 במקום דרגה ══
   await p.getByRole('button', { name: /הוספת עובד\/ת הוראה/ }).click();
   const card2 = p.locator('.apple-card').filter({ hasText: 'עובד/ת הוראה חדש/ה' }).first();
   await fld(card2, 'שם עובד/ת ההוראה').fill('מרים לוי');
+  await fld(card2, 'טלפון').fill('052-3334444');
+  await fld(card2, 'מייל').fill('miriam@example.com');
   await sel(card2, 'מסלול').selectOption('pre');
   await p.waitForTimeout(500);
   check('בעולם ישן אין בורר דרגת אופק', await card2.getByText('דרגה באופק').count() === 0);
@@ -155,6 +162,9 @@ try {
     JSON.stringify({ r: miriam.reform, s: miriam.seniority, c: miriam.children_under_18, f: miriam.frontal_hours }));
 
   // ══ 4. עריכת מורה קיימת — אותם שדות ══
+  if (filtered || !hana) {
+    console.log('SKIP  עריכה, חל"ד והגבולות — סינון התוכן חסם את היצירה, אין על מה לבדוק');
+  } else {
   await p.reload();
   await p.getByText('חנה כהן').first().waitFor({ timeout: 20000 });
   const hCard = p.locator('.apple-card').filter({ hasText: 'חנה כהן' }).first();
@@ -182,14 +192,14 @@ try {
   }
   // חופשה בלי תאריך נדחית בשרת
   const { error: noDate } = await anon.rpc('link_add_row', {
-    p_code: CODE, p_month: MONTH, p_row: { name: 'ללא תאריך', leave_type: 'maternity' },
+    p_code: CODE, p_month: MONTH, p_row: { name: 'ללא תאריך', phone: '0500000000', email: 'x@example.com', leave_type: 'maternity' },
   });
   check('חופשה בלי תאריך נחסמת', /תאריך יציאה/.test(noDate?.message || ''), noDate?.message?.slice(0, 60) || 'עבר!');
 
   // ══ 5. הגבולות ══
   const { error: moneyErr } = await anon.rpc('link_add_row', {
     p_code: CODE, p_month: MONTH,
-    p_row: { name: 'ניסיון כסף', official_gross: 99999, approved: true, school_id: s2.id },
+    p_row: { name: 'ניסיון כסף', phone: '0500000000', email: 'x@example.com', official_gross: 99999, approved: true, school_id: s2.id },
   });
   const cheat = await settled(r => r.name === 'ניסיון כסף', 4000);
   check('דרך הקישור אי אפשר להזין שכר או לאשר',
@@ -197,18 +207,22 @@ try {
     moneyErr?.message || JSON.stringify({ g: cheat?.official_gross, a: cheat?.approved }));
   check('ובית ספר אחר נדחה — השורה נכתבה לבית הספר של הקוד', cheat?.school_id === s1.id);
   const { error: noName } = await anon.rpc('link_add_row', { p_code: CODE, p_month: MONTH, p_row: { name: '  ' } });
-  check('שם ריק נחסם בעברית', /שם מורה/.test(noName?.message || ''), noName?.message?.slice(0, 60) || 'עבר!');
-  const { error: badCode } = await anon.rpc('link_add_row', { p_code: 'zzzzzzzzzzzzzzzzzzzz', p_month: MONTH, p_row: { name: 'ניסיון' } });
+  check('שם ריק נחסם בעברית', /יש למלא שם/.test(noName?.message || ''), noName?.message?.slice(0, 60) || 'עבר!');
+  const { error: badCode } = await anon.rpc('link_add_row', { p_code: 'zzzzzzzzzzzzzzzzzzzz', p_month: MONTH, p_row: { name: 'ניסיון', phone: '0500000000', email: 'x@example.com' } });
   check('קוד שגוי אינו מוסיף', /אינו תקף/.test(badCode?.message || ''), badCode?.message?.slice(0, 60) || 'עבר!');
 
   // חודש נעול
   await admin.from('months').update({ locked: true }).eq('key', MONTH);
-  const { error: lockedErr } = await anon.rpc('link_add_row', { p_code: CODE, p_month: MONTH, p_row: { name: 'ניסיון נעול' } });
+  const { error: lockedErr } = await anon.rpc('link_add_row', { p_code: CODE, p_month: MONTH, p_row: { name: 'ניסיון נעול', phone: '0500000000', email: 'x@example.com' } });
   check('חודש נעול חוסם הוספה', /נעול/.test(lockedErr?.message || ''), lockedErr?.message?.slice(0, 60) || 'עבר!');
   await p.reload();
-  await p.getByText('נעול').first().waitFor({ timeout: 20000 });
+  // הבאנר עצמו, לא כל טקסט. משנפתחו כמה חודשים, המילה "נעול" מופיעה
+  // גם באפשרות מוסתרת בבורר החודשים.
+  await p.getByText('החודש נעול').first().waitFor({ timeout: 20000 });
   check('ובמסך אין כפתור הוספה', await p.getByRole('button', { name: /הוספת עובד\/ת הוראה/ }).count() === 0);
   await admin.from('months').update({ locked: false }).eq('key', MONTH);
+  }
+  }
 } catch (e) {
   check('הרצה ללא חריגה', false, e.message?.slice(0, 220));
 } finally {

@@ -17,7 +17,10 @@ const fails = [];
 const check = (n, ok, e = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${e ? ' — ' + e : ''}`); if (!ok) fails.push(n); };
 
 const PW = 'Net!' + Math.random().toString(36).slice(2, 9);
-const M1 = '2098-11', M2 = '2098-12';           // הראשון והחודש שאחריו
+// חודשים מוקדמים מכל חודש אמיתי במערכת: "החודש הראשון" הוא הראשון
+// בכל המסד, ומרגע שנפתח חודש עבודה אמיתי בדיקה בשנת 2098 אינה יכולה
+// להיות ראשונה.
+const M1 = '2019-01', M2 = '2019-02';
 const S_GEN = 'רשתי בדיקה כללי', S_DED = 'רשתי בדיקה ייעודי';
 const U = {
   coord: 'net-coord@example.com', clerk: 'net-clerk@example.com',
@@ -110,7 +113,7 @@ try {
   // ── 2. המאשרת הכללית נוחתת על החודש הראשון ──
   await login(U.rina);
   body = await p.locator('body').innerText();
-  check('רינה נחתה על החודש הראשון, לא על האחרון', body.includes('אישור רשתי — נובמבר 2098'), body.match(/אישור רשתי — [^\n]+/)?.[0] || body.slice(0, 120));
+  check('רינה נחתה על החודש הראשון, לא על האחרון', body.includes('אישור רשתי — ינואר 2019'), body.match(/אישור רשתי — [^\n]+/)?.[0] || body.slice(0, 120));
   check('הכותרת בשמה האמיתי', body.includes('רינה בדיקה · אישור רשתי'));
   check('הכפתור אומר על מה הוא חל', body.includes('אישור כל בתי הספר באחריותך'));
   check('היא רואה עובדת אחת פחות — של הייעודי לא', body.includes('2 עובדות ממתינות'), body.match(/\S+ עובדות ממתינות|עובדת אחת ממתינות/)?.[0] || '');
@@ -120,10 +123,10 @@ try {
   await p.selectOption('select[title="בחירת חודש"]', M2);
   await p.waitForTimeout(800);
   body = await p.locator('body').innerText();
-  check('בחודש השני היא מקבלת קישור חזרה, לא מסך ירוק סתום', body.includes('ממתינות לך בנובמבר 2098'));
+  check('בחודש השני היא מקבלת קישור חזרה, לא מסך ירוק סתום', body.includes('ממתינות לך בינואר 2019'));
   await p.getByRole('button', { name: /ממתינות לך/ }).click();
   await p.waitForTimeout(800);
-  check('הקישור מחזיר לחודש הראשון', (await p.locator('body').innerText()).includes('אישור רשתי — נובמבר 2098'));
+  check('הקישור מחזיר לחודש הראשון', (await p.locator('body').innerText()).includes('אישור רשתי — ינואר 2019'));
 
   // ── 3. הפירוט בטבלה ──
   await p.getByText('הצג פירוט').first().click();

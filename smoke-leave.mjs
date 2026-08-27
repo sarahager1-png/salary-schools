@@ -22,13 +22,13 @@ try{
 
   // הוספה עם חל"ד ותאריכים
   const {data:added,error:ae}=await anon.rpc('link_add_row',{p_code:C,p_month:M,p_row:{
-    name:'יולדת בדיקה',reform:'ofek',degree:'BA',grade:'3',seniority:5,frontal_hours:26,
+    name:'יולדת בדיקה',phone:'0501111111',email:'yoledet@example.com',reform:'ofek',degree:'BA',grade:'3',seniority:5,frontal_hours:26,
     leave_type:'maternity',leave_from:'2097-11-15',leave_to:'2098-03-15'}});
   check('הוספה עם חל"ד ותאריכים',!ae&&added?.leave_type==='maternity'&&added?.leave_from==='2097-11-15'&&added?.leave_to==='2098-03-15',
     ae?.message||JSON.stringify({t:added?.leave_type,f:added?.leave_from,to:added?.leave_to}));
 
   // מורה עובדת → יציאה לחל"ד מבטלת סימולציה ואישור
-  const {data:t2}=await anon.rpc('link_add_row',{p_code:C,p_month:M,p_row:{name:'עובדת בדיקה',reform:'ofek',degree:'BA',grade:'3',seniority:5,frontal_hours:26}});
+  const {data:t2}=await anon.rpc('link_add_row',{p_code:C,p_month:M,p_row:{name:'עובדת בדיקה',phone:'0502222222',email:'ovedet@example.com',reform:'ofek',degree:'BA',grade:'3',seniority:5,frontal_hours:26}});
   await admin.from('teacher_months').update({official_gross:12000,official_gross_pre:11000}).eq('id',t2.id);
   const {data:left,error:le}=await anon.rpc('link_save_row',{p_code:C,p_row:{id:t2.id,leave_type:'maternity',leave_from:'2097-12-01'}});
   check('יציאה לחל"ד נרשמת',!le&&left?.leave_type==='maternity'&&left?.leave_from==='2097-12-01',le?.message||JSON.stringify({t:left?.leave_type,f:left?.leave_from}));

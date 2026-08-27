@@ -56,7 +56,8 @@ const message = (name, school, link, male) => {
 הרשת עוברת למערכת אחת לניהול שכר עובדי ההוראה במוכש"ר, וזה הקישור האישי שלך ל${school}.
 
 *מה צריך למלא:*
-לכל עובד/ת הוראה — *כולל אותך* — שם, ת.ז., מסלול (אופק חדש / עולם ישן), תואר, דרגה, ותק ושעות פרונטליות. אחוז המשרה מחושב לבד.
+לכל עובד/ת הוראה — *כולל אותך* — שם, ת.ז., *טלפון ומייל*, מסלול (אופק חדש / עולם ישן), תואר, דרגה, ותק ושעות פרונטליות. אחוז המשרה מחושב לבד.
+הטלפון והמייל הם חובה — דרכם נשלחים נתוני ההעסקה לחתימה.
 יציאה לחל"ד — יש בורר סטטוס עם תאריך.
 
 *חשוב:* ${male ? 'הצמד' : 'הצמדי'} למספר השעות שאושר בבניית התקציב.
@@ -73,12 +74,39 @@ ${link}
 רשת חינוך חב"ד`;
 };
 
-const post = async (path, body) => {
-  const r = await fetch(`${BASE}/${path}/${TOKEN}`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  });
-  if (!r.ok) throw new Error(`${path} → ${r.status} ${(await r.text()).slice(0, 120)}`);
-  return r.json();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/*
+  המופע נרדם כשלא משתמשים בו ומתעורר לאט. getStateInstance יכול לומר
+  authorized בזמן שהסשן עצמו עוד starting, ולהיפך — ולכן נבדקים שניהם,
+  וכל קריאה חוזרת על עצמה כשהתשובה היא "מתעורר" ולא כישלון אמיתי.
+*/
+const WAKING = /instance is starting|not authorized|starting/i;
+
+const post = async (path, body, tries = 4) => {
+  for (let n = 1; ; n++) {
+    const r = await fetch(`${BASE}/${path}/${TOKEN}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const text = await r.text();
+    if (r.ok) return JSON.parse(text);
+    if (n >= tries || !WAKING.test(text)) throw new Error(`${path} → ${r.status} ${text.slice(0, 120)}`);
+    await sleep(n * 4000);
+  }
+};
+
+// ממתין שגם ה-API וגם הסשן יהיו מוכנים
+const waitReady = async (seconds = 120) => {
+  const until = Date.now() + seconds * 1000;
+  for (;;) {
+    const [st, wa] = await Promise.all([
+      fetch(`${BASE}/getStateInstance/${TOKEN}`).then(r => r.json()).catch(() => ({})),
+      fetch(`${BASE}/getWaSettings/${TOKEN}`).then(r => r.json()).catch(() => ({})),
+    ]);
+    if (st.stateInstance === 'authorized' && wa.stateInstance === 'authorized' && wa.phone) return wa.phone;
+    if (Date.now() > until) return null;
+    await sleep(5000);
+  }
 };
 
 // ── מי מקבלת ──────────────────────────────────────────────────
@@ -111,12 +139,13 @@ if (SEND && (!INSTANCE || !TOKEN)) {
 }
 
 if (SEND) {
-  const st = await fetch(`${BASE}/getStateInstance/${TOKEN}`).then(r => r.json()).catch(() => ({}));
-  if (st.stateInstance !== 'authorized') {
-    console.error(`חשבון הוואטסאפ אינו מחובר (${st.stateInstance || 'לא ידוע'}). יש לסרוק QR בקונסולה של Green API.`);
+  process.stdout.write('ממתין שחשבון הוואטסאפ יתעורר… ');
+  const phone = await waitReady();
+  if (!phone) {
+    console.error('\nהחשבון לא התחבר תוך שתי דקות. יש לוודא בקונסולה של Green API שהמכשיר מקושר.');
     process.exit(1);
   }
-  console.log('חשבון הוואטסאפ מחובר.\n');
+  console.log(`מחובר, שולח מ-${String(phone).replace(/^972/, '0')}\n`);
 }
 
 // ── שליחה ─────────────────────────────────────────────────────
@@ -147,7 +176,7 @@ for (const [i, p] of list.entries()) {
     console.log(`✗ ${line} — ${e.message}`);
   }
 
-  if (i < list.length - 1) await new Promise(r => setTimeout(r, 1100));   // הודעה בשנייה
+  if (i < list.length - 1) await sleep(1100);   // הודעה בשנייה
 }
 
 if (SEND && log.length) {
