@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 27;
+const BUILD = 28;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -2507,19 +2507,6 @@ function SchoolReport({ school, teachers, onClose }) {
           </tfoot>
         </table>
 
-        {pendingCount > 0 && (
-          <div style={{ marginBottom:24, padding:16, background:'rgba(255,159,10,0.08)', border:'1px solid rgba(255,159,10,0.25)', borderRadius:14 }}>
-            <h3 style={{ fontWeight:700, color:'var(--warn)', marginBottom:12, fontSize:14, display:'flex', alignItems:'center', gap:6 }}><Bell size={14} strokeWidth={2.3} />שינויים ממתינים לאישור</h3>
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {ts.filter(isPending).map(t => (
-                <div key={t.id} className="apple-card" style={{ padding:14 }}>
-                  <p style={{ fontWeight:700, fontSize:13, color:'var(--apple-text)', marginBottom:6 }}>{t.name}</p>
-                  <TeacherDiff t={t} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {ts.some(t => t.scopeChanges?.length > 0) && (
           <div style={{ marginBottom:24 }}>
