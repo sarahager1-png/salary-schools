@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 21;
+const BUILD = 22;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -479,7 +479,9 @@ const hasContact = t => Boolean(String(t?.phone || '').trim() && String(t?.email
 const simComplete = t => {
   if (t._agreedGross) return true;               // שכר מוסכם — אין צורך בסימולציה
   if (isPrincipalRow(t)) return Boolean(t._officialGross);   // ניהול — סימולציה אחת
-  return Boolean(t.reform === 'ofek'
+  // בבית ספר בלי תוספת בית חב"ד (מזכרת בתיה) התשלום ישיר — סימולציה
+  // אחת של המסלול עצמו, גם באופק.
+  return Boolean(t.reform === 'ofek' && schoolPaysSupp(t.schoolId)
     ? (t._officialGross && t._officialGrossPre)
     : t._officialGross);
 };
@@ -3019,7 +3021,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         </div>
         <div className="sheet-wrap">
           <div className="sheet-scroll">
-            <table className={`apple-table sticky-head${allCols ? '' : ' compact-cols'}`} style={{ fontSize:13, minWidth: allCols ? 1330 : 0 }}>
+            <table className={`apple-table sticky-head${allCols ? '' : ' compact-cols'}${school.chabadSupp === false ? ' no-supp' : ''}`} style={{ fontSize:13, minWidth: allCols ? 1330 : 0 }}>
             <thead>
               <tr>
                 <th>שם עובדת</th>
@@ -3381,7 +3383,9 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         בעולם ישן זו הסימולציה היחידה; באופק זו סימולציית
                         העולם הישן. */}
                     <td style={{ textAlign:'center' }}>
-                      <input type="number" min="0" dir="ltr"
+                      {t.reform === 'ofek' && !schoolPaysSupp(t.schoolId)
+                        ? <span style={{ color:'var(--text3)' }} title="תשלום ישיר — אין צורך בסימולציית עולם ישן">—</span>
+                        : <input type="number" min="0" dir="ltr"
                         key={`base-${t.id}`}
                         defaultValue={(t.reform === 'ofek' ? t._officialGrossPre : t._officialGross) || ''}
                         placeholder="₪"
@@ -3396,7 +3400,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         }}
                         style={{ width:86, textAlign:'center', fontWeight:700, fontSize:13,
                           border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
-                          background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
+                          background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />}
                     </td>
                     {/* סימולציית אופק — רק למסלול אופק */}
                     <td style={{ textAlign:'center' }}>
@@ -4257,7 +4261,7 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKid
                   const isOfek   = t.reform === 'ofek';
                   const dh       = deriveHours(t);   // פרונטלי/פרטני/שהייה — אופק בלבד
                   // רק מורת אופק שאינה מנהלת דורשת שתי סימולציות
-                  const needsTwo = isOfek && !isPrincipalRow(t);
+                  const needsTwo = isOfek && !isPrincipalRow(t) && schoolPaysSupp(t.schoolId);
                   const preVal   = preInputs[t.id] ?? (t._officialGrossPre || '');
                   const mainVal  = inputs[t.id] ?? (t._officialGross || '');
                   // שלב 2 הוא המחשבון של המורה — למנהלת בית ספר זה אופק ניהול

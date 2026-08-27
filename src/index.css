@@ -516,3 +516,8 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .compact-cols th:nth-child(18), .compact-cols td:nth-child(18),
 .compact-cols th:nth-child(19), .compact-cols td:nth-child(19),
 .compact-cols th:nth-child(24), .compact-cols td:nth-child(24) { display:none; }
+
+/* בית ספר בלי תוספת בית חב"ד (מזכרת בתיה): עמודות הבסיס והתוספת
+   מוסתרות — התשלום ישיר ואין להן משמעות שם. */
+.no-supp th:nth-child(20), .no-supp td:nth-child(20),
+.no-supp th:nth-child(22), .no-supp td:nth-child(22) { display:none; }
