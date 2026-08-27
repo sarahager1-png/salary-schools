@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 4;
+const BUILD = 5;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -3175,14 +3175,17 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td style={{ textAlign:'center', fontWeight:700, color: t.reform==='ofek' ? 'var(--apple-text)' : 'var(--apple-text3)' }}>{gradeLabel}</td>
                     <td style={{ textAlign:'center', color:'var(--apple-text2)' }}>{t.seniority}</td>
                     <td style={{ textAlign:'center' }}>{derived ? derived.frontal : (t.frontalHours ?? '—')}</td>
-                    <td style={{ textAlign:'center', fontSize:12 }}>
-                      {t.role && t.role !== 'none'
-                        ? <span>{ROLES.find(r => r.id === t.role)?.label.split('(')[0].trim()}
-                            <span style={{ color:'var(--text3)' }}>
-                              {ROLES.find(r => r.id === t.role)?.pct ? ` ${ROLES.find(r => r.id === t.role).pct}%` : ''}
-                            </span>
-                          </span>
-                        : <span style={{ color:'var(--text3)' }}>—</span>}
+                    <td style={{ textAlign:'center' }}>
+                      <select key={`role-${t.id}`} value={t.role || 'none'}
+                        title="גמול תפקיד — נשמר מיד"
+                        onClick={e => e.stopPropagation()}
+                        onChange={e => onSaveTeacher({ ...t, role: e.target.value })}
+                        className="apple-select"
+                        style={{ fontSize:11.5, padding:'3px 5px', maxWidth:128,
+                          fontWeight: t.role && t.role !== 'none' ? 700 : 400,
+                          color: t.role && t.role !== 'none' ? 'var(--text)' : 'var(--text3)' }}>
+                        {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}{r.pct ? ` — ${r.pct}%` : ''}</option>)}
+                      </select>
                     </td>
                     <td style={{ textAlign:'center', fontSize:12 }}>{LEVELS[t.level]?.label || '—'}</td>
                     <td style={{ textAlign:'center', fontSize:12 }}>
@@ -3196,13 +3199,22 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         : <span style={{ color:'var(--text3)' }}>—</span>}
                     </td>
                     <td style={{ textAlign:'center' }}>
-                      {momBonus
-                        ? <span className="apple-badge badge-purple" title="זכאית לתוספת אם עובדת"><Check size={11} strokeWidth={3} />{t.childrenUnder18}</span>
-                        : (t.childrenUnder18||0) > 0
-                          ? (t.reform === 'pre'
-                              ? <span style={{ fontSize:11, color:'var(--text3)' }}>לא זכאית</span>
-                              : <span style={{ color:'var(--text2)' }} title="באופק חדש אינה רכיב שכר">{t.childrenUnder18}</span>)
-                          : <span style={{ color:'var(--text3)' }}>—</span>}
+                      <input type="number" min="0" max="20" dir="ltr"
+                        key={`kids-${t.id}`}
+                        defaultValue={t.childrenUnder18 ?? 0}
+                        title="ילדים עד 18 — נשמר ביציאה מהשדה"
+                        onClick={e => e.stopPropagation()}
+                        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                        onBlur={e => {
+                          const n = Math.max(0, Number(e.target.value) || 0);
+                          if (n === (t.childrenUnder18 ?? 0)) return;
+                          onSaveTeacher({ ...t, childrenUnder18: n });
+                        }}
+                        style={{ width:44, textAlign:'center', fontWeight:700, fontSize:13,
+                          border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
+                          background: momBonus ? 'var(--purple-100)' : 'var(--surface)',
+                          color:'var(--text)', fontFamily:'inherit' }} />
+                      {momBonus && <span style={{ display:'block', fontSize:9.5, color:'var(--purple)', fontWeight:700 }}>אם</span>}
                     </td>
                     <td style={{ textAlign:'center', color: (t.absenceDays||0)>0 ? 'var(--danger)' : 'var(--text3)', fontWeight: (t.absenceDays||0)>0 ? 700 : 400 }}>
                       {(t.absenceDays||0) > 0 ? t.absenceDays : '—'}
