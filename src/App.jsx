@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 5;
+const BUILD = 6;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -2686,6 +2686,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
     downloadCSV(headers, rows, `שכר_${school.name}_${activeMonth || stampToday()}.csv`, footer);
   };
 
+  // תצוגת עמודות: מצומצמת כברירת מחדל — 26 עמודות לא נכנסות במסך
+  const [allCols, setAllCols] = useState(false);
   const startEdit = t => { setEditingId(t.id); setEditData({ ...t }); };
   // בלי id. store.saveTeacher בוחר INSERT או UPDATE לפי קיומו, ומזהה
   // מקומי היה שולח אותה למסלול העדכון — על שורה שעוד לא קיימת.
@@ -2888,9 +2890,17 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 
       {/* ══ Table ══ */}
       <div style={{ maxWidth:1400, margin:'0 auto', padding:'18px 20px 40px' }}>
+        {/* 26 עמודות לא נכנסות במסך. בתצוגה המצומצמת נשארות רק אלה
+            שההזנה השוטפת צריכה; ההסתרה ב-CSS לפי מיקום, כותרת ותא יחד. */}
+        <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:8 }}>
+          <button className="apple-btn apple-btn-ghost" onClick={() => setAllCols(v => !v)}
+            style={{ minHeight:32, padding:'0 12px', fontSize:12.5 }}>
+            {allCols ? 'תצוגה מצומצמת' : `כל העמודות (${26})`}
+          </button>
+        </div>
         <div className="sheet-wrap">
           <div className="sheet-scroll">
-            <table className="apple-table sticky-head" style={{ fontSize:13, minWidth:1330 }}>
+            <table className={`apple-table sticky-head${allCols ? '' : ' compact-cols'}`} style={{ fontSize:13, minWidth: allCols ? 1330 : 0 }}>
             <thead>
               <tr>
                 <th>שם עובדת</th>
@@ -3170,6 +3180,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         style={{ width:56, textAlign:'center', fontWeight:700, fontSize:13,
                           border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
                           background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
+                      {momBonus && (
+                        <span style={{ display:'block', fontSize:9.5, color:'var(--purple)', fontWeight:700 }}
+                          title="ילדים בעולם ישן — עוד 10 נקודות על אחוז המשרה. המערכת אינה מוסיפה לבד; לוודא שהאחוז שהוקלד כולל אותן.">
+                          אם: +10 בפנים?
+                        </span>
+                      )}
                     </td>
                     <td style={{ textAlign:'center' }}>{degreeLabel}</td>
                     <td style={{ textAlign:'center', fontWeight:700, color: t.reform==='ofek' ? 'var(--apple-text)' : 'var(--apple-text3)' }}>{gradeLabel}</td>

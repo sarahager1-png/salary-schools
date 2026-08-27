@@ -502,3 +502,18 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   body { background: #fff; background-image: none; }
   .apple-card, .sheet-wrap { box-shadow: none; border: 1px solid #ddd; }
 }
+
+/* תצוגה מצומצמת של טבלת בית הספר: מסתירה עמודות משניות לפי מיקום,
+   כותרת ותא יחד — כך אין סיכוי להיסט בין הכותרות לתוכן. */
+.compact-cols th:nth-child(2),  .compact-cols td:nth-child(2),
+.compact-cols th:nth-child(3),  .compact-cols td:nth-child(3),
+.compact-cols th:nth-child(4),  .compact-cols td:nth-child(4),
+.compact-cols th:nth-child(12), .compact-cols td:nth-child(12),
+.compact-cols th:nth-child(13), .compact-cols td:nth-child(13),
+.compact-cols th:nth-child(14), .compact-cols td:nth-child(14),
+.compact-cols th:nth-child(16), .compact-cols td:nth-child(16),
+.compact-cols th:nth-child(17), .compact-cols td:nth-child(17),
+.compact-cols th:nth-child(18), .compact-cols td:nth-child(18),
+.compact-cols th:nth-child(19), .compact-cols td:nth-child(19),
+.compact-cols th:nth-child(22), .compact-cols td:nth-child(22),
+.compact-cols th:nth-child(24), .compact-cols td:nth-child(24) { display:none; }
