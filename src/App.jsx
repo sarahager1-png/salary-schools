@@ -159,25 +159,25 @@ function currentScope(t) {
   if (t.scopeChanges?.length > 0) {
     return [...t.scopeChanges].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
   }
-  return { scopePct: t.scopePct || 100, frontalHours: t.frontalHours || 26 };
+  return { scopePct: t.scopePct || 100, frontalHours: t.frontalHours || baseFrontalFor(t) };
 }
 // אחוז המשרה בפועל. עורך הטבלה כותב scopePct גם לעולם ישן, אבל רשומות
 // ותיקות נשמרו ב-scope בלבד — ולכן שתיהן נקראות כאן.
 function effectiveScope(t) {
   if (t.reform === 'ofek') return currentScope(t).scopePct || 100;
-  return t.scope ?? t.scopePct ?? 100;
+  return (t.scope ?? t.scopePct ?? 100) + momScopeBonus(t);
 }
 // תוספת אם עובדת קיימת בעולם ישן בלבד. באופק חדש אין לה ביטוי בשכר,
 // ולכן מספר הילדים נאסף שם כמידע ואינו רכיב שכר.
 // זכאות בעולם ישן: ילד אחד ומעלה עד גיל 18, בהיקף משרה 79% ומעלה.
 function momBonusEligible(t) {
-  return t.reform === 'pre' && (t.childrenUnder18 || 0) > 0 && effectiveScope(t) >= 79;
+  return t.reform === 'pre' && (t.childrenUnder18 || 0) > 0;
 }
-// 10% על השכר הכולל. אינו רכיב במחשבון של המשרד — נבדקו כל שדות מחשבון
-// העולם הישן ואין בהם תוספת אם — ולכן הוא מתווסף כאן, על התוצאה שחזרה
-// משם, ולא מוקלד לתוכה.
-const MOM_RATE = 0.10;
-const momBonus = (t, base) => (momBonusEligible(t) ? Math.round(base * MOM_RATE) : 0);
+// עשר נקודות אחוז על אחוז המשרה. במחשבון אין שדה לתוספת אם, וכך היא
+// מוזנת — המשרה עולה, והשכר נגזר ממנה. אינה אחוז על השכר: מי שב-73%
+// עולה ל-83%, ולא מקבלת 7.3% כסף.
+const MOM_SCOPE_BONUS = 10;
+const momScopeBonus = t => (momBonusEligible(t) ? MOM_SCOPE_BONUS : 0);
 function calcGross(t) {
   if (t._officialGross) return Number(t._officialGross);
   // שכר מנהל/ת אינו על סולם המורים, וגמול הניהול אינו אחוז מעליו: הוא
@@ -196,9 +196,14 @@ function calcNet(gross) { return Math.round(gross * 0.735); }
 // אחוז המשרה והשעות הפרונטליות קשורים זה בזה דרך השלב והפחתת הגיל.
 // אפשר להזין כל אחד מהם, והשני נגזר — לפעמים השעות ידועות, ולפעמים
 // האחוז הוא מה שאושר בבניית התקציב והשעות נגזרות ממנו.
+// שעות משרה מלאה בעולם ישן. LEVELS מחזיק את מספרי האופק — 26 ביסודי,
+// 23 בחטיבה — והם אינם חלים כאן. כל שורות הרשת היום ביסודי; אם תיפתח
+// חטיבה בעולם ישן, המספר שלה צריך להגיע ממך ולא מהערכה.
+const PRE_FRONTAL = 30;
 function baseFrontalFor(t) {
-  const lvl = LEVELS[t.level] || LEVELS.elementary;
   const agR = AGE_RED[t.ageGroup] || AGE_RED.none;
+  if (t.reform !== 'ofek') return PRE_FRONTAL - agR.f;
+  const lvl = LEVELS[t.level] || LEVELS.elementary;
   return lvl.frontal - agR.f;
 }
 // גמול חינוך בעולם ישן: שלוש שעות מעל מה שהיא מלמדת בפועל. באופק
@@ -333,11 +338,9 @@ function payBreakdown(t) {
     return { base, supplement: gross - base, gross, agreed: !!agreed };
   }
   // בית ספר עולם ישן — סימולציה אחת, אין רכיב תוספת
-  if (t.reform !== 'ofek') {
-    // תוספת אם נוספת על שכר העולם הישן, ונושאת עלות מעביד ככל שכר.
-    const mom = momBonus(t, ofek);
-    return { base: ofek + mom, mom, supplement: 0, gross: ofek + mom };
-  }
+  // תוספת אם אינה נוספת כאן: היא כבר בתוך אחוז המשרה שהוזן למחשבון,
+  // והמספר שחזר משם כולל אותה.
+  if (t.reform !== 'ofek') return { base: ofek, mom: 0, supplement: 0, gross: ofek };
   // אם האופק יוצא נמוך מהעולם הישן, העובדת נשארת עם העולם הישן
   const supplement = Math.max(0, ofek - old);
   return { base: old, mom: 0, supplement, gross: old + supplement };
@@ -2046,8 +2049,8 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             </div>
             {momBonusEligible(t) && (
               <p style={{ fontSize:12, color:'var(--apple-purple)', fontWeight:600, marginTop:8 }}>
-                זכאית לתוספת אם — {t.childrenUnder18} ילדים עד גיל 18 · 10% על השכר הכולל
-                {calcEmployer(t).mom ? ` (${calcEmployer(t).mom.toLocaleString('he-IL')} ₪)` : ''}
+                זכאית לתוספת אם — {t.childrenUnder18} ילדים עד גיל 18
+                {` · ${t.scopePct ?? t.scope ?? 100}% + ${MOM_SCOPE_BONUS} = ${effectiveScope(t)}% משרה`}
               </p>
             )}
             {t.reform === 'pre' && (t.childrenUnder18||0) > 0 && !momBonusEligible(t) && (
@@ -2968,7 +2971,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       : <span style={{ color:'var(--text3)' }}>—</span>}
                   </td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.seniority??0} onChange={e=>setF('seniority',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                  <td><input type="number" className="apple-input" dir="ltr" min="0" value={editData.frontalHours??26}
+                  <td><input type="number" className="apple-input" dir="ltr" min="0" value={editData.frontalHours ?? baseFrontalFor(editData)}
                       max={hoursCeiling(editData) ?? 40}
                       onChange={e => {
                         const hrs = Number(e.target.value);
@@ -3056,7 +3059,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         : <span style={{ color:'var(--text3)' }}>—</span>}
                     </td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.seniority??0} onChange={e=>setF('seniority',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                    <td><input type="number" className="apple-input" dir="ltr" min="0" value={d.frontalHours??26}
+                    <td><input type="number" className="apple-input" dir="ltr" min="0" value={d.frontalHours ?? baseFrontalFor(d)}
                       max={hoursCeiling(editData) ?? 40}
                       onChange={e => {
                         const hrs = Number(e.target.value);
@@ -3847,7 +3850,7 @@ function ActualCostPanel({ teachers, schools, onSave }) {
   );
 }
 
-function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMonth, userRole, userId }) {
+function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKids, activeMonth, userRole, userId }) {
   const [calc, setCalc] = useState('ofek');
   const [tab, setTab]   = useState('sim');   // 'sim' | 'cost'
   const costMissing = teachers.filter(t => simComplete(t) && !t._actualEmployerCost).length;
@@ -4022,6 +4025,12 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMon
                             {isPrincipalRow(t)
                               ? (nihulLabel(t.nihulGrade) ? ` · דרגת ניהול ${nihulLabel(t.nihulGrade)}` : ' · חסרה דרגת ניהול')
                               : t.reform === 'ofek' ? ` · דרגה ${t.grade}` : ''} · {t.seniority} שנות ותק
+                            {(t.childrenUnder18 || 0) > 0 && (
+                              <span style={{ color:'var(--purple)', fontWeight:600 }}>
+                                {` · ${t.childrenUnder18} ילדים עד 18`}
+                                {momBonusEligible(t) ? ` · תוספת אם +${MOM_SCOPE_BONUS} למשרה` : ''}
+                              </span>
+                            )}
                           </p>
                         </div>
                         <div style={{ textAlign:'left', flexShrink:0 }}>
@@ -4060,13 +4069,15 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMon
                             // שני שדות שאין להם מקבילה אצל מורה.
                             ['דרגת ניהול', isPrincipalRow(t) ? (nihulLabel(t.nihulGrade) || 'חסרה') : null],
                             ['מורכבות',    isPrincipalRow(t) ? String(school.murkavut ?? 1) : null],
-                            ['ילדים<18', t.reform === 'pre' ? String(t.childrenUnder18 ?? 0) : null],
+
                             // מחנכת בעולם ישן: המחשבון מטפל בגמול דרך השדה
                             // "כיתת חינוך (תוספת חינוך)", בשווי 3 שעות.
                             ['כיתת חינוך', t.reform === 'pre' && /^homeroom/.test(t.role || '') ? 'כן — גמול 3 ש׳' : null],
                             // תוספת אם אינה קיימת במחשבון. היא מתווספת
                             // אצלנו על התוצאה, ואין מה להקליד עבורה.
-                            ['תוספת אם', momBonusEligible(t) ? '10% — מתווסף אצלנו, לא במחשבון' : null],
+                            ['תוספת אם', momBonusEligible(t)
+                              ? `+${MOM_SCOPE_BONUS} נק׳ למשרה — כבר בתוך ה-% למעלה`
+                              : null],
                             ['סטטוס',    onLeave(t) ? leaveText(t) : null],
                           ].filter(([, v]) => v).map(([k, v]) => (
                             <span key={k} style={{
@@ -4077,6 +4088,26 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMon
                               <span style={{ opacity:.65 }}>{k} </span><b style={{ fontWeight:700 }}>{v}</b>
                             </span>
                           ))}
+                          {/* ילדים עד 18 פותחים תוספת אם, והיא משנה את אחוז
+                              המשרה שמוקלד למחשבון. צריך לדעת אותם לפני
+                              החישוב, ולכן השדה כאן ולא רק בכרטיס העובדת. */}
+                          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:11,
+                            padding:'2px 8px', borderRadius:999, background:'var(--purple-100, #EDE8F8)',
+                            color:'var(--purple, #4B2E83)', whiteSpace:'nowrap' }}
+                            onClick={e => e.stopPropagation()}>
+                            <span style={{ opacity:.75 }}>ילדים עד 18</span>
+                            <input type="number" min="0" max="20" dir="ltr"
+                              defaultValue={t.childrenUnder18 ?? 0}
+                              onClick={e => e.stopPropagation()}
+                              onBlur={e => {
+                                const n = Math.max(0, Number(e.target.value) || 0);
+                                if (n !== (t.childrenUnder18 ?? 0)) onSaveKids?.(t.id, n);
+                              }}
+                              style={{ width:38, textAlign:'center', fontWeight:700, fontSize:11.5,
+                                border:'1px solid var(--purple, #4B2E83)', borderRadius:6, padding:'1px 3px',
+                                background:'#fff', color:'inherit', fontFamily:'inherit' }} />
+                            {momBonusEligible(t) && <b style={{ fontWeight:700 }}>+{MOM_SCOPE_BONUS} למשרה</b>}
+                          </span>
                         </div>
                         {needsTwo ? (
                           <>
@@ -4300,10 +4331,11 @@ function LinkTeacherFields({ draft, apply }) {
         <LinkSelect label="גמול תפקיד" value={draft.gamulRole || draft.role || 'none'}
           onChange={v => apply({ role: v, ...principalDefaults({ ...draft, role: v }) })}
           options={ROLES.map(r => [r.id, r.label.split('(')[0].trim()])} />
-        {/* תוספת אם — רכיב של העולם הישן בלבד */}
-        {!isOfek && (
-          <LinkField label="ילדים עד 18" value={draft.childrenUnder18} onChange={v => apply({ childrenUnder18: v })} />
-        )}
+        {/* תוספת אם היא רכיב של העולם הישן, אבל המספר עצמו נאסף תמיד:
+            מסלול משתנה, וילד שלא נרשם אינו מתגלה אחר כך. */}
+        <LinkField label="ילדים עד 18" value={draft.childrenUnder18}
+          onChange={v => apply({ childrenUnder18: v })}
+          hint={isOfek ? 'למידע' : 'לתוספת אם'} />
       </div>
       <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginTop:9 }}>
         <LinkSelect label="סטטוס" value={draft.leaveType || 'none'}
@@ -4965,6 +4997,7 @@ export default function App() {
             userId={user.id}
             onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
             onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
+            onSaveKids={(id, n) => run(() => store.saveTeacher({ id, childrenUnder18: n }, activeMonth))}
           />
         ) : /* Principal: see only their school */
         !isCoord && principalSchool ? (
@@ -4990,6 +5023,7 @@ export default function App() {
             userId={user.id}
             onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
             onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
+            onSaveKids={(id, n) => run(() => store.saveTeacher({ id, childrenUnder18: n }, activeMonth))}
           />
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} />
