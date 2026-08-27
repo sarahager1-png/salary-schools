@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 10;
+const BUILD = 11;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -120,9 +120,12 @@ const ROLE_SHORT = {
 };
 // בחירת תפקיד מנהל/ת גוררת את ברירות המחדל שלה: אופק חדש ודרגת ניהול א.
 // שתיהן ניתנות לשינוי ידני אחר כך — זו נקודת פתיחה, לא נעילה.
+// מנהלת תמיד: אופק חדש · 100% משרה · 40 שעות · דרגת ניהול א.
+// נקודת פתיחה — שרה יכולה לשנות ידנית כל שדה.
 const principalDefaults = draft => (
   draft?.role === PRINCIPAL_ROLE || draft?.gamulRole === PRINCIPAL_ROLE
-    ? { reform: 'ofek', nihulGrade: draft.nihulGrade ?? 1 }
+    ? { reform: 'ofek', nihulGrade: draft.nihulGrade ?? 1,
+        scopePct: 100, scope: 100, frontalHours: 40 }
     : {});
 
 
@@ -197,6 +200,8 @@ const MOM_SCOPE_BONUS = 10;
 // האם אינה כאן — היא מעל הבסיס, ב-effectiveScope.
 // אומת מול ההקלדות הידניות של שרה, 27.8: שבע מתוך תשע עד עיגול.
 function computedBaseScope(t) {
+  // מנהלת: תמיד 100% — 40 שעות ניהול, לא נוסחת הוראה
+  if (isPrincipalRow(t)) return 100;
   const hr = t.reform === 'pre' && /^homeroom/.test(t.role || t.gamulRole || '') ? HOMEROOM_HOURS_PRE : 0;
   const full = t.reform === 'pre' ? PRE_FRONTAL : (LEVELS[t.level]?.frontal || 26);
   const h = Number(t.frontalHours) || 0;
@@ -549,7 +554,9 @@ function makePrincipalRow(school) {
     schoolId: school.id,
     name: PRINCIPAL_PLACEHOLDER,
     role: PRINCIPAL_ROLE,
-    reform: school.reform || 'ofek',
+    reform: 'ofek',
+    nihulGrade: 1,
+    scopePct: 100, scope: 100, frontalHours: 40,
     _changedAt: new Date().toISOString(),
     _approved: false,
   };
