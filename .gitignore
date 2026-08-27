@@ -12,3 +12,6 @@ users-created.txt
 
 .vercel
 .env*
+
+# יומן שליחות וואטסאפ
+outgoing-links.log
