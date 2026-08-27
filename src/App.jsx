@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 13;
+const BUILD = 14;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -3268,7 +3268,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
                       {/* שורת עזר אחת: הצעה ליישור לפי הנוסחה, ותוצאת האם.
                           כשהשדה כבר תואם — רק תוצאת האם, בלי רעש. */}
-                      {computedBaseScope(t) !== (t.scope ?? t.scopePct ?? 100) ? (
+                      {t.reform === 'pre' && !isPrincipalRow(t)
+                        && computedBaseScope(t) !== (t.scope ?? t.scopePct ?? 100) ? (
                         <button
                           title="לפי הנוסחה: שעות (ועוד 3 למחנכת בעולם ישן) חלקי 30, או 26 באופק. לחיצה מיישרת, ותוספת האם מעל."
                           onClick={e => { e.stopPropagation(); saveRow({ ...t, scopePct: computedBaseScope(t), scope: computedBaseScope(t) }); }}
