@@ -36,6 +36,10 @@ async function cleanup() {
 // הוא מה שנשמר בשרת, ולכן הבדיקה ממתינה לו ולא לתצוגה.
 // הכפתור מנוטרל כל עוד אין שינוי. React מעבד את ההקלדה בסבב הבא, ולכן
 // לחיצה מיידית אחריה נופלת על כפתור שעדיין סגור — ולא קורה דבר.
+// בחירה לפי התווית ולא לפי מיקום: משנוספו שדות הבסיס לכרטיס, השדה
+// המספרי הראשון הוא ותק ולא שעות — והבדיקה מילאה בשקט את השדה הלא נכון.
+const fld = (scope, label) => scope.locator('label').filter({ hasText: label }).first().locator('input');
+
 async function clickSave(page) {
   const btn = page.getByRole('button', { name: 'שמירה' }).first();
   const until = Date.now() + 10000;
@@ -52,10 +56,18 @@ async function settled(id, pred, ms = 15000) {
     const { data } = await admin.from('teacher_months').select('*').eq('id', id).single();
     if (data && pred(data)) return data;
     if (filtered) return null;                       // הרשת חסמה — לא המערכת
-    if (Date.now() > until) throw new Error('השמירה לא הגיעה לשרת בזמן');
+    // פסק זמן אינו חריגה שמפילה את כל החבילה: הבדיקה שתלויה בשמירה
+    // תיכשל בעצמה עם שם ברור, ושאר הבדיקות ימשיכו.
+    if (Date.now() > until) return null;
     await new Promise(r => setTimeout(r, 400));
   }
 }
+// הדגל מה-response מגיע באיחור: קריאת גוף התשובה היא אסינכרונית, ובזמן
+// שהיא רצה הבדיקה כבר ויתרה. ההודעה שהמסך מציג היא הסימן הוודאי —
+// raise() מתרגמת את דף החסימה לעברית לפני שהיא מגיעה לכרטיס.
+const blockedOnScreen = async () =>
+  (await p.locator('body').innerText().catch(() => '')).includes('סינון התוכן');
+
 const skipIfFiltered = (name) => {
   if (!filtered) return false;
   console.log(`SKIP  ${name} — סינון התוכן של הרשת חסם את הקריאה`);
@@ -115,11 +127,13 @@ try {
   check('אין עמודות כסף',       !body.includes('11,000') && !body.includes('הוצאות מעביד'));
 
   // ── שמירה ──
-  const hours = p.locator('input[inputmode="numeric"]').first();
+  const hours = fld(p, 'שעות פרונטליות');
   await hours.fill('18');
   await clickSave(p);
-  await settled(row.id, r => r.frontal_hours === 18);
-  if (!skipIfFiltered('שמירה דרך הקישור')) {
+  const savedHours = await settled(row.id, r => r.frontal_hours === 18);
+  if (!savedHours && await blockedOnScreen()) filtered = true;
+  if (!filtered && !savedHours) check('שמירה דרך הקישור הגיעה לשרת', false, 'לא הגיעה תוך 15 שניות');
+  if (!skipIfFiltered('שמירה דרך הקישור') && savedHours) {
     const { data: after } = await admin.from('teacher_months')
       .select('frontal_hours, official_gross, official_gross_pre, approved, changed_at').eq('id', row.id).single();
     check('השעות נשמרו בשרת', after.frontal_hours === 18, String(after.frontal_hours));
@@ -145,11 +159,13 @@ try {
   check('שליח אישר', !ae, ae?.message?.slice(0, 60) || '');
   await p.goto(`http://localhost:5190/?k=${CODE}`);
   await p.getByText('מורה בקישור').first().waitFor({ timeout: 20000 });
-  const absence = p.locator('input[inputmode="numeric"]').nth(1);   // ימי היעדרות
+  const absence = fld(p, 'ימי היעדרות');
   await absence.fill('3');
   await clickSave(p);
-  await settled(row.id, r => r.absence_days === 3);
-  if (!skipIfFiltered('שינוי שאינו בשכר')) {
+  const savedAbs = await settled(row.id, r => r.absence_days === 3);
+  if (!savedAbs && await blockedOnScreen()) filtered = true;
+  if (!filtered && !savedAbs) check('שינוי ימי היעדרות הגיע לשרת', false, 'לא הגיע תוך 15 שניות');
+  if (!skipIfFiltered('שינוי שאינו בשכר') && savedAbs) {
     const { data: abs } = await admin.from('teacher_months')
       .select('absence_days, official_gross, approved').eq('id', row.id).single();
     check('ימי היעדרות נשמרו', abs.absence_days === 3, String(abs.absence_days));

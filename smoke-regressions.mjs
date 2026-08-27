@@ -37,6 +37,9 @@ const settled = async (id, pred, ms = 15000) => {
     await new Promise(r => setTimeout(r, 400));
   }
 };
+// בחירה לפי תווית ולא לפי מיקום: משנוספו שדות הבסיס לכרטיס הקישור,
+// השדה המספרי הראשון הוא ותק ולא שעות.
+const fld = (scope, label) => scope.locator('label').filter({ hasText: label }).first().locator('input');
 const clickSave = async (page) => {
   const btn = page.getByRole('button', { name: 'שמירה' }).first();
   const until = Date.now() + 10000;
@@ -83,7 +86,7 @@ try {
   // ── 1. הקישור גוזר מחדש את אחוז המשרה ──
   await p.goto(`http://localhost:5190/?k=${CODE}`);
   await p.getByText('רגרסיה מורה').first().waitFor({ timeout: 20000 });
-  await p.locator('input[inputmode="numeric"]').first().fill('13');
+  await fld(p, 'שעות פרונטליות').fill('13');
   await clickSave(p);
   const after = await settled(row.id, r => r.frontal_hours === 13);
   if (!after) {
