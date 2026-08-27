@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 3;
+const BUILD = 4;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -3157,7 +3157,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     </td>
                     <td style={{ textAlign:'center' }}>
                       <input type="number" min="0" max="200" dir="ltr"
-                        key={`pct-${t.id}-${scope}`}
+                        key={`pct-${t.id}`}
                         defaultValue={scope}
                         title="אחוז משרה — הקלדה ישירה, נשמר ביציאה מהשדה"
                         onClick={e => e.stopPropagation()}
