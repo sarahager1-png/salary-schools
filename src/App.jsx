@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 24;
+const BUILD = 25;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -91,6 +91,11 @@ const calcForReform = reform => (reform === 'pre' ? 'old' : 'ofek');
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
 const CHABAD_SUPP = new Map();
+// מי שכבר שובצה לה ממ"מ: מפתחות "חודש|בית ספר|שם" של הנשות שמופיעות
+// בשדה "במקום מי" של שורה אחרת. מתעדכן בכל טעינת נתונים.
+const MM_REPLACED = new Set();
+const mmKey = (mk, sid, name) => `${mk}|${sid}|${String(name || '').trim()}`;
+const hasSubstitute = t => MM_REPLACED.has(mmKey(t.monthKey, t.schoolId, t.name));
 const schoolPaysSupp = id => CHABAD_SUPP.get(id) !== false;
 // למנהלת בית ספר יש מחשבון נפרד — אופק ניהול
 // מורת רפורמה בחטיבה העליונה היא עוז לתמורה, לא אופק חדש — שני
@@ -387,7 +392,9 @@ function calcEmployer(t) {
   // חל"ד: אין שכר מהרשת — המוסד לביטוח לאומי משלם — אבל חובת המעסיק
   // להמשיך את ההפרשות הסוציאליות נשארת: פנסיה ופיצויים וקרן השתלמות
   // על הבסיס הרגיל. יורדים: השכר, מס שכר, ביטוח לאומי, הבראה וביגוד.
-  if (t.leaveType === 'maternity') {
+  // כל עוד לא שובצה מחליפה, השכר נשאר מלא בתקציב — הוראת שרה 28.8.
+  // ברגע ששורה אחרת נושאת את שמה ב"במקום מי", עוברים למצב ההפרשות.
+  if (t.leaveType === 'maternity' && hasSubstitute(t)) {
     const bd = payBreakdown(t);
     const parts = [
       { key:'pension', label:'פנסיה ופיצויים (חל"ד)', rate:PENSION_RATE, on:bd.base, amount: Math.round(bd.base * PENSION_RATE) },
@@ -5207,6 +5214,10 @@ export default function App() {
     for (const sc of (data.schools || [])) CHABAD_SUPP.set(sc.id, sc.chabadSupp !== false);
     setApprovers(data.approvers || []);
     setMonths(data.months);
+    MM_REPLACED.clear();
+    for (const [mk, rows2] of Object.entries(data.months || {}))
+      for (const r2 of rows2 || [])
+        if (String(r2.mmFor || '').trim()) MM_REPLACED.add(mmKey(mk, r2.schoolId, r2.mmFor));
     setActiveMonth(prev => {
       const keys = Object.keys(data.months).sort();
       if (keys.includes(prev)) return prev;
