@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 8;
+const BUILD = 9;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -111,6 +111,13 @@ const isPrincipalRow = t => t?.role === PRINCIPAL_ROLE;
 // דרגת הניהול היא א..ד ואינה סולם המורים. נשמרת כמספר 1..4.
 const NIHUL_GRADES = [{ v:1, l:'א' }, { v:2, l:'ב' }, { v:3, l:'ג' }, { v:4, l:'ד' }];
 const nihulLabel = v => NIHUL_GRADES.find(g => g.v === Number(v))?.l || null;
+// שם קצר לבורר שבתוך הטבלה — השם המלא נחתך שם ואי אפשר להבחין
+// בין מחנכת כיתה א' למחנכת ב'-ו'.
+const ROLE_SHORT = {
+  none:'—', homeroom:'מחנכת ב׳-ו׳ · 10%', homeroom1:'מחנכת א׳ · 11.5%',
+  homeroom2:'מחנכת חטיבה · 11.5%', subject6:'רכזת מקצוע · 6%', subject8:'רכזת מקצוע · 8%',
+  team:'ראש צוות · 6.5%', counselor:'יועצת · 12%', counselor2:'יועצת · 18%', principal:'מנהל/ת',
+};
 // בחירת תפקיד מנהל/ת גוררת את ברירות המחדל שלה: אופק חדש ודרגת ניהול א.
 // שתיהן ניתנות לשינוי ידני אחר כך — זו נקודת פתיחה, לא נעילה.
 const principalDefaults = draft => (
@@ -3189,21 +3196,22 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         style={{ width:56, textAlign:'center', fontWeight:700, fontSize:13,
                           border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
                           background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
-                      {momBonus && (
-                        <span style={{ display:'block', fontSize:9.5, color:'var(--purple)', fontWeight:700 }}
-                          title="ילדים בעולם ישן — המערכת מוסיפה עשר נקודות על האחוז שהוקלד. מקלידים את הבסיס בלבד.">
+                      {/* שורת עזר אחת: הצעה ליישור לפי הנוסחה, ותוצאת האם.
+                          כשהשדה כבר תואם — רק תוצאת האם, בלי רעש. */}
+                      {computedBaseScope(t) !== (t.scope ?? t.scopePct ?? 100) ? (
+                        <button
+                          title="לפי הנוסחה: שעות (ועוד 3 למחנכת בעולם ישן) חלקי 30, או 26 באופק. לחיצה מיישרת, ותוספת האם מעל."
+                          onClick={e => { e.stopPropagation(); onSaveTeacher({ ...t, scopePct: computedBaseScope(t), scope: computedBaseScope(t) }); }}
+                          style={{ display:'block', margin:'3px auto 0', fontSize:10.5, color:'#fff',
+                            background:'var(--teal)', border:'none', cursor:'pointer', fontFamily:'inherit',
+                            fontWeight:700, padding:'2px 8px', borderRadius:999, whiteSpace:'nowrap' }}>
+                          {`תקני ל-${computedBaseScope(t)}`}
+                        </button>
+                      ) : momBonus ? (
+                        <span style={{ display:'block', fontSize:10, color:'var(--purple)', fontWeight:700, marginTop:2 }}>
                           {`+10 אם = ${effectiveScope(t)}%`}
                         </span>
-                      )}
-                      {computedBaseScope(t) !== (t.scope ?? t.scopePct ?? 100) && (
-                        <button
-                          title="הבסיס לפי הנוסחה: שעות (ועוד 3 למחנכת בעולם ישן) חלקי 30, או חלקי 26 באופק. לחיצה מיישרת את השדה."
-                          onClick={e => { e.stopPropagation(); onSaveTeacher({ ...t, scopePct: computedBaseScope(t), scope: computedBaseScope(t) }); }}
-                          style={{ display:'block', margin:'2px auto 0', fontSize:9.5, color:'var(--teal-700)',
-                            background:'none', border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, padding:0 }}>
-                          {`לפי השעות: ${computedBaseScope(t)}`}
-                        </button>
-                      )}
+                      ) : null}
                     </td>
                     <td style={{ textAlign:'center' }}>{degreeLabel}</td>
                     <td style={{ textAlign:'center', fontWeight:700, color: t.reform==='ofek' ? 'var(--apple-text)' : 'var(--apple-text3)' }}>{gradeLabel}</td>
@@ -3215,10 +3223,10 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         onClick={e => e.stopPropagation()}
                         onChange={e => onSaveTeacher({ ...t, role: e.target.value })}
                         className="apple-select"
-                        style={{ fontSize:11.5, padding:'3px 5px', maxWidth:128,
+                        style={{ fontSize:12, padding:'4px 6px', width:150,
                           fontWeight: t.role && t.role !== 'none' ? 700 : 400,
                           color: t.role && t.role !== 'none' ? 'var(--text)' : 'var(--text3)' }}>
-                        {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}{r.pct ? ` — ${r.pct}%` : ''}</option>)}
+                        {ROLES.map(r => <option key={r.id} value={r.id}>{ROLE_SHORT[r.id] || r.label}</option>)}
                       </select>
                     </td>
                     <td style={{ textAlign:'center', fontSize:12 }}>{LEVELS[t.level]?.label || '—'}</td>
