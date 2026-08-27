@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 9;
+const BUILD = 10;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -180,9 +180,15 @@ function effectiveScope(t) {
 // תוספת אם עובדת קיימת בעולם ישן בלבד. באופק חדש אין לה ביטוי בשכר,
 // ולכן מספר הילדים נאסף שם כמידע ואינו רכיב שכר.
 // זכאות בעולם ישן: ילד אחד ומעלה עד גיל 18, בהיקף משרה 79% ומעלה.
+const MOM_MIN_SCOPE = 79;
 function momBonusEligible(t) {
-  return t.reform === 'pre' && (t.childrenUnder18 || 0) > 0;
+  return t.reform === 'pre' && (t.childrenUnder18 || 0) > 0
+    && (t.scope ?? t.scopePct ?? 100) >= MOM_MIN_SCOPE;
 }
+// אם שמתחת לסף — לתצוגה בלבד, כדי שיהיה ברור שלא נשכחה אלא לא זכאית
+const momUnderThreshold = t =>
+  t.reform === 'pre' && (t.childrenUnder18 || 0) > 0
+  && (t.scope ?? t.scopePct ?? 100) < MOM_MIN_SCOPE;
 // עשר נקודות על אחוז המשרה, אוטומטית — הוראה מפורשת של שרה מ-27.8.
 // האחוז שמוקלד הוא הבסיס; התוספת מוצגת לידו ואינה נבלעת בשקט.
 const MOM_SCOPE_BONUS = 10;
@@ -3210,6 +3216,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       ) : momBonus ? (
                         <span style={{ display:'block', fontSize:10, color:'var(--purple)', fontWeight:700, marginTop:2 }}>
                           {`+10 אם = ${effectiveScope(t)}%`}
+                        </span>
+                      ) : momUnderThreshold(t) ? (
+                        <span style={{ display:'block', fontSize:10, color:'var(--text3)', marginTop:2 }}
+                          title={`תוספת אם ניתנת ממשרה של ${MOM_MIN_SCOPE}% ומעלה`}>
+                          {`אם · מתחת ל-${MOM_MIN_SCOPE}%`}
                         </span>
                       ) : null}
                     </td>
