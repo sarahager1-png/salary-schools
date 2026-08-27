@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { ENV_FILE } from './test-env.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { ofekRequest, oldRequest, nihulRequest, readResult } from './src/lib/calc.js';
 
@@ -6,7 +7,7 @@ import { ofekRequest, oldRequest, nihulRequest, readResult } from './src/lib/cal
 // הקריאה עצמה חסומה כרגע ב-Cloudflare — ראי supabase/functions/calc-salary.
 
 const env = Object.fromEntries(
-  fs.readFileSync('.env.local','utf8').split('\n').filter(Boolean)
+  fs.readFileSync(ENV_FILE,'utf8').split('\n').filter(Boolean)
     .map(l=>{const i=l.indexOf('=');return [l.slice(0,i),l.slice(i+1)];}));
 const admin = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {auth:{persistSession:false}});
 const fails=[]; const check=(n,ok,e='')=>{console.log(`${ok?'PASS':'FAIL'}  ${n}${e?' — '+e:''}`);if(!ok)fails.push(n);};

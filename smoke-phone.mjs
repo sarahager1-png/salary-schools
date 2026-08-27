@@ -1,7 +1,8 @@
 // טלפון ומייל של עובד/ת הוראה — דרך הקישור ודרך המסך המחובר.
 import fs from 'node:fs';
+import { ENV_FILE } from './test-env.mjs';
 import { createClient } from '@supabase/supabase-js';
-const env=Object.fromEntries(fs.readFileSync('.env.local','utf8').split(/\r?\n/).filter(Boolean)
+const env=Object.fromEntries(fs.readFileSync(ENV_FILE,'utf8').split(/\r?\n/).filter(Boolean)
   .filter(l=>!l.trimStart().startsWith('#')).map(l=>{const i=l.indexOf('=');return[l.slice(0,i).trim(),l.slice(i+1).trim()];}));
 const admin=createClient(env.VITE_SUPABASE_URL,env.SUPABASE_SECRET_KEY,{auth:{persistSession:false}});
 const anon=createClient(env.VITE_SUPABASE_URL,env.VITE_SUPABASE_ANON_KEY,{auth:{persistSession:false}});

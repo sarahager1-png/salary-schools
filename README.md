@@ -1,16 +1,83 @@
-# React + Vite
+# מערכת תקציב השכר — בתי הספר שלהבות
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+חישוב עלות שכר עובדי הוראה בשמונת בתי הספר המוכש"ר של הרשת, על בסיס
+הסימולטור של משרד החינוך.
 
-Currently, two official plugins are available:
+* אתר: https://salary-schools.vercel.app
+* מסד חי: Supabase `rvkjfjokdhkwiigorysr`
+* מסד בדיקות: Supabase `dovgircrzeputtkgxdsv` (`salary-schools-test`)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## הרצה
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+npm run dev:test    # מול מסד הבדיקות — ברירת המחדל לפיתוח, פורט 5190
+npm run dev:prod    # מול המסד החי — רק כשצריך לשחזר משהו שמנהלת מדווחת
+```
 
-## Expanding the ESLint configuration
+`dev:test` מריץ `vite --mode test`, ולכן `.env.test` גובר על `.env.local`.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+
+## בדיקות
+
+```bash
+node run-smoke.mjs              # כל החבילות ברצף
+node run-smoke.mjs links docs   # רק חבילות ששמן מכיל את המחרוזות
+```
+
+צריך שרת פיתוח פעיל ב-5190 (`npm run dev:test`).
+
+**החבילות רצות מול מסד נפרד, לא מול החי.** הן יוצרות בתי ספר, משתמשים
+וחודשים. כשהן רצו מול המסד החי, מנהלת שפתחה את הקישור בזמן שבדיקה רצה
+ראתה חודש בדיקה בבורר — היא דיווחה על "יוני 2098" — והייתה יכולה להזין
+אליו נתונים אמיתיים שאיש לא היה מוצא.
+
+`test-env.mjs` הוא השומר: הוא טוען `.env.test` אם הוא קיים, ואם ההגדרות
+מצביעות על המסד החי הוא עוצר לפני השורה הראשונה. להרצה מכוונת מול החי:
+
+```bash
+ALLOW_PROD=1 node smoke-store.mjs
+```
+
+**ברצף, לא במקביל, ועל מסד נקי.** החבילות חולקות מסד אחד, וחודש שנשאר
+מריצה קודמת מבלבל את כולן.
+
+---
+
+## תחזוקה
+
+```bash
+node scripts/list-leftovers.mjs      # מה יש במסד החי עכשיו
+node scripts/tidy.mjs 2026-09        # ניקוי שרידי בדיקה, שומר את החודש שצוין
+node scripts/check-prod.mjs          # בדיקת שפיות מול האתר החי
+node scripts/send-links.mjs          # הרצה יבשה; --send שולח באמת
+```
+
+`tidy` דורש את החודש לשמירה כפרמטר — בלי ברירת מחדל, אחרי שחודש מקודד
+קשיח מחק פעם אחת את חודש העבודה עצמו.
+
+---
+
+## מבנה
+
+| קובץ | תפקיד |
+|---|---|
+| `src/App.jsx` | כל המסכים |
+| `src/lib/store.js` | גישה ל-Supabase |
+| `src/lib/calc.js` | מיפוי עובד/ת הוראה לכל אחד ממחשבוני המשרד |
+| `supabase/migrations/` | סכימה, RLS, והפונקציות של גישת הקישור |
+| `supabase/functions/calc-salary/` | פרוקסי למחשבון — חסום ב-Cloudflare, ממתין לגישת API |
+
+---
+
+## דברים שצריך לדעת
+
+* **הרשאות ברמת עמודה** אינן אפשריות ב-RLS. מנהלת חסומה מלערוך ותק
+  ודרגה דרך טריגר BEFORE UPDATE, לא דרך מדיניות.
+* **גישת קישור** (`?k=…`) עוברת דרך פונקציות `link_*` ב-SECURITY DEFINER.
+  הטבלאות עצמן סגורות ל-`anon` לגמרי.
+* **סינון תוכן ברשת** (`safepage.neto.net.il`) מחליף לפעמים תשובות של
+  Supabase בדף חסימה. החבילות מזהות את זה ומדלגות במקום להיכשל.

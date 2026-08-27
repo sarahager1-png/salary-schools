@@ -4,11 +4,12 @@
 // שני הצעדים הראשונים דורשים מסד בלי אף חודש. אם יש חודש (חבילה אחרת
 // רצה, או שריד) — הם מדולגים ונאמר למה, לא נכשלים.
 import fs from 'node:fs';
+import { ENV_FILE } from './test-env.mjs';
 import { chromium } from 'file:///C:/tmp/node_modules/playwright/index.mjs';
 import { createClient } from '@supabase/supabase-js';
 
 const env = Object.fromEntries(
-  fs.readFileSync('.env.local', 'utf8').split('\n').filter(Boolean)
+  fs.readFileSync(ENV_FILE, 'utf8').split('\n').filter(Boolean)
     .map(l => { const i = l.indexOf('='); return [l.slice(0, i), l.slice(i + 1)]; })
 );
 const admin = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });

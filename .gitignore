@@ -15,3 +15,6 @@ users-created.txt
 
 # יומן שליחות וואטסאפ
 outgoing-links.log
+
+# מסד הבדיקות
+.env.test

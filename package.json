@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:test": "vite --mode test --port 5190",
+    "dev:prod": "vite --port 5190"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",

@@ -4,11 +4,12 @@
 // מוודאת גם שהמסך מציג את המצב הנכון, וגם שמנהלת אינה יכולה לראות
 // את התמונה של שאר בתי הספר.
 import fs from 'node:fs';
+import { ENV_FILE } from './test-env.mjs';
 import { chromium } from 'file:///C:/tmp/node_modules/playwright/index.mjs';
 import { createClient } from '@supabase/supabase-js';
 
 const env = Object.fromEntries(
-  fs.readFileSync('.env.local', 'utf8').split(/\r?\n/).filter(Boolean)
+  fs.readFileSync(ENV_FILE, 'utf8').split(/\r?\n/).filter(Boolean)
     .filter(l => !l.trimStart().startsWith('#'))
     .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }));
 const admin = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });

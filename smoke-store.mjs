@@ -3,10 +3,11 @@
 //
 //   node smoke-store.mjs
 import fs from 'node:fs';
+import { ENV_FILE } from './test-env.mjs';
 import { createClient } from '@supabase/supabase-js';
 
 const env = Object.fromEntries(
-  fs.readFileSync('.env.local', 'utf8').split('\n').filter(Boolean)
+  fs.readFileSync(ENV_FILE, 'utf8').split('\n').filter(Boolean)
     .map(l => { const i = l.indexOf('='); return [l.slice(0, i), l.slice(i + 1)]; })
 );
 const URL = env.VITE_SUPABASE_URL, ANON = env.VITE_SUPABASE_ANON_KEY, SECRET = env.SUPABASE_SECRET_KEY;

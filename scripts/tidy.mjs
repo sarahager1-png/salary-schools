@@ -18,6 +18,13 @@ for(const s of (schools||[]).filter(x=>!REAL.includes(x.name))){
   await admin.from('schools').delete().eq('id',s.id);
   console.log('בית ספר בדיקה נמחק: '+s.name);
 }
+const {data:allUsers}=await admin.auth.admin.listUsers();
+for(const u of (allUsers?.users||[]).filter(x=>/@example\.com$/i.test(x.email||''))){
+  await admin.from('access_links').delete().eq('profile_id',u.id);
+  await admin.from('profiles').delete().eq('id',u.id);
+  await admin.auth.admin.deleteUser(u.id).catch(()=>{});
+  console.log('משתמש בדיקה נמחק: '+u.email);
+}
 const {data:months}=await admin.from('months').select('key');
 for(const m of (months||[]).filter(x=>x.key!==KEEP)){
   const {count}=await admin.from('teacher_months').select('id',{count:'exact',head:true}).eq('month_key',m.key);
