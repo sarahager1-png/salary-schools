@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 26;
+const BUILD = 27;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -3245,7 +3245,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 );
 
                 return (
-                  <tr key={t.id} style={{ background: isSim ? 'var(--warn-bg)' : isAppr ? 'var(--teal-100)' : 'var(--surface)' }}>
+                  <tr key={t.id} style={{ background:
+                    isSim ? 'var(--warn-bg)'
+                    : isAppr ? 'var(--teal-100)'
+                    : t.reform === 'ofek' ? '#EDF3FE'   /* אופק חדש — כחלחל, להבחנה מעולם ישן */
+                    : 'var(--surface)' }}>
                     <td>
                       <div style={{ display:'flex', alignItems:'center', gap:6, fontWeight:600, color:'var(--text)' }}>
                         {isSim  && <Calculator size={13} strokeWidth={2.4} color="var(--warn)" aria-label="נדרשת סימולציה" />}
