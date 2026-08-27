@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 6;
+const BUILD = 7;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -168,8 +168,7 @@ function currentScope(t) {
 // ותיקות נשמרו ב-scope בלבד — ולכן שתיהן נקראות כאן.
 function effectiveScope(t) {
   if (t.reform === 'ofek') return currentScope(t).scopePct || 100;
-  // תוספת אם אינה מתווספת כאן. האחוז הוא מה שהוזן, ותו לא.
-  return t.scope ?? t.scopePct ?? 100;
+  return (t.scope ?? t.scopePct ?? 100) + momScopeBonus(t);
 }
 // תוספת אם עובדת קיימת בעולם ישן בלבד. באופק חדש אין לה ביטוי בשכר,
 // ולכן מספר הילדים נאסף שם כמידע ואינו רכיב שכר.
@@ -177,10 +176,10 @@ function effectiveScope(t) {
 function momBonusEligible(t) {
   return t.reform === 'pre' && (t.childrenUnder18 || 0) > 0;
 }
-// עשר נקודות אחוז על אחוז המשרה. במחשבון אין שדה לתוספת אם, וכך היא
-// מוזנת — המשרה עולה, והשכר נגזר ממנה. אינה אחוז על השכר: מי שב-73%
-// עולה ל-83%, ולא מקבלת 7.3% כסף.
+// עשר נקודות על אחוז המשרה, אוטומטית — הוראה מפורשת של שרה מ-27.8.
+// האחוז שמוקלד הוא הבסיס; התוספת מוצגת לידו ואינה נבלעת בשקט.
 const MOM_SCOPE_BONUS = 10;
+const momScopeBonus = t => (momBonusEligible(t) ? MOM_SCOPE_BONUS : 0);
 function calcGross(t) {
   if (t._officialGross) return Number(t._officialGross);
   // שכר מנהל/ת אינו על סולם המורים, וגמול הניהול אינו אחוז מעליו: הוא
@@ -3182,8 +3181,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
                       {momBonus && (
                         <span style={{ display:'block', fontSize:9.5, color:'var(--purple)', fontWeight:700 }}
-                          title="ילדים בעולם ישן — עוד 10 נקודות על אחוז המשרה. המערכת אינה מוסיפה לבד; לוודא שהאחוז שהוקלד כולל אותן.">
-                          אם: +10 בפנים?
+                          title="ילדים בעולם ישן — המערכת מוסיפה עשר נקודות על האחוז שהוקלד. מקלידים את הבסיס בלבד.">
+                          {`+10 אם = ${effectiveScope(t)}%`}
                         </span>
                       )}
                     </td>
@@ -4125,7 +4124,13 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKid
                           borderBottom:'1px solid var(--line-soft, #EDE8F8)',
                         }}>
                           {[
-                            ['% משרה',   `${(isOfek ? dh?.scopePct : null) ?? t.scopePct ?? t.scope ?? 100}%`],
+                            // לעולם ישן: האפקטיבי, כולל תוספת אם — זה מה
+                            // שמוקלד למחשבון בשדה אחוז המשרה.
+                            ['% משרה',   isOfek
+                              ? `${dh?.scopePct ?? t.scopePct ?? 100}%`
+                              : momBonusEligible(t)
+                                ? `${t.scopePct ?? t.scope ?? 100} +10 אם = ${effectiveScope(t)}%`
+                                : `${effectiveScope(t)}%`],
                             // מחנכת בעולם ישן משולמת על שלוש שעות מעל מה
                             // שהיא מלמדת. בלי לומר זאת, המספר במחשבון אינו
                             // מסתדר עם מה שהמנהלת הזינה.
