@@ -165,7 +165,8 @@ function currentScope(t) {
 // ותיקות נשמרו ב-scope בלבד — ולכן שתיהן נקראות כאן.
 function effectiveScope(t) {
   if (t.reform === 'ofek') return currentScope(t).scopePct || 100;
-  return (t.scope ?? t.scopePct ?? 100) + momScopeBonus(t);
+  // תוספת אם אינה מתווספת כאן. האחוז הוא מה שהוזן, ותו לא.
+  return t.scope ?? t.scopePct ?? 100;
 }
 // תוספת אם עובדת קיימת בעולם ישן בלבד. באופק חדש אין לה ביטוי בשכר,
 // ולכן מספר הילדים נאסף שם כמידע ואינו רכיב שכר.
@@ -177,7 +178,6 @@ function momBonusEligible(t) {
 // מוזנת — המשרה עולה, והשכר נגזר ממנה. אינה אחוז על השכר: מי שב-73%
 // עולה ל-83%, ולא מקבלת 7.3% כסף.
 const MOM_SCOPE_BONUS = 10;
-const momScopeBonus = t => (momBonusEligible(t) ? MOM_SCOPE_BONUS : 0);
 function calcGross(t) {
   if (t._officialGross) return Number(t._officialGross);
   // שכר מנהל/ת אינו על סולם המורים, וגמול הניהול אינו אחוז מעליו: הוא
@@ -215,20 +215,9 @@ const homeroomHours = t =>
 // בפועל וממנו נגזרת המכסה של בית הספר.
 const paidFrontal = t => (Number(t?.frontalHours) || 0) + homeroomHours(t);
 
-// הכיוון ההפוך: מאחוז משרה לשעות פרונטליות. גמול החינוך של מחנכת
-// בעולם ישן נכלל באחוז ואינו שעה שהיא מלמדת, ולכן הוא יורד כאן.
-function frontalFromScope(t, pct) {
-  const bf = baseFrontalFor(t);
-  if (!bf) return Number(t.frontalHours) || 0;
-  return Math.max(0, Math.round((Number(pct) || 0) / 100 * bf) - homeroomHours(t));
-}
-
-function scopeFromFrontal(t, hours) {
-  const bf = baseFrontalFor(t);
-  if (!bf) return t.scopePct ?? 100;
-  const paid = (Number(hours) || 0) + homeroomHours(t);
-  return Math.round(paid / bf * 100);
-}
+// אחוז המשרה מוזן ביד ואינו נגזר. הנוסחה שהייתה כאן שגתה שלוש פעמים:
+// בסיס 30 בעולם ישן ולא 26, שלוש שעות גמול חינוך למחנכת, ועשר נקודות
+// תוספת אם. עד שהיא תהיה נכונה ומאושרת — אין נוסחה.
 
 function deriveHours(t, scopeOverride) {
   if (t.reform !== 'ofek') return null;
@@ -2914,6 +2903,9 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <th style={{ textAlign:'center' }}>דרגת אופק</th>
                 <th style={{ textAlign:'center' }}>ותק</th>
                 <th style={{ textAlign:'center' }}>פרונטלי</th>
+                <th style={{ textAlign:'center' }}>גמול תפקיד</th>
+                <th style={{ textAlign:'center' }}>שלב</th>
+                <th style={{ textAlign:'center' }}>קבוצת גיל</th>
                 <th style={{ textAlign:'center' }}>שיבוץ</th>
                 <th style={{ textAlign:'center' }}>ילדים</th>
                 <th style={{ textAlign:'center' }}>העדרות (ימים)</th>
@@ -2943,16 +2935,15 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     </select>
                   </td>
                   <td style={{ textAlign:'center' }}>
-                    {/* שני הכיוונים: שעות -> אחוז, ואחוז -> שעות. */}
+                    {/* מוזן ביד. אינו נגזר מהשעות. */}
                     <input type="number" className="apple-input" dir="ltr" min="0" max="200"
                       value={editData.scopePct ?? 100}
                       onChange={e => {
                         const pct = Number(e.target.value);
-                        const hrs = frontalFromScope(editData, pct);
-                        setEditData(p => ({ ...p, scopePct: pct, scope: pct, frontalHours: hrs }));
+                        setEditData(p => ({ ...p, scopePct: pct, scope: pct }));
                       }}
                       style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:58, textAlign:'center', fontWeight:700 }} />
-                    <span style={{ display:'block', fontSize:10.5, color:'var(--text3)' }}>%  ·  גם משעות</span>
+                    <span style={{ display:'block', fontSize:10.5, color:'var(--text3)' }}>% משרה</span>
                   </td>
                   <td>
                     <select value={editData.degree||'BA'} onChange={e=>setF('degree',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
@@ -2974,13 +2965,26 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                   <td><input type="number" className="apple-input" dir="ltr" min="0" value={editData.frontalHours ?? baseFrontalFor(editData)}
                       max={hoursCeiling(editData) ?? 40}
                       onChange={e => {
-                        const hrs = Number(e.target.value);
-                        // השעות הן הקלט; אחוז המשרה נגזר מהן ומהשלב, אחרי הפחתת גיל
-                        const pct = scopeFromFrontal({ ...editData, frontalHours: hrs }, hrs);
-                        // scope הוא שדה העולם הישן; שומרים את שניהם כדי שלא ייפרדו
-                        setEditData(p => ({ ...p, frontalHours: hrs, scopePct: pct, scope: pct }));
+                        // השעות אינן גוזרות את האחוז. הנוסחה שגזרה אותו
+                        // שגתה, ושרה מזינה אותו בעצמה.
+                        setEditData(p => ({ ...p, frontalHours: Number(e.target.value) }));
                       }}
                       style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td style={{ textAlign:'center' }}>
+                    <select value={editData.role || 'none'} onChange={e=>setF('role',e.target.value)} className="apple-select" style={{ fontSize:11.5, padding:'4px 6px', maxWidth:130 }}>
+                      {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
+                    </select>
+                  </td>
+                  <td style={{ textAlign:'center' }}>
+                    <select value={editData.level || 'elementary'} onChange={e=>setF('level',e.target.value)} className="apple-select" style={{ fontSize:11.5, padding:'4px 6px' }}>
+                      {Object.entries(LEVELS).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
+                    </select>
+                  </td>
+                  <td style={{ textAlign:'center' }}>
+                    <select value={editData.ageGroup || 'none'} onChange={e=>setF('ageGroup',e.target.value)} className="apple-select" style={{ fontSize:11.5, padding:'4px 6px' }}>
+                      {Object.entries(AGE_RED).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
+                    </select>
+                  </td>
                   <td style={{ textAlign:'center' }}>
                     <label className="apple-toggle">
                       <input type="checkbox" checked={!!editData.isTemp} onChange={e=>setF('isTemp',e.target.checked)} />
@@ -3031,16 +3035,15 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       </select>
                     </td>
                     <td style={{ textAlign:'center' }}>
-                      {/* שני הכיוונים: שעות -> אחוז, ואחוז -> שעות. */}
+                      {/* מוזן ביד. אינו נגזר מהשעות. */}
                       <input type="number" className="apple-input" dir="ltr" min="0" max="200"
                         value={d.scopePct ?? 100}
                         onChange={e => {
                           const pct = Number(e.target.value);
-                          const hrs = frontalFromScope(d, pct);
-                          setEditData(p => ({ ...p, scopePct: pct, scope: pct, frontalHours: hrs }));
+                          setEditData(p => ({ ...p, scopePct: pct, scope: pct }));
                         }}
                         style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:58, textAlign:'center', fontWeight:700 }} />
-                      <span style={{ display:'block', fontSize:10.5, color:'var(--text3)' }}>%  ·  גם משעות</span>
+                      <span style={{ display:'block', fontSize:10.5, color:'var(--text3)' }}>% משרה</span>
                     </td>
                     <td>
                       <select value={d.degree||'BA'} onChange={e=>setF('degree',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
@@ -3062,13 +3065,26 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td><input type="number" className="apple-input" dir="ltr" min="0" value={d.frontalHours ?? baseFrontalFor(d)}
                       max={hoursCeiling(editData) ?? 40}
                       onChange={e => {
-                        const hrs = Number(e.target.value);
-                        // השעות הן הקלט; אחוז המשרה נגזר מהן ומהשלב, אחרי הפחתת גיל
-                        const pct = scopeFromFrontal({ ...editData, frontalHours: hrs }, hrs);
-                        // scope הוא שדה העולם הישן; שומרים את שניהם כדי שלא ייפרדו
-                        setEditData(p => ({ ...p, frontalHours: hrs, scopePct: pct, scope: pct }));
+                        // השעות אינן גוזרות את האחוז. הנוסחה שגזרה אותו
+                        // שגתה, ושרה מזינה אותו בעצמה.
+                        setEditData(p => ({ ...p, frontalHours: Number(e.target.value) }));
                       }}
                       style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td style={{ textAlign:'center' }}>
+                    <select value={d.role || 'none'} onChange={e=>setF('role',e.target.value)} className="apple-select" style={{ fontSize:11.5, padding:'4px 6px', maxWidth:130 }}>
+                      {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
+                    </select>
+                  </td>
+                  <td style={{ textAlign:'center' }}>
+                    <select value={d.level || 'elementary'} onChange={e=>setF('level',e.target.value)} className="apple-select" style={{ fontSize:11.5, padding:'4px 6px' }}>
+                      {Object.entries(LEVELS).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
+                    </select>
+                  </td>
+                  <td style={{ textAlign:'center' }}>
+                    <select value={d.ageGroup || 'none'} onChange={e=>setF('ageGroup',e.target.value)} className="apple-select" style={{ fontSize:11.5, padding:'4px 6px' }}>
+                      {Object.entries(AGE_RED).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
+                    </select>
+                  </td>
                     <td style={{ textAlign:'center' }}>
                       <label className="apple-toggle">
                         <input type="checkbox" checked={!!d.isTemp} onChange={e=>setF('isTemp',e.target.checked)} />
@@ -4365,14 +4381,9 @@ function LinkNewCard({ schoolReform, onAdd, male }) {
   const apply = (patch) => {
     setState('');
     setDraft(prev => {
-      const next = { ...prev, ...patch };
-      // אחוז המשרה נגזר מהשעות, מהשלב ומקבוצת הגיל — כמו בכל מסך אחר
-      const hrs = next.frontalHours;
-      if (hrs != null && hrs !== '') {
-        const pct = scopeFromFrontal(next, hrs);
-        next.scopePct = pct; next.scope = pct;
-      }
-      return next;
+      // אחוז המשרה אינו נגזר מהשעות. הנוסחה שגזרה אותו שגתה, והרכזת
+      // מזינה את האחוזים בעצמה עד שהיא תהיה נכונה.
+      return { ...prev, ...patch };
     });
   };
 
@@ -4420,19 +4431,12 @@ function LinkCard({ teacher, locked, onSave }) {
   useEffect(() => { setDraft(teacher); }, [teacher]);
 
   const set = (k, v) => apply({ [k]: v });
-  // כל שינוי עובר כאן, כדי שאחוז המשרה ייגזר מחדש בכל מקרה שמשפיע עליו:
-  // השעות, השלב וקבוצת הגיל. קודם הגזירה הייתה תלויה בשדה השעות בלבד.
+  // אחוז המשרה אינו נגזר מהשעות. הנוסחה שגזרה אותו שגתה שלוש פעמים —
+  // בסיס 26 במקום 30 בעולם ישן, גמול חינוך, תוספת אם — והרכזת מזינה
+  // את האחוזים בעצמה עד שתהיה נכונה.
   const apply = (patch) => {
     setState('');
-    setDraft(prev => {
-      const next = { ...prev, ...patch };
-      const hrs = next.frontalHours;
-      if (hrs != null && hrs !== '') {
-        const pct = scopeFromFrontal(next, hrs);
-        next.scopePct = pct; next.scope = pct;
-      }
-      return next;
-    });
+    setDraft(prev => ({ ...prev, ...patch }));
   };
   const dirty = JSON.stringify(draft) !== JSON.stringify(teacher);
 
