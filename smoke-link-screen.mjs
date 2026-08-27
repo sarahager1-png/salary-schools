@@ -109,11 +109,11 @@ try {
     { code: OTHER, profile_id: pB, revoked: false },
   ]);
   const { data: row } = await admin.from('teacher_months').insert({
-    month_key: MONTH, school_id: s1.id, name: 'מורה בקישור', reform: 'ofek',
+    month_key: MONTH, school_id: s1.id, name: 'מורה בקישור', phone: '0501112233', email: 'link@example.com', reform: 'ofek',
     frontal_hours: 26, scope_pct: 100, seniority: 4, official_gross: 11000, official_gross_pre: 10500,
   }).select().single();
   await admin.from('teacher_months').insert({
-    month_key: MONTH, school_id: s2.id, name: 'מורה של אחרת', reform: 'ofek', frontal_hours: 20,
+    month_key: MONTH, school_id: s2.id, name: 'מורה של אחרת', phone: '0504445566', email: 'other@example.com', reform: 'ofek', frontal_hours: 20,
   });
 
   // ── קוד תקף ──
@@ -176,7 +176,8 @@ try {
   // ── חודש נעול ──
   await admin.from('months').update({ locked: true }).eq('key', MONTH);
   await p.goto(`http://localhost:5190/?k=${CODE}`);
-  await p.getByText('נעול').first().waitFor({ timeout: 20000 });
+  // הבאנר עצמו: משנפתחו כמה חודשים, "נעול" מופיע גם כאפשרות מוסתרת בבורר
+  await p.getByText('החודש נעול').first().waitFor({ timeout: 20000 });
   check('חודש נעול מוצג ככזה', true);
   check('וכפתור השמירה מנוטרל', await p.getByRole('button', { name: 'שמירה' }).first().isDisabled());
   await admin.from('months').update({ locked: false }).eq('key', MONTH);

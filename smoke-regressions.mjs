@@ -81,6 +81,10 @@ try {
     await p.getByPlaceholder('name@reshetch.org.il').fill(email);
     await p.locator('input[type="password"]').fill(PW);
     await p.getByRole('button', { name: /כניסה למערכת/ }).click();
+    await p.waitForTimeout(2000);
+    // האפליקציה נשארת על החודש הקלנדרי כשהוא קיים
+    await p.selectOption('select[title="בחירת חודש"]', MONTH).catch(() => {});
+    await p.waitForTimeout(700);
   };
 
   // ── 1. הקישור גוזר מחדש את אחוז המשרה ──

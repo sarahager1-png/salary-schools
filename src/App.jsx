@@ -4403,6 +4403,16 @@ function LinkView({ code }) {
     <div style={{ minHeight:'100vh', background:'var(--bg)' }} dir="rtl">
       <header style={{ background:'#fff', borderBottom:'1px solid var(--line)', position:'sticky', top:0, zIndex:20 }}>
         <div style={{ maxWidth:760, margin:'0 auto', padding:'13px 16px' }}>
+          {/* לוגו וכותרת: המנהלת מגיעה לכאן מקישור בוואטסאפ, בלי מסך
+              התחברות ובלי הקשר. בלעדיהם היא לא יודעת של מי המסך. */}
+          <div style={{ display:'flex', alignItems:'center', gap:11, marginBottom:10 }}>
+            <img src="/logo-chabad.png" alt="רשת חינוך חב״ד"
+              style={{ height:38, width:'auto', objectFit:'contain', flexShrink:0 }} />
+            <div style={{ minWidth:0 }}>
+              <p style={{ fontSize:14.5, fontWeight:800, color:'var(--text)', lineHeight:1.25 }}>מערכת שכר עובדי הוראה</p>
+              <p style={{ fontSize:11.5, color:'var(--text3)', lineHeight:1.3 }}>רשת חינוך חב״ד</p>
+            </div>
+          </div>
           <p style={{ fontSize:16, fontWeight:800, color:'var(--text)' }}>{me?.schoolName || 'טוען…'}</p>
           <p style={{ fontSize:12.5, color:'var(--text3)', marginTop:1 }}>
             {me?.fullName}{me ? ' · הזנת נתוני העסקה' : ''}

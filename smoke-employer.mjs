@@ -49,6 +49,11 @@ try {
   await p.getByPlaceholder('name@reshetch.org.il').fill(EMAIL);
   await p.locator('input[type="password"]').fill(PW);
   await p.getByRole('button', { name: /כניסה למערכת/ }).click();
+  await p.waitForTimeout(2000);
+  // האפליקציה נשארת על החודש הקלנדרי כשהוא קיים, ולכן הבדיקה
+  // בוחרת במפורש את החודש שלה.
+  await p.selectOption('select[title="בחירת חודש"]', MONTH).catch(() => {});
+  await p.waitForTimeout(700);
   await p.getByText(SCHOOL).first().waitFor({ timeout: 15000 });
   await p.getByText(SCHOOL).first().click();
   await p.getByText('מורת עלות').first().waitFor({ timeout: 10000 });

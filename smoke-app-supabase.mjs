@@ -39,6 +39,10 @@ const login = async (email) => {
   await p.locator('input[type="password"]').fill(PW);
   await p.getByRole('button', { name: /כניסה למערכת/ }).click();
   await p.waitForTimeout(2500);
+  // האפליקציה נשארת על החודש הקלנדרי כשהוא קיים, ולכן הבדיקה
+  // בוחרת במפורש את החודש שלה.
+  await p.selectOption('select[title="בחירת חודש"]', MONTH).catch(() => {});
+  await p.waitForTimeout(700);
 };
 
 try {
@@ -88,6 +92,9 @@ try {
     month_key: MONTH, school_id: sc.id, name: 'נוספה בשרת', frontal_hours: 10,
   });
   await p.reload(); await p.waitForTimeout(2500);
+  // רענון מחזיר לחודש הקלנדרי — בוחרים שוב
+  await p.selectOption('select[title="בחירת חודש"]', MONTH).catch(() => {});
+  await p.waitForTimeout(700);
   await p.getByText(SCHOOL).first().click(); await p.waitForTimeout(1200);
   check('שורה שנוספה בשרת מופיעה באפליקציה',
     (await p.locator('body').innerText()).includes('נוספה בשרת'));
