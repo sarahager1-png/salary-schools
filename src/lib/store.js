@@ -19,6 +19,7 @@ const TEACHER_FIELDS = [
   ['email',                'email'],
   ['phone',                'phone'],
   ['reform',               'reform'],
+  ['nihul_grade',          'nihulGrade'],
   ['level',                'level'],
   ['grade',                'grade'],
   ['degree',               'degree'],
@@ -74,6 +75,7 @@ const schoolToRow = (s) => ({
   city: s.city ?? null,
   reform: s.reform || 'ofek',
   hours_quota: s.hoursQuota ?? null,
+  murkavut: s.murkavut ?? 1,
   principal_email: s.principalEmail ?? null,
   coordinator_email: s.coordinatorEmail ?? null,
 });
@@ -84,6 +86,7 @@ const rowToSchool = (r) => ({
   city: r.city,
   reform: r.reform,
   hoursQuota: r.hours_quota,
+  murkavut: r.murkavut ?? 1,
   principalEmail: r.principal_email,
   coordinatorEmail: r.coordinator_email,
 });

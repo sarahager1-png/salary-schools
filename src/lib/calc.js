@@ -99,21 +99,26 @@ export function oldRequest(t, monthKey) {
   };
 }
 
-// מנהלת. רמת מורכבות 1 בכל בתי הספר של הרשת.
-// דרגת הניהול היא א..ד ואינה זהה לדרגת האופק של מורה, ולכן היא נלקחת
-// מ-nihulGrade אם נשמרה, וברירת המחדל היא א.
-export function nihulRequest(t, monthKey) {
+// מנהלת. שני צירים שאינם של מורה: דרגת ניהול (א..ד) ורמת מורכבות של
+// בית הספר. שניהם היו מקודדים קשיח ל-1, ולכן כל מנהלת ברשת נשלחה
+// למחשבון כדרגה א במורכבות 1 — ורחל אורנשטיין, מנהלת במזכרת בתיה,
+// קיבלה מספר שאינו שלה.
+//
+// המורכבות מגיעה מרשומת בית הספר; ברשת היא 1 בכולם, אבל היא נתון
+// ולא הנחה. דרגת הניהול אישית, ובלעדיה אין מה לשלוח.
+export function nihulRequest(t, monthKey, school) {
   const derug = NIHUL_DERUG[t.degree];
   if (!derug) return { skip: `אין במחשבון הניהול תואר "${DEGREE_HE[t.degree] || t.degree}"` };
+  if (!t.nihulGrade) return { skip: 'חסרה דרגת ניהול (א..ד). המנהלת מזינה אותה בקישור.' };
   return {
     endpoint: 'mgmt',
     body: {
       DATE_SACHAR: dateSachar(monthKey),
       TAFKID_NIHUL1: '1',
       DERUG: derug,
-      DARGA_OFEK: String(Math.max(1, Math.min(7, Number(t.nihulGrade) || 1))),
+      DARGA_OFEK: String(Math.max(1, Math.min(4, Number(t.nihulGrade)))),
       ACHUZ_TOS_ISHIT: '',
-      RAMAT_MURKAVUT: '1',
+      RAMAT_MURKAVUT: String(Math.max(1, Math.min(9, Number(school?.murkavut) || 1))),
       MEKADEM_MISRA1: clampScope(t.scopePct ?? t.scope),
       MEKADEM_MATYA: '',
     },

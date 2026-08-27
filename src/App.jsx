@@ -105,6 +105,10 @@ const PRINCIPAL_ROLE = 'principal';
 // שכר הבסיס של מנהלת. כל מה שמעליו משולם כתוספת בית חב"ד.
 const PRINCIPAL_BASE = 14400;
 const isPrincipalRow = t => t?.role === PRINCIPAL_ROLE;
+// דרגת הניהול היא א..ד ואינה סולם המורים. נשמרת כמספר 1..4.
+const NIHUL_GRADES = [{ v:1, l:'א' }, { v:2, l:'ב' }, { v:3, l:'ג' }, { v:4, l:'ד' }];
+const nihulLabel = v => NIHUL_GRADES.find(g => g.v === Number(v))?.l || null;
+
 
 /*
   יציאה לחופשה. עד עכשיו חל"ד היה קיים רק מהצד השני — REASON_TYPES של
@@ -165,11 +169,18 @@ function momBonusEligible(t) {
 }
 function calcGross(t) {
   if (t._officialGross) return Number(t._officialGross);
+  // שכר מנהל/ת אינו על סולם המורים, וגמול הניהול אינו אחוז מעליו: הוא
+  // יוצא ממחשבון הניהול, לפי דרגת ניהול ורמת מורכבות. אומדן מטבלת
+  // המורים היה מספר שנראה סביר וטועה בכיוון אחד — כלפי מטה.
+  if (isPrincipalRow(t)) return 0;
   const base  = calcBase(t);
   const role  = calcRoleSupp(base, t.role);
   const scope = effectiveScope(t);
   return Math.round((base + role) * scope / 100);
 }
+// שורה שאין לה מספר עד שתרוץ סימולציה — להצגה, כדי שלא יופיע 0 ₪
+// כאילו זו העלות.
+const awaitingSim = t => isPrincipalRow(t) && !t._officialGross && !t._agreedGross;
 function calcNet(gross) { return Math.round(gross * 0.735); }
 // אחוז המשרה נגזר מהשעות הפרונטליות ומהשלב, אחרי הפחתת הגיל.
 // המנהלת מזינה שעות — האחוז מחושב, לא מוקלד.
@@ -3921,13 +3932,19 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMon
                             {/* המחשבון של אופק שואל גם דרגת השכלה וגם דרגה
                                 באופק, והדרגה שם אפילו נעולה עד שנבחר תואר.
                                 קודם הוצגה למורת אופק הדרגה בלבד. */}
-                            {reformLabel(t.reform)} · {DEGREE_LABELS[t.degree] || t.degree}
-                            {t.reform === 'ofek' ? ` · דרגה ${t.grade}` : ''} · {t.seniority} שנות ותק
+                            {isPrincipalRow(t) ? 'ניהול' : reformLabel(t.reform)} · {DEGREE_LABELS[t.degree] || t.degree}
+                            {isPrincipalRow(t)
+                              ? (nihulLabel(t.nihulGrade) ? ` · דרגת ניהול ${nihulLabel(t.nihulGrade)}` : ' · חסרה דרגת ניהול')
+                              : t.reform === 'ofek' ? ` · דרגה ${t.grade}` : ''} · {t.seniority} שנות ותק
                           </p>
                         </div>
                         <div style={{ textAlign:'left', flexShrink:0 }}>
                           <p style={{ fontSize:11, color:'var(--apple-text3)', marginBottom:1 }}>הערכה</p>
-                          <p style={{ fontSize:13, fontWeight:600, fontFamily:'monospace', color:'var(--apple-text2)' }}>{est.toLocaleString()} ₪</p>
+                          {/* למנהלת אין אומדן פנימי: אין בידינו את סולם הניהול,
+                              והמספר מגיע מהמחשבון הניהולי בלבד. */}
+                          <p style={{ fontSize:13, fontWeight:600, fontFamily:'monospace', color:'var(--apple-text2)' }}>
+                            {awaitingSim(t) ? 'לפי המחשבון' : `${est.toLocaleString()} ₪`}
+                          </p>
                         </div>
                       </div>
                       {isActive && (
@@ -3948,6 +3965,10 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMon
                             ['שלב',      LEVELS[t.level]?.label],
                             ['גיל',      t.ageGroup && t.ageGroup !== 'none' ? AGE_RED[t.ageGroup]?.label : null],
                             ['גמול',     t.role && t.role !== 'none' ? ROLES.find(r => r.id === t.role)?.label.split('(')[0].trim() : null],
+                            // מחשבון הניהול שואל דרגת ניהול ורמת מורכבות —
+                            // שני שדות שאין להם מקבילה אצל מורה.
+                            ['דרגת ניהול', isPrincipalRow(t) ? (nihulLabel(t.nihulGrade) || 'חסרה') : null],
+                            ['מורכבות',    isPrincipalRow(t) ? String(school.murkavut ?? 1) : null],
                             ['ילדים<18', t.reform === 'pre' ? String(t.childrenUnder18 ?? 0) : null],
                             ['סטטוס',    onLeave(t) ? leaveText(t) : null],
                           ].filter(([, v]) => v).map(([k, v]) => (
@@ -4167,9 +4188,14 @@ function LinkTeacherFields({ draft, apply }) {
           options={REFORMS.map(r => [r.id, r.label])} />
         <LinkSelect label="תואר" value={draft.degree || 'BA'} onChange={v => apply({ degree: v })}
           options={Object.entries(DEGREE_LABELS)} />
-        {isOfek && (
+        {isOfek && !isPrincipalRow(draft) && (
           <LinkSelect label="דרגה באופק" value={String(draft.grade ?? 1)} onChange={v => apply({ grade: v })}
             options={[1,2,3,4,5,6,7,8,9].map(g => [String(g), `דרגה ${g}`])} />
+        )}
+        {isPrincipalRow(draft) && (
+          <LinkSelect label="דרגת ניהול" value={String(draft.nihulGrade ?? '')}
+            onChange={v => apply({ nihulGrade: v ? Number(v) : null })}
+            options={[['', 'יש לבחור'], ...NIHUL_GRADES.map(g => [String(g.v), `דרגה ${g.l}`])]} />
         )}
         <LinkField label="ותק בהוראה" value={draft.seniority} onChange={v => apply({ seniority: v })} />
       </div>
