@@ -30,6 +30,9 @@ const TEACHER_FIELDS = [
   ['start_date',           'startDate'],
   ['end_date',             'endDate'],
   ['children_under_18',    'childrenUnder18'],
+  ['leave_type',           'leaveType'],
+  ['leave_from',           'leaveFrom'],
+  ['leave_to',             'leaveTo'],
   ['absence_days',         'absenceDays'],
   ['mm_hours',             'mmHours'],
   ['mm_for',               'mmFor'],
@@ -189,6 +192,12 @@ export async function deleteSchool(id) {
 }
 
 // ── חודשים ────────────────────────────────────────────────────
+/*
+  חודש חדש הוא העתק של הקודם. מה שלא השתנה נשאר — כולל הסימולציות,
+  כך שחשבת השכר אינה מקלידה מחדש כל חודש את אותם מספרים. מה שכן
+  מתאפס הוא מה שבאמת שייך לחודש: היעדרויות, ממ"מ, תוספות והאישורים.
+  שינוי בשדה בסיס מחזיר את השורה למסלול הרגיל — ורק אותה.
+*/
 export async function openMonth(key, teachers) {
   const { error } = await supabase.from('months').insert({ key });
   raise(error, 'פתיחת החודש נכשלה');
@@ -292,6 +301,15 @@ export async function linkRows(code, monthKey) {
   const { data, error } = await supabase.rpc('link_rows', { p_code: code, p_month: monthKey });
   raise(error, 'טעינת המורות נכשלה');
   return (data || []).map(rowToTeacher);
+}
+
+export async function linkAddRow(code, monthKey, teacher) {
+  // בית הספר נגזר מהקוד בשרת ולא נשלח מכאן
+  const { data, error } = await supabase.rpc('link_add_row', {
+    p_code: code, p_month: monthKey, p_row: teacherToRow(teacher),
+  });
+  raise(error, 'הוספת המורה נכשלה');
+  return data ? rowToTeacher(data) : null;
 }
 
 export async function linkSaveRow(code, teacher) {

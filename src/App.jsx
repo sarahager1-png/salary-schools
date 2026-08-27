@@ -106,6 +106,25 @@ const PRINCIPAL_ROLE = 'principal';
 const PRINCIPAL_BASE = 14400;
 const isPrincipalRow = t => t?.role === PRINCIPAL_ROLE;
 
+/*
+  יציאה לחופשה. עד עכשיו חל"ד היה קיים רק מהצד השני — REASON_TYPES של
+  מילוי מקום ידע לומר *למה* מישהי נכנסה, אבל לא היה איפה לרשום שמורה
+  קיימת יוצאת וממתי. זה נתון שהמנהלת יודעת ראשונה, והוא משנה שכר.
+*/
+const LEAVE_TYPES = [
+  { id: 'none',      label: 'עובדת' },
+  { id: 'maternity', label: 'חופשת לידה (חל"ד)' },
+  { id: 'unpaid',    label: 'חופשה ללא תשלום (חל"ת)' },
+  { id: 'sick',      label: 'מחלה ממושכת' },
+  { id: 'other',     label: 'חופשה אחרת' },
+];
+const leaveLabel = id => (LEAVE_TYPES.find(x => x.id === id) || LEAVE_TYPES[0]).label;
+const onLeave = t => Boolean(t?.leaveType && t.leaveType !== 'none');
+const fmtDay  = d => (d ? String(d).slice(0, 10).split('-').reverse().join('/') : '');
+// תיאור קצר לתג ולדוחות: "חל\"ד מ-01/09/2026" או "… עד 01/03/2027"
+const leaveText = t => !onLeave(t) ? '' :
+  `${leaveLabel(t.leaveType)}${t.leaveFrom ? ` מ-${fmtDay(t.leaveFrom)}` : ''}${t.leaveTo ? ` עד ${fmtDay(t.leaveTo)}` : ''}`;
+
 const REASON_TYPES = [
   { id: 'maternity', label: 'מילוי מקום לחל"ד' },
   { id: 'system',    label: 'צרכי מערכת' },
@@ -328,6 +347,9 @@ const FIELDS = [
   { key:'scope',           label:'% משרה',         base:true,  tracked:false, fmt: v => `${v}%` },
   // משפיע על השכר בעולם ישן בלבד — באופק אין לו ביטוי בשכר
   { key:'childrenUnder18', label:'ילדים עד 18',    base: t => t.reform === 'pre', tracked:true },
+  { key:'leaveType',       label:'סטטוס',          base:true,  tracked:true,  fmt: v => leaveLabel(v) },
+  { key:'leaveFrom',       label:'יציאה לחופשה',   base:true,  tracked:true,  fmt: v => fmtDay(v) },
+  { key:'leaveTo',         label:'חזרה מחופשה',    base:true,  tracked:true,  fmt: v => fmtDay(v) },
   { key:'isTemp',          label:'שיבוץ זמני',     base:false, tracked:true,  fmt: v => v ? 'כן' : 'לא' },
   { key:'startDate',       label:'מתאריך',         base:false, tracked:true,  fmt: v => v.split('-').reverse().join('/') },
   { key:'endDate',         label:'עד תאריך',       base:false, tracked:true,  fmt: v => v.split('-').reverse().join('/') },
@@ -436,6 +458,7 @@ const EMPTY_TEACHER = {
   seniority: 0, frontalHours: 26, scopePct: 100, scope: 100,
   role: 'none', ageGroup: 'none',
   isTemp: false, startDate: '', endDate: '', scopeChanges: [],
+  leaveType: 'none', leaveFrom: null, leaveTo: null,
   childrenUnder18: 0,
   _officialGrossPre: null,
   _agreedGross: null,          // שכר מוסכם למנהלת — מחליף את הסימולציה
@@ -1799,6 +1822,35 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             </div>
           </>)}
 
+          {/* יציאה לחופשה */}
+          <div className="apple-section">
+            <p className="apple-label" style={{ marginBottom:6 }}>סטטוס העסקה</p>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+              <select className="apple-select" value={t.leaveType || 'none'} style={{ flex:'1 1 160px' }}
+                onChange={e => {
+                  const v = e.target.value;
+                  set('leaveType', v);
+                  if (v === 'none') { set('leaveFrom', null); set('leaveTo', null); }
+                }}>
+                {LEAVE_TYPES.map(x => <option key={x.id} value={x.id}>{x.label}</option>)}
+              </select>
+              {onLeave(t) && (
+                <>
+                  <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 120px' }}>
+                    <span style={{ fontSize:11, color:'var(--text3)' }}>מתאריך</span>
+                    <input type="date" className="apple-input" dir="ltr" value={String(t.leaveFrom ?? '').slice(0,10)}
+                      onChange={e => set('leaveFrom', e.target.value || null)} />
+                  </label>
+                  <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 120px' }}>
+                    <span style={{ fontSize:11, color:'var(--text3)' }}>עד תאריך (אם ידוע)</span>
+                    <input type="date" className="apple-input" dir="ltr" value={String(t.leaveTo ?? '').slice(0,10)}
+                      onChange={e => set('leaveTo', e.target.value || null)} />
+                  </label>
+                </>
+              )}
+            </div>
+          </div>
+
           {/* ותק */}
           <div>
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
@@ -2874,6 +2926,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         {isSim  && <Calculator size={13} strokeWidth={2.4} color="var(--warn)" aria-label="נדרשת סימולציה" />}
                         {isAppr && <ClipboardCheck size={13} strokeWidth={2.4} color="var(--teal-700)" aria-label="ממתין לאישור" />}
                         <span style={{ color: t.name === PRINCIPAL_PLACEHOLDER ? 'var(--text3)' : undefined }}>{t.name}</span>
+                        {onLeave(t) && (
+                          <span className="apple-badge badge-orange" style={{ fontSize:10.5, padding:'2px 8px' }} title={leaveText(t)}>
+                            {leaveLabel(t.leaveType)}{t.leaveFrom ? ` ${fmtDay(t.leaveFrom)}` : ''}
+                          </span>
+                        )}
                         {isPrincipalRow(t) && (
                           <span className="apple-badge badge-purple" style={{ fontSize:10.5, padding:'2px 8px', cursor:'help' }}
                             title="נוצרה אוטומטית עם פתיחת בית הספר, עם 26 שעות כברירת מחדל — השעות נספרות במכסה. עדכני את שעותיה ואת פרטיה.">
@@ -3715,6 +3772,7 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMon
                             ['גיל',      t.ageGroup && t.ageGroup !== 'none' ? AGE_RED[t.ageGroup]?.label : null],
                             ['גמול',     t.role && t.role !== 'none' ? ROLES.find(r => r.id === t.role)?.label.split('(')[0].trim() : null],
                             ['ילדים<18', t.reform === 'pre' ? String(t.childrenUnder18 ?? 0) : null],
+                            ['סטטוס',    onLeave(t) ? leaveText(t) : null],
                           ].filter(([, v]) => v).map(([k, v]) => (
                             <span key={k} style={{
                               fontSize:11, padding:'3px 8px', borderRadius:999,
@@ -3891,8 +3949,8 @@ function LinkField({ label, value, onChange, type = 'number', hint }) {
       <span style={{ fontSize:11, fontWeight:600, color:'var(--text3)' }}>{label}</span>
       <input
         type={type} inputMode={type === 'number' ? 'numeric' : undefined}
-        className="apple-input" dir={type === 'number' ? 'ltr' : 'rtl'}
-        value={value ?? ''} placeholder={hint}
+        className="apple-input" dir={type === 'text' ? 'rtl' : 'ltr'}
+        value={type === 'date' ? String(value ?? '').slice(0, 10) : (value ?? '')} placeholder={hint}
         onChange={e => onChange(type === 'number'
           ? (e.target.value === '' ? null : Number(e.target.value))
           : e.target.value)}
@@ -3901,12 +3959,146 @@ function LinkField({ label, value, onChange, type = 'number', hint }) {
   );
 }
 
+function LinkSelect({ label, value, onChange, options }) {
+  return (
+    <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 120px', minWidth:120 }}>
+      <span style={{ fontSize:11, fontWeight:600, color:'var(--text3)' }}>{label}</span>
+      <select className="apple-select" value={value ?? ''} onChange={e => onChange(e.target.value)}
+        style={{ fontSize:15, minHeight:42 }}>
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    </label>
+  );
+}
+
+/*
+  שדות הבסיס שהמנהלת ממלאת. שינוי בכל אחד מהם מבטל את הסימולציה
+  ומחזיר את המורה לחשבת השכר — זה נאכף בשרת, וכאן רק נאמר.
+*/
+function LinkTeacherFields({ draft, apply }) {
+  const isOfek = draft.reform === 'ofek';
+  return (
+    <>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginBottom:9 }}>
+        <LinkField label="שם המורה" type="text" value={draft.name} onChange={v => apply({ name: v })} hint="שם מלא" />
+        <LinkField label="ת.ז." type="text" value={draft.tzId} onChange={v => apply({ tzId: v })} hint="9 ספרות" />
+        <LinkField label="מייל" type="text" value={draft.email} onChange={v => apply({ email: v })} hint="לא חובה" />
+      </div>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginBottom:9 }}>
+        <LinkSelect label="מסלול" value={draft.reform} onChange={v => apply({ reform: v })}
+          options={REFORMS.map(r => [r.id, r.label])} />
+        <LinkSelect label="תואר" value={draft.degree || 'BA'} onChange={v => apply({ degree: v })}
+          options={Object.entries(DEGREE_LABELS)} />
+        {isOfek && (
+          <LinkSelect label="דרגה באופק" value={String(draft.grade ?? 1)} onChange={v => apply({ grade: v })}
+            options={[1,2,3,4,5,6,7,8,9].map(g => [String(g), `דרגה ${g}`])} />
+        )}
+        <LinkField label="ותק בהוראה" value={draft.seniority} onChange={v => apply({ seniority: v })} />
+      </div>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:9 }}>
+        <LinkSelect label="שלב" value={draft.level || 'elementary'} onChange={v => apply({ level: v })}
+          options={Object.entries(LEVELS).map(([k, v]) => [k, v.label])} />
+        <LinkSelect label="קבוצת גיל" value={draft.ageGroup || 'none'} onChange={v => apply({ ageGroup: v })}
+          options={Object.entries(AGE_RED).map(([k, v]) => [k, v.label])} />
+        <LinkSelect label="גמול תפקיד" value={draft.gamulRole || draft.role || 'none'} onChange={v => apply({ role: v })}
+          options={ROLES.map(r => [r.id, r.label.split('(')[0].trim()])} />
+        {/* תוספת אם — רכיב של העולם הישן בלבד */}
+        {!isOfek && (
+          <LinkField label="ילדים עד 18" value={draft.childrenUnder18} onChange={v => apply({ childrenUnder18: v })} />
+        )}
+      </div>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginTop:9 }}>
+        <LinkSelect label="סטטוס" value={draft.leaveType || 'none'}
+          onChange={v => apply({ leaveType: v, ...(v === 'none' ? { leaveFrom: null, leaveTo: null } : {}) })}
+          options={LEAVE_TYPES.map(x => [x.id, x.label])} />
+        {onLeave(draft) && (
+          <>
+            <LinkField label="מתאריך" type="date" value={draft.leaveFrom} onChange={v => apply({ leaveFrom: v || null })} />
+            <LinkField label="עד תאריך" type="date" value={draft.leaveTo} onChange={v => apply({ leaveTo: v || null })} hint="אם ידוע" />
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* מורה חדשה — הרשימה מתמלאת בידי המנהלת, לא בידי הרשת */
+function LinkNewCard({ schoolReform, onAdd }) {
+  const blank = { ...EMPTY_TEACHER, reform: schoolReform || 'ofek', frontalHours: null, scopePct: 100, scope: 100 };
+  const [open, setOpen]   = useState(false);
+  const [draft, setDraft] = useState(blank);
+  const [state, setState] = useState('');
+
+  const apply = (patch) => {
+    setState('');
+    setDraft(prev => {
+      const next = { ...prev, ...patch };
+      // אחוז המשרה נגזר מהשעות, מהשלב ומקבוצת הגיל — כמו בכל מסך אחר
+      const hrs = next.frontalHours;
+      if (hrs != null && hrs !== '') {
+        const pct = scopeFromFrontal(next, hrs);
+        next.scopePct = pct; next.scope = pct;
+      }
+      return next;
+    });
+  };
+
+  const add = async () => {
+    if (!String(draft.name || '').trim()) { setState('יש למלא שם מורה'); return; }
+    setState('saving');
+    try { await onAdd(draft); setDraft(blank); setOpen(false); setState(''); }
+    catch (e) { setState(e.message); }
+  };
+
+  if (!open) return (
+    <button className="apple-btn apple-btn-ghost" onClick={() => setOpen(true)}
+      style={{ width:'100%', minHeight:46, borderStyle:'dashed' }}>
+      <Plus size={16} strokeWidth={2.5} />
+      הוספת מורה
+    </button>
+  );
+
+  return (
+    <div className="apple-card" style={{ padding:'14px 15px', border:'1px dashed var(--purple)' }}>
+      <p style={{ fontSize:14, fontWeight:700, color:'var(--purple)', marginBottom:10 }}>מורה חדשה</p>
+      <LinkTeacherFields draft={draft} apply={apply} />
+      <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginTop:9 }}>
+        <LinkField label="שעות פרונטליות" value={draft.frontalHours} onChange={v => apply({ frontalHours: v })} />
+        <LinkField label="ימי היעדרות"    value={draft.absenceDays}  onChange={v => apply({ absenceDays: v })} />
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:11 }}>
+        <button className="apple-btn apple-btn-blue" disabled={state === 'saving'} onClick={add}
+          style={{ minHeight:40, paddingInline:20 }}>
+          {state === 'saving' ? 'מוסיף…' : 'הוספה'}
+        </button>
+        <button className="apple-btn apple-btn-ghost" onClick={() => { setOpen(false); setDraft(blank); setState(''); }}
+          style={{ minHeight:40 }}>ביטול</button>
+        {state && state !== 'saving' && <span style={{ fontSize:12, color:'var(--danger)' }}>{state}</span>}
+      </div>
+    </div>
+  );
+}
+
 function LinkCard({ teacher, locked, onSave }) {
   const [draft, setDraft] = useState(teacher);
   const [state, setState] = useState('');   // '' | 'saving' | 'saved' | הודעת שגיאה
   useEffect(() => { setDraft(teacher); }, [teacher]);
 
-  const set = (k, v) => { setDraft(p => ({ ...p, [k]: v })); setState(''); };
+  const set = (k, v) => apply({ [k]: v });
+  // כל שינוי עובר כאן, כדי שאחוז המשרה ייגזר מחדש בכל מקרה שמשפיע עליו:
+  // השעות, השלב וקבוצת הגיל. קודם הגזירה הייתה תלויה בשדה השעות בלבד.
+  const apply = (patch) => {
+    setState('');
+    setDraft(prev => {
+      const next = { ...prev, ...patch };
+      const hrs = next.frontalHours;
+      if (hrs != null && hrs !== '') {
+        const pct = scopeFromFrontal(next, hrs);
+        next.scopePct = pct; next.scope = pct;
+      }
+      return next;
+    });
+  };
   const dirty = JSON.stringify(draft) !== JSON.stringify(teacher);
 
   const save = async () => {
@@ -3926,21 +4118,19 @@ function LinkCard({ teacher, locked, onSave }) {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, marginBottom:10 }}>
         <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>{teacher.name}</p>
         <span style={{ fontSize:11.5, color:'var(--text3)' }}>
-          {reformLabel(teacher.reform)}{teacher.scopePct ? ` · ${teacher.scopePct}% משרה` : ''}
+          {reformLabel(draft.reform)}{draft.scopePct ? ` · ${draft.scopePct}% משרה` : ''}
+          {onLeave(teacher) && (
+            <span className="apple-badge badge-orange" style={{ fontSize:10.5, padding:'2px 8px', marginInlineStart:6 }}>
+              {leaveText(teacher)}
+            </span>
+          )}
         </span>
       </div>
 
-      <div style={{ display:'flex', flexWrap:'wrap', gap:9 }}>
-        {/* אחוז המשרה נגזר מהשעות, מהשלב ומקבוצת הגיל. במסך המחובר
-            הגזירה קורית בזמן ההקלדה; כאן היא נשכחה, והשעות התעדכנו
-            בזמן שהאחוז נשאר על ערכו הישן — ומהאחוז נגזרים ביגוד,
-            הבראה והמסמך שהמורה חותמת עליו. */}
-        <LinkField label="שעות פרונטליות" value={draft.frontalHours}
-          onChange={v => {
-            const pct = scopeFromFrontal({ ...draft, frontalHours: v }, v);
-            setDraft(prev => ({ ...prev, frontalHours: v, scopePct: pct, scope: pct }));
-            setState('');
-          }} />
+      <LinkTeacherFields draft={draft} apply={apply} />
+
+      <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginTop:9 }}>
+        <LinkField label="שעות פרונטליות" value={draft.frontalHours} onChange={v => apply({ frontalHours: v })} />
         <LinkField label="ימי היעדרות"    value={draft.absenceDays}   onChange={v => set('absenceDays', v)} />
         <LinkField label={'שעות ממ' + '"' + 'מ'} value={draft.mmHours} onChange={v => set('mmHours', v)} />
         <LinkField label="במקום מי" type="text" value={draft.mmFor}   onChange={v => set('mmFor', v)} hint="שם המורה" />
@@ -4008,6 +4198,11 @@ function LinkView({ code }) {
     const saved = await store.linkSaveRow(code, draft);
     if (saved) setRows(rs => rs.map(r => (r.id === saved.id ? saved : r)));
   };
+  const onAdd = async (draft) => {
+    if (!month) throw new Error('עוד לא נפתח חודש במערכת. פנו לרשת.');
+    const added = await store.linkAddRow(code, month, draft);
+    if (added) setRows(rs => [...rs, added]);
+  };
 
   if (fatal) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }} dir="rtl">
@@ -4047,17 +4242,21 @@ function LinkView({ code }) {
         {loading ? (
           <p style={{ fontSize:14, color:'var(--text3)', textAlign:'center', padding:'40px 0' }}>טוען…</p>
         ) : !rows.length ? (
-          <div className="apple-card" style={{ padding:28, textAlign:'center' }}>
-            <p style={{ fontSize:15, fontWeight:700, color:'var(--text)', marginBottom:6 }}>אין עדיין מורות בחודש הזה</p>
-            <p style={{ fontSize:13, color:'var(--text3)' }}>הרשת מוסיפה את המורות, ואז תוכלי להזין להן נתונים כאן.</p>
-          </div>
+          <>
+            <div className="apple-card" style={{ padding:24, textAlign:'center', marginBottom:12 }}>
+              <p style={{ fontSize:15, fontWeight:700, color:'var(--text)', marginBottom:6 }}>אין עדיין מורות בחודש הזה</p>
+              <p style={{ fontSize:13, color:'var(--text3)' }}>הוסיפי את המורות של בית הספר — שם, ת.ז., מסלול, ותק ושעות.</p>
+            </div>
+            {!locked && <LinkNewCard schoolReform={me?.schoolReform} onAdd={onAdd} />}
+          </>
         ) : (
           <>
             <p style={{ fontSize:12.5, color:'var(--text3)', marginBottom:11 }}>
-              {rows.length} מורות · שינוי שעות מחזיר את המורה לחישוב שכר מחדש
+              {rows.length} מורות · שינוי בוותק, בדרגה, בתואר או בשעות מחזיר את המורה לחישוב שכר מחדש
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:11 }}>
               {rows.map(t => <LinkCard key={t.id} teacher={t} locked={locked} onSave={onSave} />)}
+              {!locked && <LinkNewCard schoolReform={me?.schoolReform} onAdd={onAdd} />}
             </div>
           </>
         )}
@@ -4183,12 +4382,16 @@ export default function App() {
     const hasAny  = Object.keys(months).length > 0;
     const nextKey = hasAny ? nextMonthKey(activeMonth) : nowMonthKey();
     if (months[nextKey]) { setActiveMonth(nextKey); return; }
-    // השדות החודשיים מתאפסים; פרטי המורה נגררים
+    // חודש חדש הוא העתק של הקודם: כל מה שלא השתנה נשאר, כולל
+    // הסימולציות — אחרת חשבת השכר מקלידה מחדש כל חודש את אותם
+    // מספרים בדיוק. מתאפס רק מה שבאמת שייך לחודש עצמו: היעדרויות,
+    // ממ"מ, תוספות והאישורים. השכר בפועל מגיע מהנהלת החשבונות לכל
+    // חודש בנפרד, ולכן גם הוא מתאפס.
     const carried = teachers.map(t => ({
       ...t,
       absenceDays: 0, mmHours: 0, mmFor: '', monthlyExtras: 0,
-      _officialGross: null, _officialGrossPre: null, _agreedGross: null,
-      _actualEmployerCost: null, _approved: false, _approvedAt: null,
+      _actualEmployerCost: null,
+      _approved: false, _approvedAt: null,
       _netApproved: false, _netApprovedAt: null, _snapshot: null,
       _changedAt: new Date().toISOString(),
     }));
