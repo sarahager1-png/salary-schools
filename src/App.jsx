@@ -173,6 +173,11 @@ function effectiveScope(t) {
 function momBonusEligible(t) {
   return t.reform === 'pre' && (t.childrenUnder18 || 0) > 0 && effectiveScope(t) >= 79;
 }
+// 10% על השכר הכולל. אינו רכיב במחשבון של המשרד — נבדקו כל שדות מחשבון
+// העולם הישן ואין בהם תוספת אם — ולכן הוא מתווסף כאן, על התוצאה שחזרה
+// משם, ולא מוקלד לתוכה.
+const MOM_RATE = 0.10;
+const momBonus = (t, base) => (momBonusEligible(t) ? Math.round(base * MOM_RATE) : 0);
 function calcGross(t) {
   if (t._officialGross) return Number(t._officialGross);
   // שכר מנהל/ת אינו על סולם המורים, וגמול הניהול אינו אחוז מעליו: הוא
@@ -195,10 +200,20 @@ function baseFrontalFor(t) {
   const agR = AGE_RED[t.ageGroup] || AGE_RED.none;
   return lvl.frontal - agR.f;
 }
+// גמול חינוך בעולם ישן: שלוש שעות מעל מה שהיא מלמדת בפועל. באופק
+// הגמול הוא אחוז מהשכר (ROLES) ולא שעות, ולכן זה חל על עולם ישן בלבד.
+const HOMEROOM_HOURS_PRE = 3;
+const homeroomHours = t =>
+  (t?.reform === 'pre' && /^homeroom/.test(t?.role || t?.gamulRole || '') ? HOMEROOM_HOURS_PRE : 0);
+// השעות שהשכר משולם עליהן. שונה מ-frontalHours, שהוא מה שהיא מלמדת
+// בפועל וממנו נגזרת המכסה של בית הספר.
+const paidFrontal = t => (Number(t?.frontalHours) || 0) + homeroomHours(t);
+
 function scopeFromFrontal(t, hours) {
   const bf = baseFrontalFor(t);
   if (!bf) return t.scopePct ?? 100;
-  return Math.round((Number(hours) || 0) / bf * 100);
+  const paid = (Number(hours) || 0) + homeroomHours(t);
+  return Math.round(paid / bf * 100);
 }
 
 function deriveHours(t, scopeOverride) {
@@ -309,16 +324,20 @@ function payBreakdown(t) {
     return { base, supplement: gross - base, gross, agreed: !!agreed };
   }
   // בית ספר עולם ישן — סימולציה אחת, אין רכיב תוספת
-  if (t.reform !== 'ofek') return { base: ofek, supplement: 0, gross: ofek };
+  if (t.reform !== 'ofek') {
+    // תוספת אם נוספת על שכר העולם הישן, ונושאת עלות מעביד ככל שכר.
+    const mom = momBonus(t, ofek);
+    return { base: ofek + mom, mom, supplement: 0, gross: ofek + mom };
+  }
   // אם האופק יוצא נמוך מהעולם הישן, העובדת נשארת עם העולם הישן
   const supplement = Math.max(0, ofek - old);
-  return { base: old, supplement, gross: old + supplement };
+  return { base: old, mom: 0, supplement, gross: old + supplement };
 }
 
 // ברוטו למעסיק = בסיס + 40% · תוספת + 30%.
 // זהו אומדן. כשהנהלת החשבונות מזינה את עלות המעביד בפועל, היא גוברת.
 function calcEmployer(t) {
-  const { base, supplement, gross } = payBreakdown(t);
+  const { base, mom, supplement, gross } = payBreakdown(t);
   const extras = calcExtras(t);
   const { parts, total: estimate } = employerParts(t, base, supplement);
   const employerSupp = supplementCost(base, supplement, extras.biguud, extras.havraah);
@@ -326,7 +345,7 @@ function calcEmployer(t) {
   const actual   = Number(t._actualEmployerCost) || 0;
   const social   = actual || estimate;
   return {
-    gross, base, supplement, employerBase, employerSupp, social,
+    gross, base, mom, supplement, employerBase, employerSupp, social,
     estimate, isEstimate: !actual,
     total: gross + social,
     parts,                                    // הפירוט המלא, שורה לכל רכיב
@@ -2018,7 +2037,8 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             </div>
             {momBonusEligible(t) && (
               <p style={{ fontSize:12, color:'var(--apple-purple)', fontWeight:600, marginTop:8 }}>
-                זכאית לתוספת אם — {t.childrenUnder18} ילדים עד גיל 18
+                זכאית לתוספת אם — {t.childrenUnder18} ילדים עד גיל 18 · 10% על השכר הכולל
+                {calcEmployer(t).mom ? ` (${calcEmployer(t).mom.toLocaleString('he-IL')} ₪)` : ''}
               </p>
             )}
             {t.reform === 'pre' && (t.childrenUnder18||0) > 0 && !momBonusEligible(t) && (
@@ -2583,6 +2603,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 
   // מכסת שעות עובדי הוראה — מספר קבוע לבית הספר, נספרות שעות פרונטליות
   const hoursQuota = Number(school.hoursQuota) || null;
+  // המכסה נספרת לפי מה שהעובדת מלמדת בפועל. שלוש שעות גמול החינוך של
+  // מחנכת בעולם ישן הן מעל המכסה — היא מלמדת 21 ומשולמת על 24.
   const usedHours  = ts.reduce((s, t) => s + (Number(t.frontalHours) || 0), 0);
   const freeHours  = hoursQuota ? hoursQuota - usedHours : null;
   // כמה שעות מותר להקצות לרשומה מסוימת בלי לחרוג — כולל השעות שכבר רשומות לה
@@ -3924,6 +3946,11 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMon
         {/* Teacher rows */}
         <div style={{ flex:1, overflowY:'auto', padding:'12px 12px', display:'flex', flexDirection:'column', gap:16 }}>
           {tab === 'cost' && <ActualCostPanel teachers={teachers} schools={schools} onSave={onSaveActual} />}
+          {/* המסמכים הם של הנהלת החשבונות, כמו העלות בפועל. בלשונית
+              הסימולציה הם רק גזלו גובה מרשימת העובדות. */}
+          {tab === 'cost' && (
+            <MonthDocuments monthKey={activeMonth} schools={schools} userRole={userRole} userId={userId} />
+          )}
           {tab === 'sim' && grouped.length === 0 && (
             <div style={{ textAlign:'center', padding:'48px 16px' }}>
               <div style={{ width:56, height:56, borderRadius:17, background:'var(--ok-bg)', margin:'0 auto 14px', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -3993,7 +4020,12 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMon
                         }}>
                           {[
                             ['% משרה',   `${(isOfek ? dh?.scopePct : null) ?? t.scopePct ?? t.scope ?? 100}%`],
-                            ['פרונטלי',  `${dh?.frontal ?? t.frontalHours ?? 0} ש'`],
+                            // מחנכת בעולם ישן משולמת על שלוש שעות מעל מה
+                            // שהיא מלמדת. בלי לומר זאת, המספר במחשבון אינו
+                            // מסתדר עם מה שהמנהלת הזינה.
+                            ['פרונטלי',  homeroomHours(t)
+                              ? `${t.frontalHours ?? 0} + ${homeroomHours(t)} גמול חינוך = ${paidFrontal(t)} ש'`
+                              : `${dh?.frontal ?? t.frontalHours ?? 0} ש'`],
                             // פרטני ושהייה נגזרים מהשלב, מקבוצת הגיל ומאחוז
                             // המשרה — המחשבון של אופק שואל את שניהם.
                             ['פרטני',    dh ? `${dh.individual} ש'` : null],
@@ -4006,6 +4038,12 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMon
                             ['דרגת ניהול', isPrincipalRow(t) ? (nihulLabel(t.nihulGrade) || 'חסרה') : null],
                             ['מורכבות',    isPrincipalRow(t) ? String(school.murkavut ?? 1) : null],
                             ['ילדים<18', t.reform === 'pre' ? String(t.childrenUnder18 ?? 0) : null],
+                            // מחנכת בעולם ישן: המחשבון מטפל בגמול דרך השדה
+                            // "כיתת חינוך (תוספת חינוך)", בשווי 3 שעות.
+                            ['כיתת חינוך', t.reform === 'pre' && /^homeroom/.test(t.role || '') ? 'כן — גמול 3 ש׳' : null],
+                            // תוספת אם אינה קיימת במחשבון. היא מתווספת
+                            // אצלנו על התוצאה, ואין מה להקליד עבורה.
+                            ['תוספת אם', momBonusEligible(t) ? '10% — מתווסף אצלנו, לא במחשבון' : null],
                             ['סטטוס',    onLeave(t) ? leaveText(t) : null],
                           ].filter(([, v]) => v).map(([k, v]) => (
                             <span key={k} style={{
@@ -4087,10 +4125,6 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, activeMon
               </div>
             </div>
           ))}
-        </div>
-
-        <div style={{ padding:'0 16px 12px' }}>
-          <MonthDocuments monthKey={activeMonth} schools={schools} userRole={userRole} userId={userId} />
         </div>
 
         <div style={{ borderTop:'1px solid var(--apple-fill2)', background:'var(--apple-surface)', padding:'10px 16px' }}>
