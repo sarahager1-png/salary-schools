@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 30;
+const BUILD = 31;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -2870,6 +2870,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               <p style={{ fontSize:13, color:'var(--text3)', marginInlineStart:13 }}>
                 {school.city}{school.city ? ' · ' : ''}מסלול ברירת מחדל לעובד/ת הוראה חדש/ה: {reformLabel(school.reform)}
               </p>
+              {!hoursQuota && extraHours > 0 && (
+                <div style={{ marginInlineStart:13, marginTop:8 }}>
+                  <span className="apple-badge badge-teal" style={{ fontSize:11.5 }}
+                    title="נשמרות בנפרד מהמכסה; כשתוגדר מכסה בסיסית הן יתווספו אליה">
+                    +{extraHours} שעות הוראה נוספות — {school.extraHoursNote || 'אושרו'} · נוצלו {usedHours.toLocaleString('he-IL')}
+                  </span>
+                </div>
+              )}
               {hoursQuota && (
                 <div style={{ marginInlineStart:13, marginTop:8, maxWidth:320 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:4 }}>
