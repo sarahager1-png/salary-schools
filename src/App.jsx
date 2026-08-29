@@ -83,7 +83,7 @@ const CALCULATORS = [
   { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
 ];
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 29;
+const BUILD = 30;
 
 const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
 // מסלול המורה -> המחשבון שמתאים לו
@@ -2696,7 +2696,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   const isPrincipal = userRole === 'principal';
 
   // מכסת שעות עובדי הוראה — מספר קבוע לבית הספר, נספרות שעות פרונטליות
-  const hoursQuota = Number(school.hoursQuota) || null;
+  // המכסה האפקטיבית: המכסה + שעות נוספות שאושרו (רמת ישי: +12 על
+  // חיבור כיתות ג'-ד'). התוספת נשמרת בנפרד כדי שהסיבה לא תלך לאיבוד.
+  const baseQuota  = Number(school.hoursQuota) || null;
+  const extraHours = Number(school.extraHours) || 0;
+  const hoursQuota = baseQuota !== null ? baseQuota + extraHours : (extraHours ? null : null);
   // המכסה נספרת לפי מה שהעובדת מלמדת בפועל. שלוש שעות גמול החינוך של
   // מחנכת בעולם ישן הן מעל המכסה — היא מלמדת 21 ומשולמת על 24.
   const usedHours  = ts.reduce((s, t) => s + (Number(t.frontalHours) || 0), 0);
@@ -2869,7 +2873,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               {hoursQuota && (
                 <div style={{ marginInlineStart:13, marginTop:8, maxWidth:320 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:4 }}>
-                    <span style={{ color:'var(--text3)' }}>שעות עובדי הוראה</span>
+                    <span style={{ color:'var(--text3)' }}>שעות עובדי הוראה{extraHours ? ` (כולל +${extraHours} — ${school.extraHoursNote || 'שעות נוספות'})` : ''}</span>
                     <span style={{ fontWeight:700, color: freeHours < 0 ? 'var(--danger)' : 'var(--text)' }}>
                       {usedHours.toLocaleString('he-IL')} / {hoursQuota.toLocaleString('he-IL')}
                       <span style={{ fontWeight:500, color:'var(--text3)' }}>
