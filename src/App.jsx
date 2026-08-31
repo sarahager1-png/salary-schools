@@ -6,7 +6,7 @@ import {
   Printer, Download, Upload, Send, Pencil, Trash2, X, Search,
   Paperclip, Image as ImageIcon, FileText, AlertTriangle, Lightbulb,
   CalendarClock, Bell, Users, FolderOpen, Database, FileSpreadsheet, ShieldAlert,
-  ExternalLink, ShieldCheck, MessageCircle,
+  ExternalLink, ShieldCheck, MessageCircle, Percent,
 } from 'lucide-react';
 import * as store from './lib/store.js';
 import './index.css';
@@ -540,6 +540,16 @@ const simComplete = t => {
 const needsSim      = t => Boolean(!unpaidThisMonth(t) && t._changedAt && !t._approved && !simComplete(t));
 const needsApproval = t => Boolean(t._changedAt && !t._approved && simComplete(t));
 const isPending     = t => Boolean(t._changedAt && !t._approved); // = needsSim || needsApproval
+
+// אחוז המשרה נקבע ביד, אחרי שהמנהלת מילאה שם ושעות. במסד הוא NOT NULL
+// DEFAULT 100, ולכן שורה שאיש לא נגע בה נראית בדיוק כמו משרה מלאה —
+// וזה מה שנכנס לסימולציה ולהבראה ולביגוד. scopeSetAt הוא החותמת שנרשמת
+// ברגע שמישהי מקלידה. אחוז שאינו 100 נספר גם הוא כנקבע: אין דרך אחרת
+// שהוא הגיע לשם, וזה חוסך מילוי לאחור של רשומות ותיקות.
+const scopeConfirmed = t =>
+  Boolean(t.scopeSetAt) || (t.scopePct ?? t.scope ?? 100) !== 100;
+// מי שממתינה לקביעת אחוז. מנהלת בית ספר תמיד 100% — 40 שעות ניהול.
+const scopeMissing = t => isPending(t) && !isPrincipalRow(t) && !scopeConfirmed(t);
 
 // בחודש הראשון נדרש אישור רשתי נוסף אחרי אישור השליח. רק אחריו נשלחים
 // למורות נתוני ההעסקה לחתימה.
@@ -3409,24 +3419,27 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       <input type="number" min="0" max="200" dir="ltr"
                         key={`pct-${t.id}`}
                         defaultValue={scope}
-                        title="אחוז משרה — הקלדה ישירה, נשמר ביציאה מהשדה"
+                        title={scopeConfirmed(t)
+                          ? 'אחוז משרה — הקלדה ישירה, נשמר ביציאה מהשדה'
+                          : 'עדיין ברירת המחדל — אחוז המשרה טרם נקבע. הקלדה כאן קובעת אותו.'}
                         onClick={e => e.stopPropagation()}
                         onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                         onBlur={e => {
                           const pct = Number(e.target.value);
                           if (!Number.isFinite(pct) || pct === scope) return;
-                          saveRow({ ...t, scopePct: pct, scope: pct });
+                          saveRow({ ...t, scopePct: pct, scope: pct, scopeSetAt: new Date().toISOString() });
                         }}
                         style={{ width:56, textAlign:'center', fontWeight:700, fontSize:13,
-                          border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
-                          background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
+                          border:`1px solid ${scopeConfirmed(t) ? 'var(--line)' : 'var(--warn)'}`, borderRadius:7, padding:'3px 4px',
+                          background: scopeConfirmed(t) ? 'var(--surface)' : 'var(--warn-bg)',
+                          color:'var(--text)', fontFamily:'inherit' }} />
                       {/* שורת עזר אחת: הצעה ליישור לפי הנוסחה, ותוצאת האם.
                           כשהשדה כבר תואם — רק תוצאת האם, בלי רעש. */}
                       {t.reform === 'pre' && !isPrincipalRow(t)
                         && computedBaseScope(t) !== (t.scope ?? t.scopePct ?? 100) ? (
                         <button
                           title="לפי הנוסחה: שעות (ועוד 3 למחנכת בעולם ישן) חלקי 30, או 26 באופק. לחיצה מיישרת, ותוספת האם מעל."
-                          onClick={e => { e.stopPropagation(); saveRow({ ...t, scopePct: computedBaseScope(t), scope: computedBaseScope(t) }); }}
+                          onClick={e => { e.stopPropagation(); saveRow({ ...t, scopePct: computedBaseScope(t), scope: computedBaseScope(t), scopeSetAt: new Date().toISOString() }); }}
                           style={{ display:'block', margin:'3px auto 0', fontSize:10.5, color:'#fff',
                             background:'var(--teal)', border:'none', cursor:'pointer', fontFamily:'inherit',
                             fontWeight:700, padding:'2px 8px', borderRadius:999, whiteSpace:'nowrap' }}>
@@ -4269,9 +4282,122 @@ function ActualCostPanel({ teachers, schools, onSave }) {
   );
 }
 
-function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKids, activeMonth, userRole, userId }) {
+/* ═══════════════════════════════════════════════════════════════
+   שלב ראשון — אחוזי משרה
+
+   המנהלת מזינה שם, ת.ז., שעות ודרגה. את אחוז המשרה קובעת שרה, ביד,
+   אחרי שהשורות מגיעות — ואין נוסחה שגוזרת אותו (היא הוסרה ב-27.8 אחרי
+   שלוש טעויות באותו יום). עד שהאחוז נקבע העמודה מראה 100, וזה נראה
+   בדיוק כמו משרה מלאה שנבחרה.
+
+   למה זה חייב לקרות לפני הסימולציה ולא אחריה: אחוז משרה הוא אחד
+   מהשדות שמאפסים סימולציה קיימת. מי שתקליד אחוז אחרי שהחשבת הזינה
+   שכר — תמחק לה את העבודה.
+
+   המסך מציג את מה שידוע — שעות, מסלול, מכסת משרה מלאה — ומחכה
+   למספר. אין כאן מילוי אוטומטי; "לפי השעות" הוא כפתור, לא ברירת מחדל.
+═══════════════════════════════════════════════════════════════ */
+function ScopePanel({ teachers, schools, onSave }) {
+  const [vals,  setVals]  = useState({});   // teacherId → מה שמוקלד
+  const [flash, setFlash] = useState({});   // teacherId → נקבע הרגע
+
+  const rows = teachers.filter(scopeMissing);
+  const bySchool = schools
+    .map(sc => ({ school: sc, list: rows.filter(t => t.schoolId === sc.id) }))
+    .filter(g => g.list.length);
+
+  const save = async (t, pct) => {
+    const n = Math.round(Number(pct));
+    if (!Number.isFinite(n) || n <= 0 || n > 200) return alert('אחוז משרה חייב להיות מספר בין 1 ל-200');
+    const ok = await onSave(t.id, n);
+    if (ok !== false) {
+      setVals(v => { const x = { ...v }; delete x[t.id]; return x; });
+      setFlash(f => ({ ...f, [t.id]: true }));
+      setTimeout(() => setFlash(f => { const x = { ...f }; delete x[t.id]; return x; }), 1500);
+    }
+  };
+
+  if (!rows.length) return (
+    <div style={{ textAlign:'center', padding:'48px 16px' }}>
+      <div style={{ width:56, height:56, borderRadius:17, background:'var(--ok-bg)', margin:'0 auto 14px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <Check size={26} strokeWidth={2.4} color="var(--ok)" />
+      </div>
+      <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>כל אחוזי המשרה נקבעו</p>
+      <p style={{ fontSize:13, color:'var(--text3)', marginTop:3 }}>אפשר לעבור להזנת השכר הרשמי</p>
+    </div>
+  );
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+      <p style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6 }}>
+        {rows.length} עובדות שאחוז המשרה שלהן עדיין ברירת המחדל — 100 שאיש לא בחר.
+        הקלדה כאן לפני הסימולציה; אחריה היא מוחקת את השכר שהוזן.
+      </p>
+      {bySchool.map(({ school, list }) => (
+        <div key={school.id}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
+            <School size={13} strokeWidth={2.2} />
+            {school.name} · {list.length}
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {list.map(t => {
+              const isOfek = t.reform === 'ofek';
+              const full   = isOfek ? baseFrontalFor(t) : PRE_FRONTAL;
+              const hr     = homeroomHours(t);
+              const sugg   = computedBaseScope(t);
+              const cur    = vals[t.id] ?? '';
+              const hasSim = Boolean(t._officialGross || t._officialGrossPre);
+              return (
+                <div key={t.id} className="apple-card" style={{ padding:'10px 12px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                  <div style={{ flex:'1 1 170px', minWidth:0 }}>
+                    <p style={{ fontSize:13.5, fontWeight:600, color:'var(--text)' }}>
+                      {t.name}
+                      {flash[t.id] && <span style={{ marginInlineStart:6, fontSize:11.5, color:'var(--ok)', fontWeight:700 }}>✓ נקבע</span>}
+                    </p>
+                    <p style={{ fontSize:11.5, color:'var(--text3)' }}>
+                      {reformLabel(t.reform)} · {t.frontalHours || 0} ש׳
+                      {hr > 0 && ` + ${hr} גמול חינוך`}
+                      {` מתוך ${full} למשרה מלאה`}
+                      {hasSim && <span style={{ color:'var(--warn)', fontWeight:700 }}> · יש סימולציה — שינוי יאפס אותה</span>}
+                    </p>
+                  </div>
+                  <input type="number" inputMode="numeric" className="apple-input" dir="ltr" placeholder="% משרה"
+                    value={cur}
+                    onChange={e => setVals(v => ({ ...v, [t.id]: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(t, cur); } }}
+                    style={{ width:96, fontSize:14, minHeight:38, textAlign:'center' }} />
+                  <button className="apple-btn apple-btn-blue" onClick={() => save(t, cur)}
+                    disabled={String(cur).trim() === ''}
+                    style={{ minHeight:38, padding:'0 14px', opacity: String(cur).trim() === '' ? .45 : 1 }}>
+                    שמור
+                  </button>
+                  {/* הצעה, לא ברירת מחדל: השעות חלקי מכסת משרה מלאה */}
+                  <button className="apple-btn apple-btn-ghost" onClick={() => save(t, sugg)}
+                    title="מחשב מהשעות שהמנהלת הזינה. אפשר להתעלם ולהקליד מספר אחר."
+                    style={{ minHeight:38, padding:'0 12px', fontSize:12.5 }}>
+                    לפי השעות · {sugg}%
+                  </button>
+                  <button className="apple-btn apple-btn-ghost" onClick={() => save(t, 100)}
+                    title="אישור שהיא באמת במשרה מלאה"
+                    style={{ minHeight:38, padding:'0 12px', fontSize:12.5 }}>
+                    100%
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKids, onSaveScope, activeMonth, userRole, userId }) {
   const [calc, setCalc] = useState('ofek');
-  const [tab, setTab]   = useState('sim');   // 'sim' | 'cost'
+  // אחוזי המשרה הם השלב הראשון, ולכן המסך נפתח עליהם כשעוד חסרים —
+  // סימולציה שתרוץ לפניהם תימחק ברגע שיוקלד האחוז.
+  const scopeTodo   = teachers.filter(scopeMissing).length;
+  const [tab, setTab]   = useState(scopeTodo ? 'scope' : 'sim');   // 'scope' | 'sim' | 'cost'
   const costMissing = teachers.filter(t => simComplete(t) && !t._actualEmployerCost).length;
   const [filterSchool, setFilterSchool] = useState('all');
   const [inputs, setInputs] = useState({});    // teacherId → string
@@ -4364,6 +4490,10 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKid
         <div style={{ background:'var(--apple-surface)', borderBottom:'1px solid var(--apple-fill2)', padding:'14px 16px', display:'flex', flexDirection:'column', gap:10 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <div className="apple-seg">
+              <button onClick={() => setTab('scope')} className={['apple-seg-item', tab === 'scope' ? 'active' : ''].join(' ')} style={{ padding:'5px 11px', fontSize:12.5 }}>
+                <Percent size={12} strokeWidth={2.6} style={{ marginInlineEnd:4 }} />
+                אחוזי משרה{scopeTodo > 0 ? ` (${scopeTodo})` : ''}
+              </button>
               <button onClick={() => setTab('sim')} className={['apple-seg-item', tab === 'sim' ? 'active' : ''].join(' ')} style={{ padding:'5px 11px', fontSize:12.5 }}>
                 הזנת שכר רשמי
               </button>
@@ -4390,6 +4520,7 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKid
 
         {/* Teacher rows */}
         <div style={{ flex:1, overflowY:'auto', padding:'12px 12px', display:'flex', flexDirection:'column', gap:16 }}>
+          {tab === 'scope' && <ScopePanel teachers={teachers} schools={schools} onSave={onSaveScope} />}
           {tab === 'cost' && <ActualCostPanel teachers={teachers} schools={schools} onSave={onSaveActual} />}
           {/* המסמכים הם של הנהלת החשבונות, כמו העלות בפועל. בלשונית
               הסימולציה הם רק גזלו גובה מרשימת העובדות. */}
@@ -5735,6 +5866,8 @@ export default function App() {
             onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
             onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
             onSaveKids={(id, n) => run(() => store.saveTeacher({ id, childrenUnder18: n }, activeMonth))}
+            onSaveScope={(id, pct) => run(() => store.saveTeacher(
+              { id, scopePct: pct, scopeSetAt: new Date().toISOString() }, activeMonth))}
           />
         ) : /* Principal: see only their school */
         !isCoord && principalSchool ? (
@@ -5761,6 +5894,8 @@ export default function App() {
             onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
             onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
             onSaveKids={(id, n) => run(() => store.saveTeacher({ id, childrenUnder18: n }, activeMonth))}
+            onSaveScope={(id, pct) => run(() => store.saveTeacher(
+              { id, scopePct: pct, scopeSetAt: new Date().toISOString() }, activeMonth))}
           />
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} />

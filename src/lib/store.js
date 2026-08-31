@@ -26,6 +26,7 @@ const TEACHER_FIELDS = [
   ['seniority',            'seniority'],
   ['frontal_hours',        'frontalHours'],
   ['scope_pct',            'scopePct'],
+  ['scope_set_at',         'scopeSetAt'],
   ['gamul_role',           'role'],
   ['age_group',            'ageGroup'],
   ['is_temp',              'isTemp'],
