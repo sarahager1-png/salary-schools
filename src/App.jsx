@@ -3817,8 +3817,11 @@ function FillProgress({ schools, month, onOpenSchool }) {
 
   // מצב לכל בית ספר, ומכאן גם הסדר: מה שדורש פעולה קודם
   const state = (r) => {
+    // שורות בטבלה גוברות על "מתי נכנסה": מי שהזינה — נכנסה, גם אם אין לכך
+    // חותמת. קישור שהונפק מחדש מתחיל בלי היסטוריה, ובלי התנאי הזה בית ספר
+    // שכבר סיים קופץ לראש הרשימה כאילו לא נגע.
     if (!r.hasLink)                return { k: 0, label: 'אין קישור',        tone: 'gray'  };
-    if (!r.lastSeen)               return { k: 1, label: 'טרם נכנסה',        tone: 'orange'};
+    if (!r.lastSeen && !r.teachers)return { k: 1, label: 'טרם נכנסה',        tone: 'orange'};
     if (r.teachers === 0)          return { k: 2, label: 'נכנסה, לא הזינה',  tone: 'orange'};
     if (r.missingContact > 0)      return { k: 3, label: `${r.missingContact} בלי פרטי קשר`, tone: 'orange' };
     if (r.simulated < r.teachers)  return { k: 4, label: 'ממתין לחשבת השכר', tone: 'teal'  };
