@@ -39,6 +39,8 @@ const TEACHER_FIELDS = [
   ['mm_hours',             'mmHours'],
   ['mm_for',               'mmFor'],
   ['monthly_extras',       'monthlyExtras'],
+  ['travel_days',          'travelDays'],
+  ['daycare_children',     'daycareChildren'],
   ['official_gross',       '_officialGross'],
   ['official_gross_pre',   '_officialGrossPre'],
   ['agreed_gross',         '_agreedGross'],

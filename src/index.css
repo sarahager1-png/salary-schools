@@ -344,10 +344,33 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .sheet-scroll .sticky-head th:first-child { background: var(--bg); }
 .sheet-scroll .sticky-head tfoot td:first-child { background: var(--fill); }
 .sheet-scroll .sticky-head tbody tr:hover td:first-child { background: var(--fill); }
+
+/* השורה התחתונה נעוצה לקצה השמאלי, כמו שהשם נעוץ לימין.
+   26 עמודות אינן נכנסות במסך, וה"סה״כ למעסיק" — המספר שבגללו פותחים
+   את המסך — נפל מחוץ לו. עכשיו הוא במקומו וכל השאר גולל מתחתיו.
+   nth-last-child(2) ולא last-child: האחרונה היא עמודת הכפתורים. */
+.sheet-scroll .sticky-head th:nth-last-child(2),
+.sheet-scroll .sticky-head td:nth-last-child(2) {
+  position: sticky;
+  inset-inline-end: 0;
+  background: inherit;
+  box-shadow: 1px 0 0 var(--line-soft);
+}
+.sheet-scroll .sticky-head th:nth-last-child(2) { background: var(--bg); z-index: 4; }
+.sheet-scroll .sticky-head tfoot td:nth-last-child(2) { background: var(--fill); }
+.sheet-scroll .sticky-head tbody tr:hover td:nth-last-child(2) { background: var(--fill); }
+
+/* מרווחי התאים בגיליון צרים מבשאר הטבלאות — 14px לצד בכפול 26 עמודות
+   הם 700px שיוצאים מהמסך לפני שהוזנה מילה. */
+.sheet-scroll .apple-table th { padding: 9px 8px; }
+.sheet-scroll .apple-table td { padding: 7px 8px; }
+
 @media (max-width: 767px) {
   .sheet-scroll { max-height: none; }
   .sheet-scroll .sticky-head th:first-child,
-  .sheet-scroll .sticky-head td:first-child { position: static; box-shadow: none; }
+  .sheet-scroll .sticky-head td:first-child,
+  .sheet-scroll .sticky-head th:nth-last-child(2),
+  .sheet-scroll .sticky-head td:nth-last-child(2) { position: static; box-shadow: none; }
 }
 .sheet-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 .sheet-table th {
@@ -497,14 +520,36 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 }
 
 /* ── Print ── */
+/* הדוחות של המערכת הם טבלאות רחבות (15 עמודות בדוח השכר), ולכן A4 לרוחב.
+   לאורך הן נחתכות או נשפכות לעמוד שני חלקי. */
+@page { size: A4 landscape; margin: 8mm; }
+
 @media print {
   .no-print { display: none !important; }
   body { background: #fff; background-image: none; }
   .apple-card, .sheet-wrap { box-shadow: none; border: 1px solid #ddd; }
+
+  /* חלון הדוח נפתח כשכבה צפה (position:fixed). בהדפסה שכבה כזאת מודפסת
+     רק בגובה המסך ומשאירה עמוד שני קטוע — כאן היא הופכת לתוכן רגיל שזורם
+     על פני כמה עמודים. */
+  .print-sheet { position: static !important; inset: auto !important;
+                 overflow: visible !important; background: #fff !important; }
+  .print-sheet > div { max-width: none !important; min-height: 0 !important;
+                       margin: 0 !important; padding: 0 !important; }
+
+  .apple-table { font-size: 8.5px !important; width: 100%; }
+  .apple-table th, .apple-table td { padding: 2px 3px !important; }
+  /* כותרת הטבלה חוזרת בראש כל עמוד, ושורה לא נשברת באמצע */
+  thead { display: table-header-group; }
+  tr, .apple-stat { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
 }
 
 /* תצוגה מצומצמת של טבלת בית הספר: מסתירה עמודות משניות לפי מיקום,
    כותרת ותא יחד — כך אין סיכוי להיסט בין הכותרות לתוכן. */
+/* המספרים הם מיקומי עמודות, ולכן כל עמודה שנוספת לכותרת מזיזה אותם.
+   ת.ז. · מייל · טלפון · שלב · קבוצת גיל · שיבוץ · העדרות · תוספות ·
+   הוצאות מעביד — 28 עמודות בסך הכול. */
 .compact-cols th:nth-child(2),  .compact-cols td:nth-child(2),
 .compact-cols th:nth-child(3),  .compact-cols td:nth-child(3),
 .compact-cols th:nth-child(4),  .compact-cols td:nth-child(4),
@@ -512,9 +557,9 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .compact-cols th:nth-child(13), .compact-cols td:nth-child(13),
 .compact-cols th:nth-child(14), .compact-cols td:nth-child(14),
 .compact-cols th:nth-child(16), .compact-cols td:nth-child(16),
-.compact-cols th:nth-child(19), .compact-cols td:nth-child(19),
-.compact-cols th:nth-child(24), .compact-cols td:nth-child(24) { display:none; }
+.compact-cols th:nth-child(21), .compact-cols td:nth-child(21),
+.compact-cols th:nth-child(26), .compact-cols td:nth-child(26) { display:none; }
 
 /* בית ספר בלי תוספת בית חב"ד (מזכרת בתיה): עמודות הבסיס והתוספת
    מוסתרות — התשלום ישיר ואין להן משמעות שם. */
-.no-supp th:nth-child(22), .no-supp td:nth-child(22) { display:none; }
+.no-supp th:nth-child(24), .no-supp td:nth-child(24) { display:none; }

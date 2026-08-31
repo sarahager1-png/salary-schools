@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
   Briefcase, Calculator, School, Check, ArrowLeft, ArrowRight,
   ChevronLeft, ChevronRight, Plus, LogOut, BarChart3, ClipboardCheck,
@@ -274,6 +275,11 @@ function deriveHours(t, scopeOverride) {
 }
 
 // ביגוד + הבראה (מקור: הסכם קיבוצי חינוך 2024)
+// החזרי הוצאות — אינם שכר לכל דבר ועניין, אינם פנסיוניים, ואינם נספרים
+// בשכר המינימום. כן חייבים במס שכר ובביטוח לאומי.
+const TRAVEL_DAY    = 22.6;  // תקרת דמי נסיעה ליום, צו הרחבה 11.8.2016
+const DAYCARE_1     = 372;   // תוספת מעונות, ילד ראשון עד גיל 5 — חוזר הממונה 1.1.2026
+const DAYCARE_2     = 251;   // ילד שני. משולם לכל היותר עבור שני ילדים
 const HAVRAAH_DAY   = 421;   // שכר יום הבראה 2024
 const BIGUUD_ANNUAL = 2028;  // ביגוד שנתי למורה (הסכם חינוך)
 function havraahDays(sen) {
@@ -293,6 +299,16 @@ function calcExtras(t) {
   const havraah = Math.round(havraahDays(t.seniority) * HAVRAAH_DAY * factor / 12);
   return { biguud, havraah, total: biguud + havraah };
 }
+// נסיעות לפי ימי עבודה בפועל; מעונות לפי מספר הילדים עד גיל 5, פרו-רטה
+// לאחוז המשרה (עובדת הוראה בחצי משרה מקבלת מחצית התוספת).
+function calcReimb(t) {
+  const travel = Math.round((Number(t.travelDays) || 0) * TRAVEL_DAY);
+  const kids = Math.min(2, Math.max(0, Number(t.daycareChildren) || 0));
+  const full = (kids >= 1 ? DAYCARE_1 : 0) + (kids >= 2 ? DAYCARE_2 : 0);
+  const daycare = Math.round(full * effectiveScope(t) / 100);
+  return { travel, daycare, total: travel + daycare };
+}
+
 /*
   הוצאות המעביד מעל הברוטו — רכיב־רכיב.
 
@@ -326,7 +342,10 @@ function bituachLeumi(wage) {
 */
 function employerParts(t, base, supplement) {
   const { biguud, havraah } = calcExtras(t);
-  const wage = base + supplement + biguud + havraah;
+  const { travel, daycare } = calcReimb(t);
+  // נסיעות ומעונות נכנסים לבסיס של מס שכר וביטוח לאומי, אך לא לפנסיה
+  // ולקרן ההשתלמות — הם החזר הוצאות ולא שכר.
+  const wage = base + supplement + biguud + havraah + travel + daycare;
   const parts = [
     { key:'pension',  label:'פנסיה ופיצויים',   rate:PENSION_RATE, on:base, amount: Math.round(base * PENSION_RATE) },
     { key:'keren',    label:'קרן השתלמות',      rate:KEREN_RATE,   on:base, amount: Math.round(base * KEREN_RATE) },
@@ -335,6 +354,8 @@ function employerParts(t, base, supplement) {
     { key:'havraah',  label:'הבראה',            rate:null,         on:null, amount: havraah },
     { key:'biguud',   label:'ביגוד',            rate:null,         on:null, amount: biguud },
   ];
+  if (travel > 0) parts.push({ key:'travel', label:`נסיעות (${t.travelDays} ימים × ₪${TRAVEL_DAY})`, rate:null, on:null, amount: travel });
+  if (daycare > 0) parts.push({ key:'daycare', label:`מעונות (${t.daycareChildren} ילדים עד גיל 5)`, rate:null, on:null, amount: daycare });
   return { parts, total: parts.reduce((s, x) => s + x.amount, 0), wage };
 }
 
@@ -409,7 +430,24 @@ function calcEmployer(t) {
   }
   const { base, mom, supplement, gross } = payBreakdown(t);
   const extras = calcExtras(t);
-  const { parts, total: estimate } = employerParts(t, base, supplement);
+  const { parts, total: itemized } = employerParts(t, base, supplement);
+
+  // רצפת תקצוב: העלות למעסיק לא יורדת מ-140% מהברוטו. הפירוט למעלה מגיע
+  // ל-127%–142% לפי תמהיל הבסיס והתוספת, ואינו כולל עדיין נסיעות ומעונות —
+  // ולכן תקצוב לפיו בלבד יוצא חסר. ההשלמה מוצגת כשורה נפרדת ולא מובלעת
+  // ברכיבים, כדי שיישאר ברור מה מפורט ומה אומדן, וכדי שברגע שנסיעות
+  // ומעונות ייכנסו כרכיבים אמיתיים היא תצטמצם מעצמה. הוראת שרה 29.8.
+  const FLOOR_RATE = 0.40;
+  const floorGap = Math.max(0, Math.round(gross * FLOOR_RATE) - itemized);
+  if (floorGap > 0) {
+    parts.push({
+      key: 'floor',
+      label: 'השלמה ל-140% (נסיעות, מעונות ותוספות שטרם פורטו)',
+      rate: null, on: null, amount: floorGap,
+    });
+  }
+  const estimate = itemized + floorGap;
+
   const employerSupp = supplementCost(base, supplement, extras.biguud, extras.havraah);
   const employerBase = estimate - employerSupp;
   const actual   = Number(t._actualEmployerCost) || 0;
@@ -419,8 +457,8 @@ function calcEmployer(t) {
     estimate, isEstimate: !actual,
     total: gross + social,
     parts,                                    // הפירוט המלא, שורה לכל רכיב
-    // השיעור בפועל, מעל הברוטו לעובדת. הוא אינו קבוע: הוא נמוך יותר
-    // ככל שחלק גדול יותר מהשכר הוא תוספת בית חב"ד, שנושאת פחות.
+    // השיעור בפועל, מעל הברוטו לעובדת. עם רצפת ה-140% הוא לא יורד מ-40%,
+    // ועולה מעליה במורה שרוב שכרה בסיס (פנסיה וקרן חלות על הבסיס בלבד).
     pct: gross ? Math.round(estimate / gross * 1000) / 10 : 0,
     extras,
   };
@@ -585,6 +623,8 @@ const EMPTY_TEACHER = {
   mmHours: 0,            // שעות ממ"מ
   mmFor: '',             // במקום מי
   monthlyExtras: 0,      // תוספות חודשיות נוספות (₪)
+  travelDays: 0,         // ימי עבודה בפועל — לחישוב נסיעות
+  daycareChildren: 0,    // ילדים עד גיל 5 — לתוספת מעונות
 };
 
 const fmt = d => d ? d.split('-').reverse().join('/') : '—';
@@ -1558,6 +1598,27 @@ function parseTeachers(text, schoolId) {
 /* ═══════════════════════════════════════════════════════════════
    EXPORT — הורדת קבצים (CSV עם BOM, וגיבוי JSON)
 ═══════════════════════════════════════════════════════════════ */
+
+// קובץ .xlsx אמיתי — לא CSV. אקסל בהגדרות עברית מפריד בנקודה-פסיק, ולכן
+// קובץ מופרד בפסיקים נפתח אצלו כעמודה אחת. גיליון בינארי עוקף את הבעיה
+// לגמרי, שומר עברית, ומאפשר רוחבי עמודות וכיוון מימין לשמאל.
+function downloadXLSX(headers, rows, filename, footer, sheetName = 'דוח') {
+  const aoa = [headers.map(h => h.label)];
+  rows.forEach(r => aoa.push(headers.map(h => r[h.key] ?? '')));
+  if (footer) aoa.push(headers.map(h => footer[h.key] ?? ''));
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(9, Math.min(24, h.label.length + 6)) }));
+
+  const wb = XLSX.utils.book_new();
+  // כיוון מימין לשמאל נשמר ברמת החוברת; ברמת הגיליון בלבד הוא לא נכתב לקובץ
+  wb.Workbook = { Views: [{ RTL: true }] };
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  downloadBlob(buf, filename,
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+
 function downloadBlob(content, filename, mime) {
   const blob = new Blob([content], { type: mime });
   const url  = URL.createObjectURL(blob);
@@ -2424,12 +2485,48 @@ function SchoolReport({ school, teachers, onClose }) {
   const totGross    = tsOfficial.reduce((s, t) => s + calcEmployer(t).gross, 0);
   const pendingCount = ts.filter(isPending).length;
 
+  // אותן עמודות שבטבלה, באותו סדר — כדי שהקובץ והנייר יראו אותו דבר
+  const exportExcel = () => {
+    const headers = [
+      { key:'name', label:'שם' }, { key:'tz', label:'ת.ז.' }, { key:'reform', label:'רפורמה' },
+      { key:'grade', label:'דרגה' }, { key:'seniority', label:'ותק' }, { key:'scope', label:'% משרה' },
+      { key:'frontal', label:'פרונטלי' }, { key:'individual', label:'פרטני' }, { key:'presence', label:'שהייה' },
+      { key:'role', label:'תפקיד' }, { key:'from', label:'מתאריך' }, { key:'to', label:'עד תאריך' },
+      { key:'gross', label:'ברוטו' }, { key:'social', label:'הוצאות מעביד' }, { key:'total', label:'ברוטו למעסיק' },
+    ];
+    const rows = ts.map(t => {
+      const emp = calcEmployer(t);
+      const derived = deriveHours(t);
+      return {
+        name: t.name,
+        tz: t.tzId || '',
+        reform: reformLabel(t.reform),
+        grade: t.reform === 'ofek' ? (t.grade === 'intern' ? 'מתמחה' : `ד${t.grade}`) : (t.degree === 'intern' ? 'מתמחה' : t.degree),
+        seniority: t.seniority,
+        scope: (t.reform === 'ofek' ? (derived?.scopePct || t.scopePct || 100) : (t.scope || 100)) + '%',
+        frontal: derived ? derived.frontal : (t.frontalHours ?? ''),
+        individual: derived ? derived.individual : '',
+        presence: derived ? derived.presence : '',
+        role: t.role !== 'none' ? (ROLES.find(r => r.id === t.role)?.label.split('(')[0].trim() || '') : '',
+        from: fmt(t.startDate), to: fmt(t.endDate),
+        gross: t._officialGross ? Math.round(Number(t._officialGross)) : '',
+        social: Math.round(emp.social),
+        total: Math.round(emp.total),
+      };
+    });
+    const footer = { name: 'סה"כ', gross: Math.round(totGross), total: Math.round(totEmpGross) };
+    downloadXLSX(headers, rows, `דוח_שכר_${school.name}_${stampToday()}.xlsx`, footer, 'דוח שכר');
+  };
+
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, overflowY:'auto' }} dir="rtl">
+    <div className="print-sheet" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, overflowY:'auto' }} dir="rtl">
       <div style={{ maxWidth:1000, margin:'0 auto', background:'var(--apple-surface)', minHeight:'100vh', padding:32 }}>
         <div className="no-print" style={{ display:'flex', justifyContent:'space-between', marginBottom:24 }}>
           <button className="apple-btn apple-btn-ghost" onClick={onClose}><ArrowRight size={15} strokeWidth={2.4} />חזרה</button>
-          <button className="apple-btn apple-btn-blue" onClick={() => window.print()}><Printer size={15} strokeWidth={2.2} />הדפסה</button>
+          <div style={{ display:'flex', gap:8 }}>
+            <button className="apple-btn apple-btn-ghost" onClick={exportExcel}>הורדה לאקסל</button>
+            <button className="apple-btn apple-btn-blue" onClick={() => window.print()}><Printer size={15} strokeWidth={2.2} />הדפסה</button>
+          </div>
         </div>
 
         <div style={{ borderBottom:'2px solid var(--apple-text)', paddingBottom:16, marginBottom:24 }}>
@@ -3024,7 +3121,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
           </button>
           <button className="apple-btn apple-btn-ghost" onClick={() => setAllCols(v => !v)}
             style={{ minHeight:32, padding:'0 12px', fontSize:12.5 }}>
-            {allCols ? 'תצוגה מצומצמת' : `כל העמודות (${26})`}
+            {allCols ? 'תצוגה מצומצמת' : `כל העמודות (${28})`}
           </button>
         </div>
         <div className="sheet-wrap">
@@ -3048,6 +3145,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <th style={{ textAlign:'center' }}>שיבוץ</th>
                 <th style={{ textAlign:'center' }}>ילדים</th>
                 <th style={{ textAlign:'center' }}>העדרות (ימים)</th>
+                <th style={{ textAlign:'center' }}>ימי נסיעה</th>
+                <th style={{ textAlign:'center' }}>ילדים עד 5</th>
                 <th style={{ textAlign:'center' }}>ממ"מ שעות</th>
                 <th style={{ textAlign:'center' }}>במקום מי</th>
                 <th style={{ textAlign:'center' }}>תוספות (₪)</th>
@@ -3132,6 +3231,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                   </td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.childrenUnder18??0} onChange={e=>setF('childrenUnder18',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.absenceDays??0} onChange={e=>setF('absenceDays',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td><input type="number" className="apple-input" dir="ltr" value={editData.travelDays??0} onChange={e=>setF('travelDays',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td><input type="number" className="apple-input" dir="ltr" value={editData.daycareChildren??0} onChange={e=>setF('daycareChildren',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.mmHours??0} onChange={e=>setF('mmHours',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td><input className="apple-input" value={editData.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם עובד/ת ההוראה" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
                   <td><input type="number" className="apple-input" dir="ltr" value={editData.monthlyExtras??0} onChange={e=>setF('monthlyExtras',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:70, textAlign:'center' }} /></td>
@@ -3146,7 +3247,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               )}
 
               {filtered.length === 0 && editingId !== 'new' ? (
-                <tr><td colSpan={15} style={{ textAlign:'center', padding:'40px', color:'var(--apple-text3)' }}>
+                <tr><td colSpan={28} style={{ textAlign:'center', padding:'40px', color:'var(--apple-text3)' }}>
                   {ts.length === 0 ? 'אין עדיין עובדי הוראה' : 'לא נמצאו תוצאות'}
                 </td></tr>
               ) : filtered.map(t => {
@@ -3232,6 +3333,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     </td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.childrenUnder18??0} onChange={e=>setF('childrenUnder18',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.absenceDays??0} onChange={e=>setF('absenceDays',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                    <td><input type="number" className="apple-input" dir="ltr" value={d.travelDays??0} onChange={e=>setF('travelDays',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                    <td><input type="number" className="apple-input" dir="ltr" value={d.daycareChildren??0} onChange={e=>setF('daycareChildren',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.mmHours??0} onChange={e=>setF('mmHours',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                     <td><input className="apple-input" value={d.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם עובד/ת ההוראה" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
                     <td><input type="number" className="apple-input" dir="ltr" value={d.monthlyExtras??0} onChange={e=>setF('monthlyExtras',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:70, textAlign:'center' }} /></td>
@@ -3388,6 +3491,17 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td style={{ textAlign:'center', color: (t.absenceDays||0)>0 ? 'var(--danger)' : 'var(--text3)', fontWeight: (t.absenceDays||0)>0 ? 700 : 400 }}>
                       {(t.absenceDays||0) > 0 ? t.absenceDays : '—'}
                     </td>
+                    {/* נסיעות ומעונות — התאים חסרו בשורת התצוגה בזמן שהכותרות
+                        כבר היו שם, וכל מה שמשמאלם הוצג עמודה אחת מוקדם מדי:
+                        "הוצאות מעביד" ו"סה״כ למעסיק" נשארו ריקות. */}
+                    <td style={{ textAlign:'center', color: (t.travelDays||0)>0 ? 'var(--text)' : 'var(--text3)', fontWeight: (t.travelDays||0)>0 ? 700 : 400 }}
+                        title={(t.travelDays||0) > 0 ? `נסיעות: ${calcReimb(t).travel.toLocaleString('he-IL')} ₪` : undefined}>
+                      {(t.travelDays||0) > 0 ? t.travelDays : '—'}
+                    </td>
+                    <td style={{ textAlign:'center', color: (t.daycareChildren||0)>0 ? 'var(--text)' : 'var(--text3)', fontWeight: (t.daycareChildren||0)>0 ? 700 : 400 }}
+                        title={(t.daycareChildren||0) > 0 ? `מעונות: ${calcReimb(t).daycare.toLocaleString('he-IL')} ₪` : undefined}>
+                      {(t.daycareChildren||0) > 0 ? t.daycareChildren : '—'}
+                    </td>
                     <td style={{ textAlign:'center', color: (t.mmHours||0)>0 ? 'var(--text)' : 'var(--text3)', fontWeight: (t.mmHours||0)>0 ? 700 : 400 }}>
                       {(t.mmHours||0) > 0 ? t.mmHours : '—'}
                     </td>
@@ -3529,8 +3643,17 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
             </tbody>
             {tsOfficial.length > 0 && !isPrincipal && (
               <tfoot>
+                {/* שורת הסיכום נבנית תא-תא ולא ב-colSpan אחד גדול. שתי סיבות:
+                    ה-colSpan היה 14 בזמן שהטבלה מונה 26 עמודות, ולכן כל סכום
+                    ישב ארבע עמודות ימינה — "הוצאות מעביד" ו"סה״כ למעסיק"
+                    נשארו ריקות לגמרי; וההסתרה בתצוגה המצומצמת היא לפי מיקום
+                    התא, ותא מתפרש אחד אינו יכול להיעלם עם העמודה שלו. */}
                 <tr>
-                  <td colSpan={14} style={{ fontWeight:700 }}>סה״כ ({tsOfficial.length} מורות עם סימולציה מלאה)</td>
+                  <td style={{ fontWeight:700, whiteSpace:'nowrap' }}
+                      title={`${tsOfficial.length} מורות עם סימולציה מלאה`}>
+                    סה״כ · {tsOfficial.length} מורות
+                  </td>
+                  {Array.from({ length: 19 }, (_, i) => <td key={`pad${i}`}></td>)}
                   <td style={{ textAlign:'center', fontWeight:700 }}>{totMonthly > 0 ? totMonthly.toLocaleString('he-IL') + ' ₪' : '—'}</td>
                   <td style={{ textAlign:'center', fontWeight:700 }}>{totBase.toLocaleString('he-IL')} ₪</td>
                   <td></td>
@@ -4768,6 +4891,8 @@ function LinkCard({ teacher, locked, onSave }) {
         <LinkField label={'שעות ממ' + '"' + 'מ'} value={draft.mmHours} onChange={v => set('mmHours', v)} />
         <LinkField label="במקום מי" type="text" value={draft.mmFor}   onChange={v => set('mmFor', v)} hint="שם עובד/ת ההוראה" />
         <LinkField label="תוספות החודש"   value={draft.monthlyExtras} onChange={v => set('monthlyExtras', v)} />
+        <LinkField label="ימי נסיעה"      value={draft.travelDays}    onChange={v => set('travelDays', v)} hint="ימי עבודה בפועל" />
+        <LinkField label="ילדים עד גיל 5" value={draft.daycareChildren} onChange={v => set('daycareChildren', v)} hint="לתוספת מעונות, עד שניים" />
       </div>
 
       <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:11 }}>
@@ -5349,7 +5474,7 @@ export default function App() {
     // חודש בנפרד, ולכן גם הוא מתאפס.
     const carried = teachers.map(t => ({
       ...t,
-      absenceDays: 0, mmHours: 0, mmFor: '', monthlyExtras: 0,
+      absenceDays: 0, mmHours: 0, mmFor: '', monthlyExtras: 0, travelDays: 0, daycareChildren: 0,
       _actualEmployerCost: null,
       // האישור עובר עם השורה: מה שלא השתנה אינו חוזר לאישור.
       // שינוי אמיתי מאפס אותו ממילא דרך מעקב השינויים.

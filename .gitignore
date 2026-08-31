@@ -18,3 +18,7 @@ outgoing-links.log
 
 # מסד הבדיקות
 .env.test
+
+# תוצרי בדיקת היישור
+align-*.png
+print-report.pdf
