@@ -24,6 +24,8 @@ const arg = (name, def = null) => {
 };
 const MONTH  = arg('month');
 const SCHOOL = arg('school');
+// שמות מופרדים בפסיק — לבדיקה חוזרת ממוקדת של שורות שנויות במחלוקת
+const NAMES  = arg('names') ? String(arg('names')).split(',').map(x => x.trim()) : null;
 const LIMIT  = Number(arg('limit', 0)) || 0;
 const LIVE   = process.argv.includes('--live');
 if (!MONTH || !/^\d{4}-\d{2}$/.test(String(MONTH))) {
@@ -43,6 +45,7 @@ let q = sb.from('teacher_months')
   .select('name, reform, degree, grade, seniority, scope_pct, scope_set_at, gamul_role, leave_type, children_under_18, official_gross, schools!inner(name)')
   .eq('month_key', MONTH);
 if (SCHOOL && SCHOOL !== true) q = q.eq('schools.name', SCHOOL);
+if (NAMES) q = q.in('name', NAMES);
 const { data: rows, error } = await q;
 if (error) { console.error('טעינה נכשלה:', error.message); process.exit(1); }
 
@@ -64,7 +67,7 @@ console.log(`חודש ${MONTH} · ${rows.length} שורות · ${todo.length} ע
 if (!todo.length) process.exit(0);
 
 const b = await chromium.launch();
-const p = await (await b.newContext({ locale: 'he-IL', viewport: { width: 1300, height: 1400 } })).newPage();
+const p = await (await b.newContext({ locale: 'he-IL', viewport: { width: 1300, height: 1600 } })).newPage();
 const same = [], diff = [], failed = [];
 try {
   await openForm(p);

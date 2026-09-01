@@ -85,7 +85,7 @@ if (!todo.length) {
 }
 
 const b = await chromium.launch();
-const p = await (await b.newContext({ locale: 'he-IL', viewport: { width: 1300, height: 1400 } })).newPage();
+const p = await (await b.newContext({ locale: 'he-IL', viewport: { width: 1300, height: 1600 } })).newPage();
 const done = [], failed = [];
 try {
   await openForm(p, todo[0].plan.calc || 'old');

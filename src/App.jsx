@@ -6,7 +6,7 @@ import {
   Printer, Download, Upload, Send, Pencil, Trash2, X, Search,
   Paperclip, Image as ImageIcon, FileText, AlertTriangle, Lightbulb,
   CalendarClock, Bell, Users, FolderOpen, Database, FileSpreadsheet, ShieldAlert,
-  ExternalLink, ShieldCheck, MessageCircle, Percent,
+  ExternalLink, ShieldCheck, MessageCircle, Percent, Wallet,
 } from 'lucide-react';
 import * as store from './lib/store.js';
 import './index.css';
@@ -3490,9 +3490,15 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 /* ═══════════════════════════════════════════════════════════════
    NETWORK REPORT
 ═══════════════════════════════════════════════════════════════ */
-// פירוט המשרות של בית ספר אחד, נפתח מתוך שורת הדוח. קריאה בלבד —
-// כל שינוי נעשה במסך בית הספר עצמו, שם יושבות ההרשאות והזרימה.
-function SchoolPositions({ school }) {
+/*
+  פירוט המשרות של בית ספר אחד, נפתח מתוך שורת הדוח.
+
+  היה קריאה בלבד; "תן לי אפשרות לשנות משרות — כל נתון" (שרה, 2.9)
+  פתח אותו לעריכה ישירה: תפקיד, מסלול, ותק, אחוז, שעות וברוטו נשמרים
+  ביציאה מהשדה, דרך אותו onSaveTeacher של מסך בית הספר — אותה זרימה,
+  אותם אישורים, בלי מסלול צדדי. ההרשאות ממילא נאכפות במסד.
+*/
+function SchoolPositions({ school, onSaveTeacher }) {
   const ts = [...(school.ts || [])].sort((a, b) => calcEmployer(b).total - calcEmployer(a).total);
   const nis = v => (v > 0 ? Math.round(v).toLocaleString('he-IL') + ' ₪' : '—');
   const status = t => {
@@ -3519,6 +3525,7 @@ function SchoolPositions({ school }) {
               <th>שם</th>
               <th>תפקיד</th>
               <th style={{ textAlign:'center' }}>מסלול</th>
+              <th style={{ textAlign:'center' }}>ותק</th>
               <th style={{ textAlign:'center' }}>אחוז משרה</th>
               <th style={{ textAlign:'center' }}>שעות</th>
               <th style={{ textAlign:'center' }}>ברוטו / חודש</th>
@@ -3528,7 +3535,7 @@ function SchoolPositions({ school }) {
           </thead>
           <tbody>
             {ts.length === 0 && (
-              <tr><td colSpan={8} style={{ textAlign:'center', padding:22, color:'var(--text3)' }}>אין עדיין עובדי הוראה</td></tr>
+              <tr><td colSpan={9} style={{ textAlign:'center', padding:22, color:'var(--text3)' }}>אין עדיין עובדי הוראה</td></tr>
             )}
             {ts.map(t => {
               const emp = calcEmployer(t);
@@ -3539,16 +3546,73 @@ function SchoolPositions({ school }) {
               return (
                 <tr key={t.id}>
                   <td style={{ fontWeight:600 }}>{isPrincipalRow(t) && <Briefcase size={11} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}{t.name}</td>
-                  <td style={{ color:'var(--text2)' }}>{t.role && t.role !== 'none' ? (ROLES.find(x => x.id === t.role)?.label.split('(')[0].trim() || '—') : '—'}</td>
-                  <td style={{ textAlign:'center' }}>{reformLabel(t.reform)}</td>
+                  <td style={{ color:'var(--text2)' }}>
+                    {onSaveTeacher ? (
+                      <select className="apple-select" value={t.role || 'none'}
+                        onChange={e => onSaveTeacher({ ...t, role: e.target.value })}
+                        style={{ fontSize:13.8, padding:'3px 7px', maxWidth:150 }}>
+                        {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
+                      </select>
+                    ) : (t.role && t.role !== 'none' ? (ROLES.find(x => x.id === t.role)?.label.split('(')[0].trim() || '—') : '—')}
+                  </td>
+                  <td style={{ textAlign:'center' }}>
+                    {onSaveTeacher ? (
+                      <select className="apple-select" value={t.reform}
+                        onChange={e => onSaveTeacher({ ...t, reform: e.target.value })}
+                        style={{ fontSize:13.8, padding:'3px 7px' }}>
+                        {REFORMS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                      </select>
+                    ) : reformLabel(t.reform)}
+                  </td>
+                  <td style={{ textAlign:'center' }}>
+                    {onSaveTeacher ? (
+                      <input type="number" min="1" dir="ltr" className="apple-input"
+                        key={`pos-sen-${t.id}-${t.seniority ?? ''}`}
+                        defaultValue={t.seniority ?? 1}
+                        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                        onBlur={e => { const v = Math.max(1, Number(e.target.value) || 1); if (v !== t.seniority) onSaveTeacher({ ...t, seniority: v }); }}
+                        style={{ width:56, textAlign:'center', fontSize:14.4, padding:'3px 6px' }} />
+                    ) : (t.seniority ?? '—')}
+                  </td>
                   {/* אחוז שלא נקבע ידנית מוצג באפור — 100 הוא ברירת המחדל במסד ולא בהכרח המצב בפועל */}
                   <td style={{ textAlign:'center', fontWeight:600,
                     color: scopeConfirmed(t) ? 'var(--text)' : 'var(--text3)' }}>
-                    {scope}%{!scopeConfirmed(t) && <span title="ברירת מחדל — טרם נקבע אחוז משרה"> *</span>}
+                    {onSaveTeacher ? (
+                      <span style={{ display:'inline-flex', alignItems:'center', gap:2 }}>
+                        <input type="number" min="0" max="200" dir="ltr" className="apple-input"
+                          key={`pos-pct-${t.id}-${t.scopePct ?? ''}`}
+                          defaultValue={scope}
+                          title={scopeConfirmed(t) ? 'אחוז משרה' : 'עדיין ברירת המחדל — הקלדה כאן קובעת אותו'}
+                          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                          onBlur={e => { const v = Number(e.target.value); if (v > 0 && v !== t.scopePct) onSaveTeacher({ ...t, scopePct: v, scope: v, scopeSetAt: new Date().toISOString() }); }}
+                          style={{ width:64, textAlign:'center', fontSize:14.4, padding:'3px 6px' }} />
+                        %{!scopeConfirmed(t) && <span title="ברירת מחדל — טרם נקבע אחוז משרה"> *</span>}
+                      </span>
+                    ) : (<>{scope}%{!scopeConfirmed(t) && <span title="ברירת מחדל — טרם נקבע אחוז משרה"> *</span>}</>)}
                   </td>
-                  <td style={{ textAlign:'center' }}>{Number(t.frontalHours) || '—'}</td>
-                  {/* בלי סימולציה מלאה אין ברוטו רשמי, ולכן גם אין מה לסכום */}
-                  <td style={{ textAlign:'center', color: done ? 'var(--text)' : 'var(--text3)' }}>{done ? nis(emp.gross) : '—'}</td>
+                  <td style={{ textAlign:'center' }}>
+                    {onSaveTeacher ? (
+                      <input type="number" min="0" dir="ltr" className="apple-input"
+                        key={`pos-hrs-${t.id}-${t.frontalHours ?? ''}`}
+                        defaultValue={Number(t.frontalHours) || ''}
+                        placeholder="—"
+                        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                        onBlur={e => { const v = e.target.value === '' ? 0 : Number(e.target.value); if (v !== (Number(t.frontalHours) || 0)) onSaveTeacher({ ...t, frontalHours: v }); }}
+                        style={{ width:56, textAlign:'center', fontSize:14.4, padding:'3px 6px' }} />
+                    ) : (Number(t.frontalHours) || '—')}
+                  </td>
+                  {/* בלי הזנה מלאה אין ברוטו רשמי, ולכן גם אין מה לסכום */}
+                  <td style={{ textAlign:'center', color: done ? 'var(--text)' : 'var(--text3)' }}>
+                    {onSaveTeacher && !isPrincipalRow(t) ? (
+                      <input type="number" min="0" dir="ltr" className="apple-input"
+                        key={`pos-gross-${t.id}-${t._officialGross ?? ''}`}
+                        defaultValue={t._officialGross || ''}
+                        placeholder="₪"
+                        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                        onBlur={e => { const v = e.target.value === '' ? null : Number(e.target.value); if ((v ?? null) !== (t._officialGross ?? null)) onSaveTeacher({ ...t, _officialGross: v }); }}
+                        style={{ width:86, textAlign:'center', fontSize:14.4, padding:'3px 6px' }} />
+                    ) : (done ? nis(emp.gross) : '—')}
+                  </td>
                   <td style={{ textAlign:'center', fontWeight:700, color: done ? 'var(--text)' : 'var(--text3)' }}>{done ? nis(emp.total) : '—'}</td>
                   <td style={{ textAlign:'center' }}><span className={`apple-badge ${st.cls}`}>{st.label}</span></td>
                 </tr>
@@ -3558,7 +3622,7 @@ function SchoolPositions({ school }) {
           {ts.length > 0 && (
             <tfoot>
               <tr>
-                <td colSpan={4} style={{ fontWeight:800 }}>סה״כ {school.name}</td>
+                <td colSpan={5} style={{ fontWeight:800 }}>סה״כ {school.name}</td>
                 <td style={{ textAlign:'center', fontWeight:700 }}>{tot.hours || '—'}</td>
                 <td style={{ textAlign:'center', fontWeight:700 }}>{nis(tot.gross)}</td>
                 <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>{nis(tot.total)}</td>
@@ -3578,7 +3642,157 @@ function SchoolPositions({ school }) {
 }
 
 
-function ReportView({ schools, teachers }) {
+
+/* ═══════════════════════════════════════════════════════════════
+   עלות הוראה מול תקציב — לעיני שרה בלבד
+
+   "תקציב הכנסות משרד החינוך פחות ייעול פחות הוצאות עלות שכר,
+   בדף נפרד לעיני בלבד" (שרה, 2.9.2026).
+
+   תקציב וייעול הם מספרים שנתיים ששרה מקלידה כאן; עלות השכר נמשכת
+   מהחודש הפעיל (עלות מעביד בפועל כשהוזנה, אחרת האומדן) ומוכפלת
+   ב-12 כדי שההשוואה תהיה שנתי מול שנתי. שני הצדדים מוצגים, כדי
+   שיהיה ברור ממה נולד כל מספר.
+
+   ההסתרה אינה רק בקוד: הטבלה school_finance מאחורי RLS של
+   coordinator, כך שגם מי שיפתח את ה-API יקבל ריק.
+═══════════════════════════════════════════════════════════════ */
+function TeachingCostView({ schools, teachers, monthKey }) {
+  const [fin, setFin]     = useState(null);   // null: עוד נטען
+  const [err, setErr]     = useState('');
+  const [flash, setFlash] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const rows = await store.loadFinance();
+        if (alive) setFin(Object.fromEntries(rows.map(r => [r.schoolId, r])));
+      } catch (e) { if (alive) { setErr(e.message); setFin({}); } }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const monthlyCost = (sid) => teachers
+    .filter(t => t.schoolId === sid)
+    .reduce((sum, t) => sum + calcEmployer(t).total, 0);
+
+  const save = async (sid, patch) => {
+    const cur = { ...(fin?.[sid] || {}), ...patch };
+    setFin(f => ({ ...f, [sid]: cur }));
+    try { await store.saveFinance(sid, cur); setErr(''); setFlash(Date.now()); }
+    catch (e) { setErr(e.message); }
+  };
+
+  const money = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
+
+  const rows = schools.map(sc => {
+    const f = fin?.[sc.id] || {};
+    const monthly = monthlyCost(sc.id);
+    const annual  = monthly * 12;
+    const left = (f.ministryBudget != null || f.yieul != null)
+      ? (f.ministryBudget || 0) - (f.yieul || 0) - annual
+      : null;
+    return { sc, f, monthly, annual, left };
+  });
+  const tot = rows.reduce((a, r) => ({
+    budget: a.budget + (r.f.ministryBudget || 0),
+    yieul:  a.yieul  + (r.f.yieul || 0),
+    monthly: a.monthly + r.monthly,
+    annual: a.annual + r.annual,
+    left: a.left + (r.left || 0),
+  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, left: 0 });
+
+  const TH = ({ children }) => (
+    <th style={{ padding:'10px 12px', fontSize:14.5, fontWeight:700, color:'var(--text2)',
+      textAlign:'center', whiteSpace:'nowrap' }}>{children}</th>
+  );
+  const moneyInput = (sid, field, val) => (
+    <input type="number" min="0" dir="ltr" className="apple-input"
+      key={`fin-${sid}-${field}-${val ?? ''}`}
+      defaultValue={val ?? ''}
+      placeholder="—"
+      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      onBlur={e => {
+        const v = e.target.value === '' ? null : Number(e.target.value);
+        if (v !== (val ?? null)) save(sid, { [field]: v });
+      }}
+      style={{ width:130, textAlign:'center', fontSize:16.1, fontWeight:600, padding:'7px 9px' }} />
+  );
+
+  return (
+    <div style={{ maxWidth:1120, margin:'0 auto' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:6 }}>
+        <h1 style={{ fontSize:24.2, fontWeight:800 }}>עלות הוראה מול תקציב</h1>
+        <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700,
+          color:'var(--apple-blue)', background:'rgba(90,110,255,.07)',
+          border:'1px solid rgba(90,110,255,.2)', borderRadius:999, padding:'3px 11px' }}>
+        <ShieldCheck size={14} strokeWidth={2.4} />לעינייך בלבד
+        </span>
+        {flash > 0 && Date.now() - flash < 4000 && (
+          <span style={{ fontSize:13.8, color:'var(--ok, #2e7d32)', fontWeight:700 }}>נשמר ✓</span>
+        )}
+      </div>
+      <p style={{ fontSize:15.5, color:'var(--text2)', marginBottom:16, lineHeight:1.55 }}>
+        תקציב הכנסות משרד החינוך פחות ייעול פחות עלות השכר. התקציב והייעול שנתיים ומוקלדים כאן;
+        עלות השכר נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
+      </p>
+      {err && (
+        <div style={{ background:'#fdecec', color:'var(--danger)', borderRadius:10,
+          padding:'9px 14px', fontSize:14.9, fontWeight:600, marginBottom:12 }}>{err}</div>
+      )}
+      <div className="apple-card" style={{ padding:0, overflowX:'auto' }}>
+        <table style={{ width:'100%', borderCollapse:'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
+              <TH>בית ספר</TH>
+              <TH>תקציב הכנסות משרד החינוך · שנתי</TH>
+              <TH>ייעול · שנתי</TH>
+              <TH>עלות שכר · חודש</TH>
+              <TH>עלות שכר · שנה</TH>
+              <TH>יתרה לאחר שכר</TH>
+            </tr>
+          </thead>
+          <tbody>
+            {fin === null ? (
+              <tr><td colSpan={6} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+            ) : rows.map(({ sc, f, monthly, annual, left }) => (
+              <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
+                <td style={{ padding:'10px 12px', fontSize:16.1, fontWeight:700 }}>{sc.name}</td>
+                <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'ministryBudget', f.ministryBudget)}</td>
+                <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'yieul', f.yieul)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1 }}>{money(monthly)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(annual)}</td>
+                <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
+                  color: left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
+                  {left == null ? '—' : money(left)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          {fin !== null && rows.length > 1 && (
+            <tfoot>
+              <tr style={{ borderTop:'2px solid var(--line)', background:'var(--apple-fill)' }}>
+                <td style={{ padding:'11px 12px', fontSize:16.1, fontWeight:800 }}>סה"כ הרשת</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.budget)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.yieul)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.monthly)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.annual)}</td>
+                <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
+                  color: tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(tot.left)}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+      <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10 }}>
+        חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
+      </p>
+    </div>
+  );
+}
+
+function ReportView({ schools, teachers, onSaveTeacher }) {
   // לחיצה על שורת בית ספר פותחת את פירוט המשרות שלו. פתוח אחד בכל רגע —
   // הדוח נועד להשוואה בין בתי ספר, לא לקריאה של כולם במקביל.
   const [openSchool, setOpenSchool] = useState(null);
@@ -3716,7 +3930,7 @@ function ReportView({ schools, teachers }) {
                 {openSchool === r.id && (
                   <tr>
                     <td colSpan={8} style={{ padding:0, background:'var(--bg)' }}>
-                      <SchoolPositions school={r} />
+                      <SchoolPositions onSaveTeacher={onSaveTeacher} school={r} />
                     </td>
                   </tr>
                 )}
@@ -6034,6 +6248,12 @@ export default function App() {
                 דוח רשת
               </button>
             )}
+            {isCoord && (
+              <button className={`nav-btn ${view==='finance' ? 'active' : ''}`} onClick={() => setView('finance')}>
+                <Wallet size={15} strokeWidth={2.2} />
+                עלות הוראה
+              </button>
+            )}
             {/* מה שהמערכת אמרה ולמי — הוואטסאפ נבלע בין הודעות, זה נשאר */}
             {(isCoord || isClerk) && (
               <button className={`nav-btn ${view==='alerts' ? 'active' : ''}`} onClick={() => setView('alerts')}>
@@ -6183,7 +6403,9 @@ export default function App() {
         ) : view === 'alerts' ? (
           <NotificationsView />
         ) : view === 'report' ? (
-          <ReportView schools={schools} teachers={teachers} />
+          <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} />
+        ) : view === 'finance' && user.role === 'coordinator' ? (
+          <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} />
         ) : view === 'school' && activeSchool ? (
           <SchoolView userId={user.id}
             school={activeSchool}
