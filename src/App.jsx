@@ -160,20 +160,38 @@ function effectiveScope(t) {
   if (t.reform === 'ofek') return currentScope(t).scopePct || 100;
   return (t.scope ?? t.scopePct ?? 100);
 }
-// תוספת אם קיימת בעולם ישן בלבד. באופק אין לה ביטוי בשכר, ולכן מספר
-// הילדים נאסף שם כמידע ואינו רכיב שכר.
+// תוספת אם קיימת בשני המסלולים. בעולם ישן היא עשר נקודות מעל 79%;
+// באופק היא טבלה (OFEK_MOM_SCOPE) ולא תוספת אחוזים.
 //
 // זכאות: אֵם — ולא כל מי שיש לו ילדים. הזכאות נגזרה ממספר הילדים עד 18
 // בלבד, ולכן שלושה גברים ברשת קיבלו אותה על הנייר. gender='f' הוא
 // התנאי; שורה בלי מין אינה זכאית עד שייקבע.
 const MOM_MIN_SCOPE = 79;
 const isMother = t => t.gender === 'f' && (t.childrenUnder18 || 0) > 0;
+
+/*
+  תוספת אם באופק חדש — קיימת, בניגוד למה שהמערכת החזיקה עד 1.9.
+
+  שרה מסרה את הטבלה: 21 שעות = 86%, 22 = 91%, 23 = 94%. אלה אינם
+  השעות חלקי 26 (שהיו נותנות 81, 85, 88) ואינם הבסיס ועוד עשר —
+  זו טבלה, לא נוסחה, ולכן היא נשמרת כטבלה.
+
+  מחוץ לשלוש השורות האלה אין הצעה. ניחוש בין ערכים היה נראה כמו ידיעה,
+  ואחוז משרה שגוי מזיז את כל השכר — זה בדיוק מה שקרה כשהייתה כאן נוסחה
+  שהוסרה ב-27.8.
+*/
+const OFEK_MOM_SCOPE = { 21: 86, 22: 91, 23: 94 };
+const ofekMomScope = t =>
+  t.reform === 'ofek' && isMother(t) ? (OFEK_MOM_SCOPE[Number(t.frontalHours)] ?? null) : null;
+
 function momBonusEligible(t) {
+  if (t.reform === 'ofek') return ofekMomScope(t) != null;
   return t.reform === 'pre' && isMother(t) && computedBaseScope(t) > MOM_MIN_SCOPE;
 }
 // אם שמתחת לסף — לתצוגה בלבד, כדי שיהיה ברור שלא נשכחה אלא לא זכאית
 const momUnderThreshold = t =>
-  t.reform === 'pre' && isMother(t) && computedBaseScope(t) <= MOM_MIN_SCOPE;
+  isMother(t) && !momBonusEligible(t) &&
+  (t.reform === 'pre' ? computedBaseScope(t) <= MOM_MIN_SCOPE : true);
 // עשר נקודות על אחוז המשרה. הן כבר בתוך האחוז הרשום — ראי effectiveScope.
 const MOM_SCOPE_BONUS = 10;
 // בסיס אחוז המשרה מהשעות: 30 שעות = משרה מלאה בעולם ישן, 26 באופק
@@ -194,7 +212,7 @@ const momScopeBonus = t => (momBonusEligible(t) ? MOM_SCOPE_BONUS : 0);
   תוספת האם כשהיא מגיעה. האחוז שנשמר הוא הסופי, ולכן ההצעה חייבת
   להיות סופית גם היא. אין כאן מילוי אוטומטי; ההצעה מחכה ללחיצה.
 */
-const suggestedScope = t => computedBaseScope(t) + momScopeBonus(t);
+const suggestedScope = t => ofekMomScope(t) ?? (computedBaseScope(t) + momScopeBonus(t));
 function calcNet(gross) { return Math.round(gross * 0.735); }
 // אחוז המשרה והשעות הפרונטליות קשורים זה בזה דרך השלב והפחתת הגיל.
 // אפשר להזין כל אחד מהם, והשני נגזר — לפעמים השעות ידועות, ולפעמים
@@ -1885,7 +1903,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 <p style={{ fontSize:13.8, color:'var(--text2)' }}>
                   {t.reform === 'pre'
                     ? 'ילדים עד גיל 18 (זכאות מ-79% משרה)'
-                    : 'באופק חדש אינה רכיב שכר — נאסף כמידע בלבד'}
+                    : 'באופק: 21 שעות = 86% · 22 = 91% · 23 = 94%'}
                 </p>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -5022,6 +5040,7 @@ function OnboardingView({ code }) {
   const [form, setForm] = useState({});
   const [sig, setSig] = useState(null);
   const [contractSig, setContractSig] = useState(null);
+  const [bank, setBank] = useState({});
   const [contractUrl, setContractUrl] = useState(null);
   const [msg, setMsg] = useState('');
 
@@ -5041,6 +5060,7 @@ function OnboardingView({ code }) {
   const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const steps = [
     me.form101_signed, me.has_id_doc, me.has_salary_form, me.has_ministry_file,
+    me.bank_saved,                                       // פרטי בנק — בלעדיהם אין לאן להעביר
     me.contract_available ? me.contract_signed : null,   // null = עוד לא זמין
   ];
   const doneCount = steps.filter(x => x === true).length;
@@ -5057,6 +5077,22 @@ function OnboardingView({ code }) {
     await store.obSave(code, { form101: form, sign101: true, signature_path: path });
     await load();
   };
+  /*
+    פרטי בנק. בלעדיהם השכר אינו יכול לצאת, וזה היה השלב היחיד שנשאר
+    מחוץ לקליטה המקוונת — הפרטים נמסרו בנייר או בוואטסאפ.
+
+    מספר חשבון שהוקלד בטעות מעביר כסף לאדם אחר, ולכן האישור (צ׳ק מבוטל
+    או אישור ניהול חשבון) אינו קישוט: הוא הראיה שמולה בודקים.
+  */
+  const saveBank = async () => {
+    for (const [k, l] of [['bank','שם הבנק'], ['branch','מספר סניף'], ['account','מספר חשבון']]) {
+      if (!String(bank[k] ?? '').trim()) { setMsg(`יש למלא ${l}`); return; }
+    }
+    setMsg('');
+    await store.obSave(code, { bank: { ...bank, owner: (bank.owner || me.name) } });
+    await load();
+  };
+
   const upload = slotKey => async f => {
     const path = await store.obUpload(code, slotKey, f);
     await store.obSave(code, { [slotKey + '_path']: path });
@@ -5142,9 +5178,50 @@ function OnboardingView({ code }) {
         <ObUpload label="3 · טופס נתוני שכר — משרד החינוך" hint="הטופס מהפורטל של משרד החינוך" done={me.has_salary_form} onFile={upload('salary_form')} />
         <ObUpload label="4 · אסמכתת תיק במשרד החינוך (חובה)" hint="אישור קיום תיק עובד הוראה" done={me.has_ministry_file} onFile={upload('ministry_file')} />
 
-        {/* ── שלב 5: חוזה ── */}
+        {/* ── שלב 5: פרטי בנק ── */}
         <div className="apple-card" style={{ padding:18 }}>
-          <p style={{ fontWeight:800, fontSize:18.4 }}>5 · חוזה העסקה</p>
+          <p style={{ fontWeight:800, fontSize:18.4, marginBottom:2 }}>5 · פרטי חשבון בנק</p>
+          {me.bank_saved ? (
+            <>
+              <p style={{ color:'var(--ok)', fontWeight:700, fontSize:15.5, marginTop:6 }}>
+                ✓ נשמרו · {me.bank?.bank} סניף {me.bank?.branch} · חשבון {me.bank?.account}
+              </p>
+              {!me.has_bank_doc && (
+                <p style={{ fontSize:13.8, color:'var(--warn)', marginTop:6 }}>
+                  נותר לצרף אישור ניהול חשבון או צ׳ק מבוטל.
+                </p>
+              )}
+            </>
+          ) : (<>
+            <p style={{ fontSize:14.4, color:'var(--text3)', marginBottom:12 }}>
+              לחשבון הזה תועבר המשכורת. יש להקליד בדיוק כפי שמופיע באישור מהבנק.
+            </p>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+              <div style={{ flex:'1 1 150px' }}><p className="apple-label">שם הבנק</p>
+                <input value={bank.bank || ''} onChange={e => setBank(b => ({ ...b, bank: e.target.value }))}
+                  className="apple-input" style={{ width:'100%' }} /></div>
+              <div style={{ flex:'1 1 110px' }}><p className="apple-label">מספר סניף</p>
+                <input value={bank.branch || ''} onChange={e => setBank(b => ({ ...b, branch: e.target.value }))}
+                  className="apple-input" dir="ltr" inputMode="numeric" style={{ width:'100%' }} /></div>
+              <div style={{ flex:'1 1 160px' }}><p className="apple-label">מספר חשבון</p>
+                <input value={bank.account || ''} onChange={e => setBank(b => ({ ...b, account: e.target.value }))}
+                  className="apple-input" dir="ltr" inputMode="numeric" style={{ width:'100%' }} /></div>
+              <div style={{ flex:'1 1 100%' }}><p className="apple-label">בעל/ת החשבון — אם אינו על שמך</p>
+                <input value={bank.owner || ''} onChange={e => setBank(b => ({ ...b, owner: e.target.value }))}
+                  placeholder={me.name} className="apple-input" style={{ width:'100%' }} /></div>
+            </div>
+            <button className="apple-btn apple-btn-blue" onClick={saveBank}
+              style={{ marginTop:12, minHeight:42, padding:'0 20px', fontSize:15.5 }}>
+              שמירת פרטי החשבון
+            </button>
+          </>)}
+        </div>
+        <ObUpload label="6 · אישור ניהול חשבון או צ׳ק מבוטל" hint="הראיה לפרטי החשבון — בלעדיה לא מעבירים"
+          done={me.has_bank_doc} onFile={upload('bank_doc')} />
+
+        {/* ── שלב 7: חוזה ── */}
+        <div className="apple-card" style={{ padding:18 }}>
+          <p style={{ fontWeight:800, fontSize:18.4 }}>7 · חוזה העסקה</p>
           {!me.contract_available ? (
             <p style={{ fontSize:14.9, color:'var(--text3)', marginTop:6 }}>החוזה יעלה בקרוב — תקבלי הודעה כשיהיה מוכן לחתימה.</p>
           ) : me.contract_signed ? (
@@ -5193,7 +5270,7 @@ function OnboardingAdmin({ activeMonth, onClose }) {
 
   const bySchool = {};
   for (const r of rows || []) (bySchool[r.schools?.name || '—'] ??= []).push(r);
-  const doneOf = r => [r.form101_signed_at, r.id_doc_path, r.salary_form_path, r.ministry_file_path, r.contract_signed_at].filter(Boolean).length;
+  const doneOf = r => [r.form101_signed_at, r.id_doc_path, r.salary_form_path, r.ministry_file_path, r.bank_saved_at, r.bank_doc_path, r.contract_signed_at].filter(Boolean).length;
   const total = (rows || []).length;
   const complete = (rows || []).filter(r => doneOf(r) >= 5).length;
 
@@ -5227,12 +5304,14 @@ function OnboardingAdmin({ activeMonth, onClose }) {
           </div>
         ) : Object.entries(bySchool).map(([sn, list]) => (
           <div key={sn} style={{ marginTop:14 }}>
-            <p style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:6 }}>{sn} · {list.filter(r => doneOf(r) >= 5).length}/{list.length} הושלמו</p>
+            <p style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:6 }}>{sn} · {list.filter(r => doneOf(r) >= 7).length}/{list.length} הושלמו</p>
             <div style={{ overflowX:'auto' }}>
               <table className="apple-table" style={{ fontSize:13.8 }}>
                 <thead><tr>
                   <th>עובדת</th><th style={{ textAlign:'center' }}>101</th><th style={{ textAlign:'center' }}>ת.ז.</th>
                   <th style={{ textAlign:'center' }}>נתוני שכר</th><th style={{ textAlign:'center' }}>תיק משה"ח</th>
+                  <th style={{ textAlign:'center' }} title="פרטי חשבון הבנק">בנק</th>
+                  <th style={{ textAlign:'center' }} title="אישור ניהול חשבון או צ׳ק מבוטל">אישור</th>
                   <th style={{ textAlign:'center' }}>חוזה</th><th style={{ textAlign:'center' }}>קישור</th>
                 </tr></thead>
                 <tbody>
@@ -5247,6 +5326,8 @@ function OnboardingAdmin({ activeMonth, onClose }) {
                         <td style={{ textAlign:'center' }}>{C(r.id_doc_path)}</td>
                         <td style={{ textAlign:'center' }}>{C(r.salary_form_path)}</td>
                         <td style={{ textAlign:'center' }}>{C(r.ministry_file_path)}</td>
+                        <td style={{ textAlign:'center' }}>{C(r.bank_saved_at)}</td>
+                        <td style={{ textAlign:'center' }}>{C(r.bank_doc_path)}</td>
                         <td style={{ textAlign:'center' }}>{C(r.contract_signed_at)}</td>
                         <td style={{ textAlign:'center' }}>
                           <button className="apple-btn apple-btn-ghost" onClick={() => copy(r.code, r.name)} style={{ minHeight:28, padding:'0 10px', fontSize:13.2 }}>
