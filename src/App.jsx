@@ -5606,7 +5606,15 @@ export default function App() {
   const [error,   setError]   = useState('');
   const [busy,    setBusy]    = useState(false);
 
-  const [view,          setView]          = useState('schools');
+  /*
+    ?v=calc בכתובת פותח ישר את מסך הסימולציה, ובתוכו את שלב אחוזי המשרה
+    כשעוד חסרים. בלי זה אין דרך לשלוח קישור למסך מסוים — המצב חי בזיכרון
+    בלבד, וכל קישור נחת בעמוד הבית. ערך שאינו מוכר מתעלמים ממנו.
+  */
+  const [view,          setView]          = useState(() => {
+    const v = new URLSearchParams(window.location.search).get('v');
+    return ['schools', 'calc', 'report', 'netapprove'].includes(v) ? v : 'schools';
+  });
   const [activeSchool,  setActiveSchool]  = useState(null);
   const [schoolModal,   setSchoolModal]   = useState(null);
   const [teacherModal,  setTeacherModal]  = useState(null);
@@ -5666,7 +5674,10 @@ export default function App() {
         const profile = await store.getProfile();
         if (!alive) return;
         setUser(profile);
-        setView(profile.role === 'clerk' ? 'calc' : profile.role === 'network' ? 'netapprove' : 'schools');
+        // מי שהגיעה עם ?v= בכתובת ביקשה מסך מסוים — לא דורסים אותה
+        if (!new URLSearchParams(window.location.search).get('v')) {
+          setView(profile.role === 'clerk' ? 'calc' : profile.role === 'network' ? 'netapprove' : 'schools');
+        }
         const data = await refresh();
         landOnFirstMonth(profile, data);
       } catch (e) {
@@ -5684,7 +5695,10 @@ export default function App() {
 
   const onSignedIn = async (profile) => {
     setUser(profile);
-    setView(profile.role === 'clerk' ? 'calc' : profile.role === 'network' ? 'netapprove' : 'schools');
+    // מי שהגיעה עם ?v= בכתובת ביקשה מסך מסוים — לא דורסים אותה
+    if (!new URLSearchParams(window.location.search).get('v')) {
+      setView(profile.role === 'clerk' ? 'calc' : profile.role === 'network' ? 'netapprove' : 'schools');
+    }
     setBusy(true); setError('');
     try { landOnFirstMonth(profile, await refresh()); }
     catch (e) { setError(e.message); }
