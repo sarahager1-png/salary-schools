@@ -47,3 +47,7 @@ alter table public.teacher_months
     check (seniority is null or seniority >= 1);
 
 notify pgrst, 'reload schema';
+
+-- ברירת המחדל של העמודה נשארה 0, והיא אינה ותק חוקי: כל שורה חדשה
+-- נולדה שגויה ונפלה על ה-CHECK. שנה ראשונה בהוראה היא 1, גם כברירת מחדל.
+alter table public.teacher_months alter column seniority set default 1;

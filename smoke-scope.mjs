@@ -82,8 +82,10 @@ try {
   check('מי שאחוזה כבר נקבע אינה ברשימה',  !list.includes('ישן שנקבע'));
 
   // ══ 3. שתי המכסות נכונות: 26 באופק, 30 בעולם ישן ══
-  check('אופק — מכסה 26', /20 ש׳ מתוך 26 למשרה מלאה/.test(list), (list.match(/.{0,30}למשרה מלאה/) || [''])[0]);
-  check('עולם ישן — מכסה 30', /21 ש׳ מתוך 30 למשרה מלאה/.test(list));
+  check('אופק — מכסה 26', /20 ש׳ מתוך 26/.test(list), (list.match(/.{0,24}מתוך 26/) || [''])[0]);
+  check('עולם ישן — מכסה 30', /21 ש׳ מתוך 30/.test(list));
+  // מורת אופק מקבלת שני שדות: האחוז באופק אינו האחוז בעולם הישן
+  check('למורת אופק שני שדות אחוז', /אחוז באופק/.test(list) && /אחוז בעולם הישן/.test(list));
 
   // ══ 4. הקלדה נשמרת, עם חותמת ══
   const card = p.locator('.apple-card').filter({ hasText: 'ישן ברירת מחדל' }).first();
@@ -107,6 +109,20 @@ try {
   const { data: after2 } = await admin.from('teacher_months')
     .select('name, scope_pct, scope_set_at').eq('month_key', MONTH).eq('name', 'אופק ברירת מחדל');
   check('לחיצה על ההצעה קובעת את האחוז', after2?.[0]?.scope_pct === 77, String(after2?.[0]?.scope_pct));
+  // ...ועדיין ברשימה, כי אחוז העולם הישן שלה טרם נקבע
+  check('מורת אופק נשארת עד שגם הבסיס נקבע', (await body()).includes('אחוזי משרה (2)'),
+    ((await body()).match(/אחוזי משרה[^\n]*/) || [''])[0]);
+
+  // ══ 5ב. אחוז העולם הישן של מורת האופק ══
+  const cardO = p.locator('.apple-card').filter({ hasText: 'אופק ברירת מחדל' }).first();
+  await cardO.locator('input[type="number"]').nth(1).fill('103');
+  await cardO.getByRole('button', { name: 'שמור' }).nth(1).click();
+  await p.waitForTimeout(2500);
+  const { data: after3 } = await admin.from('teacher_months')
+    .select('scope_pct, scope_pct_pre, scope_pre_set_at').eq('month_key', MONTH).eq('name', 'אופק ברירת מחדל');
+  check('אחוז העולם הישן נשמר בנפרד', after3?.[0]?.scope_pct_pre === 103, String(after3?.[0]?.scope_pct_pre));
+  check('אחוז האופק לא נדרס', after3?.[0]?.scope_pct === 77, String(after3?.[0]?.scope_pct));
+  check('נרשמה חותמת לאחוז הבסיס', !!after3?.[0]?.scope_pre_set_at);
   check('נשארה רק זו של חשבת השכר', (await body()).includes('אחוזי משרה (1)'),
     ((await body()).match(/אחוזי משרה[^\n]*/) || [''])[0]);
 

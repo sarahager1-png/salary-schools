@@ -582,8 +582,12 @@ const isPending     = t => Boolean(t._changedAt && !t._approved); // = needsSim 
 // שהוא הגיע לשם, וזה חוסך מילוי לאחור של רשומות ותיקות.
 const scopeConfirmed = t =>
   Boolean(t.scopeSetAt) || (t.scopePct ?? t.scope ?? 100) !== 100;
+// אחוז המשרה בעולם הישן. למורת אופק זה מספר אחר מהאחוז באופק, והוא
+// זה שנכנס לסימולציית הבסיס — שהפער בינה לבין האופק הוא תוספת בית חב"ד.
+const preScopeSet = t => t.reform !== 'ofek' || t.scopePctPre != null;
 // מי שממתינה לקביעת אחוז. מנהלת בית ספר תמיד 100% — 40 שעות ניהול.
-const scopeMissing = t => isPending(t) && !isPrincipalRow(t) && !scopeConfirmed(t);
+const scopeMissing = t =>
+  isPending(t) && !isPrincipalRow(t) && (!scopeConfirmed(t) || !preScopeSet(t));
 
 // בחודש הראשון נדרש אישור רשתי נוסף אחרי אישור השליח. רק אחריו נשלחים
 // למורות נתוני ההעסקה לחתימה.
@@ -4381,14 +4385,15 @@ function ScopePanel({ teachers, schools, onSave }) {
     .map(sc => ({ school: sc, list: rows.filter(t => t.schoolId === sc.id) }))
     .filter(g => g.list.length);
 
-  const save = async (t, pct) => {
+  // שני אחוזים, שני מפתחות: 'ofek' הוא scopePct ו-'pre' הוא scopePctPre.
+  const save = async (t, which, pct) => {
     const n = Math.round(Number(pct));
     if (!Number.isFinite(n) || n <= 0 || n > 200) return alert('אחוז משרה חייב להיות מספר בין 1 ל-200');
-    const ok = await onSave(t.id, n);
+    const ok = await onSave(t.id, which, n);
     if (ok !== false) {
-      setVals(v => { const x = { ...v }; delete x[t.id]; return x; });
-      setFlash(f => ({ ...f, [t.id]: true }));
-      setTimeout(() => setFlash(f => { const x = { ...f }; delete x[t.id]; return x; }), 1500);
+      setVals(v => { const x = { ...v }; delete x[`${t.id}|${which}`]; return x; });
+      setFlash(f => ({ ...f, [`${t.id}|${which}`]: true }));
+      setTimeout(() => setFlash(f => { const x = { ...f }; delete x[`${t.id}|${which}`]; return x; }), 1500);
     }
   };
 
@@ -4417,49 +4422,78 @@ function ScopePanel({ teachers, schools, onSave }) {
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {list.map(t => {
               const isOfek = t.reform === 'ofek';
-              const full   = isOfek ? baseFrontalFor(t) : PRE_FRONTAL;
               const hr     = homeroomHours(t);
-              const sugg   = suggestedScope(t);
-              const cur    = vals[t.id] ?? '';
               const hasSim = Boolean(t._officialGross || t._officialGrossPre);
+              /*
+                שדה אחד לכל מסלול שהמורה שייכת אליו. מורת עולם ישן — אחד.
+                מורת אופק — שניים, ולא אותו מספר: דבורי גלפרין היא 91%
+                באופק ו-103% בעולם הישן. הפער בין שתי הסימולציות הוא
+                תוספת בית חב"ד, ולכן שדה הבסיס אינו פחות חשוב מהאחר.
+              */
+              const fields = isOfek ? [
+                { which:'ofek', label:'אחוז באופק', done: scopeConfirmed(t),
+                  now: t.scopePct ?? t.scope, sugg: suggestedScope(t),
+                  hint: `${t.frontalHours || 0} ש׳ מתוך ${baseFrontalFor(t)}` },
+                { which:'pre', label:'אחוז בעולם הישן', done: t.scopePctPre != null,
+                  now: t.scopePctPre, sugg: null,
+                  hint: 'נכנס לסימולציית הבסיס — הפער ממנה הוא תוספת בית חב״ד' },
+              ] : [
+                { which:'ofek', label:'אחוז משרה', done: scopeConfirmed(t),
+                  now: t.scopePct ?? t.scope, sugg: suggestedScope(t),
+                  hint: `${t.frontalHours || 0} ש׳${hr > 0 ? ` + ${hr} חינוך` : ''} מתוך ${PRE_FRONTAL}` },
+              ];
               return (
-                <div key={t.id} className="apple-card" style={{ padding:'10px 12px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-                  <div style={{ flex:'1 1 170px', minWidth:0 }}>
-                    <p style={{ fontSize:13.5, fontWeight:600, color:'var(--text)' }}>
-                      {t.name}
-                      {flash[t.id] && <span style={{ marginInlineStart:6, fontSize:11.5, color:'var(--ok)', fontWeight:700 }}>✓ נקבע</span>}
-                    </p>
-                    <p style={{ fontSize:11.5, color:'var(--text3)' }}>
-                      {reformLabel(t.reform)} · {t.frontalHours || 0} ש׳
-                      {hr > 0 && ` + ${hr} גמול חינוך`}
-                      {` מתוך ${full} למשרה מלאה`}
+                <div key={t.id} className="apple-card" style={{ padding:'10px 12px' }}>
+                  <p style={{ fontSize:13.5, fontWeight:600, color:'var(--text)', marginBottom:2 }}>
+                    {t.name}
+                    <span style={{ fontWeight:400, fontSize:11.5, color:'var(--text3)' }}>
+                      {' · '}{reformLabel(t.reform)}
                       {hasSim && <span style={{ color:'var(--warn)', fontWeight:700 }}> · יש סימולציה — שינוי יאפס אותה</span>}
-                    </p>
-                  </div>
-                  <input type="number" inputMode="numeric" className="apple-input" dir="ltr" placeholder="% משרה"
-                    value={cur}
-                    onChange={e => setVals(v => ({ ...v, [t.id]: e.target.value }))}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(t, cur); } }}
-                    style={{ width:96, fontSize:14, minHeight:38, textAlign:'center' }} />
-                  <button className="apple-btn apple-btn-blue" onClick={() => save(t, cur)}
-                    disabled={String(cur).trim() === ''}
-                    style={{ minHeight:38, padding:'0 14px', opacity: String(cur).trim() === '' ? .45 : 1 }}>
-                    שמור
-                  </button>
-                  {/* הצעה, לא ברירת מחדל: השעות חלקי מכסת משרה מלאה */}
-                  <button className="apple-btn apple-btn-ghost" onClick={() => save(t, sugg)}
-                    title="מחשב מהשעות שהמנהלת הזינה. אפשר להתעלם ולהקליד מספר אחר."
-                    style={{ minHeight:38, padding:'0 12px', fontSize:12.5 }}>
-                    לפי השעות · {sugg}%
-                  </button>
-                  <button className="apple-btn apple-btn-ghost" onClick={() => save(t, 100)}
-                    title="אישור שהיא באמת במשרה מלאה"
-                    style={{ minHeight:38, padding:'0 12px', fontSize:12.5 }}>
-                    100%
-                  </button>
+                    </span>
+                  </p>
+                  {fields.map(f => {
+                    const key = `${t.id}|${f.which}`;
+                    const cur = vals[key] ?? '';
+                    return (
+                      <div key={f.which} style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:6 }}>
+                        <div style={{ flex:'1 1 150px', minWidth:0 }}>
+                          <p style={{ fontSize:12, fontWeight:600, color: f.done ? 'var(--text2)' : 'var(--warn)' }}>
+                            {f.label}
+                            {f.done && <span style={{ color:'var(--ok)', fontWeight:700 }}>{` · ${f.now}%`}</span>}
+                            {flash[key] && <span style={{ marginInlineStart:6, fontSize:11, color:'var(--ok)', fontWeight:700 }}>✓ נקבע</span>}
+                          </p>
+                          <p style={{ fontSize:11, color:'var(--text3)' }}>{f.hint}</p>
+                        </div>
+                        <input type="number" inputMode="numeric" className="apple-input" dir="ltr" placeholder="%"
+                          value={cur}
+                          onChange={e => setVals(v => ({ ...v, [key]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(t, f.which, cur); } }}
+                          style={{ width:82, fontSize:14, minHeight:36, textAlign:'center' }} />
+                        <button className="apple-btn apple-btn-blue" onClick={() => save(t, f.which, cur)}
+                          disabled={String(cur).trim() === ''}
+                          style={{ minHeight:36, padding:'0 13px', opacity: String(cur).trim() === '' ? .45 : 1 }}>
+                          שמור
+                        </button>
+                        {/* הצעה, לא ברירת מחדל. לעולם הישן של מורת אופק אין
+                            נוסחה — האחוז שם אינו נגזר מהשעות, ולכן אין כפתור. */}
+                        {f.sugg != null && (
+                          <button className="apple-btn apple-btn-ghost" onClick={() => save(t, f.which, f.sugg)}
+                            title="מחושב מהשעות שהמנהלת הזינה. אפשר להתעלם ולהקליד מספר אחר."
+                            style={{ minHeight:36, padding:'0 11px', fontSize:12 }}>
+                            {`לפי השעות · ${f.sugg}%`}
+                          </button>
+                        )}
+                        <button className="apple-btn apple-btn-ghost" onClick={() => save(t, f.which, 100)}
+                          style={{ minHeight:36, padding:'0 11px', fontSize:12 }}>
+                          100%
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
+
           </div>
         </div>
       ))}
@@ -5955,8 +5989,10 @@ export default function App() {
             onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
             onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
             onSaveKids={(id, n) => run(() => store.saveTeacher({ id, childrenUnder18: n }, activeMonth))}
-            onSaveScope={(id, pct) => run(() => store.saveTeacher(
-              { id, scopePct: pct, scopeSetAt: new Date().toISOString() }, activeMonth))}
+            onSaveScope={(id, which, pct) => run(() => store.saveTeacher(
+              which === 'pre'
+                ? { id, scopePctPre: pct, scopePreSetAt: new Date().toISOString() }
+                : { id, scopePct: pct, scopeSetAt: new Date().toISOString() }, activeMonth))}
           />
         ) : /* Principal: see only their school */
         !isCoord && principalSchool ? (
@@ -5983,8 +6019,10 @@ export default function App() {
             onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
             onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
             onSaveKids={(id, n) => run(() => store.saveTeacher({ id, childrenUnder18: n }, activeMonth))}
-            onSaveScope={(id, pct) => run(() => store.saveTeacher(
-              { id, scopePct: pct, scopeSetAt: new Date().toISOString() }, activeMonth))}
+            onSaveScope={(id, which, pct) => run(() => store.saveTeacher(
+              which === 'pre'
+                ? { id, scopePctPre: pct, scopePreSetAt: new Date().toISOString() }
+                : { id, scopePct: pct, scopeSetAt: new Date().toISOString() }, activeMonth))}
           />
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} />
