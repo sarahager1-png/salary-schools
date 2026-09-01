@@ -4385,6 +4385,19 @@ function ScopePanel({ teachers, schools, onSave }) {
     .map(sc => ({ school: sc, list: rows.filter(t => t.schoolId === sc.id) }))
     .filter(g => g.list.length);
 
+  /*
+    מין — נשאל כאן ולא במסך אחר. תוספת אם משנה את האחוז שמוקלד למחשבון,
+    ובלי לדעת מי אֵם אי אפשר להציע אותו. השדה היה ריק אצל כולן, ולכן
+    ההצעה יצאה בלי התוספת גם למי שזכאית.
+  */
+  const saveGender = async (t, g) => {
+    const ok = await onSave(t.id, 'gender', t.gender === g ? null : g);
+    if (ok !== false) {
+      setFlash(f => ({ ...f, [`${t.id}|gender`]: true }));
+      setTimeout(() => setFlash(f => { const x = { ...f }; delete x[`${t.id}|gender`]; return x; }), 1500);
+    }
+  };
+
   // שני אחוזים, שני מפתחות: 'ofek' הוא scopePct ו-'pre' הוא scopePctPre.
   const save = async (t, which, pct) => {
     const n = Math.round(Number(pct));
@@ -4451,6 +4464,26 @@ function ScopePanel({ teachers, schools, onSave }) {
                       {hasSim && <span style={{ color:'var(--warn)', fontWeight:700 }}> · יש סימולציה — שינוי יאפס אותה</span>}
                     </span>
                   </p>
+                  {/* מין נשאל רק היכן שהוא משנה את המספר: עולם ישן עם ילדים.
+                      באופק לתוספת אם אין ביטוי בשכר, ובלי ילדים אין למה. */}
+                  {t.reform === 'pre' && (t.childrenUnder18 || 0) > 0 && (
+                    <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:4 }}>
+                      <span style={{ fontSize:11.5, color: t.gender ? 'var(--text3)' : 'var(--warn)', fontWeight: t.gender ? 400 : 700 }}>
+                        {`${t.childrenUnder18} ילדים עד 18 · `}
+                        {t.gender === 'f' ? 'אֵם — התוספת בתוך ההצעה'
+                          : t.gender === 'm' ? 'גבר — אין תוספת אם'
+                          : 'מי היא? בלי זה ההצעה בלי תוספת אם'}
+                      </span>
+                      {[{ v:'f', l:'אישה' }, { v:'m', l:'גבר' }].map(o => (
+                        <button key={o.v} onClick={() => saveGender(t, o.v)}
+                          className={`apple-btn ${t.gender === o.v ? 'apple-btn-blue' : 'apple-btn-ghost'}`}
+                          style={{ minHeight:28, padding:'0 11px', fontSize:11.5 }}>
+                          {o.l}
+                        </button>
+                      ))}
+                      {flash[`${t.id}|gender`] && <span style={{ fontSize:11, color:'var(--ok)', fontWeight:700 }}>✓</span>}
+                    </div>
+                  )}
                   {fields.map(f => {
                     const key = `${t.id}|${f.which}`;
                     const cur = vals[key] ?? '';
@@ -6003,10 +6036,11 @@ export default function App() {
             onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
             onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
             onSaveKids={(id, n) => run(() => store.saveTeacher({ id, childrenUnder18: n }, activeMonth))}
-            onSaveScope={(id, which, pct) => run(() => store.saveTeacher(
-              which === 'pre'
-                ? { id, scopePctPre: pct, scopePreSetAt: new Date().toISOString() }
-                : { id, scopePct: pct, scopeSetAt: new Date().toISOString() }, activeMonth))}
+            onSaveScope={(id, which, val) => run(() => store.saveTeacher(
+              which === 'gender' ? { id, gender: val }
+                : which === 'pre'
+                  ? { id, scopePctPre: val, scopePreSetAt: new Date().toISOString() }
+                  : { id, scopePct: val, scopeSetAt: new Date().toISOString() }, activeMonth))}
           />
         ) : /* Principal: see only their school */
         !isCoord && principalSchool ? (
@@ -6033,10 +6067,11 @@ export default function App() {
             onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
             onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
             onSaveKids={(id, n) => run(() => store.saveTeacher({ id, childrenUnder18: n }, activeMonth))}
-            onSaveScope={(id, which, pct) => run(() => store.saveTeacher(
-              which === 'pre'
-                ? { id, scopePctPre: pct, scopePreSetAt: new Date().toISOString() }
-                : { id, scopePct: pct, scopeSetAt: new Date().toISOString() }, activeMonth))}
+            onSaveScope={(id, which, val) => run(() => store.saveTeacher(
+              which === 'gender' ? { id, gender: val }
+                : which === 'pre'
+                  ? { id, scopePctPre: val, scopePreSetAt: new Date().toISOString() }
+                  : { id, scopePct: val, scopeSetAt: new Date().toISOString() }, activeMonth))}
           />
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} />
