@@ -130,16 +130,18 @@ try {
   check('חתימת המאשר נחתמה בשרת', signed.approved_by === ids.coordinator && !!signed.approved_at,
     JSON.stringify(signed).slice(0, 60));
 
+  // האישור הרשתי ירד (הכרעת שרה, 1.9): אישור אחד, של השליח. התפקיד
+  // שנשאר במסד חסום מלעדכן שורות שכר, וזה מה שנבדק כאן.
   await cli.auth.signOut();
   await cli.auth.signInWithPassword({ email: USERS.network, password: PW });
   const { error: netErr } = await cli.from('teacher_months').update({ net_approved: true }).eq('id', teacherId);
-  check('רינה מאשרת אחרי השליח', !netErr, netErr?.message?.slice(0, 60) || '');
+  check('התפקיד הרשתי אינו מעדכן שורות שכר', !!netErr, netErr?.message?.slice(0, 60) || 'עבר!');
 
   // ── 6. יומן אירועים ──
   const { data: log } = await cli.from('audit_log').select('action').eq('row_id', teacherId);
   const actions = (log || []).map(x => x.action);
-  check('היומן תיעד סימולציה, אישור ואישור רשתי',
-    actions.includes('simulation_entered') && actions.includes('approved') && actions.includes('net_approved'),
+  check('היומן תיעד הזנת שכר ואישור',
+    actions.includes('simulation_entered') && actions.includes('approved'),
     actions.join(', '));
 
   // ── 7. חודש נעול ──

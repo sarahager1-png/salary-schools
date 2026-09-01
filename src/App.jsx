@@ -15,32 +15,46 @@ import './index.css';
 /* ═══════════════════════════════════════════════════════════════
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
-function buildBase(start, end, steps = 30) {
-  return Array.from({ length: steps }, (_, i) =>
-    Math.round(start + (end - start) * (i / (steps - 1)))
-  );
-}
-const OFEK_SALARY = {
-  intern: buildBase(4800, 6096, 30),
-  1: buildBase(6096,  8900),  2: buildBase(7300,  10200),
-  3: buildBase(8500,  11500), 4: buildBase(9800,  12800),
-  5: buildBase(11000, 13600), 6: buildBase(11900, 14300),
-  7: buildBase(12800, 15000), 8: buildBase(13700, 15600),
-  9: buildBase(14600, 16339),
+const LEVELS = {
+  elementary: { label: 'יסודי',        frontal: 26, individual: 5, presence: 5 },
+  middle:     { label: 'חטיבת ביניים', frontal: 23, individual: 4, presence: 9 },
+  high:       { label: 'עליון',         frontal: 23, individual: 4, presence: 9 },
 };
+const AGE_RED = {
+  none:  { label: 'עד גיל 50',        f: 0, i: 0 },
+  age50: { label: 'גיל 50–55',        f: 2, i: 0 },
+  age55: { label: "גיל 55+ (ותיק/ה)", f: 3, i: 1 },
+  age55n:{ label: "גיל 55+ (חדש/ה)",  f: 2, i: 0 },
+};
+// מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
+const BUILD = 31;
+
+// אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
+// payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
+const CHABAD_SUPP = new Map();
+// מי שכבר שובצה לה ממ"מ: מפתחות "חודש|בית ספר|שם" של הנשות שמופיעות
+// בשדה "במקום מי" של שורה אחרת. מתעדכן בכל טעינת נתונים.
+const MM_REPLACED = new Set();
+const mmKey = (mk, sid, name) => `${mk}|${sid}|${String(name || '').trim()}`;
+const hasSubstitute = t => MM_REPLACED.has(mmKey(t.monthKey, t.schoolId, t.name));
+const schoolPaysSupp = id => CHABAD_SUPP.get(id) !== false;
+// למנהלת בית ספר יש מחשבון נפרד — אופק ניהול
+// מורת רפורמה בחטיבה העליונה היא עוז לתמורה, לא אופק חדש — שני
+// מחשבונים שונים באתר. קודם כולן נותבו לאופק, והכותרת אישרה לחשבת
+// בחירה שגויה.
+const reformLabel = r => (REFORMS.find(x => x.id === r) || REFORMS[0]).label;
+
+// שורת המנהלת מזוהה לפי התפקיד, שכבר קיים ב-ROLES
 const OFEK_GRADES = [
   { id: 'intern', label: 'מתמחה' },
   { id: 1, label: '1' }, { id: 2, label: '2' }, { id: 3, label: '3' },
   { id: 4, label: '4' }, { id: 5, label: '5' }, { id: 6, label: '6' },
   { id: 7, label: '7' }, { id: 8, label: '8' }, { id: 9, label: '9' },
 ];
-const PRE_SALARY = {
-  intern:     buildBase(4500, 5800, 30),  // מתמחה
-  unlicensed: buildBase(5000, 10500),     // לא מוסמך
-  senior:     buildBase(5500, 12000),     // בכיר
-  BA:         buildBase(5800, 13500),     // תואר ראשון
-  MA:         buildBase(7200, 15200),     // תואר שני
-};
+const REFORMS = [
+  { id: 'ofek', label: 'אופק חדש' },
+  { id: 'pre',  label: 'עולם ישן' },
+];
 const DEGREE_LABELS = {
   intern: 'מתמחה', unlicensed: 'לא מוסמך', senior: 'בכיר',
   BA: 'תואר ראשון', MA: 'תואר שני',
@@ -57,63 +71,12 @@ const ROLES = [
   { id: 'counselor2', label: "יועץ/ת (רישיון קבוע)",         pct: 18,   min: 0    },
   { id: 'principal',  label: 'מנהל/ת בית ספר (אופק ד1)',    pct: 0,    min: 0    },
 ];
-const LEVELS = {
-  elementary: { label: 'יסודי',        frontal: 26, individual: 5, presence: 5 },
-  middle:     { label: 'חטיבת ביניים', frontal: 23, individual: 4, presence: 9 },
-  high:       { label: 'עליון',         frontal: 23, individual: 4, presence: 9 },
-};
-const AGE_RED = {
-  none:  { label: 'עד גיל 50',        f: 0, i: 0 },
-  age50: { label: 'גיל 50–55',        f: 2, i: 0 },
-  age55: { label: "גיל 55+ (ותיק/ה)", f: 3, i: 1 },
-  age55n:{ label: "גיל 55+ (חדש/ה)",  f: 2, i: 0 },
-};
 /* ═══════════════════════════════════════════════════════════════
    המחשבון הרשמי של משרד החינוך
    הראוטים שמיים. קודם היו כאן מספרים (Calculators/1..4) — כל אחד מהם
    מפנה בשקט לרשימת המחשבונים, כך שהחשבת חשבה שהיא במחשבון אחד
    בזמן שהמסך שלפניה היה מסך אחר לגמרי.
 ═══════════════════════════════════════════════════════════════ */
-const CALC_BASE = 'https://educalc.unq.co.il/#/Calculators/';
-// דף רשימת המחשבונים — בלי לוכסן בסוף, אחרת זה אינו ראוט תקין באתר
-const CALC_HOME = 'https://educalc.unq.co.il/#/Calculators';
-const CALCULATORS = [
-  { id: 'ofek', route: 'OfekHadash', label: 'אופק חדש' },
-  { id: 'oz',   route: 'OzLetmura',  label: 'עוז לתמורה' },
-  { id: 'mgmt', route: 'OfekNihul',  label: 'אופק — ניהול' },
-  { id: 'old',  route: 'OldWorld',   label: 'עולם ישן' },
-];
-// מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 31;
-
-const calcUrl = id => CALC_BASE + (CALCULATORS.find(c => c.id === id) || CALCULATORS[0]).route;
-// מסלול המורה -> המחשבון שמתאים לו
-const calcForReform = reform => (reform === 'pre' ? 'old' : 'ofek');
-// אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
-// payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
-const CHABAD_SUPP = new Map();
-// מי שכבר שובצה לה ממ"מ: מפתחות "חודש|בית ספר|שם" של הנשות שמופיעות
-// בשדה "במקום מי" של שורה אחרת. מתעדכן בכל טעינת נתונים.
-const MM_REPLACED = new Set();
-const mmKey = (mk, sid, name) => `${mk}|${sid}|${String(name || '').trim()}`;
-const hasSubstitute = t => MM_REPLACED.has(mmKey(t.monthKey, t.schoolId, t.name));
-const schoolPaysSupp = id => CHABAD_SUPP.get(id) !== false;
-// למנהלת בית ספר יש מחשבון נפרד — אופק ניהול
-// מורת רפורמה בחטיבה העליונה היא עוז לתמורה, לא אופק חדש — שני
-// מחשבונים שונים באתר. קודם כולן נותבו לאופק, והכותרת אישרה לחשבת
-// בחירה שגויה.
-const calcForTeacher = t => (
-  isPrincipalRow(t) ? 'mgmt'
-  : t?.reform === 'ofek' && t?.level === 'high' ? 'oz'
-  : calcForReform(t?.reform));
-
-const REFORMS = [
-  { id: 'ofek', label: 'אופק חדש' },
-  { id: 'pre',  label: 'עולם ישן' },
-];
-const reformLabel = r => (REFORMS.find(x => x.id === r) || REFORMS[0]).label;
-
-// שורת המנהלת מזוהה לפי התפקיד, שכבר קיים ב-ROLES
 const PRINCIPAL_ROLE = 'principal';
 // שכר הבסיס של מנהלת. כל מה שמעליו משולם כתוספת בית חב"ד.
 // שכר מנהלת באופק — מספר אחד וקבוע, ולא סולם לפי ותק: ותק 9 עד 23
@@ -123,7 +86,6 @@ const PRINCIPAL_OFEK_GROSS = 19087;
 const isPrincipalRow = t => t?.role === PRINCIPAL_ROLE;
 // דרגת הניהול היא א..ד ואינה סולם המורים. נשמרת כמספר 1..4.
 const NIHUL_GRADES = [{ v:1, l:'א' }, { v:2, l:'ב' }, { v:3, l:'ג' }, { v:4, l:'ד' }];
-const nihulLabel = v => NIHUL_GRADES.find(g => g.v === Number(v))?.l || null;
 // שם קצר לבורר שבתוך הטבלה — השם המלא נחתך שם ואי אפשר להבחין
 // בין מחנכת כיתה א' למחנכת ב'-ו'.
 const ROLE_SHORT = {
@@ -173,17 +135,6 @@ const REASON_TYPES = [
 /* ═══════════════════════════════════════════════════════════════
    CALCULATIONS
 ═══════════════════════════════════════════════════════════════ */
-function calcBase(t) {
-  const sen = Math.min(Math.max(Math.floor(t.seniority), 0), 29);
-  if (t.reform === 'ofek') return (OFEK_SALARY[t.grade] || OFEK_SALARY[1])[sen];
-  // טרום רפורמה: מתמחה = intern, אחרת לפי תואר
-  return (PRE_SALARY[t.degree] || PRE_SALARY.BA)[sen];
-}
-function calcRoleSupp(base, roleId) {
-  const r = ROLES.find(r => r.id === roleId);
-  if (!r || r.pct === 0) return 0;
-  return Math.max(Math.round(base * r.pct / 100), r.min);
-}
 function currentScope(t) {
   if (t.scopeChanges?.length > 0) {
     return [...t.scopeChanges].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
@@ -244,22 +195,6 @@ const momScopeBonus = t => (momBonusEligible(t) ? MOM_SCOPE_BONUS : 0);
   להיות סופית גם היא. אין כאן מילוי אוטומטי; ההצעה מחכה ללחיצה.
 */
 const suggestedScope = t => computedBaseScope(t) + momScopeBonus(t);
-function calcGross(t) {
-  if (t._officialGross) return Number(t._officialGross);
-  // שכר מנהל/ת אינו על סולם המורים, וגמול הניהול אינו אחוז מעליו: הוא
-  // יוצא ממחשבון הניהול, לפי דרגת ניהול ורמת מורכבות. אומדן מטבלת
-  // המורים היה מספר שנראה סביר וטועה בכיוון אחד — כלפי מטה.
-  if (isPrincipalRow(t)) return 0;
-  const base  = calcBase(t);
-  const role  = calcRoleSupp(base, t.role);
-  const scope = effectiveScope(t);
-  return Math.round((base + role) * scope / 100);
-}
-// שורה שאין לה מספר עד שתרוץ סימולציה — להצגה, כדי שלא יופיע 0 ₪
-// כאילו זו העלות.
-// מנהלת באופק אינה ממתינה לסימולציה: המספר שלה קבוע וידוע.
-const awaitingSim = t =>
-  isPrincipalRow(t) && !t._officialGross && !t._agreedGross && t.reform !== 'ofek';
 function calcNet(gross) { return Math.round(gross * 0.735); }
 // אחוז המשרה והשעות הפרונטליות קשורים זה בזה דרך השלב והפחתת הגיל.
 // אפשר להזין כל אחד מהם, והשני נגזר — לפעמים השעות ידועות, ולפעמים
@@ -401,39 +336,34 @@ function supplementCost(base, supplement, biguud, havraah) {
   gross      — סך הברוטו לעובדת
 */
 function payBreakdown(t) {
-  const ofek = Number(t._officialGross) || 0;
-  const old  = Number(t._officialGrossPre) || 0;
   /*
-    מנהלת: מספר אחד, תשלום ישיר — אין תוספת בית חב"ד.
+    ברוטו אחד, ותוספת שהוזנה.
 
-    ההכרעה הזאת התקבלה ב-28.8 ולא נכנסה לתוקף: הקוד שמימש אותה נוסף
-    מתחת לענף קודם שכבר החזיר, ולכן מעולם לא רץ. המסך הראה "מנהלת —
-    אין תוספת בית חב"ד" בזמן שהחישוב מאחוריו עדיין פיצל את השכר ב-14,400
-    ויצר תוספת של כמעט 4,700 ₪. ההפרש אינו קוסמטי: פנסיה וקרן השתלמות
-    חלות על הבסיס בלבד, ולכן הפיצול הקטין את עלות המעביד של כל מנהלת.
+    עד 1.9 היו כאן שתי עמודות — סימולציית עולם ישן וסימולציית אופק —
+    והפער ביניהן היה תוספת בית חב"ד. המודל הזה ירד: מתוך 28 הסימולציות
+    שנבדקו מול המחשבון הרשמי 8 התאימו, והפערים היו בקלט. שרה הכריעה
+    שהפער אינו עניינה ושחשבת השכר מזינה ברוטו ותוספת.
 
-    מנהלת באופק — 19,087 ₪ ברוטו, וכל מה שמעבר לזה על פי הסכם מראש
-    (הוראת שרה, 1.9.2026). השכר המוסכם גובר תמיד; המספר הקבוע הוא
-    ברירת המחדל כשאין מוסכם ולא הוזנה סימולציית ניהול.
+    base       — הברוטו פחות התוספת. פנסיה וקרן השתלמות חלות עליו בלבד.
+    supplement — תוספת בית חב"ד כפי שהוזנה. אינה פנסיונית ואינה נושאת
+                 קרן השתלמות; נושאת מס שכר וביטוח לאומי.
+    gross      — הברוטו לעובדת.
   */
+  const gross0 = Number(t._officialGross) || 0;
+  const supp0  = Math.max(0, Number(t._chabadSupp) || 0);
   const agreed = Number(t._agreedGross) || 0;
+
+  // מנהלת: מספר אחד, תשלום ישיר — אין תוספת בית חב"ד. באופק המספר קבוע
+  // (19,087), וכל מה שמעבר לו על פי הסכם מראש שנרשם כשכר מוסכם.
   if (isPrincipalRow(t)) {
-    const gross = agreed || ofek || (t.reform === 'ofek' ? PRINCIPAL_OFEK_GROSS : 0);
+    const gross = agreed || gross0 || (t.reform === 'ofek' ? PRINCIPAL_OFEK_GROSS : 0);
     return { base: gross, mom: 0, supplement: 0, gross, agreed: !!agreed };
   }
-  // בית ספר עולם ישן — סימולציה אחת, אין רכיב תוספת
-  const paysSupp = schoolPaysSupp(t.schoolId);
-  if (t.reform !== 'ofek') {
-    // עולם ישן: רכיב "ת.שכר מינימום" מהתלוש הוא תוספת בית חב"ד —
-    // לא פנסיוני ולא נושא קרן השתלמות. בבית ספר בלי תוספת (מזכרת
-    // בתיה) כל הברוטו הוא בסיס רגיל.
-    const minSupp = paysSupp ? Math.min(Number(t._minWageSupp) || 0, ofek) : 0;
-    return { base: ofek - minSupp, mom: 0, supplement: minSupp, gross: ofek };
-  }
-  if (!paysSupp) return { base: ofek, mom: 0, supplement: 0, gross: ofek };
-  // אם האופק יוצא נמוך מהעולם הישן, העובדת נשארת עם העולם הישן
-  const supplement = Math.max(0, ofek - old);
-  return { base: old, mom: 0, supplement, gross: old + supplement };
+
+  const gross = agreed || gross0;
+  // בית ספר שאינו משלם תוספת (מזכרת בתיה) — כל הברוטו הוא בסיס רגיל
+  const supplement = schoolPaysSupp(t.schoolId) ? Math.min(supp0, gross) : 0;
+  return { base: gross - supplement, mom: 0, supplement, gross, agreed: !!agreed };
 }
 
 // ברוטו למעסיק = בסיס + 40% · תוספת + 30%.
@@ -556,15 +486,17 @@ function baseFieldsChanged(next, prev) {
 // שורה בלעדיהם נראית שלמה ומתגלה רק בשלב החתימה.
 const hasContact = t => Boolean(String(t?.phone || '').trim() && String(t?.email || '').trim());
 
+/*
+  יש לשורה מספר.
+
+  קודם זה נקרא "סימולציה מלאה" ודרש אחת או שתי סימולציות מהמחשבון
+  הרשמי. מעכשיו התנאי אחד: חשבת השכר הזינה ברוטו. שכר מוסכם גובר,
+  ומנהלת באופק מכוסה במספר הקבוע.
+*/
 const simComplete = t => {
-  if (t._agreedGross) return true;               // שכר מוסכם — אין צורך בסימולציה
-  // ניהול — סימולציה אחת, ובאופק גם היא לא נדרשת: המספר קבוע
+  if (t._agreedGross) return true;
   if (isPrincipalRow(t)) return Boolean(t._officialGross) || t.reform === 'ofek';
-  // בבית ספר בלי תוספת בית חב"ד (מזכרת בתיה) התשלום ישיר — סימולציה
-  // אחת של המסלול עצמו, גם באופק.
-  return Boolean(t.reform === 'ofek' && schoolPaysSupp(t.schoolId)
-    ? (t._officialGross && t._officialGrossPre)
-    : t._officialGross);
+  return Boolean(t._officialGross);
 };
 
 // סטטוס מורה בזרימת העבודה:
@@ -582,12 +514,15 @@ const isPending     = t => Boolean(t._changedAt && !t._approved); // = needsSim 
 // שהוא הגיע לשם, וזה חוסך מילוי לאחור של רשומות ותיקות.
 const scopeConfirmed = t =>
   Boolean(t.scopeSetAt) || (t.scopePct ?? t.scope ?? 100) !== 100;
-// אחוז המשרה בעולם הישן. למורת אופק זה מספר אחר מהאחוז באופק, והוא
-// זה שנכנס לסימולציית הבסיס — שהפער בינה לבין האופק הוא תוספת בית חב"ד.
-const preScopeSet = t => t.reform !== 'ofek' || t.scopePctPre != null;
-// מי שממתינה לקביעת אחוז. מנהלת בית ספר תמיד 100% — 40 שעות ניהול.
+/*
+  מי שממתינה לקביעת אחוז. מנהלת בית ספר תמיד 100% — 40 שעות ניהול.
+
+  עד 1.9 היו כאן שני אחוזים, כי סימולציית הבסיס של מורת אופק רצה בעולם
+  הישן ודרשה אחוז משלה. הסימולציות ירדו, והפער בין המסלולים הוא מספר
+  שחשבת השכר מזינה — ולכן נשאר אחוז אחד.
+*/
 const scopeMissing = t =>
-  isPending(t) && !isPrincipalRow(t) && (!scopeConfirmed(t) || !preScopeSet(t));
+  isPending(t) && !isPrincipalRow(t) && !scopeConfirmed(t);
 
 /*
   אישור אחד, של שרה.
@@ -650,7 +585,8 @@ const nextMonthKey = k => { const [y,m]=k.split('-').map(Number); return m===12 
 const EMPTY_TEACHER = {
   id: '', schoolId: '', tzId: '', name: '', email: '', phone: '',
   reform: 'ofek', level: 'elementary', grade: 1, degree: 'BA',
-  seniority: 0, frontalHours: 26, scopePct: 100, scope: 100,
+  // אין ותק 0 — שנה ראשונה בהוראה היא 1, וה-CHECK במסד דוחה אפס
+  seniority: 1, frontalHours: 26, scopePct: 100, scope: 100,
   role: 'none', ageGroup: 'none',
   isTemp: false, startDate: '', endDate: '', scopeChanges: [],
   leaveType: 'none', leaveFrom: null, leaveTo: null,
@@ -715,87 +651,6 @@ function exportBackup(schools, months) {
 /* iframe של אתר חיצוני — אם הוא לא נטען (חסימת עוגיות צד-שלישי, תקלה
    באתר, רשת מסוננת) המסך נשאר לבן בלי הסבר. כאן יש מצב טעינה,
    פסק זמן, ותמיד דרך לפתוח את המחשבון בחלון נפרד. */
-function CalculatorFrame({ calcId, style }) {
-  const url = calcUrl(calcId);
-  const [state, setState] = useState('loading');   // loading | ready | slow
-  const frameRef = useRef(null);
-
-  // האתר הוא SPA, וקישור עמוק ישיר נופל חזרה לרשימת המחשבונים ומציג את
-  // אופק חדש. לכן נטענת הרשימה, ורק אחרי שהאתר מסיים את האתחול שלו —
-  // הוא מפנה את עצמו דרך /ClientPage — משנים את ה-hash.
-  //
-  // הניווט נעשה ב-contentWindow.location ולא בהחלפת src: החלפת src היא
-  // טעינה מחדש, והאתר בולע בה את הראוט שוב. ניווט על מסמך שכבר טעון הוא
-  // שינוי hash, והראוטר של האתר מגיב לו. כתיבה ל-location של מסגרת
-  // ממקור אחר מותרת — רק קריאה חסומה.
-  //
-  // הקומפוננטה ממופתחת ב-key לפי calcId בצד הקורא, ולכן החלפת מחשבון
-  // מרכיבה אותה מחדש והמצב חוזר ל-loading בלי setState בתוך effect.
-  useEffect(() => {
-    const nudge = () => {
-      try { frameRef.current?.contentWindow?.location.replace(url); }
-      catch { /* מקור אחר — הניווט עדיין נשלח */ }
-    };
-    // דחיפה אחת אינה מספיקה: כל עוד האתר מפנה את עצמו דרך /ClientPage
-    // הניווט נבלע. דוחפים שוב ושוב עד שהוא נתפס. ניווט חוזר לאותה
-    // כתובת בדיוק הוא no-op, ולכן אינו מאפס טופס שכבר מולא.
-    const nudges = [3000, 4500, 6000, 7500].map(ms => setTimeout(nudge, ms));
-    // הכיסוי יורד רק אחרי הדחיפה האחרונה. קודם הוא ירד ב-6 שניות, בעוד
-    // המסגרת עדיין הציגה את אופק חדש — והחשבת יכלה להקליד למחשבון הלא
-    // נכון בלי לדעת. ריק זה בלבול; מחשבון שגוי זה מספר שגוי.
-    const ok   = setTimeout(() => setState('ready'), 8500);
-    const slow = setTimeout(() => setState(s => (s === 'ready' ? s : 'slow')), 18000);
-    return () => { nudges.forEach(clearTimeout); clearTimeout(ok); clearTimeout(slow); };
-  }, [url]);
-
-  return (
-    // הטופס של משרד החינוך גבוה מ-1,200 פיקסלים, וכפתור "חשב" בתחתיתו.
-    // כשהמסגרת בגובה הפאנל הכפתור נופל מתחת לקצה, והגלילה היחידה שמגיעה
-    // אליו היא גלילה *בתוך* המסגרת — שאין לה סימן ואיש אינו מנחש אותה.
-    // לכן המסגרת נפרשת למלוא גובה הטופס, והפאנל עצמו הוא שנגלל.
-    <div style={{ position:'relative', flex:1, minHeight:0, overflowY:'auto', ...style }}>
-      <iframe
-        ref={frameRef}
-        src={CALC_HOME}
-        style={{ width:'100%', height:'100%', minHeight:1320, border:'none', display:'block' }}
-        title="מחשבון שכר רשמי — משרד החינוך"
-        allow="fullscreen"
-      />
-      {state === 'ready' && (
-        // הכפתור "חשב" נמצא בתחתית טופס ארוך. בלי המשפט הזה אפשר למלא
-        // את כל השדות ולא למצוא איפה מחשבים.
-        <div style={{ position:'sticky', bottom:0, insetInline:0, padding:'7px 12px', background:'rgba(255,255,255,0.94)',
-          borderTop:'1px solid var(--line)', backdropFilter:'blur(6px)', pointerEvents:'none' }}>
-          <p style={{ fontSize:11.5, color:'var(--text3)', textAlign:'center' }}>
-            מלאי את השדות וגללי מטה — הכפתור <b style={{ color:'var(--text2)' }}>חשב</b> בתחתית הטופס
-          </p>
-        </div>
-      )}
-      {state !== 'ready' && (
-        <div style={{ position:'absolute', inset:0, background:'var(--bg)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, padding:24, textAlign:'center' }}>
-          {state === 'loading' ? (
-            <p style={{ fontSize:13.5, color:'var(--text3)', fontWeight:600 }}>טוען את המחשבון הרשמי…</p>
-          ) : (
-            <>
-              <div style={{ width:52, height:52, borderRadius:16, background:'var(--warn-bg)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                <AlertTriangle size={24} strokeWidth={2} color="var(--warn)" />
-              </div>
-              <p style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>המחשבון הרשמי לא נטען</p>
-              <p style={{ fontSize:12.5, color:'var(--text3)', maxWidth:320, lineHeight:1.6 }}>
-                ייתכן שהדפדפן חוסם עוגיות צד-שלישי, או שהאתר של משרד החינוך אינו זמין כרגע.
-                אפשר לפתוח אותו בחלון נפרד ולחזור לכאן עם התוצאה.
-              </p>
-            </>
-          )}
-          <a href={url} target="_blank" rel="noopener noreferrer" className="apple-btn apple-btn-ghost" style={{ textDecoration:'none' }}>
-            <ExternalLink size={14} strokeWidth={2.2} />
-            פתיחה בחלון נפרד
-          </a>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // פס "גרסה חדשה" — משווה את הבנדל שבאוויר לזה שנטען
 function UpdateBanner() {
@@ -1283,7 +1138,7 @@ function buildEmailBody(school, teachers, monthLabel) {
   const ts  = teachers.filter(t => t.schoolId === school.id);
   // החודש הפעיל, לא הקלנדרי — הדוח הוא על חודש השכר שעובדים עליו
   const now = monthLabel || new Date().toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
-  const totGross = ts.reduce((s,t) => s + calcGross(t), 0);
+  const totGross = ts.reduce((s,t) => s + calcEmployer(t).gross, 0);
   const totEmp   = ts.reduce((s,t) => s + calcEmployer(t).total, 0);
   const pending  = ts.filter(isPending);
 
@@ -1701,7 +1556,6 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
   const [t, setT] = useState({ ...EMPTY_TEACHER, ...teacher, scopeChanges: teacher.scopeChanges || [], _files: teacher._files || [] });
   const [showScopeChange, setShowScopeChange] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
-  const [simCalc, setSimCalc] = useState(calcForTeacher(teacher));
   const set = (k, v) => setT(p => {
     const next = { ...p, [k]: v };
     // תפקיד מנהל/ת גורר אופק חדש ודרגת ניהול א, כנקודת פתיחה
@@ -1736,21 +1590,6 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
 
   return (
     <div className={['fixed inset-0 bg-black/50 z-50 flex', showSimulator ? 'flex-row items-stretch' : 'flex-col items-center justify-start overflow-y-auto p-4'].join(' ')}>
-
-      {/* סימולטור — פאנל שמאל */}
-      {showSimulator && (
-        <div style={{ display:'flex', flexDirection:'column', background:'#fff', borderLeft:'0.5px solid var(--apple-fill2)', width:'55%' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', background:'var(--apple-fill)', borderBottom:'0.5px solid var(--apple-fill2)', flexWrap:'wrap' }}>
-            <span style={{ fontSize:12, fontWeight:600, color:'var(--apple-text2)' }}>מחשבון רשמי</span>
-            <div className="apple-seg">
-              {CALCULATORS.map(c => (
-                <button key={c.id} onClick={() => setSimCalc(c.id)} className={['apple-seg-item', simCalc===c.id?'active':''].join(' ')} style={{ padding:'5px 10px', fontSize:12 }}>{c.label}</button>
-              ))}
-            </div>
-          </div>
-          <CalculatorFrame key={simCalc} calcId={simCalc} />
-        </div>
-      )}
 
       {/* טופס — פאנל ימין */}
       <div style={showSimulator
@@ -2069,28 +1908,6 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                   : t.gender !== 'f' ? 'תוספת אם ניתנת לאם בלבד'
                   : `אחוז משרה ${computedBaseScope(t)}% — התוספת ניתנת מעל ${MOM_MIN_SCOPE}%`}
               </p>
-            )}
-            {/* מורת אופק: אחוז המשרה שלה בעולם הישן אינו זהה לאחוז באופק.
-                דבורי גלפרין היא 91% באופק ו-103% בעולם הישן, ורק ב-103%
-                המחשבון מחזיר את המספר שנשמר לה. הפער בין שתי הסימולציות
-                הוא תוספת בית חב"ד — ולכן האחוז הזה הוא כסף. */}
-            {t.reform === 'ofek' && !isPrincipalRow(t) && (
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginTop:10 }}>
-                <div>
-                  <p style={{ fontSize:13.5, fontWeight:600, color:'var(--text)' }}>אחוז משרה בעולם הישן</p>
-                  <p style={{ fontSize:12, color: t.scopePctPre == null ? 'var(--warn)' : 'var(--text2)' }}>
-                    {t.scopePctPre == null
-                      ? 'טרם נקבע — בלעדיו אי אפשר להריץ את סימולציית הבסיס'
-                      : `באופק ${t.scopePct ?? 100}% · בעולם הישן ${t.scopePctPre}%`}
-                  </p>
-                </div>
-                <input type="number" min="1" max="200" dir="ltr" className="apple-input"
-                  value={t.scopePctPre ?? ''}
-                  placeholder="—"
-                  onChange={e => set('scopePctPre', e.target.value === '' ? null : Number(e.target.value))}
-                  onBlur={() => t.scopePctPre != null && !t.scopePreSetAt && set('scopePreSetAt', new Date().toISOString())}
-                  style={{ width:86, textAlign:'center', fontWeight:700, minHeight:38 }} />
-              </div>
             )}
             {/* מין: הזכאות לתוספת אם נגזרה ממספר הילדים בלבד, ולכן שלושה
                 גברים ברשת הופיעו כזכאים. השדה נשאל כאן, ליד הילדים. */}
@@ -2801,38 +2618,34 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 
   // שתי עמודות הכסף. איזה שדה נערך תלוי במסלול: במסלול אופק הבסיס הוא
   // סימולציית העולם הישן, ובעולם ישן יש סימולציה אחת שהיא גם הבסיס.
+  /*
+    תאי הכסף בשורת העריכה — ארבעה, כמספר עמודות הכסף בטבלה:
+    ברוטו, תוספת בית חב"ד, הוצאות מעביד וסה״כ. שני הראשונים נערכים
+    (שדות של חשבת השכר), שני האחרונים מחושבים.
+
+    עד 1.9 היו כאן שישה, כי הברוטו היה מפוצל לשתי סימולציות. כל תא
+    שנוסף או ירד כאן חייב להתאים למספר העמודות בכותרת — אחרת כל השורה
+    מוסטת, וזה קרה.
+  */
   const moneyEditCells = (v) => {
-    const isOfek = v.reform === 'ofek';
     const emp = calcEmployer(v);
-    const numCell = (key) => (
+    const numCell = (key, bg) => (
       <td><input type="number" className="apple-input" dir="ltr" value={v[key] || ''}
         onChange={e => setF(key, e.target.value ? Number(e.target.value) : null)} placeholder="—"
-        style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>
+        style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center',
+                 background: bg || undefined }} /></td>
     );
+    const supplies = !isPrincipalRow(v) && schoolPaysSupp(v.schoolId);
     return (
       <>
-        {isPrincipal
-          ? <td style={{ textAlign:'center' }} title="נקבע בסימולציה אצל חשבת השכר">
-              {emp.base
-                ? <span style={{ fontWeight:700, color:'var(--text)' }}>{emp.base.toLocaleString('he-IL')}</span>
-                : <span className="apple-badge badge-orange" style={{ fontWeight:600 }}>נדרשת סימולציה</span>}
-            </td>
-          : numCell(isOfek ? '_officialGrossPre' : '_officialGross')}
-        {isPrincipal || !isOfek
-          ? <td style={{ textAlign:'center', color:'var(--text3)' }}>
-              {isOfek && v._officialGross ? Number(v._officialGross).toLocaleString('he-IL') : '—'}
-            </td>
-          : numCell('_officialGross')}
-        {!isPrincipal && <td style={{ textAlign:'center', color:'var(--purple)', fontWeight:700 }}>
-          {emp.supplement > 0 ? emp.supplement.toLocaleString('he-IL') + ' ₪' : '—'}
-        </td>}
-        {!isPrincipal && <td style={{ textAlign:'center', fontWeight:700 }}>
-          {emp.gross ? emp.gross.toLocaleString('he-IL') : '—'}
-        </td>}
+        {numCell('_officialGross')}
+        {!isPrincipal && (supplies
+          ? numCell('_chabadSupp', 'var(--purple-100)')
+          : <td style={{ textAlign:'center', color:'var(--text3)' }}>—</td>)}
         {!isPrincipal && <td style={{ textAlign:'center', color:'var(--text3)' }}>
           {emp.social ? emp.social.toLocaleString('he-IL') : '—'}
         </td>}
-        {!isPrincipal && <td style={{ textAlign:'center', color:'var(--text3)' }}>
+        {!isPrincipal && <td style={{ textAlign:'center', fontWeight:700, color:'var(--purple)' }}>
           {emp.total ? emp.total.toLocaleString('he-IL') : '—'}
         </td>}
       </>
@@ -3015,7 +2828,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
           </button>
           <button className="apple-btn apple-btn-ghost" onClick={() => setAllCols(v => !v)}
             style={{ minHeight:32, padding:'0 12px', fontSize:12.5 }}>
-            {allCols ? 'תצוגה מצומצמת' : `כל העמודות (${28})`}
+            {allCols ? 'תצוגה מצומצמת' : `כל העמודות (${26})`}
           </button>
         </div>
         <div className="sheet-wrap">
@@ -3044,10 +2857,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                 <th style={{ textAlign:'center' }}>ממ"מ שעות</th>
                 <th style={{ textAlign:'center' }}>במקום מי</th>
                 <th style={{ textAlign:'center' }}>תוספות (₪)</th>
-                <th style={{ textAlign:'center' }} title="השכר שרץ במערכת התשלומים">עולם ישן — בסיס (₪)</th>
-                <th style={{ textAlign:'center' }} title="סימולציית אופק חדש — רק במסלול אופק">אופק חדש (₪)</th>
-                {!isPrincipal && <th style={{ textAlign:'center' }} title="הפער בין אופק לעולם הישן">תוספת בית חב"ד</th>}
-                {!isPrincipal && <th style={{ textAlign:'center' }}>ברוטו</th>}
+                <th style={{ textAlign:'center' }} title="הברוטו שחשבת השכר הזינה — מה שרץ במערכת התשלומים">ברוטו (₪)</th>
+                {!isPrincipal && <th style={{ textAlign:'center' }} title='החלק שאינו פנסיוני — מוזן בידי חשבת השכר'>תוספת בית חב"ד</th>}
                 {!isPrincipal && <th style={{ textAlign:'center' }} title={`פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד · ~ = אומדן שממתין לסכום מהנהלת החשבונות`}>הוצאות מעביד</th>}
                 {!isPrincipal && <th style={{ textAlign:'center', color:'var(--purple)' }}>סה״כ למעסיק</th>}
                 <th style={{ width:92 }}></th>
@@ -3141,7 +2952,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               )}
 
               {filtered.length === 0 && editingId !== 'new' ? (
-                <tr><td colSpan={28} style={{ textAlign:'center', padding:'40px', color:'var(--apple-text3)' }}>
+                <tr><td colSpan={26} style={{ textAlign:'center', padding:'40px', color:'var(--apple-text3)' }}>
                   {ts.length === 0 ? 'אין עדיין עובדי הוראה' : 'לא נמצאו תוצאות'}
                 </td></tr>
               ) : filtered.map(t => {
@@ -3414,76 +3225,45 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     <td style={{ textAlign:'center', color: (t.monthlyExtras||0)>0 ? 'var(--text)' : 'var(--text3)', fontWeight: (t.monthlyExtras||0)>0 ? 700 : 400 }}>
                       {(t.monthlyExtras||0) > 0 ? Number(t.monthlyExtras).toLocaleString('he-IL')+' ₪' : '—'}
                     </td>
-                    {/* בסיס — מה שרץ במערכת התשלומים. הקלדה ישירה:
-                        בעולם ישן זו הסימולציה היחידה; באופק זו סימולציית
-                        העולם הישן. */}
+                    {/* ברוטו — מה שחשבת השכר הזינה. עד 1.9 היו כאן שתי
+                        עמודות, סימולציית עולם ישן וסימולציית אופק, והפער
+                        ביניהן היה תוספת בית חב"ד. הסימולציות ירדו. */}
                     <td style={{ textAlign:'center' }}>
-                      {isPrincipalRow(t) || (t.reform === 'ofek' && !schoolPaysSupp(t.schoolId))
-                        ? <span style={{ color:'var(--text3)' }} title={isPrincipalRow(t) ? 'שכר ניהול — מספר אחד, בעמודת אופק חדש' : 'תשלום ישיר — אין צורך בסימולציית עולם ישן'}>—</span>
-                        : <input type="number" min="0" dir="ltr"
-                        key={`base-${t.id}`}
-                        defaultValue={(t.reform === 'ofek' ? t._officialGrossPre : t._officialGross) || ''}
+                      <input type="number" min="0" dir="ltr"
+                        key={`gross-${t.id}`}
+                        defaultValue={t._officialGross || ''}
                         placeholder="₪"
-                        title="ברוטו עולם ישן מהמחשבון — נשמר ביציאה מהשדה"
+                        title="הברוטו לעובדת — נשמר ביציאה מהשדה"
                         onClick={e => e.stopPropagation()}
                         onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                         onBlur={e => {
                           const v2 = e.target.value === '' ? null : Number(e.target.value);
-                          const key = t.reform === 'ofek' ? '_officialGrossPre' : '_officialGross';
-                          if ((v2 ?? null) === (t[key] ?? null)) return;
-                          saveRow({ ...t, [key]: v2 });
+                          if ((v2 ?? null) === (t._officialGross ?? null)) return;
+                          saveRow({ ...t, _officialGross: v2 });
                         }}
-                        style={{ width:86, textAlign:'center', fontWeight:700, fontSize:13,
+                        style={{ width:92, textAlign:'center', fontWeight:700, fontSize:13,
                           border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
-                          background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />}
-                    </td>
-                    {/* סימולציית אופק — רק למסלול אופק */}
-                    <td style={{ textAlign:'center' }}>
-                      {t.reform === 'ofek' ? (
-                        <input type="number" min="0" dir="ltr"
-                          key={`ofek-${t.id}`}
-                          defaultValue={t._officialGross || ''}
-                          placeholder="₪"
-                          title="ברוטו אופק חדש מהמחשבון — נשמר ביציאה מהשדה"
-                          onClick={e => e.stopPropagation()}
-                          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                          onBlur={e => {
-                            const v2 = e.target.value === '' ? null : Number(e.target.value);
-                            if ((v2 ?? null) === (t._officialGross ?? null)) return;
-                            saveRow({ ...t, _officialGross: v2 });
-                          }}
-                          style={{ width:86, textAlign:'center', fontWeight:700, fontSize:13,
-                            border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
-                            background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
-                      ) : <span style={{ color:'var(--text3)' }} title="עולם ישן — סימולציה אחת">—</span>}
+                          background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
                     </td>
                     {!isPrincipal && <td style={{ textAlign:'center' }}>
-                      {isPrincipalRow(t) ? <span style={{ color:'var(--text3)' }} title='מנהלת — אין תוספת בית חב"ד'>—</span>
-                       : t.reform !== 'ofek' && schoolPaysSupp(t.schoolId) ? (
-                        <span title='רכיב ת.שכר מינימום מהתלוש — משולם כתוספת בית חב"ד: מס שכר וביטוח לאומי בלבד'>
-                          <input type="number" min="0" dir="ltr"
-                            key={`mws-${t.id}`}
-                            defaultValue={t._minWageSupp || ''}
-                            placeholder="שכר מינ׳"
+                      {isPrincipalRow(t) || !schoolPaysSupp(t.schoolId)
+                        ? <span style={{ color:'var(--text3)' }}
+                            title={isPrincipalRow(t) ? 'מנהלת — תשלום ישיר' : 'בית ספר בלי תוספת בית חב"ד'}>—</span>
+                        : <input type="number" min="0" dir="ltr"
+                            key={`supp-${t.id}`}
+                            defaultValue={t._chabadSupp || ''}
+                            placeholder="₪"
+                            title='תוספת בית חב"ד — לא פנסיונית, נושאת מס שכר וביטוח לאומי'
                             onClick={e => e.stopPropagation()}
                             onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                             onBlur={e => {
                               const v2 = e.target.value === '' ? null : Number(e.target.value);
-                              if ((v2 ?? null) === (t._minWageSupp ?? null)) return;
-                              saveRow({ ...t, _minWageSupp: v2 });
+                              if ((v2 ?? null) === (t._chabadSupp ?? null)) return;
+                              saveRow({ ...t, _chabadSupp: v2 });
                             }}
-                            style={{ width:78, textAlign:'center', fontWeight:700, fontSize:12.5,
+                            style={{ width:84, textAlign:'center', fontWeight:700, fontSize:12.5,
                               border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
-                              background:'var(--purple-100)', color:'var(--text)', fontFamily:'inherit' }} />
-                        </span>
-                      ) : emp.supplement > 0
-                        ? <span className="apple-badge badge-purple">{emp.supplement.toLocaleString('he-IL')} ₪</span>
-                        : done && t.reform === 'ofek'
-                          ? <span style={{ fontSize:11, color:'var(--text3)' }} title="שכר האופק אינו גבוה מהעולם הישן">0</span>
-                          : <span style={{ color:'var(--text3)' }}>—</span>}
-                    </td>}
-                    {!isPrincipal && <td style={{ textAlign:'center', fontWeight: done ? 700 : 400, color: done ? 'var(--text)' : 'var(--text3)' }}>
-                      {done ? emp.gross.toLocaleString('he-IL') : '—'}
+                              background:'var(--purple-100)', color:'var(--text)', fontFamily:'inherit' }} />}
                     </td>}
                     {!isPrincipal && <td style={{ textAlign:'center', color:'var(--text2)' }}
                       title={done
@@ -3543,12 +3323,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       title={`${tsOfficial.length} מורות עם סימולציה מלאה`}>
                     סה״כ · {tsOfficial.length} מורות
                   </td>
+                  {/* 26 עמודות: 1 שם, 19 ריקות, ואז תוספות · ברוטו ·
+                      תוספת בית חב"ד · הוצאות מעביד · סה״כ · כפתורים */}
                   {Array.from({ length: 19 }, (_, i) => <td key={`pad${i}`}></td>)}
                   <td style={{ textAlign:'center', fontWeight:700 }}>{totMonthly > 0 ? totMonthly.toLocaleString('he-IL') + ' ₪' : '—'}</td>
-                  <td style={{ textAlign:'center', fontWeight:700 }}>{totBase.toLocaleString('he-IL')} ₪</td>
-                  <td></td>
-                  <td style={{ textAlign:'center', fontWeight:700, color:'var(--purple)' }}>{totChabad.toLocaleString('he-IL')} ₪</td>
                   <td style={{ textAlign:'center', fontWeight:700 }}>{totGross.toLocaleString('he-IL')} ₪</td>
+                  <td style={{ textAlign:'center', fontWeight:700, color:'var(--purple)' }}>{totChabad.toLocaleString('he-IL')} ₪</td>
                   <td style={{ textAlign:'center', fontWeight:700 }}>{totExtras.toLocaleString('he-IL')} ₪</td>
                   <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>{totEmp.toLocaleString('he-IL')} ₪</td>
                   <td></td>
@@ -4315,7 +4095,6 @@ function ScopePanel({ teachers, schools, onSave }) {
     }
   };
 
-  // שני אחוזים, שני מפתחות: 'ofek' הוא scopePct ו-'pre' הוא scopePctPre.
   const save = async (t, which, pct) => {
     const n = Math.round(Number(pct));
     if (!Number.isFinite(n) || n <= 0 || n > 200) return alert('אחוז משרה חייב להיות מספר בין 1 ל-200');
@@ -4382,17 +4161,12 @@ function ScopePanel({ teachers, schools, onSave }) {
                 באופק ו-103% בעולם הישן. הפער בין שתי הסימולציות הוא
                 תוספת בית חב"ד, ולכן שדה הבסיס אינו פחות חשוב מהאחר.
               */
-              const fields = isOfek ? [
-                { which:'ofek', label:'אחוז באופק', done: scopeConfirmed(t),
-                  now: t.scopePct ?? t.scope, sugg: suggestedScope(t),
-                  hint: `${t.frontalHours || 0} ש׳ מתוך ${baseFrontalFor(t)}` },
-                { which:'pre', label:'אחוז בעולם הישן', done: t.scopePctPre != null,
-                  now: t.scopePctPre, sugg: null,
-                  hint: 'נכנס לסימולציית הבסיס — הפער ממנה הוא תוספת בית חב״ד' },
-              ] : [
+              const fields = [
                 { which:'ofek', label:'אחוז משרה', done: scopeConfirmed(t),
                   now: t.scopePct ?? t.scope, sugg: suggestedScope(t),
-                  hint: `${t.frontalHours || 0} ש׳${hr > 0 ? ` + ${hr} חינוך` : ''} מתוך ${PRE_FRONTAL}` },
+                  hint: isOfek
+                    ? `${t.frontalHours || 0} ש׳ מתוך ${baseFrontalFor(t)}`
+                    : `${t.frontalHours || 0} ש׳${hr > 0 ? ` + ${hr} חינוך` : ''} מתוך ${PRE_FRONTAL}` },
               ];
               return (
                 <div key={t.id} className="apple-card" style={{ padding:'10px 12px' }}>
@@ -4487,377 +4261,185 @@ function ScopePanel({ teachers, schools, onSave }) {
   );
 }
 
-function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKids, onSaveScope, activeMonth, userRole, userId }) {
-  const [calc, setCalc] = useState('ofek');
-  // אחוזי המשרה הם השלב הראשון, ולכן המסך נפתח עליהם כשעוד חסרים —
-  // סימולציה שתרוץ לפניהם תימחק ברגע שיוקלד האחוז.
-  // אחוז המשרה הוא שדה של השליח: השרת חוסם אותו לחשבת השכר, שרשאית
-  // לגעת בשכר הרשמי ובעלות בפועל בלבד. השלב מוצג למי שיכולה לשמור אותו.
+/* ═══════════════════════════════════════════════════════════════
+   שולחן השכר — חשבת השכר ושרה, מסך אחד ושתי לשוניות לכל אחת
+
+   החליף את מסך הסימולציה. שם היה iframe של המחשבון הרשמי, שתי עמודות
+   ברוטו והרצה ידנית; מתוך 28 הסימולציות שנבדקו מול המחשבון 8 התאימו,
+   והפערים היו בקלט. שרה הכריעה שהכיוון שגוי: הפער בין המסלולים אינו
+   עניינה, וחשבת השכר מזינה ברוטו ועלות מעביד.
+
+   שרה רואה כאן את אחוזי המשרה שהיא קובעת. חשבת השכר רואה את ההזנה
+   ואת המסמכים. אף אחת לא רואה את הלשונית של השנייה — לא כדי להסתיר,
+   אלא כי שמירה שם הייתה נחסמת בשרת ממילא.
+═══════════════════════════════════════════════════════════════ */
+function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveScope,
+                       activeMonth, userRole, userId }) {
+  const isClerk = userRole === 'clerk';
   const canSetScope = userRole === 'coordinator';
-  const scopeTodo   = canSetScope ? teachers.filter(scopeMissing).length : 0;
-  const [tab, setTab]   = useState(scopeTodo ? 'scope' : 'sim');   // 'scope' | 'sim' | 'cost'
-  const costMissing = teachers.filter(t => simComplete(t) && !t._actualEmployerCost).length;
-  const [filterSchool, setFilterSchool] = useState('all');
-  const [inputs, setInputs] = useState({});    // teacherId → string
-  const [saved, setSaved]   = useState({});    // teacherId → true (just saved flash)
-  const [preInputs, setPreInputs] = useState({});   // סימולציית עולם ישן, לחישוב תוספת בית חב"ד
-  // Enter בשלב 1 החליף את המחשבון אבל השאיר את הסמן במקום, וההקלדה
-  // הבאה נדבקה לסוף המספר הראשון. autoFocus אינו עוזר — הוא פועל רק
-  // ברגע ההרכבה, והשדה השני כבר מורכב. לכן מעבירים את הסמן במפורש.
-  const step1Ref = useRef(null);
-  const step2Ref = useRef(null);
-  const [activeId, setActiveId] = useState(null);
+  const scopeTodo = canSetScope ? teachers.filter(scopeMissing).length : 0;
+  const [tab, setTab] = useState(isClerk ? 'entry' : (scopeTodo ? 'scope' : 'entry'));
 
-
-  // כל המורים שממתינים לסימולציה (שינוי נתונים, אין עדיין שכר רשמי)
-  const allMissing = teachers.filter(needsSim);
-  // רק מה שממתין החודש. קודם, כשלא נשאר דבר, המונה נפל על כל המורות
-  // והציג "0 / 5 הושלמו" רגע אחרי שהחשבת סיימה 5 / 5.
-  const total = teachers.filter(isPending).length;
-  const done  = teachers.filter(needsApproval).length;
-
-  // Schools that have at least one missing teacher
-  const missingSchoolIds = [...new Set(allMissing.map(t => t.schoolId))];
-
-  const filtered = filterSchool === 'all'
-    ? allMissing
-    : allMissing.filter(t => t.schoolId === filterSchool);
-
-  // Group by school
-  const grouped = schools
-    .filter(s => filterSchool === 'all' ? missingSchoolIds.includes(s.id) : s.id === filterSchool)
-    .map(s => ({ school: s, teachers: filtered.filter(t => t.schoolId === s.id) }))
-    .filter(g => g.teachers.length > 0);
-
-  // בחירת מורה בוחרת גם את המחשבון שמתאים למסלול שלה — ההגנה האמיתית
-  // מפני הזנת מספר שחושב במחשבון הלא נכון.
-  const selectTeacher = (t) => {
-    setActiveId(t.id);
-    setCalc(calcForTeacher(t));
-  };
-
-  // 8100.75 החזיר "invalid input syntax for type integer" גולמי מהמסד,
-  // ומינוס — check constraint. אגורות מתעגלות; מינוס נעצר בעברית.
-  const clean = v => (v === '' || v == null || isNaN(Number(v))) ? null : Math.round(Number(v));
-  const handleSave = (t) => {
-    const val = clean(inputs[t.id] ?? t._officialGross);
-    if (val === null) return;
-    if (val <= 0) return alert('השכר חייב להיות מספר חיובי');
-    const pre = clean(preInputs[t.id] ?? t._officialGrossPre);
-    if (pre !== null && pre <= 0) return alert('שכר העולם הישן חייב להיות מספר חיובי');
-    // מורת אופק לא נשמרת בלי שתי הסימולציות — הפער ביניהן הוא רכיב התשלום.
-    // מנהלת פטורה: לה יש סימולציית ניהול אחת שהיא הבסיס במלואו.
-    if (t.reform === 'ofek' && !isPrincipalRow(t) && pre === null) return;
-    onSaveGross(t.id, val, pre ?? undefined);
-    setSaved(prev => ({ ...prev, [t.id]: true }));
-    setTimeout(() => setSaved(prev => { const n={...prev}; delete n[t.id]; return n; }), 1500);
-    // advance to next in list
-    const flat = grouped.flatMap(g => g.teachers);
-    const idx  = flat.findIndex(x => x.id === t.id);
-    if (idx !== -1 && idx + 1 < flat.length) selectTeacher(flat[idx + 1]);
-  };
-
-  const pct = total ? Math.round(done / total * 100) : 100;
+  const rows = teachers.filter(t => !unpaidThisMonth(t));
+  const missingGross = rows.filter(t => !simComplete(t)).length;
+  const missingCost  = rows.filter(t => simComplete(t) && !t._actualEmployerCost).length;
 
   return (
-    <div className="sim-split">
-
-      {/* LEFT — simulator iframe */}
-      <div className="sim-calc">
-        <div style={{ background:'var(--apple-surface)', borderBottom:'1px solid var(--apple-fill2)', padding:'10px 16px', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-          <span style={{ fontSize:12, fontWeight:600, color:'var(--text3)', marginInlineEnd:4, display:'inline-flex', alignItems:'center', gap:5 }}>
-            <Calculator size={13} strokeWidth={2.2} />
-            מחשבון רשמי
-          </span>
-          <div className="apple-seg">
-            {CALCULATORS.map(o => (
-              <button key={o.id} onClick={() => setCalc(o.id)}
-                className={`apple-seg-item${calc === o.id ? ' active' : ''}`}>
-                {o.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <CalculatorFrame key={calc} calcId={calc} />
+    <div className="fade-in" style={{ maxWidth:1400, margin:'0 auto', padding:'18px 20px 40px' }} dir="rtl">
+      <div className="apple-seg" style={{ marginBottom:14, flexWrap:'wrap' }}>
+        {canSetScope && (
+          <button onClick={() => setTab('scope')} className={['apple-seg-item', tab === 'scope' ? 'active' : ''].join(' ')}
+            style={{ padding:'6px 13px', fontSize:13 }}>
+            <Percent size={12} strokeWidth={2.6} style={{ marginInlineEnd:4 }} />
+            אחוזי משרה{scopeTodo > 0 ? ` (${scopeTodo})` : ''}
+          </button>
+        )}
+        <button onClick={() => setTab('entry')} className={['apple-seg-item', tab === 'entry' ? 'active' : ''].join(' ')}
+          style={{ padding:'6px 13px', fontSize:13 }}>
+          הזנת שכר{missingGross > 0 ? ` (${missingGross})` : ''}
+        </button>
+        <button onClick={() => setTab('cost')} className={['apple-seg-item', tab === 'cost' ? 'active' : ''].join(' ')}
+          style={{ padding:'6px 13px', fontSize:13 }}>
+          עלות מעביד בפועל{missingCost > 0 ? ` (${missingCost})` : ''}
+        </button>
+        <button onClick={() => setTab('docs')} className={['apple-seg-item', tab === 'docs' ? 'active' : ''].join(' ')}
+          style={{ padding:'6px 13px', fontSize:13 }}>
+          תלושים ומסמכים
+        </button>
       </div>
 
-      {/* RIGHT — teacher list */}
-      <div className="sim-list">
+      {tab === 'scope' && canSetScope && <ScopePanel teachers={teachers} schools={schools} onSave={onSaveScope} />}
+      {tab === 'entry' && <PayrollEntry teachers={rows} schools={schools} onSave={onSavePayroll} />}
+      {tab === 'cost'  && <ActualCostPanel teachers={teachers} schools={schools} onSave={onSaveActual} />}
+      {tab === 'docs'  && (
+        <MonthDocuments monthKey={activeMonth} schools={schools} userRole={userRole} userId={userId} />
+      )}
+    </div>
+  );
+}
 
-        {/* Header */}
-        <div style={{ background:'var(--apple-surface)', borderBottom:'1px solid var(--apple-fill2)', padding:'14px 16px', display:'flex', flexDirection:'column', gap:10 }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div className="apple-seg">
-              {canSetScope && (
-                <button onClick={() => setTab('scope')} className={['apple-seg-item', tab === 'scope' ? 'active' : ''].join(' ')} style={{ padding:'5px 11px', fontSize:12.5 }}>
-                  <Percent size={12} strokeWidth={2.6} style={{ marginInlineEnd:4 }} />
-                  אחוזי משרה{scopeTodo > 0 ? ` (${scopeTodo})` : ''}
-                </button>
-              )}
-              <button onClick={() => setTab('sim')} className={['apple-seg-item', tab === 'sim' ? 'active' : ''].join(' ')} style={{ padding:'5px 11px', fontSize:12.5 }}>
-                הזנת שכר רשמי
-              </button>
-              <button onClick={() => setTab('cost')} className={['apple-seg-item', tab === 'cost' ? 'active' : ''].join(' ')} style={{ padding:'5px 11px', fontSize:12.5 }}>
-                עלות מעביד בפועל{costMissing > 0 ? ` (${costMissing})` : ''}
-              </button>
-            </div>
-            {tab === 'sim' && <span style={{ fontSize:12, color:'var(--apple-text2)' }}>{total ? `${done} / ${total} הושלמו` : 'אין ממתינות'}</span>}
-          </div>
-          {/* Progress bar */}
-          <div style={{ background:'var(--fill2)', borderRadius:999, height:6, overflow:'hidden' }}>
-            <div style={{ width: pct+'%', background:'linear-gradient(to left, var(--purple), var(--teal))', borderRadius:999, height:6, transition:'width .45s var(--ease-out)' }} />
-          </div>
-          {tab === 'sim' && (
-            <select className="apple-select" style={{ fontSize:13 }}
-              value={filterSchool} onChange={e => setFilterSchool(e.target.value)}>
-              <option value="all">כל בתי הספר ({allMissing.length} ממתינים)</option>
-              {schools.filter(s => missingSchoolIds.includes(s.id)).map(s => (
-                <option key={s.id} value={s.id}>{s.name} ({allMissing.filter(t => t.schoolId === s.id).length})</option>
-              ))}
-            </select>
-          )}
-        </div>
+/* ── הזנת הברוטו ותוספת בית חב"ד ────────────────────────────────
+   שתי עמודות בלבד, ולצידן מה שהמערכת יודעת: אחוז המשרה שנקבע והאומדן
+   שלנו לעלות המעביד. האומדן מוצג כדי שיהיה במה להשוות, לא כדי להחליף.
+*/
+function PayrollEntry({ teachers, schools, onSave }) {
+  const [vals,  setVals]  = useState({});
+  const [flash, setFlash] = useState({});
+  const [busy,  setBusy]  = useState(null);
+  const [err,   setErr]   = useState('');
+  const [onlyMissing, setOnlyMissing] = useState(true);
 
-        {/* Teacher rows */}
-        <div style={{ flex:1, overflowY:'auto', padding:'12px 12px', display:'flex', flexDirection:'column', gap:16 }}>
-          {tab === 'scope' && canSetScope && <ScopePanel teachers={teachers} schools={schools} onSave={onSaveScope} />}
-          {tab === 'cost' && <ActualCostPanel teachers={teachers} schools={schools} onSave={onSaveActual} />}
-          {/* המסמכים הם של הנהלת החשבונות, כמו העלות בפועל. בלשונית
-              הסימולציה הם רק גזלו גובה מרשימת העובדות. */}
-          {tab === 'cost' && (
-            <MonthDocuments monthKey={activeMonth} schools={schools} userRole={userRole} userId={userId} />
-          )}
-          {tab === 'sim' && grouped.length === 0 && (
-            <div style={{ textAlign:'center', padding:'48px 16px' }}>
-              <div style={{ width:56, height:56, borderRadius:17, background:'var(--ok-bg)', margin:'0 auto 14px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                <Check size={26} strokeWidth={2.4} color="var(--ok)" />
-              </div>
-              <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>כל עובדי ההוראה הוזנו</p>
-              <p style={{ fontSize:13, color:'var(--text3)', marginTop:3 }}>אין שכר שממתין לסימולציה</p>
-            </div>
-          )}
-          {tab === 'sim' && grouped.map(({ school, teachers: gTeachers }) => (
-            <div key={school.id}>
-              <div style={{ fontSize:12, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
-                <School size={13} strokeWidth={2.2} />
-                {school.name}
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {gTeachers.map(t => {
-                  const est = calcGross(t);
-                  const isActive = activeId === t.id;
-                  const wasSaved = saved[t.id];
-                  const isOfek   = t.reform === 'ofek';
-                  const dh       = deriveHours(t);   // פרונטלי/פרטני/שהייה — אופק בלבד
-                  // רק מורת אופק שאינה מנהלת דורשת שתי סימולציות
-                  const needsTwo = isOfek && !isPrincipalRow(t) && schoolPaysSupp(t.schoolId);
-                  const preVal   = preInputs[t.id] ?? (t._officialGrossPre || '');
-                  const mainVal  = inputs[t.id] ?? (t._officialGross || '');
-                  // שלב 2 הוא המחשבון של המורה — למנהלת בית ספר זה אופק ניהול
-                  const step2Calc  = calcForTeacher(t);
-                  const step2Label = (CALCULATORS.find(c => c.id === step2Calc) || CALCULATORS[0]).label;
-                  // בכרטיס פעיל הלחיצה אינה בוחרת מחדש: focus על שדה "עולם
-                  // ישן" מגיע לפני click, ו-selectTeacher היה דורס אותו ומחזיר
-                  // את המחשבון לאופק — בדיוק השדה שזקוק למחשבון האחר היה
-                  // היחיד שאי אפשר להגיע אליו בעכבר.
-                  return (
-                    <div key={t.id} onClick={() => { if (activeId !== t.id) selectTeacher(t); }}
-                      className="apple-card"
-                      style={{ padding:'12px 14px', cursor:'pointer', borderRight: isActive ? '3px solid var(--apple-blue)' : '3px solid transparent', boxShadow: isActive ? '0 4px 20px rgba(0,122,255,0.12)' : '' }}>
-                      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8, marginBottom: isActive ? 10 : 0 }}>
-                        <div>
-                          <p style={{ fontWeight:600, fontSize:14, color:'var(--apple-text)', marginBottom:2 }}>{t.name}</p>
-                          <p style={{ fontSize:12, color:'var(--apple-text2)' }}>
-                            {/* המחשבון של אופק שואל גם דרגת השכלה וגם דרגה
-                                באופק, והדרגה שם אפילו נעולה עד שנבחר תואר.
-                                קודם הוצגה למורת אופק הדרגה בלבד. */}
-                            {isPrincipalRow(t) ? 'ניהול' : reformLabel(t.reform)} · {DEGREE_LABELS[t.degree] || t.degree}
-                            {isPrincipalRow(t)
-                              ? (nihulLabel(t.nihulGrade) ? ` · דרגת ניהול ${nihulLabel(t.nihulGrade)}` : ' · חסרה דרגת ניהול')
-                              : t.reform === 'ofek' ? ` · דרגה ${t.grade}` : ''} · {t.seniority} שנות ותק
-                            {(t.childrenUnder18 || 0) > 0 && (
-                              <span style={{ color:'var(--purple)', fontWeight:600 }}>
-                                {` · ${t.childrenUnder18} ילדים עד 18`}
-                                {momBonusEligible(t) ? ` · תוספת אם — כבר בתוך האחוז` : ''}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                        <div style={{ textAlign:'left', flexShrink:0 }}>
-                          <p style={{ fontSize:11, color:'var(--apple-text3)', marginBottom:1 }}>הערכה</p>
-                          {/* למנהלת אין אומדן פנימי: אין בידינו את סולם הניהול,
-                              והמספר מגיע מהמחשבון הניהולי בלבד. */}
-                          <p style={{ fontSize:13, fontWeight:600, fontFamily:'monospace', color:'var(--apple-text2)' }}>
-                            {awaitingSim(t) ? 'לפי המחשבון' : `${est.toLocaleString()} ₪`}
-                          </p>
-                        </div>
-                      </div>
-                      {isActive && (
-                        <>
-                        {/* מה שהמחשבון הרשמי שואל. בלי זה אין לחשבת מסך אחר
-                            לפתוח — אין לה גישה לכרטיס המורה ולא לבית הספר. */}
-                        <div style={{
-                          display:'flex', flexWrap:'wrap', gap:'5px 7px', marginBottom:10, paddingBottom:10,
-                          borderBottom:'1px solid var(--line-soft, #EDE8F8)',
-                        }}>
-                          {[
-                            // לעולם ישן: האפקטיבי, כולל תוספת אם — זה מה
-                            // שמוקלד למחשבון בשדה אחוז המשרה.
-                            ['% משרה',   isOfek
-                              ? `${dh?.scopePct ?? t.scopePct ?? 100}%`
-                              : `${effectiveScope(t)}%${momBonusEligible(t) ? ' (כולל תוספת אם)' : ''}`],
-                            // מחנכת בעולם ישן משולמת על שלוש שעות מעל מה
-                            // שהיא מלמדת. בלי לומר זאת, המספר במחשבון אינו
-                            // מסתדר עם מה שהמנהלת הזינה.
-                            ['פרונטלי',  homeroomHours(t)
-                              ? `${t.frontalHours ?? 0} ש' + ${homeroomHours(t)} למחנכת`
-                              : `${dh?.frontal ?? t.frontalHours ?? 0} ש'`],
-                            // פרטני ושהייה נגזרים מהשלב, מקבוצת הגיל ומאחוז
-                            // המשרה — המחשבון של אופק שואל את שניהם.
-                            ['פרטני',    dh ? `${dh.individual} ש'` : null],
-                            ['שהייה',    dh ? `${dh.presence} ש'`   : null],
-                            ['שלב',      LEVELS[t.level]?.label],
-                            ['גיל',      t.ageGroup && t.ageGroup !== 'none' ? AGE_RED[t.ageGroup]?.label : null],
-                            ['גמול',     t.role && t.role !== 'none' ? ROLES.find(r => r.id === t.role)?.label.split('(')[0].trim() : null],
-                            // מחשבון הניהול שואל דרגת ניהול ורמת מורכבות —
-                            // שני שדות שאין להם מקבילה אצל מורה.
-                            ['דרגת ניהול', isPrincipalRow(t) ? (nihulLabel(t.nihulGrade) || 'חסרה') : null],
-                            ['מורכבות',    isPrincipalRow(t) ? String(school.murkavut ?? 1) : null],
+  const shown = teachers.filter(t => !onlyMissing || !simComplete(t));
+  const bySchool = schools
+    .map(sc => ({ school: sc, list: shown.filter(t => t.schoolId === sc.id) }))
+    .filter(g => g.list.length);
 
-                            // מחנכת בעולם ישן: המחשבון מטפל בגמול דרך השדה
-                            // "כיתת חינוך (תוספת חינוך)", בשווי 3 שעות.
-                            // שני דברים נפרדים שמצטברים: שלוש השעות שנכנסות
-                            // לאחוז המשרה, וגמול החינוך שנקבע בטופס עצמו —
-                            // במקטע "חינוך כיתה", שמקופל בברירת מחדל ומי
-                            // שאינו יודע שהוא שם אינו פותח אותו.
-                            ['גמול חינוך', t.reform === 'pre' && /^homeroom/.test(t.role || '')
-                              ? `${ROLES.find(r => r.id === t.role)?.pct}% — לפתוח "חינוך כיתה" בטופס ולסמן כיתה`
-                              : null],
-                            // תוספת אם אינה קיימת במחשבון. היא מתווספת
-                            // אצלנו על התוצאה, ואין מה להקליד עבורה.
-                            ['תוספת אם', momBonusEligible(t)
-                              ? `+${MOM_SCOPE_BONUS} נק׳ למשרה — כבר בתוך ה-% למעלה`
-                              : null],
-                            ['סטטוס',    onLeave(t) ? leaveText(t) : null],
-                          ].filter(([, v]) => v).map(([k, v]) => {
-                          // אחוז המשרה הוא המספר הראשון שנכנס למחשבון. כשהוא
-                          // עדיין ברירת המחדל — 100 שאיש לא בחר — הסימולציה
-                          // תרוץ עליו ותצא שגויה. הצ׳יפ אומר זאת במקום שבו
-                          // מקלידים, ולא במסך אחר שאין לחשבת גישה אליו.
-                          const notSet = k === '% משרה' && !scopeConfirmed(t) && !isPrincipalRow(t);
-                          return (
-                            <span key={k} title={notSet ? 'אחוז המשרה עדיין ברירת המחדל. השליח קובעת אותו — כדאי להמתין לפני שמריצים.' : undefined}
-                              style={{
-                                fontSize:11, padding:'3px 8px', borderRadius:999,
-                                background: notSet ? 'var(--warn-bg)' : 'var(--fill2, #F0EDF8)',
-                                color: notSet ? 'var(--warn)' : 'var(--text2, #4A3F6B)',
-                                border: notSet ? '1px solid var(--warn)' : undefined,
-                                whiteSpace:'nowrap',
-                              }}>
-                              <span style={{ opacity:.65 }}>{k} </span>
-                              <b style={{ fontWeight:700 }}>{notSet ? `${v} · טרם נקבע` : v}</b>
-                            </span>
-                          );
-                          })}
-                          {/* ילדים עד 18 פותחים תוספת אם, והיא משנה את אחוז
-                              המשרה שמוקלד למחשבון. צריך לדעת אותם לפני
-                              החישוב, ולכן השדה כאן ולא רק בכרטיס העובדת. */}
-                          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:11,
-                            padding:'2px 8px', borderRadius:999, background:'var(--purple-100, #EDE8F8)',
-                            color:'var(--purple, #4B2E83)', whiteSpace:'nowrap' }}
-                            onClick={e => e.stopPropagation()}>
-                            <span style={{ opacity:.75 }}>ילדים עד 18</span>
-                            <input type="number" min="0" max="20" dir="ltr"
-                              defaultValue={t.childrenUnder18 ?? 0}
-                              onClick={e => e.stopPropagation()}
-                              onBlur={e => {
-                                const n = Math.max(0, Number(e.target.value) || 0);
-                                if (n !== (t.childrenUnder18 ?? 0)) onSaveKids?.(t.id, n);
-                              }}
-                              style={{ width:38, textAlign:'center', fontWeight:700, fontSize:11.5,
-                                border:'1px solid var(--purple, #4B2E83)', borderRadius:6, padding:'1px 3px',
-                                background:'#fff', color:'inherit', fontFamily:'inherit' }} />
-                            {momBonusEligible(t) && <b style={{ fontWeight:700 }}>+{MOM_SCOPE_BONUS} למשרה</b>}
-                          </span>
-                        </div>
-                        {needsTwo ? (
-                          <>
-                            {/* שלב 1 — העולם הישן. זה מה שרץ במערכת התשלומים. */}
-                            <SimStep
-                              n={1} label="עולם ישן — בסיס" calcLabel="מחשבון העולם הישן"
-                              active={calc === 'old'} onFocus={() => setCalc('old')}
-                              value={preVal}
-                              onChange={v => setPreInputs(prev => ({ ...prev, [t.id]: v }))}
-                              onEnter={() => { setCalc(step2Calc); step2Ref.current?.focus(); step2Ref.current?.select(); }}
-                              autoFocus={!preVal}
-                              inputRef={step1Ref}
-                            />
-                            {/* שלב 2 — האופק. הפער בין השניים הוא רכיב התוספת. */}
-                            <SimStep
-                              n={2} label={step2Label} calcLabel={`מחשבון ${step2Label}`}
-                              active={calc === step2Calc} onFocus={() => setCalc(step2Calc)}
-                              value={mainVal}
-                              onChange={v => setInputs(prev => ({ ...prev, [t.id]: v }))}
-                              onEnter={() => handleSave(t)}
-                              autoFocus={!!preVal && !mainVal}
-                              inputRef={step2Ref}
-                            />
-                          </>
-                        ) : (
-                          <div style={{ marginBottom:8 }}>
-                            <p className="apple-label" style={{ marginBottom:4 }}>שכר משולב — מחשבון {step2Label}</p>
-                            <input type="number" className="apple-input" dir="ltr" autoFocus
-                              placeholder={`שכר משולב ממחשבון ${step2Label}`}
-                              value={mainVal}
-                              onChange={e => setInputs(prev => ({ ...prev, [t.id]: e.target.value }))}
-                              onKeyDown={e => e.key === 'Enter' && handleSave(t)}
-                              style={{ fontSize:14 }} />
-                          </div>
-                        )}
+  const save = async (t, patch) => {
+    setBusy(t.id); setErr('');
+    try {
+      const ok = await onSave(t.id, patch);
+      if (ok !== false) {
+        setVals(v => { const x = { ...v }; delete x[`${t.id}|gross`]; delete x[`${t.id}|supp`]; return x; });
+        setFlash(f => ({ ...f, [t.id]: true }));
+        setTimeout(() => setFlash(f => { const x = { ...f }; delete x[t.id]; return x; }), 1500);
+      }
+    } catch (e) { setErr(e.message); }
+    finally { setBusy(null); }
+  };
 
-                        {/* הפער מתעדכן חי מול מה שהוקלד */}
-                        {needsTwo && preVal && mainVal && (
-                          <div style={{ background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:10, padding:'8px 11px', marginBottom:8, fontSize:12.5 }}>
-                            <div style={{ display:'flex', justifyContent:'space-between', color:'var(--text2)' }}>
-                              <span>תוספת בית חב"ד</span>
-                              <span className="num" style={{ fontWeight:800, color:'var(--purple)' }}>
-                                {Math.max(0, Number(mainVal) - Number(preVal)).toLocaleString('he-IL')} ₪
-                              </span>
-                            </div>
-                            {Number(mainVal) < Number(preVal) && (
-                              <p style={{ fontSize:11, color:'var(--warn)', marginTop:4 }}>
-                                האופק נמוך מהעולם הישן — התוספת 0, והעובדת נשארת עם שכר העולם הישן.
-                              </p>
-                            )}
-                          </div>
-                        )}
+  const num = v => (String(v).trim() === '' ? null : Math.round(Number(v)));
 
-                        <button className="apple-btn" onClick={() => handleSave(t)}
-                          disabled={!mainVal || (needsTwo && !preVal)}
-                          title={needsTwo && !preVal ? 'נדרשות שתי הסימולציות' : undefined}
-                          style={{
-                            width:'100%', fontSize:13.5, minHeight:38,
-                            background: wasSaved ? 'var(--ok)' : (mainVal && (!needsTwo || preVal)) ? 'var(--purple)' : 'var(--fill2)',
-                            color: (wasSaved || (mainVal && (!needsTwo || preVal))) ? '#fff' : 'var(--text3)',
-                          }}>
-                          {wasSaved ? <Check size={15} strokeWidth={2.8} /> : 'שמור'}
-                        </button>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+  if (!teachers.length) return (
+    <p style={{ fontSize:13, color:'var(--text3)', textAlign:'center', padding:'48px 16px' }}>
+      אין עובדות בחודש הזה
+    </p>
+  );
 
-        <div style={{ borderTop:'1px solid var(--apple-fill2)', background:'var(--apple-surface)', padding:'10px 16px' }}>
-          <p style={{ fontSize:12, color:'var(--text3)', textAlign:'center', lineHeight:1.6 }}>
-            למורת אופק: קודם עולם ישן, אחריו אופק · Enter עובר לשלב הבא ומהשלב האחרון שומר
-          </p>
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
+        <p style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6, flex:'1 1 240px' }}>
+          הברוטו שאת מזינה הוא מה שרץ בתשלומים. תוספת בית חב"ד היא החלק שאינו
+          פנסיוני ואינו נושא קרן השתלמות — הוא נושא מס שכר וביטוח לאומי בלבד.
+        </p>
+        <div className="apple-seg" style={{ flexShrink:0 }}>
+          <button onClick={() => setOnlyMissing(true)} className={['apple-seg-item', onlyMissing ? 'active' : ''].join(' ')}
+            style={{ padding:'5px 11px', fontSize:12 }}>ממתינות</button>
+          <button onClick={() => setOnlyMissing(false)} className={['apple-seg-item', !onlyMissing ? 'active' : ''].join(' ')}
+            style={{ padding:'5px 11px', fontSize:12 }}>כל העובדות</button>
         </div>
       </div>
+      {err && <p style={{ fontSize:12.5, color:'var(--danger)' }}>{err}</p>}
+
+      {bySchool.length === 0 && (
+        <div style={{ textAlign:'center', padding:'48px 16px' }}>
+          <div style={{ width:56, height:56, borderRadius:17, background:'var(--ok-bg)', margin:'0 auto 14px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <Check size={26} strokeWidth={2.4} color="var(--ok)" />
+          </div>
+          <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>כל הברוטו הוזן</p>
+        </div>
+      )}
+
+      {bySchool.map(({ school, list }) => (
+        <div key={school.id}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
+            <School size={13} strokeWidth={2.2} />
+            {school.name}
+            {school.chabadSupp === false && <span style={{ fontWeight:400 }}> · בלי תוספת בית חב"ד</span>}
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {list.map(t => {
+              const emp = calcEmployer(t);
+              const gCur = vals[`${t.id}|gross`] ?? (t._officialGross ?? '');
+              const sCur = vals[`${t.id}|supp`]  ?? (t._chabadSupp ?? '');
+              const noSupp = school.chabadSupp === false || isPrincipalRow(t);
+              return (
+                <div key={t.id} className="apple-card" style={{ padding:'10px 12px' }}>
+                  <p style={{ fontSize:13.5, fontWeight:600, color:'var(--text)' }}>
+                    {t.name}
+                    <span style={{ fontWeight:400, fontSize:11.5, color:'var(--text3)' }}>
+                      {` · ${reformLabel(t.reform)} · ${DEGREE_LABELS[t.degree] || t.degree || '—'}`}
+                      {` · ותק ${t.seniority ?? 1} · ${effectiveScope(t)}% משרה`}
+                      {t.role && t.role !== 'none' ? ` · ${ROLE_SHORT[t.role] || t.role}` : ''}
+                    </span>
+                    {flash[t.id] && <span style={{ marginInlineStart:6, fontSize:11.5, color:'var(--ok)', fontWeight:700 }}>✓ נשמר</span>}
+                  </p>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:6 }}>
+                    <label style={{ fontSize:11.5, color:'var(--text3)' }}>
+                      ברוטו
+                      <input type="number" min="0" dir="ltr" className="apple-input"
+                        value={gCur}
+                        onChange={e => setVals(v => ({ ...v, [`${t.id}|gross`]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                        onBlur={e => { const n = num(e.target.value); if (n !== (t._officialGross ?? null)) save(t, { gross: n }); }}
+                        style={{ width:104, minHeight:36, textAlign:'center', fontWeight:700, marginInlineStart:6 }} />
+                    </label>
+                    {!noSupp && (
+                      <label style={{ fontSize:11.5, color:'var(--text3)' }}>
+                        תוספת בית חב"ד
+                        <input type="number" min="0" dir="ltr" className="apple-input"
+                          value={sCur}
+                          onChange={e => setVals(v => ({ ...v, [`${t.id}|supp`]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                          onBlur={e => { const n = num(e.target.value); if (n !== (t._chabadSupp ?? null)) save(t, { chabadSupp: n }); }}
+                          style={{ width:96, minHeight:36, textAlign:'center', fontWeight:700, marginInlineStart:6,
+                                   background:'var(--purple-100)' }} />
+                      </label>
+                    )}
+                    {simComplete(t) && (
+                      <span style={{ fontSize:11.5, color:'var(--text3)' }}>
+                        {`עלות מעביד לפי הנוסחה: ${emp.estimate.toLocaleString('he-IL')} ₪ (${emp.pct}%)`}
+                        {` · סה״כ ${emp.total.toLocaleString('he-IL')} ₪`}
+                      </span>
+                    )}
+                    {busy === t.id && <span style={{ fontSize:11.5, color:'var(--text3)' }}>שומר…</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -5941,20 +5523,17 @@ export default function App() {
 
       <div className="flex-1">
         {isClerk ? (
-          <SimulatorView
+          <PayrollDesk
             teachers={teachers}
             schools={schools}
             activeMonth={activeMonth}
             userRole={user.role}
             userId={user.id}
-            onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
+            onSavePayroll={(id, patch) => run(() => store.savePayroll(id, patch))}
             onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
-            onSaveKids={(id, n) => run(() => store.saveTeacher({ id, childrenUnder18: n }, activeMonth))}
             onSaveScope={(id, which, val) => run(() => store.saveTeacher(
               which === 'gender' ? { id, gender: val }
-                : which === 'pre'
-                  ? { id, scopePctPre: val, scopePreSetAt: new Date().toISOString() }
-                  : { id, scopePct: val, scopeSetAt: new Date().toISOString() }, activeMonth))}
+                : { id, scopePct: val, scopeSetAt: new Date().toISOString() }, activeMonth))}
           />
         ) : /* Principal: see only their school */
         !isCoord && principalSchool ? (
@@ -5971,20 +5550,17 @@ export default function App() {
             fmtMonthFn={fmtMonth}
           />
         ) : view === 'calc' ? (
-          <SimulatorView
+          <PayrollDesk
             teachers={teachers}
             schools={schools}
             activeMonth={activeMonth}
             userRole={user.role}
             userId={user.id}
-            onSaveGross={(id, gross, grossPre) => run(() => store.saveSimulation(id, gross, grossPre))}
+            onSavePayroll={(id, patch) => run(() => store.savePayroll(id, patch))}
             onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
-            onSaveKids={(id, n) => run(() => store.saveTeacher({ id, childrenUnder18: n }, activeMonth))}
             onSaveScope={(id, which, val) => run(() => store.saveTeacher(
               which === 'gender' ? { id, gender: val }
-                : which === 'pre'
-                  ? { id, scopePctPre: val, scopePreSetAt: new Date().toISOString() }
-                  : { id, scopePct: val, scopeSetAt: new Date().toISOString() }, activeMonth))}
+                : { id, scopePct: val, scopeSetAt: new Date().toISOString() }, activeMonth))}
           />
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} />

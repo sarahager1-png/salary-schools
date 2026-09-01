@@ -41,7 +41,9 @@ try {
   await admin.from('teacher_months').insert({
     month_key: MONTH, school_id: sc.id, name: 'מורת עלות', reform: 'ofek',
     frontal_hours: 26, scope_pct: 100, seniority: 8, grade: 5, degree: 'BA', level: 'elementary',
-    official_gross_pre: 11200, official_gross: 12500, changed_at: new Date().toISOString(),
+    // הברוטו וזה שממנו תוספת בית חב"ד — מה שחשבת השכר מזינה. עד 1.9 היו
+    // כאן שתי סימולציות והתוספת הייתה הפער; מעכשיו היא מספר.
+    official_gross: 12500, chabad_supp: 1300, changed_at: new Date().toISOString(),
   });
 
   await p.goto('http://localhost:5190/');

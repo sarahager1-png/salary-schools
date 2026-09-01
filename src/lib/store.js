@@ -50,6 +50,11 @@ const TEACHER_FIELDS = [
   ['agreed_gross',         '_agreedGross'],
   ['actual_employer_cost', '_actualEmployerCost'],
   ['min_wage_supp',        '_minWageSupp'],
+  ['chabad_supp',          '_chabadSupp'],
+  ['gross_set_at',         '_grossSetAt'],
+  ['reported_at',          '_reportedAt'],
+  ['late_report',          '_lateReport'],
+  ['payroll_ready',        '_payrollReady'],
   ['changed_at',           '_changedAt'],
   ['snapshot',             '_snapshot'],
   ['approved',             '_approved'],
@@ -324,23 +329,33 @@ export async function deleteTeacher(id) {
   raise(error, 'מחיקת המורה נכשלה');
 }
 
-// חשבת שכר. approved_at/by נחתמים בשרת, לא נשלחים מכאן.
-export async function saveSimulation(id, gross, grossPre) {
-  const patch = { official_gross: gross };
-  if (grossPre !== undefined) patch.official_gross_pre = grossPre;
+/*
+  חשבת השכר מזינה: ברוטו, תוספת בית חב"ד, ועלות מעביד בפועל.
+
+  קודם זו הייתה "שמירת סימולציה" ושתי עמודות ברוטו. הסימולטור ירד, והמספר
+  מגיע ממנה. gross_set_at נחתם כאן כדי שיהיה אפשר להבדיל בין מספר שהיא
+  הזינה לשריד מהתקופה הקודמת. approved_at/by נחתמים בשרת.
+
+  הטריגר בשרת מתיר לחשבת בדיוק את העמודות האלה ותו לא — אחוז המשרה,
+  למשל, נשאר של שרה.
+*/
+export async function savePayroll(id, { gross, chabadSupp, actualCost } = {}) {
+  const patch = {};
+  if (gross !== undefined) {
+    patch.official_gross = gross ?? null;
+    patch.gross_set_at = gross == null ? null : new Date().toISOString();
+  }
+  if (chabadSupp !== undefined) patch.chabad_supp = chabadSupp ?? null;
+  if (actualCost !== undefined) patch.actual_employer_cost = actualCost ?? null;
+  if (!Object.keys(patch).length) return null;
   const { data, error } = await supabase.from('teacher_months').update(patch).eq('id', id).select().single();
-  raise(error, 'שמירת הסימולציה נכשלה');
+  raise(error, 'השמירה נכשלה');
   return rowToTeacher(data);
 }
 
-// עלות המעביד בפועל, מהנהלת החשבונות. null מחזיר את השורה לאומדן.
-// חשבת השכר רשאית לכתוב בדיוק את העמודה הזו — הטריגר בשרת מתיר לה
-// official_gross, official_gross_pre ו-actual_employer_cost בלבד.
+// עלות המעביד בפועל בלבד. null מחזיר את השורה לאומדן.
 export async function saveActualCost(id, amount) {
-  const { data, error } = await supabase.from('teacher_months')
-    .update({ actual_employer_cost: amount ?? null }).eq('id', id).select().single();
-  raise(error, 'שמירת עלות המעביד נכשלה');
-  return rowToTeacher(data);
+  return savePayroll(id, { actualCost: amount ?? null });
 }
 
 export async function approve(ids) {

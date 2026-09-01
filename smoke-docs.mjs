@@ -81,6 +81,8 @@ try {
 
   // ── 1. אסתר מעלה קובץ ──
   await login(U.clerk);
+  // המסמכים עברו ללשונית משלהם בשולחן השכר, אחרי שמסך הסימולציה ירד
+  await p.getByRole('button', { name: /תלושים ומסמכים/ }).click();
   await p.getByText('מסמכים מהנהלת החשבונות').first().waitFor({ timeout: 15000 });
   check('לחשבת השכר יש פאנל מסמכים לחודש', true);
   const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n');

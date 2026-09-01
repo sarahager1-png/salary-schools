@@ -73,12 +73,12 @@ try {
   };
   await mk(U.coord, 'שליח עלות', 'coordinator');
   await mk(U.clerk, 'חשבת עלות', 'clerk');
-  // מורה עם סימולציה מלאה (11,200 / 12,500 → אומדן 5,091), ומורה בלי
+  // מורה עם ברוטו ותוספת (12,500 ומתוכם 1,300 תוספת → אומדן 5,091), ומורה בלי
   const ins = async (row) => (await admin.from('teacher_months').insert({
     month_key: MONTH, school_id: sc.id, reform: 'ofek', level: 'elementary', degree: 'BA', grade: '5',
     seniority: 8, frontal_hours: 26, scope_pct: 100, changed_at: new Date().toISOString(), ...row,
   }).select().single()).data;
-  const done    = await ins({ name: 'עלות מורה מוכנה', official_gross: 12500, official_gross_pre: 11200 });
+  const done    = await ins({ name: 'עלות מורה מוכנה', official_gross: 12500, chabad_supp: 1300 });
   const pending = await ins({ name: 'עלות מורה ממתינה' });
 
   // ── 1. הלשונית ──

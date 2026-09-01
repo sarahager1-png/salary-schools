@@ -12,7 +12,7 @@ import { ENV_FILE, URL } from './test-env.mjs';
 const OBSOLETE = new Set([
   'smoke.mjs', 'smoke-export.mjs', 'smoke-fields.mjs',
   'smoke-payroll.mjs', 'smoke-principal.mjs', 'smoke-principal-row.mjs',
-  'smoke-seed.mjs', 'smoke-simulator.mjs',
+  'smoke-seed.mjs',
 ]);
 const all = fs.readdirSync('.')
   .filter(f => /^smoke.*\.mjs$/.test(f) && !OBSOLETE.has(f)).sort();
