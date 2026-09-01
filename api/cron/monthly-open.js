@@ -5,7 +5,7 @@
   אם לא משתנה, ככה זה" (שרה, 27.8). רק שורה שתשתנה תחזור לאישור, דרך
   מעקב השינויים. מועדי הדיווח נקבעים כאן: ה-5 וה-6.
 */
-import { db, guard, monthKeyNow, monthOf } from '../_lib/db.js';
+import { db, guard, monthKeyNow, monthOf, cycleStarted } from '../_lib/db.js';
 
 export default async function handler(req, res) {
   const bad = guard(req);
@@ -13,6 +13,9 @@ export default async function handler(req, res) {
 
   const sb = db();
   const key = monthOf(req);
+  if (!cycleStarted(key)) {
+    return res.status(200).json({ ok: true, month: key, skipped: 'המחזור עוד לא התחיל בחודש הזה' });
+  }
   // החודש שלפניו — נגזר מהמפתח עצמו, כדי שגם הרצה על חודש אחר תעתיק
   // מהמקום הנכון ולא מהחודש הקלנדרי הקודם.
   const [py, pm] = key.split('-').map(Number);

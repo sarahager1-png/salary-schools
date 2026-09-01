@@ -7,7 +7,7 @@
 
   בסוף היום שרה מקבלת הודעה אחת עם מה שקפץ לבדיקה.
 */
-import { db, guard, monthKeyNow, monthOf } from '../_lib/db.js';
+import { db, guard, monthKeyNow, monthOf, cycleStarted } from '../_lib/db.js';
 
 const KIND = 'report_due_summary';
 
@@ -17,6 +17,9 @@ export default async function handler(req, res) {
 
   const sb = db();
   const key = monthOf(req);
+  if (!cycleStarted(key)) {
+    return res.status(200).json({ ok: true, month: key, skipped: 'המחזור עוד לא התחיל בחודש הזה' });
+  }
   const { data: month } = await sb.from('months').select('key').eq('key', key).maybeSingle();
   if (!month) return res.status(200).json({ ok: true, note: 'החודש טרם נפתח' });
 

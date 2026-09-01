@@ -8,7 +8,7 @@
 
   אין מחיקה ואין ביטול. השורה ממתינה לחודש הבא או להכרעה ידנית.
 */
-import { db, guard, monthKeyNow, monthOf } from '../_lib/db.js';
+import { db, guard, monthKeyNow, monthOf, cycleStarted } from '../_lib/db.js';
 
 const KIND = 'payroll_cutoff';
 
@@ -18,6 +18,9 @@ export default async function handler(req, res) {
 
   const sb = db();
   const key = monthOf(req);
+  if (!cycleStarted(key)) {
+    return res.status(200).json({ ok: true, month: key, skipped: 'המחזור עוד לא התחיל בחודש הזה' });
+  }
 
   const { data: rows } = await sb.from('teacher_months')
     .select('id, name, tz_id, official_gross, agreed_gross, approved, payroll_ready, leave_type, schools!inner(name)')

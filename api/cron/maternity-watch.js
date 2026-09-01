@@ -5,7 +5,7 @@
   חופשת לידה אינה ממתינה למועד דיווח, והשכר, המחליפה וההפרשות תלויים
   בה. מדווחת רק על מה שנוסף מאז הריצה הקודמת.
 */
-import { db, guard, monthKeyNow, monthOf } from '../_lib/db.js';
+import { db, guard, monthKeyNow, monthOf, cycleStarted } from '../_lib/db.js';
 
 const KIND = 'maternity_alert';
 
@@ -15,6 +15,9 @@ export default async function handler(req, res) {
 
   const sb = db();
   const key = monthOf(req);
+  if (!cycleStarted(key)) {
+    return res.status(200).json({ ok: true, month: key, skipped: 'המחזור עוד לא התחיל בחודש הזה' });
+  }
   const { data: rows } = await sb.from('teacher_months')
     .select('id, name, leave_from, leave_to, mm_for, schools!inner(name)')
     .eq('month_key', key)

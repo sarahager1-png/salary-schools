@@ -39,3 +39,18 @@ export function monthOf(req) {
   const q = new URL(req.url, 'http://x').searchParams.get('month');
   return /^\d{4}-\d{2}$/.test(q || '') ? q : monthKeyNow();
 }
+
+/*
+  מתי המחזור מתחיל לפעול.
+
+  ספטמבר 2026 אינו חודש רגיל במערכת: בו משולם שכר אוגוסט, והמעבר
+  למחזור המתוזמן נקבע לאוקטובר (הוראת שרה, 1.9). בלי השער הזה
+  התזכורות היו יוצאות למנהלות בעוד יומיים, על חודש שלא נועד להן.
+
+  CYCLE_START_MONTH ריק = הכול פעיל. זו ברירת המחדל אחרי שהמעבר יושלם.
+*/
+export function cycleStarted(monthKey) {
+  const from = String(process.env.CYCLE_START_MONTH || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(from)) return true;
+  return monthKey >= from;
+}
