@@ -4988,9 +4988,166 @@ function LinkCard({ teacher, locked, onSave }) {
 }
 
 /* ═══ קליטת עובדת הוראה — קישור אישי ═══ */
+// שנת המס של הטופס. הטופס הרשמי נושא שנה, ומי שממלאת אותו בינואר
+// ממלאת על השנה החדשה — לכן הוא נגזר ולא מוקלד.
+const TAX_YEAR = new Date().getFullYear();
 const OB_DEADLINE = 'יום ראשון, 6.9.2026';
 
 // חתימה מצוירת באצבע או בעכבר
+/* ═══════════════════════════════════════════════════════════════
+   טופס 101 להדפסה — במבנה הרשמי
+
+   מה שהמורה מילאה על המסך, מסודר כפי שהטופס הרשמי מסודר, עם החתימה
+   שלה מוטבעת. זה המסמך שנשמר בתיק ומוצג בביקורת ניכויים.
+
+   שדה שלא מולא נשאר ריק ומסומן בקו — לא ממציאים ולא משלימים. טופס
+   שמופיע בו נתון שאיש לא מסר גרוע מטופס חסר.
+
+   מספר תיק הניכויים של הרשת אינו במערכת, ולכן הוא מוצג כשדה ריק
+   למילוי ידני. ניחוש שלו היה הופך את המסמך לשקר.
+═══════════════════════════════════════════════════════════════ */
+// תא בטופס המודפס: תווית קטנה וערך על קו. ריק נשאר ריק — לא ממציאים.
+const F101Field = ({ label, value, w = '1 1 150px' }) => (
+  <div style={{ flex: w, minWidth: 0 }}>
+    <p style={{ fontSize: 9, color: '#555' }}>{label}</p>
+    <p style={{ fontSize: 12, fontWeight: 600, borderBottom: '1px solid #999', minHeight: 18, paddingBottom: 1 }}>
+      {value || ' '}
+    </p>
+  </div>
+);
+
+function Form101Print({ row, onClose }) {
+  const [sig, setSig] = useState(null);
+  const f = row.form101 || {};
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!row.signature_path) return;
+      try { const u = await store.obDownload(row.signature_path); if (alive) setSig(u); } catch { /* חתימה חסרה — המסמך עדיין תקף להדפסה */ }
+    })();
+    return () => { alive = false; };
+  }, [row.signature_path]);
+
+  const day = d => (d ? String(d).split('-').reverse().join('/') : '');
+  const yn = v => (v === 'yes' ? 'כן' : v === 'no' ? 'לא' : '');
+  const CREDITS = [
+    ['creditResident', 'תושב/ת ישראל'], ['creditNewImmigrant', 'עולה חדש/ה'],
+    ['creditSoldier', 'חייל/ת משוחרר/ת'], ['creditDegree', 'תואר אקדמי / לימודי מקצוע'],
+    ['creditSingleParent', 'הורה יחיד'], ['creditDisabled', 'ילד נטול יכולת'],
+    ['creditAlimony', 'תשלום מזונות'], ['creditSettlement', 'תושב/ת יישוב מזכה'],
+  ];
+
+  return (
+    <div className="print-sheet" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:60, overflowY:'auto' }} dir="rtl">
+      <div style={{ maxWidth:820, margin:'20px auto', background:'#fff', padding:'26px 30px', borderRadius:8 }}>
+        <div className="no-print" style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
+          <button className="apple-btn apple-btn-blue" onClick={() => window.print()}>
+            <Printer size={15} strokeWidth={2.2} />הדפסה / שמירה כ-PDF
+          </button>
+          <button className="apple-btn apple-btn-ghost" onClick={onClose}>סגירה</button>
+        </div>
+
+        <div style={{ textAlign:'center', borderBottom:'2px solid #000', paddingBottom:6, marginBottom:10 }}>
+          <p style={{ fontSize:15, fontWeight:800 }}>טופס 101 — כרטיס עובד</p>
+          <p style={{ fontSize:11 }}>הצהרה לצורך חישוב מס הכנסה · שנת המס {row.form101_signed_at ? new Date(row.form101_signed_at).getFullYear() : TAX_YEAR}</p>
+        </div>
+
+        <p style={{ fontSize:11, fontWeight:800, background:'#eee', padding:'3px 6px', margin:'10px 0 6px' }}>א · פרטי המעסיק</p>
+        <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+          <F101Field label="שם המעסיק" value='רשת חינוך חב"ד' w="1 1 220px" />
+          <F101Field label="מספר תיק ניכויים" value="" />
+        </div>
+
+        <p style={{ fontSize:11, fontWeight:800, background:'#eee', padding:'3px 6px', margin:'10px 0 6px' }}>ב · פרטי העובד/ת</p>
+        <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+          <F101Field label="שם משפחה" value={f.lastName} />
+          <F101Field label="שם פרטי" value={f.firstName} />
+          <F101Field label="מספר זהות" value={row.tz_id || f.tz} />
+          <F101Field label="תאריך לידה" value={day(f.birth)} />
+          <F101Field label="תאריך עלייה" value={day(f.aliyaDate)} />
+          <F101Field label="מין" value={f.sex === 'm' ? 'זכר' : f.sex === 'f' ? 'נקבה' : ''} />
+          <F101Field label="מצב משפחתי" value={f.marital} />
+          <F101Field label="רחוב ומספר" value={f.address} w="1 1 220px" />
+          <F101Field label="יישוב" value={f.city} />
+          <F101Field label="מיקוד" value={f.zip} />
+          <F101Field label="טלפון" value={f.phone || row.phone} />
+          <F101Field label='דוא"ל' value={f.email} w="1 1 200px" />
+          <F101Field label="תושב/ת ישראל" value={f.resident === 'no' ? 'לא' : 'כן'} />
+        </div>
+
+        {f.marital === 'נשואה' && (<>
+          <p style={{ fontSize:11, fontWeight:800, background:'#eee', padding:'3px 6px', margin:'10px 0 6px' }}>ג · פרטי בן/בת הזוג</p>
+          <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+            <F101Field label="שם מלא" value={f.spouseName} w="1 1 220px" />
+            <F101Field label="מספר זהות" value={f.spouseTz} />
+            <F101Field label="תאריך לידה" value={day(f.spouseBirth)} />
+            <F101Field label="יש הכנסה" value={yn(f.spouseIncome)} />
+          </div>
+        </>)}
+
+        <p style={{ fontSize:11, fontWeight:800, background:'#eee', padding:'3px 6px', margin:'10px 0 6px' }}>ד · ילדים</p>
+        {(f.children || []).length === 0
+          ? <p style={{ fontSize:11, color:'#555' }}>לא דווחו ילדים.</p>
+          : (
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
+              <thead><tr style={{ background:'#f3f3f3' }}>
+                <th style={{ border:'1px solid #bbb', padding:3 }}>שם</th>
+                <th style={{ border:'1px solid #bbb', padding:3 }}>מספר זהות</th>
+                <th style={{ border:'1px solid #bbb', padding:3 }}>תאריך לידה</th>
+                <th style={{ border:'1px solid #bbb', padding:3 }}>בחזקתי</th>
+              </tr></thead>
+              <tbody>
+                {(f.children || []).map((c, i) => (
+                  <tr key={i}>
+                    <td style={{ border:'1px solid #bbb', padding:3 }}>{c.name || ''}</td>
+                    <td style={{ border:'1px solid #bbb', padding:3, direction:'ltr', textAlign:'center' }}>{c.tz || ''}</td>
+                    <td style={{ border:'1px solid #bbb', padding:3, textAlign:'center' }}>{day(c.birth)}</td>
+                    <td style={{ border:'1px solid #bbb', padding:3, textAlign:'center' }}>{c.custody === false ? 'לא' : 'כן'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+        <p style={{ fontSize:11, fontWeight:800, background:'#eee', padding:'3px 6px', margin:'10px 0 6px' }}>ה · הכנסות</p>
+        <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+          <F101Field label="זו הכנסתי היחידה" value={f.otherIncome === 'no' ? 'כן' : f.otherIncome === 'yes' ? 'לא' : ''} />
+          <F101Field label="מעסיק נוסף" value={f.otherEmployer} w="1 1 200px" />
+          <F101Field label="סוג ההכנסה הנוספת" value={f.otherKind} />
+        </div>
+
+        <p style={{ fontSize:11, fontWeight:800, background:'#eee', padding:'3px 6px', margin:'10px 0 6px' }}>ו · בקשה לנקודות זיכוי</p>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:'4px 16px', fontSize:11 }}>
+          {CREDITS.map(([k, l]) => (
+            <span key={k} style={{ flex:'0 0 45%' }}>{f[k] ? '☒' : '☐'} {l}</span>
+          ))}
+        </div>
+
+        <p style={{ fontSize:11, fontWeight:800, background:'#eee', padding:'3px 6px', margin:'10px 0 6px' }}>ז · הצהרה וחתימה</p>
+        <p style={{ fontSize:11, lineHeight:1.6 }}>
+          אני מצהיר/ה כי הפרטים שמסרתי בטופס זה מלאים ונכונים, וידוע לי שמסירת פרטים לא נכונים
+          היא עבירה על פקודת מס הכנסה.
+        </p>
+        <div style={{ display:'flex', gap:24, alignItems:'flex-end', marginTop:10 }}>
+          <div style={{ flex:'0 0 200px' }}>
+            <p style={{ fontSize:9, color:'#555' }}>חתימה</p>
+            {sig
+              ? <img src={sig} alt="חתימה" style={{ height:56, borderBottom:'1px solid #999', display:'block' }} />
+              : <div style={{ height:56, borderBottom:'1px solid #999' }} />}
+          </div>
+          <F101Field label="תאריך החתימה" value={row.form101_signed_at ? day(String(row.form101_signed_at).slice(0, 10)) : ''} />
+        </div>
+
+        <p style={{ fontSize:9, color:'#666', marginTop:14, borderTop:'1px solid #ccc', paddingTop:6 }}>
+          הופק ממערכת השכר של רשת חינוך חב"ד. הנתונים נמסרו וניחתמו דיגיטלית בידי העובד/ת
+          {row.form101_signed_at ? ` בתאריך ${day(String(row.form101_signed_at).slice(0, 10))}` : ''}.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function SignaturePad({ onChange }) {
   const ref = useRef(null);
   const drawing = useRef(false);
@@ -5067,7 +5224,9 @@ function OnboardingView({ code }) {
   const totalSteps = steps.filter(x => x !== null).length;
 
   const sign101 = async () => {
-    for (const [k, l] of [['firstName','שם פרטי'], ['lastName','שם משפחה'], ['birth','תאריך לידה'], ['address','כתובת'], ['city','עיר'], ['marital','מצב משפחתי'], ['otherIncome','הכנסה נוספת']]) {
+    for (const [k, l] of [['firstName','שם פרטי'], ['lastName','שם משפחה'], ['birth','תאריך לידה'],
+                          ['address','רחוב ומספר'], ['city','יישוב'], ['phone','טלפון'],
+                          ['marital','מצב משפחתי'], ['otherIncome','האם זו הכנסתך היחידה']]) {
       if (!String(form[k] ?? '').trim()) { setMsg(`יש למלא ${l}`); return; }
     }
     if (!form.declare) { setMsg('יש לאשר את ההצהרה'); return; }
@@ -5105,6 +5264,16 @@ function OnboardingView({ code }) {
     await load();
   };
 
+  // הילדים הם רשימה ולא מספר: הטופס הרשמי מבקש שם, ת.ז. ותאריך לידה
+  // לכל אחד, והם שקובעים את נקודות הזיכוי.
+  const setChild = (i, k, v) => setForm(p => {
+    const kids = [...(p.children || [])];
+    kids[i] = { ...kids[i], [k]: v };
+    return { ...p, children: kids };
+  });
+  const addChild = () => setForm(p => ({ ...p, children: [...(p.children || []), { custody: true }] }));
+  const removeChild = i => setForm(p => ({ ...p, children: (p.children || []).filter((_, j) => j !== i) }));
+
   const field = (k, label, type = 'text', dir2) => (
     <div key={k} style={{ flex:'1 1 150px' }}>
       <p className="apple-label">{label}</p>
@@ -5139,27 +5308,126 @@ function OnboardingView({ code }) {
           {me.form101_signed ? (
             <p style={{ color:'var(--ok)', fontWeight:700, fontSize:15.5, marginTop:6 }}>✓ מולא ונחתם. תודה!</p>
           ) : (<>
-            <p style={{ fontSize:14.4, color:'var(--text3)', marginBottom:12 }}>שנת המס 2026 · המעסיקה: רשת חינוך חב"ד</p>
+            <p style={{ fontSize:14.4, color:'var(--text3)', marginBottom:12 }}>
+              שנת המס {TAX_YEAR} · המעסיקה: רשת חינוך חב"ד
+            </p>
+
+            {/* ── ב. פרטי העובדת ── */}
+            <p style={{ fontWeight:700, fontSize:15.5, color:'var(--purple)', margin:'6px 0 8px' }}>פרטים אישיים</p>
             <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
-              {field('firstName','שם פרטי')}
               {field('lastName','שם משפחה')}
-              <div style={{ flex:'1 1 150px' }}><p className="apple-label">ת.ז.</p>
-                <input value={me.tz_id || form.tz || ''} onChange={e => setF('tz', e.target.value)} className="apple-input" dir="ltr" style={{ width:'100%' }} /></div>
+              {field('firstName','שם פרטי')}
+              <div style={{ flex:'1 1 150px' }}><p className="apple-label">מספר זהות</p>
+                <input value={me.tz_id || form.tz || ''} onChange={e => setF('tz', e.target.value)}
+                  className="apple-input" dir="ltr" inputMode="numeric" style={{ width:'100%' }} /></div>
               {field('birth','תאריך לידה','date')}
-              {field('address','רחוב ומספר')}
-              {field('city','עיר')}
+              {field('aliyaDate','תאריך עלייה — אם עלית','date')}
+              <div style={{ flex:'1 1 130px' }}><p className="apple-label">מין</p>
+                <select value={form.sex || 'f'} onChange={e => setF('sex', e.target.value)} className="apple-select" style={{ width:'100%' }}>
+                  <option value="f">נקבה</option><option value="m">זכר</option>
+                </select></div>
               <div style={{ flex:'1 1 150px' }}><p className="apple-label">מצב משפחתי</p>
                 <select value={form.marital || ''} onChange={e => setF('marital', e.target.value)} className="apple-select" style={{ width:'100%' }}>
-                  <option value="">בחרי</option><option>רווקה</option><option>נשואה</option><option>גרושה</option><option>אלמנה</option>
+                  <option value="">בחרי</option><option>רווקה</option><option>נשואה</option>
+                  <option>גרושה</option><option>אלמנה</option><option>פרודה</option>
                 </select></div>
-              {field('kids','ילדים עד גיל 18','number','ltr')}
-              <div style={{ flex:'1 1 100%' }}><p className="apple-label">הכנסה נוספת ממעסיק אחר?</p>
-                <select value={form.otherIncome || ''} onChange={e => setF('otherIncome', e.target.value)} className="apple-select" style={{ width:'100%' }}>
-                  <option value="">בחרי</option>
-                  <option value="no">אין — זו הכנסתי היחידה, מבקשת חישוב מס רגיל</option>
-                  <option value="yes">יש — אמציא תיאום מס</option>
+              {field('address','רחוב ומספר')}
+              {field('city','יישוב')}
+              {field('zip','מיקוד','text','ltr')}
+              {field('phone','טלפון','tel','ltr')}
+              {field('email','דוא"ל','email','ltr')}
+              <div style={{ flex:'1 1 100%' }}><p className="apple-label">תושבות</p>
+                <select value={form.resident || 'yes'} onChange={e => setF('resident', e.target.value)} className="apple-select" style={{ width:'100%' }}>
+                  <option value="yes">תושבת ישראל</option>
+                  <option value="no">אינני תושבת ישראל</option>
                 </select></div>
             </div>
+
+            {/* ── ג. בן/בת הזוג ── */}
+            {form.marital === 'נשואה' && (<>
+              <p style={{ fontWeight:700, fontSize:15.5, color:'var(--purple)', margin:'14px 0 8px' }}>פרטי בן/בת הזוג</p>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+                {field('spouseName','שם מלא')}
+                {field('spouseTz','מספר זהות','text','ltr')}
+                {field('spouseBirth','תאריך לידה','date')}
+                <div style={{ flex:'1 1 100%' }}><p className="apple-label">האם יש לו/ה הכנסה?</p>
+                  <select value={form.spouseIncome || ''} onChange={e => setF('spouseIncome', e.target.value)} className="apple-select" style={{ width:'100%' }}>
+                    <option value="">בחרי</option><option value="yes">כן</option><option value="no">לא</option>
+                  </select></div>
+              </div>
+            </>)}
+
+            {/* ── ד. ילדים ── */}
+            <p style={{ fontWeight:700, fontSize:15.5, color:'var(--purple)', margin:'14px 0 4px' }}>ילדים עד גיל 18</p>
+            <p style={{ fontSize:13.2, color:'var(--text3)', marginBottom:8 }}>
+              הם קובעים נקודות זיכוי. יש למלא שורה לכל ילד/ה.
+            </p>
+            {(form.children || []).map((c, i) => (
+              <div key={i} style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'flex-end', marginBottom:8 }}>
+                <div style={{ flex:'1 1 130px' }}><p className="apple-label">שם</p>
+                  <input value={c.name || ''} className="apple-input" style={{ width:'100%' }}
+                    onChange={e => setChild(i, 'name', e.target.value)} /></div>
+                <div style={{ flex:'1 1 120px' }}><p className="apple-label">מספר זהות</p>
+                  <input value={c.tz || ''} className="apple-input" dir="ltr" inputMode="numeric" style={{ width:'100%' }}
+                    onChange={e => setChild(i, 'tz', e.target.value)} /></div>
+                <div style={{ flex:'1 1 130px' }}><p className="apple-label">תאריך לידה</p>
+                  <input type="date" value={c.birth || ''} className="apple-input" style={{ width:'100%' }}
+                    onChange={e => setChild(i, 'birth', e.target.value)} /></div>
+                <label style={{ fontSize:13.8, display:'flex', alignItems:'center', gap:5, paddingBottom:9 }}>
+                  <input type="checkbox" checked={c.custody !== false}
+                    onChange={e => setChild(i, 'custody', e.target.checked)} />
+                  בחזקתי
+                </label>
+                <button className="apple-btn apple-btn-ghost" onClick={() => removeChild(i)}
+                  style={{ minHeight:36, padding:'0 10px', color:'var(--danger)' }}>הסרה</button>
+              </div>
+            ))}
+            <button className="apple-btn apple-btn-ghost" onClick={addChild} style={{ minHeight:36, fontSize:13.8 }}>
+              + הוספת ילד/ה
+            </button>
+
+            {/* ── ה. הכנסות ── */}
+            <p style={{ fontWeight:700, fontSize:15.5, color:'var(--purple)', margin:'14px 0 8px' }}>הכנסות</p>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+              <div style={{ flex:'1 1 100%' }}><p className="apple-label">האם זו הכנסתך היחידה?</p>
+                <select value={form.otherIncome || ''} onChange={e => setF('otherIncome', e.target.value)} className="apple-select" style={{ width:'100%' }}>
+                  <option value="">בחרי</option>
+                  <option value="no">כן — זו הכנסתי היחידה, מבקשת חישוב מס רגיל</option>
+                  <option value="yes">לא — יש לי הכנסה נוספת, אמציא תיאום מס</option>
+                </select></div>
+              {form.otherIncome === 'yes' && (<>
+                {field('otherEmployer','שם המעסיק הנוסף')}
+                <div style={{ flex:'1 1 150px' }}><p className="apple-label">סוג ההכנסה הנוספת</p>
+                  <select value={form.otherKind || ''} onChange={e => setF('otherKind', e.target.value)} className="apple-select" style={{ width:'100%' }}>
+                    <option value="">בחרי</option><option>משכורת</option><option>קצבה</option>
+                    <option>מלגה</option><option>עסק</option><option>אחר</option>
+                  </select></div>
+              </>)}
+            </div>
+
+            {/* ── ו. נקודות זיכוי ── */}
+            <p style={{ fontWeight:700, fontSize:15.5, color:'var(--purple)', margin:'14px 0 4px' }}>בקשה לנקודות זיכוי</p>
+            <p style={{ fontSize:13.2, color:'var(--text3)', marginBottom:8 }}>
+              סמני את מה שחל עלייך. לכל סעיף שתסמני יש לצרף אסמכתה.
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {[
+                ['creditResident', 'תושבת ישראל'],
+                ['creditNewImmigrant', 'עולה חדשה'],
+                ['creditSoldier', 'חיילת משוחררת / שירות לאומי'],
+                ['creditDegree', 'סיום תואר אקדמי או לימודי מקצוע'],
+                ['creditSingleParent', 'הורה יחיד'],
+                ['creditDisabled', 'ילד נטול יכולת'],
+                ['creditAlimony', 'תשלום מזונות'],
+                ['creditSettlement', 'תושבת יישוב מזכה'],
+              ].map(([k, l]) => (
+                <label key={k} style={{ display:'flex', gap:8, alignItems:'center', fontSize:14.4, color:'var(--text2)' }}>
+                  <input type="checkbox" checked={!!form[k]} onChange={e => setF(k, e.target.checked)} />
+                  {l}
+                </label>
+              ))}
+            </div>
+
             <label style={{ display:'flex', gap:8, alignItems:'flex-start', marginTop:12, fontSize:14.4, color:'var(--text2)' }}>
               <input type="checkbox" checked={!!form.declare} onChange={e => setF('declare', e.target.checked)} style={{ marginTop:2 }} />
               <span>אני מצהירה כי הפרטים שמסרתי בטופס זה מלאים ונכונים, וידוע לי שמסירת פרטים לא נכונים היא עבירה על פקודת מס הכנסה.</span>
@@ -5248,6 +5516,7 @@ function OnboardingAdmin({ activeMonth, onClose }) {
   const [rows, setRows] = useState(null);
   const [busy, setBusy] = useState('');
   const [copied, setCopied] = useState('');
+  const [print101, setPrint101] = useState(null);   // הטופס הרשמי להדפסה
 
   const load = useCallback(async () => setRows(await store.listOnboarding()), []);
   useEffect(() => { Promise.resolve().then(load); }, [load]);
@@ -5329,10 +5598,18 @@ function OnboardingAdmin({ activeMonth, onClose }) {
                         <td style={{ textAlign:'center' }}>{C(r.bank_saved_at)}</td>
                         <td style={{ textAlign:'center' }}>{C(r.bank_doc_path)}</td>
                         <td style={{ textAlign:'center' }}>{C(r.contract_signed_at)}</td>
-                        <td style={{ textAlign:'center' }}>
+                        <td style={{ textAlign:'center', whiteSpace:'nowrap' }}>
                           <button className="apple-btn apple-btn-ghost" onClick={() => copy(r.code, r.name)} style={{ minHeight:28, padding:'0 10px', fontSize:13.2 }}>
                             {copied === r.name ? 'הועתק ✓' : 'העתקה'}
                           </button>
+                          {/* הטופס במבנה הרשמי — זה מה שנשמר בתיק ומוצג בביקורת */}
+                          {r.form101_signed_at && (
+                            <button className="apple-btn apple-btn-ghost" onClick={() => setPrint101(r)}
+                              title="טופס 101 במבנה הרשמי, להדפסה או לשמירה כ-PDF"
+                              style={{ minHeight:28, padding:'0 10px', fontSize:13.2, marginInlineStart:4 }}>
+                              101
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -5346,6 +5623,7 @@ function OnboardingAdmin({ activeMonth, onClose }) {
           השליחה בוואטסאפ נעשית דרך scripts/send-onboarding.mjs — הרצה יבשה קודם, שליחה רק באישורך.
         </p>
       </div>
+      {print101 && <Form101Print row={print101} onClose={() => setPrint101(null)} />}
     </div>
   );
 }
