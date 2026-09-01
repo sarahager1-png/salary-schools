@@ -4379,8 +4379,17 @@ function ActualCostPanel({ teachers, schools, onSave }) {
 function ScopePanel({ teachers, schools, onSave }) {
   const [vals,  setVals]  = useState({});   // teacherId → מה שמוקלד
   const [flash, setFlash] = useState({});   // teacherId → נקבע הרגע
+  /*
+    ברירת המחדל היא מי שחסרה — זו העבודה שממתינה. אבל אחוז שנקבע אינו
+    נעול: מספר משתנה, נכנס שגוי, או מתברר אחרת אחרי הסימולציה. במצב
+    "כל העובדות" כל השורות פתוחות לשינוי, עם מה שרשום בהן היום.
+  */
+  const [showAll, setShowAll] = useState(false);
 
-  const rows = teachers.filter(scopeMissing);
+  const missing = teachers.filter(scopeMissing);
+  const rows = showAll
+    ? teachers.filter(t => isPending(t) && !isPrincipalRow(t))
+    : missing;
   const bySchool = schools
     .map(sc => ({ school: sc, list: rows.filter(t => t.schoolId === sc.id) }))
     .filter(g => g.list.length);
@@ -4417,15 +4426,37 @@ function ScopePanel({ teachers, schools, onSave }) {
       </div>
       <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>כל אחוזי המשרה נקבעו</p>
       <p style={{ fontSize:13, color:'var(--text3)', marginTop:3 }}>אפשר לעבור להזנת השכר הרשמי</p>
+      {!showAll && (
+        <button className="apple-btn apple-btn-ghost" onClick={() => setShowAll(true)}
+          style={{ marginTop:14, minHeight:36, fontSize:12.5 }}>
+          לשינוי אחוז שכבר נקבע
+        </button>
+      )}
     </div>
   );
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-      <p style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6 }}>
-        {rows.length} עובדות שאחוז המשרה שלהן עדיין ברירת המחדל — 100 שאיש לא בחר.
-        הקלדה כאן לפני הסימולציה; אחריה היא מוחקת את השכר שהוזן.
-      </p>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
+        <p style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6, flex:'1 1 220px' }}>
+          {showAll
+            ? `${rows.length} עובדות — כולל מי שאחוזה כבר נקבע. הקלדה דורסת את הקיים.`
+            : `${rows.length} עובדות שאחוז המשרה שלהן עדיין ברירת המחדל — 100 שאיש לא בחר.`}
+          {' '}הקלדה כאן לפני הסימולציה; אחריה היא מוחקת את השכר שהוזן.
+        </p>
+        <div className="apple-seg" style={{ flexShrink:0 }}>
+          <button onClick={() => setShowAll(false)}
+            className={['apple-seg-item', !showAll ? 'active' : ''].join(' ')}
+            style={{ padding:'5px 11px', fontSize:12 }}>
+            {`ממתינות (${missing.length})`}
+          </button>
+          <button onClick={() => setShowAll(true)}
+            className={['apple-seg-item', showAll ? 'active' : ''].join(' ')}
+            style={{ padding:'5px 11px', fontSize:12 }}>
+            כל העובדות
+          </button>
+        </div>
+      </div>
       {bySchool.map(({ school, list }) => (
         <div key={school.id}>
           <div style={{ fontSize:12, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
@@ -4461,8 +4492,19 @@ function ScopePanel({ teachers, schools, onSave }) {
                     {t.name}
                     <span style={{ fontWeight:400, fontSize:11.5, color:'var(--text3)' }}>
                       {' · '}{reformLabel(t.reform)}
+                      {` · ${DEGREE_LABELS[t.degree] || t.degree || 'בלי תואר'}`}
+                      {` · ${t.seniority ?? 1} שנות ותק`}
                       {hasSim && <span style={{ color:'var(--warn)', fontWeight:700 }}> · יש סימולציה — שינוי יאפס אותה</span>}
                     </span>
+                  </p>
+                  {/* הגמול משנה את האחוז — מחנכת מקבלת 3 שעות מעליו, ושאר
+                      הגמולים אחוז מהשכר. בלי לראות אותו אי אפשר להחליט. */}
+                  <p style={{ fontSize:11.5, color:'var(--text3)', marginBottom:4 }}>
+                    {t.role && t.role !== 'none'
+                      ? <span style={{ color:'var(--purple)', fontWeight:600 }}>{ROLE_SHORT[t.role] || t.role}</span>
+                      : <span>ללא גמול תפקיד</span>}
+                    {isOfek && t.grade ? ` · דרגה ${t.grade}` : ''}
+                    {t.level && LEVELS[t.level] ? ` · ${LEVELS[t.level].label}` : ''}
                   </p>
                   {/* מספר הילדים והמין — לכל מורה עם ילדים, בשני המסלולים.
                       קודם הוצג לעולם ישן בלבד, וכל השורות עם ילדים ברשימה
