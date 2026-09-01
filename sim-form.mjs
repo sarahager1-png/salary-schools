@@ -34,7 +34,20 @@ export const kitaFor = (t) => {
   return /^homeroom/.test(r) ? '2' : null;
 };
 
-export const scopeConfirmed = (t) => Boolean(t.scope_set_at) || (t.scope_pct ?? 100) !== 100;
+/*
+  האחוז שנכנס למחשבון העולם הישן.
+
+  למורת אופק זה אחוז אחר מזה שבאופק (הוראת שרה, 1.9): דבורי גלפרין היא
+  91% באופק ו-103% בעולם הישן, ורק ב-103% המחשבון מחזיר את המספר שנשמר
+  לה. לכן לא scope_pct אלא scope_pct_pre, ובלעדיו אין מה להריץ — הפער
+  בין שתי הסימולציות הוא תוספת בית חב"ד, ואחוז שגוי מנפח אותה.
+*/
+export const preScope = (t) => (t.reform === 'ofek' ? t.scope_pct_pre : (t.scope_pct_pre ?? t.scope_pct));
+
+export const scopeConfirmed = (t) =>
+  t.reform === 'ofek'
+    ? t.scope_pct_pre != null
+    : (Boolean(t.scope_set_at) || (t.scope_pct ?? 100) !== 100);
 
 // לאיזה שדה נכנסת התוצאה: בעולם ישן זו הסימולציה היחידה; באופק זו
 // סימולציית הבסיס, והפער עד האופק הוא תוספת בית חב"ד.
@@ -44,7 +57,8 @@ export const targetField = (t) => (t.reform === 'ofek' ? 'official_gross_pre' : 
 export function formFields(t) {
   const darga = dargaFor(t);
   if (!darga) return { skip: `אין במחשבון תואר "${t.degree}"` };
-  const pct = t.scope_pct ?? 100;
+  const pct = preScope(t);
+  if (pct == null) return { skip: 'אחוז המשרה בעולם הישן טרם נקבע' };
   if (!(pct > 0 && pct <= 200)) return { skip: `אחוז משרה לא תקין (${pct})` };
   return {
     darga,
@@ -59,7 +73,7 @@ export function formFields(t) {
 export function planFor(t) {
   if (t.gamul_role === 'principal') return { skip: 'מנהלת — מחשבון ניהול, לא כאן' };
   if (t.leave_type === 'unpaid')    return { skip: 'חל"ת — אין שכר' };
-  if (!scopeConfirmed(t))           return { skip: 'אחוז המשרה טרם נקבע' };
+  if (!scopeConfirmed(t))           return { skip: t.reform === 'ofek' ? 'אחוז העולם הישן טרם נקבע' : 'אחוז המשרה טרם נקבע' };
   if (t[targetField(t)] != null)    return { skip: 'כבר יש סימולציה' };
   return formFields(t);
 }

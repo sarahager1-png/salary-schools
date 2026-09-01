@@ -2260,6 +2260,28 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                   : `אחוז משרה ${computedBaseScope(t)}% — התוספת ניתנת מעל ${MOM_MIN_SCOPE}%`}
               </p>
             )}
+            {/* מורת אופק: אחוז המשרה שלה בעולם הישן אינו זהה לאחוז באופק.
+                דבורי גלפרין היא 91% באופק ו-103% בעולם הישן, ורק ב-103%
+                המחשבון מחזיר את המספר שנשמר לה. הפער בין שתי הסימולציות
+                הוא תוספת בית חב"ד — ולכן האחוז הזה הוא כסף. */}
+            {t.reform === 'ofek' && !isPrincipalRow(t) && (
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginTop:10 }}>
+                <div>
+                  <p style={{ fontSize:13.5, fontWeight:600, color:'var(--text)' }}>אחוז משרה בעולם הישן</p>
+                  <p style={{ fontSize:12, color: t.scopePctPre == null ? 'var(--warn)' : 'var(--text2)' }}>
+                    {t.scopePctPre == null
+                      ? 'טרם נקבע — בלעדיו אי אפשר להריץ את סימולציית הבסיס'
+                      : `באופק ${t.scopePct ?? 100}% · בעולם הישן ${t.scopePctPre}%`}
+                  </p>
+                </div>
+                <input type="number" min="1" max="200" dir="ltr" className="apple-input"
+                  value={t.scopePctPre ?? ''}
+                  placeholder="—"
+                  onChange={e => set('scopePctPre', e.target.value === '' ? null : Number(e.target.value))}
+                  onBlur={() => t.scopePctPre != null && !t.scopePreSetAt && set('scopePreSetAt', new Date().toISOString())}
+                  style={{ width:86, textAlign:'center', fontWeight:700, minHeight:38 }} />
+              </div>
+            )}
             {/* מין: הזכאות לתוספת אם נגזרה ממספר הילדים בלבד, ולכן שלושה
                 גברים ברשת הופיעו כזכאים. השדה נשאל כאן, ליד הילדים. */}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginTop:10 }}>

@@ -73,7 +73,7 @@ const { error: authErr } = await sb.auth.signInWithPassword({ email: EMAIL, pass
 if (authErr) { console.error('התחברות נכשלה:', authErr.message); process.exit(1); }
 
 let q = sb.from('teacher_months')
-  .select('id, name, reform, degree, seniority, scope_pct, scope_set_at, gamul_role, leave_type, children_under_18, official_gross, official_gross_pre, schools!inner(name)')
+  .select('id, name, reform, degree, seniority, scope_pct, scope_pct_pre, scope_set_at, gamul_role, leave_type, children_under_18, official_gross, official_gross_pre, schools!inner(name)')
   .eq('month_key', MONTH);
 if (SCHOOL && SCHOOL !== true) q = q.eq('schools.name', SCHOOL);
 const { data: rows, error } = await q;
