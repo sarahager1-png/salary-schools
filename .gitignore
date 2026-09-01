@@ -22,3 +22,4 @@ outgoing-links.log
 # תוצרי בדיקת היישור
 align-*.png
 print-report.pdf
+verify-sim-diffs.json
