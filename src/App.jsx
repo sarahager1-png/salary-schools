@@ -116,7 +116,10 @@ const reformLabel = r => (REFORMS.find(x => x.id === r) || REFORMS[0]).label;
 // שורת המנהלת מזוהה לפי התפקיד, שכבר קיים ב-ROLES
 const PRINCIPAL_ROLE = 'principal';
 // שכר הבסיס של מנהלת. כל מה שמעליו משולם כתוספת בית חב"ד.
-const PRINCIPAL_BASE = 14400;
+// שכר מנהלת באופק — מספר אחד וקבוע, ולא סולם לפי ותק: ותק 9 עד 23
+// מחזירים את אותו מספר במחשבון הניהול (הוראת שרה, 1.9.2026). כל מה
+// שמעבר לו נקבע בהסכם מראש ונרשם כשכר מוסכם.
+const PRINCIPAL_OFEK_GROSS = 19087;
 const isPrincipalRow = t => t?.role === PRINCIPAL_ROLE;
 // דרגת הניהול היא א..ד ואינה סולם המורים. נשמרת כמספר 1..4.
 const NIHUL_GRADES = [{ v:1, l:'א' }, { v:2, l:'ב' }, { v:3, l:'ג' }, { v:4, l:'ד' }];
@@ -234,7 +237,9 @@ function calcGross(t) {
 }
 // שורה שאין לה מספר עד שתרוץ סימולציה — להצגה, כדי שלא יופיע 0 ₪
 // כאילו זו העלות.
-const awaitingSim = t => isPrincipalRow(t) && !t._officialGross && !t._agreedGross;
+// מנהלת באופק אינה ממתינה לסימולציה: המספר שלה קבוע וידוע.
+const awaitingSim = t =>
+  isPrincipalRow(t) && !t._officialGross && !t._agreedGross && t.reform !== 'ofek';
 function calcNet(gross) { return Math.round(gross * 0.735); }
 // אחוז המשרה והשעות הפרונטליות קשורים זה בזה דרך השלב והפחתת הגיל.
 // אפשר להזין כל אחד מהם, והשני נגזר — לפעמים השעות ידועות, ולפעמים
@@ -378,17 +383,25 @@ function supplementCost(base, supplement, biguud, havraah) {
 function payBreakdown(t) {
   const ofek = Number(t._officialGross) || 0;
   const old  = Number(t._officialGrossPre) || 0;
-  // מנהלת: שכר הבסיס קבוע, וכל מה שמעליו הוא תוספת בית חב"ד.
-  // הברוטו מגיע מסימולציית הניהול, או מהשכר המוסכם אם נקבע לה כזה.
+  /*
+    מנהלת: מספר אחד, תשלום ישיר — אין תוספת בית חב"ד.
+
+    ההכרעה הזאת התקבלה ב-28.8 ולא נכנסה לתוקף: הקוד שמימש אותה נוסף
+    מתחת לענף קודם שכבר החזיר, ולכן מעולם לא רץ. המסך הראה "מנהלת —
+    אין תוספת בית חב"ד" בזמן שהחישוב מאחוריו עדיין פיצל את השכר ב-14,400
+    ויצר תוספת של כמעט 4,700 ₪. ההפרש אינו קוסמטי: פנסיה וקרן השתלמות
+    חלות על הבסיס בלבד, ולכן הפיצול הקטין את עלות המעביד של כל מנהלת.
+
+    מנהלת באופק — 19,087 ₪ ברוטו, וכל מה שמעבר לזה על פי הסכם מראש
+    (הוראת שרה, 1.9.2026). השכר המוסכם גובר תמיד; המספר הקבוע הוא
+    ברירת המחדל כשאין מוסכם ולא הוזנה סימולציית ניהול.
+  */
   const agreed = Number(t._agreedGross) || 0;
   if (isPrincipalRow(t)) {
-    const gross = agreed || ofek;
-    const base  = Math.min(PRINCIPAL_BASE, gross);
-    return { base, supplement: gross - base, gross, agreed: !!agreed };
+    const gross = agreed || ofek || (t.reform === 'ofek' ? PRINCIPAL_OFEK_GROSS : 0);
+    return { base: gross, mom: 0, supplement: 0, gross, agreed: !!agreed };
   }
   // בית ספר עולם ישן — סימולציה אחת, אין רכיב תוספת
-  // מנהלת: מספר אחד ממחשבון הניהול, תשלום ישיר — אין תוספת בית חב"ד.
-  if (isPrincipalRow(t)) return { base: ofek, mom: 0, supplement: 0, gross: ofek };
   const paysSupp = schoolPaysSupp(t.schoolId);
   if (t.reform !== 'ofek') {
     // עולם ישן: רכיב "ת.שכר מינימום" מהתלוש הוא תוספת בית חב"ד —
@@ -525,7 +538,8 @@ const hasContact = t => Boolean(String(t?.phone || '').trim() && String(t?.email
 
 const simComplete = t => {
   if (t._agreedGross) return true;               // שכר מוסכם — אין צורך בסימולציה
-  if (isPrincipalRow(t)) return Boolean(t._officialGross);   // ניהול — סימולציה אחת
+  // ניהול — סימולציה אחת, ובאופק גם היא לא נדרשת: המספר קבוע
+  if (isPrincipalRow(t)) return Boolean(t._officialGross) || t.reform === 'ofek';
   // בבית ספר בלי תוספת בית חב"ד (מזכרת בתיה) התשלום ישיר — סימולציה
   // אחת של המסלול עצמו, גם באופק.
   return Boolean(t.reform === 'ofek' && schoolPaysSupp(t.schoolId)
