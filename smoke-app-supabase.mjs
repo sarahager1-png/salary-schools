@@ -101,15 +101,18 @@ try {
     (await p.locator('body').innerText()).includes('נוספה בשרת'));
 
   // ══ 5. עריכה באפליקציה נשמרת בשרת ══
+  // סדר שדות המספר בשורת העריכה: אחוז משרה, ותק, שעות פרונטליות…
+  // (אחוז המשרה נוסף ב-1.9 — מוזן ביד, אינו נגזר מהשעות)
   await p.getByTitle('עריכה מהירה בשורה').first().click(); await p.waitForTimeout(400);
-  await p.locator('table input[type="number"]').nth(1).fill('18');
+  await p.locator('table input[type="number"]').nth(2).fill('18');
   await p.getByRole('button', { name: 'שמור' }).click();
   await p.waitForTimeout(2500);
   const { data: saved } = await admin.from('teacher_months')
-    .select('name, frontal_hours, scope_pct').eq('month_key', MONTH).order('name');
+    .select('name, frontal_hours, scope_pct, seniority').eq('month_key', MONTH).order('name');
   const edited = saved.find(x => x.frontal_hours === 18);
   check('העריכה נשמרה בבסיס הנתונים', !!edited, JSON.stringify(saved.map(x => x.frontal_hours)));
-  check('אחוז המשרה הנגזר נשמר גם הוא', edited?.scope_pct === 69, String(edited?.scope_pct));
+  check('אחוז המשרה לא נגרר מהשעות — מוזן ביד בלבד', edited?.scope_pct === 100, String(edited?.scope_pct));
+  check('והוותק לא נדרס אגב העריכה', edited?.seniority !== 18, String(edited?.seniority));
 
   // ══ 6. מנהלת רואה רק את בית ספרה, ואין לה שדות כסף ══
   await login(U.prin);
@@ -119,10 +122,11 @@ try {
   check('למנהלת אין שדה שכר רשמי פתוח',
     (await p.locator('table input[placeholder="—"]').count()) === 0);
 
-  // ══ 7. חשבת שכר נכנסת ישר לסימולטור ══
+  // ══ 7. חשבת שכר נכנסת לשולחן ההזנה (הסימולטור ירד ב-1.9) ══
   await login(U.clerk);
-  check('חשבת שכר נכנסת למסך הסימולציה',
-    (await p.locator('iframe').count()) > 0);
+  await p.waitForTimeout(1200);
+  check('חשבת שכר נכנסת לשולחן ההזנה',
+    (await p.locator('body').innerText()).includes('הזנת שכר'));
 
   // ══ 8. יציאה ══
   await p.getByRole('button', { name: 'יציאה' }).click();

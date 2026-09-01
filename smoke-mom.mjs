@@ -1,8 +1,10 @@
-// תוספת אם — 10% על השכר הכולל, בעולם ישן.
+// תוספת אם — הברוטו מוצג כפי שהוזן, בלי תוספות שקטות.
 //
-// הזכאות הוצגה על המסך מאז ומעולם אבל לא נכנסה לחישוב: momBonusEligible
-// שימש רק להערה. במחשבון של המשרד אין שדה לתוספת אם — כל שדות מחשבון
-// העולם הישן נמנו — ולכן היא לא הגיעה גם משם. כל אם חושבה בחסר של 10%.
+// גלגול קודם של המסך הוסיף 10% לברוטו של אם זכאית. ההוספה בוטלה ב-1.9
+// (הוראת שרה): תוספת האם נכנסת דרך אחוז המשרה שהיא קובעת — האחוז
+// הרשום כבר כולל אותה — והוספה מעל הברוטו ספרה אותה פעמיים (יוכבד
+// דובקין: 8,508 במקום 7,666). מה שנבדק כאן: מה שחשבת השכר הזינה הוא
+// מה שמוצג, לכל ארבעת המקרים, ושום שורה אינה מנופחת.
 //
 //   node smoke-mom.mjs
 import fs from 'node:fs';
@@ -57,33 +59,24 @@ await p.waitForTimeout(800);
 await p.getByText(S).first().click();
 await p.waitForTimeout(2500);
 
+// הברוטו מוצג בשדה קלט (חשבת השכר עורכת אותו במקום), ו-innerText של
+// שורה אינו כולל ערכי קלט — לכן נאספים גם הם.
 const rowOf = async name => {
   const tr = p.locator('tr').filter({ hasText: name }).first();
-  return (await tr.innerText()).replace(/\s+/g, ' ');
+  const text = (await tr.innerText()).replace(/\s+/g, ' ');
+  const inputs = await tr.locator('input').evaluateAll(es => es.map(e => e.value).filter(Boolean));
+  return text + ' ⌨ ' + inputs.map(v => Number(v).toLocaleString('he-IL')).join(' ');
 };
 const num = (txt, after) => {
   const cells = txt.split(' ').map(x => x.replace(/,/g, '')).filter(x => /^\d{3,}$/.test(x));
   return cells;
 };
 
-const eligible = await rowOf('אם זכאית');
-check('אם זכאית — הברוטו כולל 10%', eligible.includes('11,000'), eligible.slice(0, 160));
-
-const partial = await rowOf('אם במשרה חלקית');
-check('משרה מתחת ל-79% — בלי תוספת', partial.includes('10,000') && !partial.includes('11,000'), partial.slice(0, 130));
-
-const noKids = await rowOf('בלי ילדים');
-check('בלי ילדים — בלי תוספת', noKids.includes('10,000') && !noKids.includes('11,000'), noKids.slice(0, 130));
-
-const ofek = await rowOf('אם באופק');
-check('אופק חדש — תוספת אם אינה חלה', !ofek.includes('11,000'), ofek.slice(0, 130));
-
-// עלות המעביד נגזרת מהברוטו הכולל, לא מזה שלפני התוספת
-await p.getByText('אם זכאית').first().click();
-await p.waitForTimeout(1200);
-const card = (await p.locator('body').innerText()).replace(/\s+/g, ' ');
-check('הכרטיס אומר כמה התוספת', /תוספת אם/.test(card) && /1,000/.test(card),
-  (card.match(/זכאית לתוספת אם[^·]*·[^)]*\)/) || [''])[0].slice(0, 90));
+for (const name of ['אם זכאית', 'אם במשרה חלקית', 'בלי ילדים', 'אם באופק']) {
+  const row = await rowOf(name);
+  check(`${name} — הברוטו כפי שהוזן`, row.includes('10,000') && !row.includes('11,000'),
+    row.slice(0, 130));
+}
 
 await admin.from('teacher_months').delete().eq('month_key', M);
 await admin.from('schools').delete().eq('id', sc.id);

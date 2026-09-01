@@ -105,6 +105,9 @@ export function formFields(t) {
 export function planFor(t) {
   if (t.gamul_role === 'principal') return { skip: 'מנהלת — מחשבון ניהול, לא כאן' };
   if (t.leave_type === 'unpaid')    return { skip: 'חל"ת — אין שכר' };
+  // "מי שעדיין עם 0 שעות נחכה לעדכון המנהלות" (שרה, 1.9) — לא מריצים
+  // ולא ממלאים שורה בלי שעות; היא עוד לא דווחה באמת.
+  if (!Number(t.frontal_hours))     return { skip: '0 שעות — ממתינה לעדכון המנהלת' };
   if (!scopeConfirmed(t))           return { skip: 'אחוז המשרה טרם נקבע' };
   if (t[targetField(t)] != null)    return { skip: 'כבר יש ברוטו' };
   return formFields(t);

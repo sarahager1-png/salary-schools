@@ -108,11 +108,13 @@ try {
   // ── 4. חשבת שכר ──
   await cli.auth.signOut();
   await cli.auth.signInWithPassword({ email: USERS.clerk, password: PW });
-  const { data: all } = await cli.from('teacher_months').select('id');
+  // הספירה תחומה לשני בתי הספר של החבילה — הטבלה משותפת לכל החבילות,
+  // ושאריות מריצה אחרת אינן כישלון של ההרשאה הנבדקת כאן.
+  const { data: all } = await cli.from('teacher_months').select('id').in('school_id', [schoolId, otherId]);
   check('חשבת שכר רואה את כל הרשת', all?.length === 2, `${all?.length} שורות`);
   const { error: simErr } = await cli.from('teacher_months')
-    .update({ official_gross: 12500, official_gross_pre: 11200 }).eq('id', teacherId);
-  check('חשבת שכר מזינה שתי סימולציות', !simErr, simErr?.message?.slice(0, 60) || '');
+    .update({ official_gross: 12500, chabad_supp: 300 }).eq('id', teacherId);
+  check('חשבת שכר מזינה ברוטו ותוספת', !simErr, simErr?.message?.slice(0, 60) || '');
   const { error: nameErr } = await cli.from('teacher_months').update({ name: 'שם אחר' }).eq('id', teacherId);
   check('חשבת שכר נחסמת משינוי שם', !!nameErr, nameErr?.message?.slice(0, 50) || 'לא נחסמה');
 
