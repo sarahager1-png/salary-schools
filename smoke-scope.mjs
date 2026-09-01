@@ -12,6 +12,7 @@ const env = Object.fromEntries(
 const admin = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
 const PW = 'Scope!' + Math.random().toString(36).slice(2, 9);
 const EMAIL = 'scope-coord@example.com';
+const CLERK = 'scope-clerk@example.com';
 const MONTH = '2095-03';
 const SCHOOL = 'אחוזים בדיקה';
 
@@ -20,8 +21,10 @@ const check = (n, ok, e = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${e
 
 async function cleanup() {
   const { data } = await admin.auth.admin.listUsers();
-  const u = data?.users?.find(x => x.email === EMAIL);
-  if (u) { await admin.from('profiles').delete().eq('id', u.id); await admin.auth.admin.deleteUser(u.id); }
+  for (const email of [EMAIL, CLERK]) {
+    const u = data?.users?.find(x => x.email === email);
+    if (u) { await admin.from('profiles').delete().eq('id', u.id); await admin.auth.admin.deleteUser(u.id); }
+  }
   await admin.from('teacher_months').delete().eq('month_key', MONTH);
   await admin.from('months').delete().eq('key', MONTH);
   await admin.from('schools').delete().eq('name', SCHOOL);
@@ -46,6 +49,9 @@ try {
     // אחוז שנקבע — אמורה להיות מחוץ לשלב
     { month_key: MONTH, school_id: sc.id, name: 'ישן שנקבע', reform: 'pre',
       frontal_hours: 21, scope_pct: 70, monthly_extras: 0, changed_at: changed },
+    // נשארת על ברירת המחדל עד הסוף — היא זו שחשבת השכר תראה
+    { month_key: MONTH, school_id: sc.id, name: 'לחשבת השכר', reform: 'pre',
+      frontal_hours: 18, scope_pct: 100, monthly_extras: 0, changed_at: changed },
   ]).select();
   if (ins.error) throw new Error('seed: ' + ins.error.message);
 
@@ -65,7 +71,7 @@ try {
   });
   await p.waitForTimeout(1500);
   const body = () => p.locator('body').innerText();
-  check('שלב אחוזי המשרה מופיע עם מונה', (await body()).includes('אחוזי משרה (2)'),
+  check('שלב אחוזי המשרה מופיע עם מונה', (await body()).includes('אחוזי משרה (3)'),
     ((await body()).match(/אחוזי משרה[^\n]*/) || [''])[0]);
   check('המסך נפתח על שלב האחוזים', (await body()).includes('שאחוז המשרה שלהן עדיין ברירת המחדל'));
 
@@ -89,7 +95,7 @@ try {
   const saved = after.find(x => x.name === 'ישן ברירת מחדל');
   check('האחוז שהוקלד נשמר', saved?.scope_pct === 64, String(saved?.scope_pct));
   check('נרשמה חותמת שהאחוז נקבע', !!saved?.scope_set_at, String(saved?.scope_set_at));
-  check('היא ירדה מהרשימה', (await body()).includes('אחוזי משרה (1)'),
+  check('היא ירדה מהרשימה', (await body()).includes('אחוזי משרה (2)'),
     ((await body()).match(/אחוזי משרה[^\n]*/) || [''])[0]);
 
   // ══ 5. "לפי השעות" מציע ואינו קובע לבד ══
@@ -101,7 +107,31 @@ try {
   const { data: after2 } = await admin.from('teacher_months')
     .select('name, scope_pct, scope_set_at').eq('month_key', MONTH).eq('name', 'אופק ברירת מחדל');
   check('לחיצה על ההצעה קובעת את האחוז', after2?.[0]?.scope_pct === 77, String(after2?.[0]?.scope_pct));
-  check('כל האחוזים נקבעו', (await body()).includes('כל אחוזי המשרה נקבעו'));
+  check('נשארה רק זו של חשבת השכר', (await body()).includes('אחוזי משרה (1)'),
+    ((await body()).match(/אחוזי משרה[^\n]*/) || [''])[0]);
+
+  // ══ 6. חשבת השכר: אין לה את השלב, אבל היא רואה שהאחוז לא נקבע ══
+  const { data: clerkUsr } = await admin.auth.admin.createUser({ email: CLERK, password: PW, email_confirm: true });
+  await admin.from('profiles').insert({ id: clerkUsr.user.id, full_name: 'חשבת בדיקה', role: 'clerk' });
+  await p.goto('http://localhost:5190/');
+  await p.evaluate(() => localStorage.clear());
+  await p.reload();
+  await p.getByPlaceholder('name@reshetch.org.il').fill(CLERK);
+  await p.locator('input[type="password"]').fill(PW);
+  await p.getByRole('button', { name: /כניסה למערכת/ }).click();
+  await p.waitForTimeout(3000);
+  await p.selectOption('select[title="בחירת חודש"]', MONTH).catch(() => {});
+  await p.waitForTimeout(1200);
+  const clerkBody = await body();
+  check('לחשבת השכר אין את שלב האחוזים', !clerkBody.includes('אחוזי משרה'),
+    (clerkBody.match(/אחוזי משרה[^\n]*/) || [''])[0]);
+  check('היא כן רואה את רשימת הסימולציה', clerkBody.includes('הזנת שכר רשמי'));
+  // הכרטיס נפתח בלחיצה, והצ׳יפים מוצגים רק בו
+  await p.getByText('לחשבת השכר').first().click();
+  await p.waitForTimeout(900);
+  const openCard = await p.locator('.apple-card').filter({ hasText: 'לחשבת השכר' }).first().innerText();
+  check('הכרטיס מזהיר שאחוז המשרה טרם נקבע', /טרם נקבע/.test(openCard),
+    openCard.replace(/\n/g, ' ').slice(0, 110));
 } catch (e) { check('הבדיקה רצה', false, e.message); }
 finally { await cleanup(); await b.close(); }
 console.log(fails.length ? `\n${fails.length} נכשלו` : '\nהכול עבר');

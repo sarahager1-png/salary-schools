@@ -4396,7 +4396,10 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKid
   const [calc, setCalc] = useState('ofek');
   // אחוזי המשרה הם השלב הראשון, ולכן המסך נפתח עליהם כשעוד חסרים —
   // סימולציה שתרוץ לפניהם תימחק ברגע שיוקלד האחוז.
-  const scopeTodo   = teachers.filter(scopeMissing).length;
+  // אחוז המשרה הוא שדה של השליח: השרת חוסם אותו לחשבת השכר, שרשאית
+  // לגעת בשכר הרשמי ובעלות בפועל בלבד. השלב מוצג למי שיכולה לשמור אותו.
+  const canSetScope = userRole === 'coordinator';
+  const scopeTodo   = canSetScope ? teachers.filter(scopeMissing).length : 0;
   const [tab, setTab]   = useState(scopeTodo ? 'scope' : 'sim');   // 'scope' | 'sim' | 'cost'
   const costMissing = teachers.filter(t => simComplete(t) && !t._actualEmployerCost).length;
   const [filterSchool, setFilterSchool] = useState('all');
@@ -4490,10 +4493,12 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKid
         <div style={{ background:'var(--apple-surface)', borderBottom:'1px solid var(--apple-fill2)', padding:'14px 16px', display:'flex', flexDirection:'column', gap:10 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <div className="apple-seg">
-              <button onClick={() => setTab('scope')} className={['apple-seg-item', tab === 'scope' ? 'active' : ''].join(' ')} style={{ padding:'5px 11px', fontSize:12.5 }}>
-                <Percent size={12} strokeWidth={2.6} style={{ marginInlineEnd:4 }} />
-                אחוזי משרה{scopeTodo > 0 ? ` (${scopeTodo})` : ''}
-              </button>
+              {canSetScope && (
+                <button onClick={() => setTab('scope')} className={['apple-seg-item', tab === 'scope' ? 'active' : ''].join(' ')} style={{ padding:'5px 11px', fontSize:12.5 }}>
+                  <Percent size={12} strokeWidth={2.6} style={{ marginInlineEnd:4 }} />
+                  אחוזי משרה{scopeTodo > 0 ? ` (${scopeTodo})` : ''}
+                </button>
+              )}
               <button onClick={() => setTab('sim')} className={['apple-seg-item', tab === 'sim' ? 'active' : ''].join(' ')} style={{ padding:'5px 11px', fontSize:12.5 }}>
                 הזנת שכר רשמי
               </button>
@@ -4520,7 +4525,7 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKid
 
         {/* Teacher rows */}
         <div style={{ flex:1, overflowY:'auto', padding:'12px 12px', display:'flex', flexDirection:'column', gap:16 }}>
-          {tab === 'scope' && <ScopePanel teachers={teachers} schools={schools} onSave={onSaveScope} />}
+          {tab === 'scope' && canSetScope && <ScopePanel teachers={teachers} schools={schools} onSave={onSaveScope} />}
           {tab === 'cost' && <ActualCostPanel teachers={teachers} schools={schools} onSave={onSaveActual} />}
           {/* המסמכים הם של הנהלת החשבונות, כמו העלות בפועל. בלשונית
               הסימולציה הם רק גזלו גובה מרשימת העובדות. */}
@@ -4641,15 +4646,26 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKid
                               ? `+${MOM_SCOPE_BONUS} נק׳ למשרה — כבר בתוך ה-% למעלה`
                               : null],
                             ['סטטוס',    onLeave(t) ? leaveText(t) : null],
-                          ].filter(([, v]) => v).map(([k, v]) => (
-                            <span key={k} style={{
-                              fontSize:11, padding:'3px 8px', borderRadius:999,
-                              background:'var(--fill2, #F0EDF8)', color:'var(--text2, #4A3F6B)',
-                              whiteSpace:'nowrap',
-                            }}>
-                              <span style={{ opacity:.65 }}>{k} </span><b style={{ fontWeight:700 }}>{v}</b>
+                          ].filter(([, v]) => v).map(([k, v]) => {
+                          // אחוז המשרה הוא המספר הראשון שנכנס למחשבון. כשהוא
+                          // עדיין ברירת המחדל — 100 שאיש לא בחר — הסימולציה
+                          // תרוץ עליו ותצא שגויה. הצ׳יפ אומר זאת במקום שבו
+                          // מקלידים, ולא במסך אחר שאין לחשבת גישה אליו.
+                          const notSet = k === '% משרה' && !scopeConfirmed(t) && !isPrincipalRow(t);
+                          return (
+                            <span key={k} title={notSet ? 'אחוז המשרה עדיין ברירת המחדל. השליח קובעת אותו — כדאי להמתין לפני שמריצים.' : undefined}
+                              style={{
+                                fontSize:11, padding:'3px 8px', borderRadius:999,
+                                background: notSet ? 'var(--warn-bg)' : 'var(--fill2, #F0EDF8)',
+                                color: notSet ? 'var(--warn)' : 'var(--text2, #4A3F6B)',
+                                border: notSet ? '1px solid var(--warn)' : undefined,
+                                whiteSpace:'nowrap',
+                              }}>
+                              <span style={{ opacity:.65 }}>{k} </span>
+                              <b style={{ fontWeight:700 }}>{notSet ? `${v} · טרם נקבע` : v}</b>
                             </span>
-                          ))}
+                          );
+                          })}
                           {/* ילדים עד 18 פותחים תוספת אם, והיא משנה את אחוז
                               המשרה שמוקלד למחשבון. צריך לדעת אותם לפני
                               החישוב, ולכן השדה כאן ולא רק בכרטיס העובדת. */}
