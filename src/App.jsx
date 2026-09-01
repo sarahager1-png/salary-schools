@@ -4464,15 +4464,18 @@ function ScopePanel({ teachers, schools, onSave }) {
                       {hasSim && <span style={{ color:'var(--warn)', fontWeight:700 }}> · יש סימולציה — שינוי יאפס אותה</span>}
                     </span>
                   </p>
-                  {/* מין נשאל רק היכן שהוא משנה את המספר: עולם ישן עם ילדים.
-                      באופק לתוספת אם אין ביטוי בשכר, ובלי ילדים אין למה. */}
-                  {t.reform === 'pre' && (t.childrenUnder18 || 0) > 0 && (
+                  {/* מספר הילדים והמין — לכל מורה עם ילדים, בשני המסלולים.
+                      קודם הוצג לעולם ישן בלבד, וכל השורות עם ילדים ברשימה
+                      היו מורות אופק — כך שהשאלה לא נראתה לאיש. גם למורת
+                      אופק זה נחוץ: סימולציית הבסיס שלה היא עולם ישן, ושם
+                      תוספת אם קיימת. */}
+                  {(t.childrenUnder18 || 0) > 0 && (
                     <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:4 }}>
                       <span style={{ fontSize:11.5, color: t.gender ? 'var(--text3)' : 'var(--warn)', fontWeight: t.gender ? 400 : 700 }}>
                         {`${t.childrenUnder18} ילדים עד 18 · `}
-                        {t.gender === 'f' ? 'אֵם — התוספת בתוך ההצעה'
-                          : t.gender === 'm' ? 'גבר — אין תוספת אם'
-                          : 'מי היא? בלי זה ההצעה בלי תוספת אם'}
+                        {t.gender === 'f' ? 'אֵם' : t.gender === 'm' ? 'גבר — אין תוספת אם' : 'מי היא?'}
+                        {t.gender === 'f' && isOfek ? ' — רלוונטי לאחוז בעולם הישן' : ''}
+                        {!t.gender ? ' בלי זה אין תוספת אם' : ''}
                       </span>
                       {[{ v:'f', l:'אישה' }, { v:'m', l:'גבר' }].map(o => (
                         <button key={o.v} onClick={() => saveGender(t, o.v)}
