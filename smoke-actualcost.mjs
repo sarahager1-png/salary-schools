@@ -112,8 +112,17 @@ try {
   // ── 4. אצל השליח: אין יותר ~ ──
   await login(U.coord);
   await p.getByText(SCHOOL).first().click();
-  const row = await p.locator('tr').filter({ hasText: 'עלות מורה מוכנה' }).first().innerText();
-  check('בטבלת השליח הסכום בפועל בלי ~', row.includes('5,400') && !/~\s*5,400/.test(row), row.replace(/\s+/g, ' ').slice(-80));
+  await p.getByText('עלות מורה מוכנה').first().waitFor({ timeout: 15000 });
+  // 26 העמודות לא נכנסות במסך: עמודת "הוצאות מעביד" גלויה רק בתצוגת
+  // "כל העמודות", ו-innerText של השורה מדלג על תאים מוסתרים. פותחים,
+  // וקוראים את התא עצמו — כשמוזנת עלות בפועל ה-title שלו אומר זאת,
+  // והטילדה (סימן האומדן) איננה.
+  await p.getByRole('button', { name: /כל העמודות/ }).first().click();
+  const costTr   = p.locator('tr').filter({ hasText: 'עלות מורה מוכנה' }).first();
+  const costCell = costTr.locator('td[title^="סכום בפועל מהנהלת החשבונות"]');
+  check('תא ההוצאות מסומן כסכום בפועל, לא אומדן', await costCell.count() === 1, `${await costCell.count()} תאים`);
+  const costTxt = ((await costCell.first().innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
+  check('בטבלת השליח הסכום בפועל בלי ~', costTxt.includes('5,400') && !costTxt.includes('~'), costTxt || 'התא לא נמצא');
 
   // ── 5. ריק = חזרה לאומדן ──
   await login(U.clerk);
@@ -124,6 +133,16 @@ try {
   await f2.press('Enter');
   const back = await settled(done.id, r => r.actual_employer_cost === null);
   check('ריק מחזיר לאומדן', !!back, back ? '' : 'הערך לא התאפס');
+
+  // ואצל השליח הטילדה חוזרת — בלעדיה "בלי ~" לעיל לא מוכיח דבר
+  await login(U.coord);
+  await p.getByText(SCHOOL).first().click();
+  await p.getByText('עלות מורה מוכנה').first().waitFor({ timeout: 15000 });
+  await p.getByRole('button', { name: /כל העמודות/ }).first().click();
+  const estCell = p.locator('tr').filter({ hasText: 'עלות מורה מוכנה' }).first()
+    .locator('td[title^="אומדן"]');
+  const estTxt = ((await estCell.first().innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
+  check('אחרי איפוס האומדן חוזר עם ~', await estCell.count() === 1 && estTxt.includes('~') && estTxt.includes('5,091'), estTxt || 'אין תא אומדן');
 
   // ── 6. מנהלת אינה יכולה (השרת) ──
   const { data: pu } = await admin.auth.admin.createUser({ email: 'act-prin@example.com', password: PW, email_confirm: true });

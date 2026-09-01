@@ -7,16 +7,6 @@ import fs from 'node:fs';
 import { ENV_FILE } from './test-env.mjs';
 import { chromium } from 'file:///C:/tmp/node_modules/playwright/index.mjs';
 import { createClient } from '@supabase/supabase-js';
-// המסגרת נטענת פעם אחת ומנווטת ב-hash, ולכן התכונה src קפואה על דף
-// הבית. הכתובת האמיתית היא זו של המסמך בתוך המסגרת.
-const frameUrl = async (page, tries = 14) => {
-  for (let i = 0; i < tries; i++) {
-    const f = page.frames().find(x => x.url().includes('educalc'));
-    if (f && /\/Calculators\/\w/.test(f.url())) return f.url();
-    await page.waitForTimeout(1200);
-  }
-  return page.frames().find(x => x.url().includes('educalc'))?.url() || '';
-};
 
 const env = Object.fromEntries(
   fs.readFileSync(ENV_FILE, 'utf8').split('\n').filter(Boolean)
@@ -130,7 +120,9 @@ try {
   // שורת המנהלת — המערכת יוצרת אותה עם פתיחת בית ספר מהממשק; כאן נוצרת ישירות
   await ins({ name: 'מנהלת בית הספר', gamul_role: 'principal', changed_at: null });
   const tPre  = await ins({ name: 'תיקונים ישן',  reform: 'pre', frontal_hours: 24, scope_pct: 92 });
-  const tHigh = await ins({ name: 'תיקונים עליון', level: 'high', frontal_hours: 23 });
+  // 20 שעות בחטיבה העליונה: מכסת עוז לתמורה היא 23, ולכן ההצעה 87% —
+  // אילו נותבה למכסת יסודי (26) ההצעה הייתה 77%. המספר מבחין בין המסלולים.
+  const tHigh = await ins({ name: 'תיקונים עליון', level: 'high', frontal_hours: 20 });
   const tOfek = await ins({ name: 'תיקונים אופק' });
 
   // ══ 2. השליח ══
@@ -166,53 +158,72 @@ try {
   await p.keyboard.press('Escape');
   await p.getByRole('button', { name: /סגירה/ }).first().click().catch(() => {});
 
-  // ══ 3. חשבת השכר ══
+  // מורת עוז לתמורה במודל החדש: הסימולטור ירד ב-1.9, ומה שנשאר לוודא הוא
+  // שחטיבה עליונה מחושבת ומוצגת לפי המכסה שלה — 23 שעות למשרה מלאה, לא 26.
+  // ניווט מלא ולא סגירת המודאל: חלון הגיבוי נשאר מעל הכול אם הסגירה החטיאה.
+  await p.goto('http://localhost:5190/');
+  await p.getByRole('button', { name: /יציאה/ }).first().waitFor({ timeout: 20000 });
+  await p.waitForTimeout(800);
+  await p.selectOption('select[title="בחירת חודש"]', MONTH).catch(() => {});
+  await p.waitForTimeout(600);
+  await p.getByRole('button', { name: /סימולציה/ }).first().click();
+  await p.getByRole('button', { name: /אחוזי משרה/ }).click();
+  await p.getByText('תיקונים עליון').first().waitFor({ timeout: 15000 });
+  const highCard = p.locator('.apple-card').filter({ hasText: 'תיקונים עליון' }).first();
+  const highTxt  = (await highCard.innerText()).replace(/\s+/g, ' ');
+  check('מורת חטיבה עליונה — הכרטיס נוקב במכסת 23 ובשלב עליון',
+    highTxt.includes('מתוך 23') && highTxt.includes('· עליון'), highTxt.slice(0, 160));
+  check('וההצעה לפי השעות נגזרת ממכסת עוז לתמורה',
+    highTxt.includes('לפי השעות · 87%'), highTxt.match(/לפי השעות · \d+%/)?.[0] || 'אין הצעה');
+  const elemCard = p.locator('.apple-card').filter({ hasText: 'תיקונים אופק' }).first();
+  const elemTxt  = (await elemCard.innerText()).replace(/\s+/g, ' ');
+  check('ומורת יסודי לצידה נשארת על מכסת 26', elemTxt.includes('מתוך 26'), elemTxt.slice(0, 140));
+
+  // ══ 3. חשבת השכר — שולחן השכר של המחזור החודשי ══
+  // הסימולטור והמסגרת של educalc ירדו ב-1.9. מה שנבדק עכשיו: לכל מורה
+  // כרטיס עם עמודת ברוטו אחת, ההקלדה נשמרת בשרת, ומינוס נחסם שם.
   await login(U.clerk);
   await p.selectOption('select[title="בחירת חודש"]', MONTH).catch(() => {});
   await p.waitForTimeout(800);
-  await p.getByText('תיקונים עליון').first().waitFor({ timeout: 15000 });
-  await p.getByText('תיקונים עליון').first().click();
-  await p.waitForTimeout(800);
-  check('מורת חטיבה עליונה מנותבת לעוז לתמורה', await p.getByPlaceholder('שכר משולב ממחשבון עוז לתמורה').count() > 0);
+  await p.getByText('תיקונים אופק').first().waitFor({ timeout: 15000 });
+  check('מסך החשבת בלי מסגרת מחשבון', await p.locator('iframe').count() === 0,
+    `${await p.locator('iframe').count()} מסגרות`);
+  const ofekCard = p.locator('.apple-card').filter({ hasText: 'תיקונים אופק' }).first();
+  const grossIn  = ofekCard.locator('label', { hasText: 'ברוטו' }).locator('input');
+  check('כרטיס המורה: שדה ברוטו יחיד ולצידו תוספת בית חב"ד',
+    await grossIn.count() === 1 && (await ofekCard.innerText()).includes('תוספת בית חב"ד'),
+    (await ofekCard.innerText()).replace(/\s+/g, ' ').slice(0, 120));
 
-  // לחיצה על שדה "עולם ישן" בכרטיס פעיל אינה מחליפה למחשבון אופק
-  await p.getByText('תיקונים אופק').first().click();
-  await p.waitForTimeout(800);
-  const oldField = p.getByPlaceholder('שכר משולב ממחשבון העולם הישן');
-  await oldField.click();
-  await p.waitForTimeout(4500);   // המסגרת מנווטת אחרי שהאתר מתייצב
-  const src = await frameUrl(p);
-  check('לחיצה על שדה "עולם ישן" משאירה את מחשבון העולם הישן', /OldWorld/.test(src || ''), src || '');
-
-  // מינוס נעצר בעברית — בשמירה (Enter בשלב הראשון רק עובר לשלב השני)
-  const ofekField = p.getByPlaceholder('שכר משולב ממחשבון אופק חדש');
-  await oldField.fill('-500');
-  await oldField.press('Enter');
-  await ofekField.fill('12500');
-  await ofekField.press('Enter');
-  await p.waitForTimeout(400);
-  check('סכום שלילי — הודעה בעברית, לא שגיאת Postgres', lastDialog.includes('חיובי'), lastDialog);
+  // מינוס: אילוץ המסד עוצר, ולא נשמר דבר
+  await grossIn.fill('-500');
+  await grossIn.press('Enter');
+  await p.waitForTimeout(1800);
   const { data: untouched } = await admin.from('teacher_months').select('official_gross').eq('id', tOfek.id).single();
-  check('ולא נשמר דבר', untouched.official_gross === null, String(untouched.official_gross));
+  check('ברוטו שלילי נדחה בשרת ולא נשמר', untouched.official_gross === null, String(untouched.official_gross));
 
-  // אגורות מתעגלות
-  await oldField.fill('8100.75');
-  await oldField.press('Enter');
-  await p.getByPlaceholder('שכר משולב ממחשבון אופק חדש').fill('12500');
-  await p.getByPlaceholder('שכר משולב ממחשבון אופק חדש').press('Enter');
-  const saved = await settled(tOfek.id, r => r.official_gross === 12500);
-  check('אגורות מתעגלות לשקל שלם', saved?.official_gross_pre === 8101, String(saved?.official_gross_pre));
+  // אגורות מתעגלות — בעמודת הברוטו האחת
+  await grossIn.fill('8100.75');
+  await grossIn.press('Enter');
+  const saved = await settled(tOfek.id, r => r.official_gross != null);
+  check('אגורות מתעגלות לשקל שלם', saved?.official_gross === 8101, String(saved?.official_gross));
 
-  // המונה אחרי שהכול אושר
+  // המונה אחרי שהכול הוזן ואושר
   const clerk = await client(U.clerk);
-  for (const t of [tPre, tHigh]) await clerk.from('teacher_months').update({ official_gross: 11000, official_gross_pre: t.reform === 'pre' ? null : 10500 }).eq('id', t.id);
+  for (const t of [tPre, tHigh]) {
+    const { error: ge } = await clerk.from('teacher_months').update({ official_gross: 11000 }).eq('id', t.id);
+    if (ge) throw new Error(`הזנת ברוטו ${t.name}: ${ge.message}`);
+  }
   const coord = await client(U.coord);
   for (const t of [tPre, tHigh, tOfek]) await coord.from('teacher_months').update({ approved: true }).eq('id', t.id);
   await p.reload();
   await p.getByRole('button', { name: /יציאה/ }).first().waitFor({ timeout: 20000 });
-  await p.waitForTimeout(1200);
+  await p.waitForTimeout(1000);
+  await p.selectOption('select[title="בחירת חודש"]', MONTH).catch(() => {});
+  await p.waitForTimeout(800);
+  const entryTab = await p.getByRole('button', { name: /הזנת שכר/ }).innerText();
+  check('אחרי שהכול הוזן הלשונית בלי מונה', !/\(\d+\)/.test(entryTab), entryTab);
   body = await p.locator('body').innerText();
-  check('אחרי שהכול אושר המונה לא מציג "0 / 3"', !/0 \/ \d+ הושלמו/.test(body) && body.includes('אין ממתינות'), body.match(/\d+ \/ \d+ הושלמו|אין ממתינות/)?.[0] || '');
+  check('והפאנל מאשר שכל הברוטו הוזן', body.includes('כל הברוטו הוזן'));
 
   // ══ 4. המנהלת: "שלח לשליח" בלי מייל שליח ══
   await login(U.prin);

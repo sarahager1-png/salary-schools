@@ -83,8 +83,10 @@ try {
   await login(U.clerk);
   // המסמכים עברו ללשונית משלהם בשולחן השכר, אחרי שמסך הסימולציה ירד
   await p.getByRole('button', { name: /תלושים ומסמכים/ }).click();
-  await p.getByText('מסמכים מהנהלת החשבונות').first().waitFor({ timeout: 15000 });
-  check('לחשבת השכר יש פאנל מסמכים לחודש', true);
+  // הכותרת נוקבת בחודש: ההעלאה עוברת דרך monthKey של המסך, וקובץ שעולה
+  // לחודש אחר נעלם מהרשימה בשקט. אם השולחן עומד על חודש אחר — נכשלים כאן.
+  await p.getByText('מסמכים מהנהלת החשבונות — יוני 2098').first().waitFor({ timeout: 15000 });
+  check('לחשבת השכר יש פאנל מסמכים לחודש הנבדק', true);
   const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n');
   await p.getByPlaceholder('הערה (לא חובה)').fill('דוח שכר מהמשרד');
   await p.locator('input[type="file"]').setInputFiles({ name: FILE, mimeType: 'application/pdf', buffer: pdfBytes });
@@ -159,6 +161,9 @@ try {
 
   // ── 7. מחיקה ──
   await login(U.clerk);
+  // החשבת נוחתת על "הזנת שכר" — המסמכים מאחורי הלשונית, כמו בצעד 1
+  await p.getByRole('button', { name: /תלושים ומסמכים/ }).click();
+  await p.getByText('מסמכים מהנהלת החשבונות — יוני 2098').first().waitFor({ timeout: 15000 });
   await p.getByText(FILE).first().waitFor({ timeout: 15000 });
   p.once('dialog', d => d.accept());
   await p.locator('button[title="מחיקה"]').first().click();
