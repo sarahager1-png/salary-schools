@@ -190,26 +190,40 @@ function currentScope(t) {
   }
   return { scopePct: t.scopePct || 100, frontalHours: t.frontalHours || baseFrontalFor(t) };
 }
-// אחוז המשרה בפועל. עורך הטבלה כותב scopePct גם לעולם ישן, אבל רשומות
-// ותיקות נשמרו ב-scope בלבד — ולכן שתיהן נקראות כאן.
+/*
+  אחוז המשרה בפועל — והוא סופי.
+
+  עד 1.9 המערכת הוסיפה כאן עוד עשר נקודות על מה שרשום, בהנחה שהרשום
+  הוא הבסיס מהשעות. הבדיקה מול המחשבון הרשמי הראתה את ההפך: האחוז
+  הרשום כבר כולל את תוספת האם. יוכבד דובקין מלמדת 21 שעות ועוד 3
+  למחנכת — 24 מתוך 30, שהם 80% — ורשום לה 91, כלומר 80 ועוד התוספת.
+  ההוספה השנייה הפכה אותה ל-101%, ומי שהקליד 101 למחשבון קיבל 8,508
+  במקום 7,666 שרשומים לה. אחת הכפילות האלה לכל אם ברשת.
+
+  הכלל עצמו (הוראת שרה, 1.9): 30 שעות הן 100% בעולם ישן, מחנכת מקבלת
+  3 שעות מעל מה שהיא מלמדת, ואם התוצאה עולה מעל 79% ומדובר באם —
+  מוסיפים עשר נקודות. לאם, בפועל, 27 שעות הן כבר 100%. הנוסחה הזאת
+  חיה ב-computedBaseScope ומוצעת ככפתור; היא אינה רצה מעצמה.
+*/
 function effectiveScope(t) {
   if (t.reform === 'ofek') return currentScope(t).scopePct || 100;
-  return (t.scope ?? t.scopePct ?? 100) + momScopeBonus(t);
+  return (t.scope ?? t.scopePct ?? 100);
 }
-// תוספת אם עובדת קיימת בעולם ישן בלבד. באופק חדש אין לה ביטוי בשכר,
-// ולכן מספר הילדים נאסף שם כמידע ואינו רכיב שכר.
-// זכאות בעולם ישן: ילד אחד ומעלה עד גיל 18, בהיקף משרה 79% ומעלה.
+// תוספת אם קיימת בעולם ישן בלבד. באופק אין לה ביטוי בשכר, ולכן מספר
+// הילדים נאסף שם כמידע ואינו רכיב שכר.
+//
+// זכאות: אֵם — ולא כל מי שיש לו ילדים. הזכאות נגזרה ממספר הילדים עד 18
+// בלבד, ולכן שלושה גברים ברשת קיבלו אותה על הנייר. gender='f' הוא
+// התנאי; שורה בלי מין אינה זכאית עד שייקבע.
 const MOM_MIN_SCOPE = 79;
+const isMother = t => t.gender === 'f' && (t.childrenUnder18 || 0) > 0;
 function momBonusEligible(t) {
-  return t.reform === 'pre' && (t.childrenUnder18 || 0) > 0
-    && (t.scope ?? t.scopePct ?? 100) >= MOM_MIN_SCOPE;
+  return t.reform === 'pre' && isMother(t) && computedBaseScope(t) > MOM_MIN_SCOPE;
 }
 // אם שמתחת לסף — לתצוגה בלבד, כדי שיהיה ברור שלא נשכחה אלא לא זכאית
 const momUnderThreshold = t =>
-  t.reform === 'pre' && (t.childrenUnder18 || 0) > 0
-  && (t.scope ?? t.scopePct ?? 100) < MOM_MIN_SCOPE;
-// עשר נקודות על אחוז המשרה, אוטומטית — הוראה מפורשת של שרה מ-27.8.
-// האחוז שמוקלד הוא הבסיס; התוספת מוצגת לידו ואינה נבלעת בשקט.
+  t.reform === 'pre' && isMother(t) && computedBaseScope(t) <= MOM_MIN_SCOPE;
+// עשר נקודות על אחוז המשרה. הן כבר בתוך האחוז הרשום — ראי effectiveScope.
 const MOM_SCOPE_BONUS = 10;
 // בסיס אחוז המשרה מהשעות: 30 שעות = משרה מלאה בעולם ישן, 26 באופק
 // (יסודי). מחנכת בעולם ישן מקבלת 3 שעות מעל מה שהיא מלמדת. תוספת
@@ -224,6 +238,12 @@ function computedBaseScope(t) {
   return full ? Math.round((h + hr) / full * 100) : 100;
 }
 const momScopeBonus = t => (momBonusEligible(t) ? MOM_SCOPE_BONUS : 0);
+/*
+  ההצעה שמוצגת ככפתור — מה שבאמת מוקלד למחשבון: הבסיס מהשעות, ועוד
+  תוספת האם כשהיא מגיעה. האחוז שנשמר הוא הסופי, ולכן ההצעה חייבת
+  להיות סופית גם היא. אין כאן מילוי אוטומטי; ההצעה מחכה ללחיצה.
+*/
+const suggestedScope = t => computedBaseScope(t) + momScopeBonus(t);
 function calcGross(t) {
   if (t._officialGross) return Number(t._officialGross);
   // שכר מנהל/ת אינו על סולם המורים, וגמול הניהול אינו אחוז מעליו: הוא
@@ -2177,7 +2197,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               <span style={{ fontSize:13, color:'var(--apple-text2)' }}>שנות ותק</span>
               <span style={{ fontWeight:700, color:'var(--apple-blue)' }}>{t.seniority}</span>
             </div>
-            <input type="range" min={0} max={40} value={t.seniority} onChange={e => set('seniority', +e.target.value)} style={{ accentColor:'var(--apple-blue)' }} />
+            <input type="range" min={1} max={40} value={Math.max(1, t.seniority || 1)} onChange={e => set('seniority', +e.target.value)} style={{ accentColor:'var(--apple-blue)' }} />
           </div>
 
           {/* תפקיד */}
@@ -2230,14 +2250,33 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             {momBonusEligible(t) && (
               <p style={{ fontSize:12, color:'var(--apple-purple)', fontWeight:600, marginTop:8 }}>
                 זכאית לתוספת אם — {t.childrenUnder18} ילדים עד גיל 18
-                {` · ${t.scopePct ?? t.scope ?? 100}% + ${MOM_SCOPE_BONUS} = ${effectiveScope(t)}% משרה`}
+                {` · ${effectiveScope(t)}% משרה — כולל תוספת אם`}
               </p>
             )}
             {t.reform === 'pre' && (t.childrenUnder18||0) > 0 && !momBonusEligible(t) && (
               <p style={{ fontSize:12, color:'var(--apple-orange)', marginTop:8 }}>
-                אחוז משרה נמוך מ-79% — אין זכאות לתוספת אם
+                {!t.gender ? 'חסר מין — תוספת אם ניתנת לאם בלבד'
+                  : t.gender !== 'f' ? 'תוספת אם ניתנת לאם בלבד'
+                  : `אחוז משרה ${computedBaseScope(t)}% — התוספת ניתנת מעל ${MOM_MIN_SCOPE}%`}
               </p>
             )}
+            {/* מין: הזכאות לתוספת אם נגזרה ממספר הילדים בלבד, ולכן שלושה
+                גברים ברשת הופיעו כזכאים. השדה נשאל כאן, ליד הילדים. */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginTop:10 }}>
+              <div>
+                <p style={{ fontSize:13.5, fontWeight:600, color:'var(--text)' }}>מין</p>
+                <p style={{ fontSize:12, color:'var(--text2)' }}>קובע את הזכאות לתוספת אם</p>
+              </div>
+              <div style={{ display:'flex', gap:6 }}>
+                {[{ v:'f', l:'אישה' }, { v:'m', l:'גבר' }].map(o => (
+                  <button key={o.v} onClick={() => set('gender', t.gender === o.v ? null : o.v)}
+                    className={`apple-btn ${t.gender === o.v ? 'apple-btn-blue' : 'apple-btn-ghost'}`}
+                    style={{ minHeight:32, padding:'0 14px', fontSize:12.5 }}>
+                    {o.l}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* מנהלת בית ספר אינה מזינה שכר, והשרת אוסר עליה את העמודות
@@ -3223,7 +3262,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         </select>
                       : <span style={{ color:'var(--text3)' }}>—</span>}
                   </td>
-                  <td><input type="number" className="apple-input" dir="ltr" value={editData.seniority??0} onChange={e=>setF('seniority',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td><input type="number" min="1" className="apple-input" dir="ltr" value={editData.seniority??1} onChange={e=>setF('seniority',Math.max(1, Number(e.target.value)||1))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td><input type="number" className="apple-input" dir="ltr" min="0" value={editData.frontalHours ?? baseFrontalFor(editData)}
                       max={hoursCeiling(editData) ?? 40}
                       onChange={e => {
@@ -3325,7 +3364,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           </select>
                         : <span style={{ color:'var(--text3)' }}>—</span>}
                     </td>
-                    <td><input type="number" className="apple-input" dir="ltr" value={d.seniority??0} onChange={e=>setF('seniority',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                    <td><input type="number" min="1" className="apple-input" dir="ltr" value={d.seniority??1} onChange={e=>setF('seniority',Math.max(1, Number(e.target.value)||1))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                     <td><input type="number" className="apple-input" dir="ltr" min="0" value={d.frontalHours ?? baseFrontalFor(d)}
                       max={hoursCeiling(editData) ?? 40}
                       onChange={e => {
@@ -3450,18 +3489,18 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       {/* שורת עזר אחת: הצעה ליישור לפי הנוסחה, ותוצאת האם.
                           כשהשדה כבר תואם — רק תוצאת האם, בלי רעש. */}
                       {t.reform === 'pre' && !isPrincipalRow(t)
-                        && computedBaseScope(t) !== (t.scope ?? t.scopePct ?? 100) ? (
+                        && suggestedScope(t) !== (t.scope ?? t.scopePct ?? 100) ? (
                         <button
                           title="לפי הנוסחה: שעות (ועוד 3 למחנכת בעולם ישן) חלקי 30, או 26 באופק. לחיצה מיישרת, ותוספת האם מעל."
-                          onClick={e => { e.stopPropagation(); saveRow({ ...t, scopePct: computedBaseScope(t), scope: computedBaseScope(t), scopeSetAt: new Date().toISOString() }); }}
+                          onClick={e => { e.stopPropagation(); const v = suggestedScope(t); saveRow({ ...t, scopePct: v, scope: v, scopeSetAt: new Date().toISOString() }); }}
                           style={{ display:'block', margin:'3px auto 0', fontSize:10.5, color:'#fff',
                             background:'var(--teal)', border:'none', cursor:'pointer', fontFamily:'inherit',
                             fontWeight:700, padding:'2px 8px', borderRadius:999, whiteSpace:'nowrap' }}>
-                          {`תקני ל-${computedBaseScope(t)}`}
+                          {`תקני ל-${suggestedScope(t)}`}
                         </button>
                       ) : momBonus ? (
                         <span style={{ display:'block', fontSize:10, color:'var(--purple)', fontWeight:700, marginTop:2 }}>
-                          {`+10 אם = ${effectiveScope(t)}%`}
+                          {`כולל +${MOM_SCOPE_BONUS} אם`}
                         </span>
                       ) : momUnderThreshold(t) ? (
                         <span style={{ display:'block', fontSize:10, color:'var(--text3)', marginTop:2 }}
@@ -4358,7 +4397,7 @@ function ScopePanel({ teachers, schools, onSave }) {
               const isOfek = t.reform === 'ofek';
               const full   = isOfek ? baseFrontalFor(t) : PRE_FRONTAL;
               const hr     = homeroomHours(t);
-              const sugg   = computedBaseScope(t);
+              const sugg   = suggestedScope(t);
               const cur    = vals[t.id] ?? '';
               const hasSim = Boolean(t._officialGross || t._officialGrossPre);
               return (
@@ -4597,7 +4636,7 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKid
                             {(t.childrenUnder18 || 0) > 0 && (
                               <span style={{ color:'var(--purple)', fontWeight:600 }}>
                                 {` · ${t.childrenUnder18} ילדים עד 18`}
-                                {momBonusEligible(t) ? ` · תוספת אם +${MOM_SCOPE_BONUS} למשרה` : ''}
+                                {momBonusEligible(t) ? ` · תוספת אם — כבר בתוך האחוז` : ''}
                               </span>
                             )}
                           </p>
@@ -4624,9 +4663,7 @@ function SimulatorView({ teachers, schools, onSaveGross, onSaveActual, onSaveKid
                             // שמוקלד למחשבון בשדה אחוז המשרה.
                             ['% משרה',   isOfek
                               ? `${dh?.scopePct ?? t.scopePct ?? 100}%`
-                              : momBonusEligible(t)
-                                ? `${t.scopePct ?? t.scope ?? 100} +10 אם = ${effectiveScope(t)}%`
-                                : `${effectiveScope(t)}%`],
+                              : `${effectiveScope(t)}%${momBonusEligible(t) ? ' (כולל תוספת אם)' : ''}`],
                             // מחנכת בעולם ישן משולמת על שלוש שעות מעל מה
                             // שהיא מלמדת. בלי לומר זאת, המספר במחשבון אינו
                             // מסתדר עם מה שהמנהלת הזינה.

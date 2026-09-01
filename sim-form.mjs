@@ -9,22 +9,26 @@
 // ── תרגום מורה לשדות הטופס. מה שלא ודאי — לא נשלח ──────────────
 const OLD_DARGA = { MA: '2', BA: '3', senior: '7', intern: '18' };
 const OLD_UNLICENSED_A = '12';        // שלב א — כל הבלתי מוסמכות ברשת
-const MOM_MIN_SCOPE = 79, MOM_BONUS = 10;
 
 export const dargaFor = (t) =>
   t.degree === 'unlicensed' ? OLD_UNLICENSED_A : (OLD_DARGA[t.degree] || null);
 
-// תוספת אם: עשר נקודות על אחוז המשרה, בעולם ישן בלבד, מ-79% ומעלה.
-// למחשבון אין שדה עבורה — היא נכנסת דרך אחוז המשרה, בדיוק כפי שהכרטיס
-// אומר לאסתר להקליד.
-export const momBonus = (t) =>
-  t.reform === 'pre' && (t.children_under_18 || 0) > 0 && (t.scope_pct ?? 100) >= MOM_MIN_SCOPE
-    ? MOM_BONUS : 0;
+/*
+  תוספת אם אינה נוספת כאן. למחשבון אין שדה עבורה והיא נכנסת דרך אחוז
+  המשרה — אבל האחוז שרשום במערכת כבר כולל אותה (אומת מול הנתונים,
+  1.9.2026: יוכבד דובקין מלמדת 24 שעות שהן 80%, ורשום לה 91). הוספה
+  כאן הייתה מקלידה 101 למחשבון ומקבלת 8,508 במקום 7,666.
+*/
 
-// כיתת חינוך: א' משלמת 11.5% וכיתות ב'–ו' 10%. הנתון שיש לנו הוא הגמול,
-// לא הכיתה עצמה, ולכן נבחרת נציגה של הטווח — ב' לכל ב'–ו'.
+/*
+  כיתת חינוך: א' משלמת 11.5% וכיתות ב'–ו' 10%. הנתון שיש לנו הוא הגמול
+  ולא הכיתה עצמה, ולכן נבחרת נציגה של הטווח — ב' לכל ב'–ו'.
+
+  גם למורת אופק. הסימולציה הזאת היא עולם ישן לכל דבר (הוראת שרה, 1.9),
+  והפער בינה לבין שכר האופק הוא תוספת בית חב"ד — כלומר כל שקל שחסר כאן
+  מנפח את התוספת שהרשת משלמת.
+*/
 export const kitaFor = (t) => {
-  if (t.reform !== 'pre') return null;
   const r = t.gamul_role || '';
   if (r === 'homeroom1') return '1';
   return /^homeroom/.test(r) ? '2' : null;
@@ -40,7 +44,7 @@ export const targetField = (t) => (t.reform === 'ofek' ? 'official_gross_pre' : 
 export function formFields(t) {
   const darga = dargaFor(t);
   if (!darga) return { skip: `אין במחשבון תואר "${t.degree}"` };
-  const pct = (t.scope_pct ?? 100) + momBonus(t);
+  const pct = t.scope_pct ?? 100;
   if (!(pct > 0 && pct <= 200)) return { skip: `אחוז משרה לא תקין (${pct})` };
   return {
     darga,
@@ -48,7 +52,6 @@ export function formFields(t) {
     pct: String(pct),
     kita: kitaFor(t),
     field: targetField(t),
-    mom: momBonus(t) > 0,
   };
 }
 

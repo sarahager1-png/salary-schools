@@ -30,7 +30,7 @@
 import fs from 'node:fs';
 import { chromium } from 'file:///C:/tmp/node_modules/playwright/index.mjs';
 import { createClient } from '@supabase/supabase-js';
-import { planFor, openForm, runOne, pickEnv } from './sim-form.mjs';
+import { planFor, openForm, runOne, setMonth, pickEnv } from './sim-form.mjs';
 
 // ── ארגומנטים ────────────────────────────────────────────────
 const arg = (name, def = null) => {
@@ -108,7 +108,7 @@ try {
       saved = 'נשמר';
     }
     done.push({ t, plan, gross });
-    console.log(`✓ ${t.name.padEnd(20)} ${t.reform === 'ofek' ? 'בסיס' : 'עולם ישן'} · דרגה ${plan.darga} · ותק ${plan.vetek} · ${plan.pct}%${plan.mom ? ' (כולל אם)' : ''}${plan.kita ? ' · מחנכת' : ''} → ${gross.toLocaleString('he-IL')} ₪ · ${saved}`);
+    console.log(`✓ ${t.name.padEnd(20)} ${t.reform === 'ofek' ? 'בסיס' : 'עולם ישן'} · דרגה ${plan.darga} · ותק ${plan.vetek} · ${plan.pct}%${plan.kita ? ' · מחנכת' : ''} → ${gross.toLocaleString('he-IL')} ₪ · ${saved}`);
   }
 } finally { await b.close(); }
 
