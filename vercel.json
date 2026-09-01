@@ -3,7 +3,15 @@
   "framework": "vite",
   "buildCommand": "vite build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
+  "crons": [
+    { "path": "/api/cron/monthly-open",    "schedule": "0 4 1 * *" },
+    { "path": "/api/cron/report-reminder", "schedule": "0 6 3 * *" },
+    { "path": "/api/cron/report-due",      "schedule": "0 15 5 * *" },
+    { "path": "/api/cron/payroll-cutoff",  "schedule": "0 15 6 * *" },
+    { "path": "/api/cron/maternity-watch", "schedule": "0 * * * *" },
+    { "path": "/api/cron/queue-drain",     "schedule": "*/10 * * * *" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
