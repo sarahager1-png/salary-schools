@@ -24,3 +24,6 @@ align-*.png
 print-report.pdf
 verify-sim-diffs.json
 g.txt
+computed-sims.json
+unexplained-gaps.json
+verify-sim-diffs.json

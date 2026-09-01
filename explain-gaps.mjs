@@ -23,7 +23,7 @@ const diffs = JSON.parse(fs.readFileSync('verify-sim-diffs.json', 'utf8'));
 console.log(`${diffs.length} פערים · מנסים שינוי אחד בכל פעם\n`);
 
 const b = await chromium.launch();
-const p = await (await b.newContext({ locale: 'he-IL', viewport: { width: 1300, height: 1500 } })).newPage();
+const p = await (await b.newContext({ locale: 'he-IL', viewport: { width: 1300, height: 1600 } })).newPage();
 const unexplained = [];
 
 try {
