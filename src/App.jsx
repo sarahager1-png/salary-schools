@@ -2475,7 +2475,89 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
 /* ═══════════════════════════════════════════════════════════════
    SCHOOL DETAIL
 ═══════════════════════════════════════════════════════════════ */
-function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn, userId }) {
+/* ═══════════════════════════════════════════════════════════════
+   הדיווח החודשי של המנהלת
+
+   מה שהמנהלת מדווחת כל חודש: מי נעדרה, מי מילאה מקום, ומי יצאה לחל"ד.
+   שלושת אלה כבר היו שדות בשורה — מה שחסר היה הרגע שבו היא אומרת
+   "סיימתי". בלעדיו אין דרך לדעת אם בית ספר שקט כי אין שינויים או כי
+   איש לא נגע בו, ואוטומציית ה-5 הייתה מסמנת את כולן כמאחרות.
+
+   "אין שינוי החודש" הוא התשובה הנכונה לרוב בתי הספר ברוב החודשים,
+   ולכן הוא כפתור ולא חוסר-מעש.
+═══════════════════════════════════════════════════════════════ */
+function ReportMonth({ school, teachers, monthKey, due, onReport }) {
+  const [busy, setBusy] = useState(false);
+  const [err,  setErr]  = useState('');
+  const [done, setDone] = useState(null);
+
+  const rows = teachers.filter(t => !unpaidThisMonth(t));
+  const reported = rows.length > 0 && rows.every(t => t._reportedAt);
+  const dueDate = due?.report ? new Date(due.report + 'T23:59:59') : null;
+  const daysLeft = dueDate ? Math.ceil((dueDate - new Date()) / 86400000) : null;
+  const past = dueDate ? new Date() > dueDate : false;
+
+  const send = async () => {
+    setBusy(true); setErr('');
+    try {
+      const r = await onReport(school.id, monthKey);
+      setDone(r?.late ? 'late' : 'ok');
+    } catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const changed = rows.filter(t => (t.absenceDays || 0) > 0 || (t.mmHours || 0) > 0 || t.leaveType);
+
+  return (
+    <div className="apple-card" style={{ padding:'14px 16px', marginBottom:14 }} dir="rtl">
+      <div style={{ display:'flex', alignItems:'center', gap:9, flexWrap:'wrap', marginBottom:4 }}>
+        <CalendarClock size={15} strokeWidth={2.3} color="var(--purple)" />
+        <p style={{ fontSize:13.5, fontWeight:700, color:'var(--text)' }}>הדיווח החודשי — {fmtMonth(monthKey)}</p>
+        {reported
+          ? <span className="apple-badge badge-green" style={{ fontSize:10.5, padding:'2px 8px' }}>נמסר</span>
+          : past
+            ? <span className="apple-badge badge-orange" style={{ fontSize:10.5, padding:'2px 8px' }}>אחרי המועד</span>
+            : daysLeft != null && <span className="apple-badge badge-purple" style={{ fontSize:10.5, padding:'2px 8px' }}>
+                {daysLeft === 0 ? 'היום המועד האחרון' : `נותרו ${daysLeft} ימים`}
+              </span>}
+      </div>
+      <p style={{ fontSize:11.5, color:'var(--text3)', lineHeight:1.6, marginBottom:10 }}>
+        העדרויות, מילוי מקום וחופשות לידה. {due?.report
+          ? `המועד האחרון ${String(due.report).split('-').reverse().join('/')} — דיווח שיגיע אחריו לא ייכנס לשכר החודש.`
+          : ''}
+      </p>
+
+      {changed.length > 0 && (
+        <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:10 }}>
+          {changed.map(t => (
+            <p key={t.id} style={{ fontSize:12, color:'var(--text2)' }}>
+              · <b>{t.name}</b>
+              {(t.absenceDays || 0) > 0 && ` · ${t.absenceDays} ימי היעדרות`}
+              {(t.mmHours || 0) > 0 && ` · ${t.mmHours} ש׳ מילוי מקום${t.mmFor ? ` במקום ${t.mmFor}` : ''}`}
+              {t.leaveType && ` · ${leaveLabel(t.leaveType)}`}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {err  && <p style={{ fontSize:12.5, color:'var(--danger)', marginBottom:8 }}>{err}</p>}
+      {done && (
+        <p style={{ fontSize:12.5, color: done === 'late' ? 'var(--warn)' : 'var(--ok)', fontWeight:600, marginBottom:8 }}>
+          {done === 'late'
+            ? 'הדיווח נמסר אחרי המועד — הוא מסומן, ויעבור לשכר רק באישור מפורש.'
+            : 'הדיווח נמסר. תודה.'}
+        </p>
+      )}
+
+      <button className="apple-btn apple-btn-blue" onClick={send} disabled={busy || reported}
+        style={{ minHeight:38, padding:'0 18px', fontSize:13, opacity: reported ? .5 : 1 }}>
+        {busy ? 'שולח…' : reported ? 'הדיווח נמסר' : changed.length ? 'שליחת הדיווח' : 'אין שינוי החודש — שליחה'}
+      </button>
+    </div>
+  );
+}
+
+function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn, userId, monthDue, onReportMonth }) {
   const [search, setSearch]           = useState('');
   const [showReport, setShowReport]   = useState(false);
   const [showAbsence, setShowAbsence] = useState(false);
@@ -2808,6 +2890,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 
       {/* ══ Table ══ */}
       <div style={{ maxWidth:1400, margin:'0 auto', padding:'18px 20px 40px' }}>
+        {/* הדיווח החודשי — למנהלת בלבד, בראש המסך שלה ולא בתחתיתו */}
+        {isPrincipal && onReportMonth && (
+          <ReportMonth school={school} teachers={ts} monthKey={activeMonth}
+            due={monthDue} onReport={onReportMonth} />
+        )}
         {/* 26 עמודות לא נכנסות במסך. בתצוגה המצומצמת נשארות רק אלה
             שההזנה השוטפת צריכה; ההסתרה ב-CSS לפי מיקום, כותרת ותא יחד. */}
         <div style={{ display:'flex', justifyContent:'flex-end', alignItems:'center', gap:10, marginBottom:8 }}>
@@ -5264,6 +5351,8 @@ export default function App() {
   const [user,    setUser]    = useState(null);   // הפרופיל: תפקיד, שם, בית ספר
   const [schools, setSchools] = useState([]);
   const [months,  setMonths]  = useState({});
+  // מועדי הדיווח לכל חודש — מסך הדיווח של המנהלת סופר לפיהם
+  const [due,     setDue]     = useState({});
   const [activeMonth, setActiveMonth] = useState(nowMonthKey());
   const [booting, setBooting] = useState(true);
   const [error,   setError]   = useState('');
@@ -5291,6 +5380,7 @@ export default function App() {
     setSchools(data.schools);
     for (const sc of (data.schools || [])) CHABAD_SUPP.set(sc.id, sc.chabadSupp !== false);
     setMonths(data.months);
+    setDue(data.due || {});
     MM_REPLACED.clear();
     for (const [mk, rows2] of Object.entries(data.months || {}))
       for (const r2 of rows2 || [])
@@ -5651,6 +5741,9 @@ export default function App() {
             onImportTeachers={onImportTeachers}
             activeMonth={activeMonth}
             fmtMonthFn={fmtMonth}
+            monthDue={due[activeMonth]}
+            onReportMonth={(schoolId, key) =>
+              store.reportMonth(schoolId, key).then(async r => { await refresh(); return r; })}
           />
         ) : view === 'calc' ? (
           <PayrollDesk

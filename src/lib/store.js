@@ -255,6 +255,8 @@ export async function loadAll() {
     schools: schoolsRes.data.map(rowToSchool),
     months,
     locked: Object.fromEntries(monthsRes.data.map(m => [m.key, m.locked])),
+    // מועדי הדיווח לכל חודש — מסך הדיווח של המנהלת סופר לפיהם
+    due: Object.fromEntries(monthsRes.data.map(m => [m.key, { report: m.report_due, submit: m.submit_due }])),
     approvers: (approversRes.data || []).map(a => ({ schoolId: a.school_id, name: a.full_name })),
   };
 }
@@ -601,4 +603,22 @@ export async function markNotificationRead(id) {
   const { error } = await supabase.from('notifications')
     .update({ read_at: new Date().toISOString() }).eq('id', id);
   raise(error, 'סימון ההתראה נכשל');
+}
+
+/* ── דיווח חודשי של המנהלת ──────────────────────────────────────
+   סימון "דיווחתי" על כל שורות בית הספר בחודש. השדות עצמם (העדרות,
+   מילוי מקום, חל"ד) נשמרים בשורה כרגיל; זה מה שמכריז שהחודש נמסר.
+
+   late נקבע בשרת ולא כאן: שעון הדפדפן אינו ראיה. הוא מחושב מול
+   months.report_due באותה שאילתה שכותבת את החותמת.
+*/
+export async function reportMonth(schoolId, monthKey) {
+  const { data: m } = await supabase.from('months').select('report_due').eq('key', monthKey).maybeSingle();
+  const now = new Date();
+  const late = m?.report_due ? now > new Date(m.report_due + 'T23:59:59') : false;
+  const { error } = await supabase.from('teacher_months')
+    .update({ reported_at: now.toISOString(), late_report: late })
+    .eq('school_id', schoolId).eq('month_key', monthKey);
+  raise(error, 'שליחת הדיווח נכשלה');
+  return { late };
 }
