@@ -3390,9 +3390,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     </td>}
                     {!isPrincipal && <td style={{ textAlign:'center', fontWeight:800, color: done ? 'var(--purple)' : 'var(--text3)' }}>
                       {done ? emp.total.toLocaleString('he-IL')+' ₪'
-                        : <span style={{ fontSize:13.2, color:'var(--text3)' }}>
-                            {t.reform === 'ofek' && t._officialGross && !t._officialGrossPre ? 'חסר עולם ישן' : 'חסר ברוטו'}
-                          </span>}
+                        : <span style={{ fontSize:13.2, color:'var(--text3)' }}>חסר ברוטו</span>}
                     </td>}
                     <td>
                       <div style={{ display:'flex', gap:4 }}>

@@ -124,6 +124,13 @@ function raise(error, fallback) {
     throw new Error('החיבור לשרת נחסם על ידי סינון התוכן של הרשת. יש לאשר את הכתובת supabase.co בסינון, או להתחבר מרשת אחרת.');
   }
   if (/duplicate key/i.test(m)) throw new Error('הרשומה כבר קיימת');
+  // אילוצי מסד על מספרים (ברוטו שלילי וכדומה) — הודעה בעברית במקום
+  // שגיאת Postgres גולמית. האילוץ עצמו נשאר במסד; כאן רק התרגום.
+  if (/violates check constraint/i.test(m)) {
+    if (/gross|cost|supp/i.test(m)) throw new Error('הסכום חייב להיות מספר חיובי');
+    if (/seniority/i.test(m))       throw new Error('ותק חייב להיות שנה אחת לפחות');
+    throw new Error('הערך שהוקלד אינו תקין');
+  }
   if (/failed to fetch|network|load failed/i.test(m)) throw new Error('אין חיבור לשרת. בדקי את האינטרנט ונסי שוב.');
   if (/JWT|not authenticated/i.test(m)) throw new Error('פג תוקף ההתחברות — התחברי מחדש');
   throw new Error(m || fallback || 'הפעולה נכשלה');
