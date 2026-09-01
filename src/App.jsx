@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import * as XLSX from 'xlsx';
 import {
   Briefcase, Calculator, School, Check, ArrowLeft, ArrowRight,
@@ -589,23 +589,20 @@ const preScopeSet = t => t.reform !== 'ofek' || t.scopePctPre != null;
 const scopeMissing = t =>
   isPending(t) && !isPrincipalRow(t) && (!scopeConfirmed(t) || !preScopeSet(t));
 
-// בחודש הראשון נדרש אישור רשתי נוסף אחרי אישור השליח. רק אחריו נשלחים
-// למורות נתוני ההעסקה לחתימה.
-const NETWORK_APPROVER = 'רינה אלהרר';
-// שורה מאושרת שהסימולציה שלה נמחקה אחרי האישור אינה עוברת הלאה: בלי
-// סימולציה מלאה אין מספר לחתום עליו, והמאשרת ראתה "בסיס 0" ו-818 ₪.
-const needsNetApproval = (t, isFirstMonth) =>
-  Boolean(isFirstMonth && t._approved && !t._netApproved && simComplete(t));
-const fullyApproved = (t, isFirstMonth) =>
-  Boolean(t._approved && simComplete(t) && (!isFirstMonth || t._netApproved));
+/*
+  אישור אחד, של שרה.
 
-// מי מאשרת את בית הספר: מאשר ייעודי אם יש, אחרת המאשרת הכללית.
-// השם המקודד נשאר רק כגיבוי לרגע שלפני הטעינה.
-function approverFor(approvers, schoolId) {
-  return approvers.find(a => a.schoolId === schoolId)
-      || approvers.find(a => !a.schoolId)
-      || { name: NETWORK_APPROVER, schoolId: null };
-}
+  עד 1.9 היה שלב שני — אישור רשתי בחודש הראשון, אצל רינה אלהרר. שרה
+  הכריעה שהוא יורד: "רינה לא מאשרת, רק אני". השורה עוברת לשכר ברגע
+  שהיא אישרה אותה, ולא ממתינה לאיש.
+
+  העמודות net_approved* נשארות במסד עם ההיסטוריה של החודש הראשון, ואינן
+  נקראות עוד. הן יימחקו במיגרציה נפרדת אחרי חודש עבודה תקין.
+
+  שורה מאושרת שהסימולציה שלה נמחקה אחרי האישור אינה עוברת הלאה: בלי
+  מספר אין מה לחתום עליו, והמאשרת ראתה "בסיס 0" ו-818 ₪.
+*/
+const fullyApproved = (t) => Boolean(t._approved && simComplete(t));
 
 function readableVal(field, val) {
   if (val === undefined || val === null || val === '') return '—';
@@ -1090,197 +1087,6 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
 /* ═══════════════════════════════════════════════════════════════
    NETWORK APPROVAL — אישור רשתי בחודש הראשון
 ═══════════════════════════════════════════════════════════════ */
-function NetworkApprovalView({ schools, teachers, isFirstMonth, monthLabel, onApprove,
-  approvers = [], user, firstMonthKey, firstMonthLabel, firstMonthPending = 0, onGoToMonth }) {
-  const [openSchool, setOpenSchool] = useState(null);
-
-  const waiting = teachers.filter(t => needsNetApproval(t, isFirstMonth));
-  // תחום האחריות: מאשר ייעודי — בית ספר אחד; המאשרת הכללית — כל מה
-  // שאין לו ייעודי. "אישור כל הרשת" שסיים ב"הכול מאושר" בזמן שעפולה
-  // חיכתה למענדי — נבע מכך שהמסך ספר רק את מה שה-RLS החזיר.
-  const mine   = user?.schoolId
-    ? schools.filter(s => s.id === user.schoolId)
-    : schools.filter(s => !approvers.some(a => a.schoolId === s.id));
-  const others = schools.filter(s => !mine.includes(s));
-  const scopeLabel = user?.schoolId ? (mine[0]?.name || 'בית הספר שלך') : 'כל בתי הספר באחריותך';
-  const nWorkers   = n => (n === 1 ? 'עובדת אחת' : `${n} עובדות`);
-  const othersNote = others.length
-    ? `${others.map(s => `${s.name} (${approverFor(approvers, s.id).name})`).join(', ')} — באישור של מאשר אחר`
-    : '';
-  const grouped = schools
-    .map(s => ({ school: s, list: waiting.filter(t => t.schoolId === s.id) }))
-    .filter(g => g.list.length > 0);
-  const totalCost = waiting.reduce((s, t) => s + calcEmployer(t).total, 0);
-
-  const confirmAnd = (list, what) => {
-    if (!list.length) return;
-    const cost = list.reduce((s, t) => s + calcEmployer(t).total, 0);
-    const ok = window.confirm(
-      `אישור ${what}\n\n${nWorkers(list.length)} · עלות מעסיק ${cost.toLocaleString('he-IL')} ₪ לחודש · ${(cost * 12).toLocaleString('he-IL')} ₪ לשנה\n\n`
-      + `לאחר האישור אפשר להפיק למורות את נתוני ההעסקה לחתימה.\n\nלאשר?`
-    );
-    if (ok) onApprove(list.map(t => t.id));
-  };
-
-  if (!isFirstMonth) {
-    return (
-      <div style={{ maxWidth:640, margin:'0 auto', padding:'60px 20px', textAlign:'center' }} dir="rtl">
-        <div style={{ width:56, height:56, borderRadius:17, background:'var(--ok-bg)', margin:'0 auto 14px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <ShieldCheck size={26} strokeWidth={2.2} color="var(--ok)" />
-        </div>
-        <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>אין צורך באישור רשתי ב{monthLabel}</p>
-        <p style={{ fontSize:13, color:'var(--text3)', marginTop:4, lineHeight:1.7 }}>
-          האישור הרשתי נדרש בחודש הראשון בלבד. בחודשים שאחריו האישור של השליח מספיק.
-        </p>
-        {firstMonthPending > 0 && onGoToMonth && (
-          <button className="apple-btn apple-btn-blue" style={{ marginTop:18 }} onClick={() => onGoToMonth(firstMonthKey)}>
-            <ShieldCheck size={15} strokeWidth={2.3} />
-            {nWorkers(firstMonthPending)} ממתינות לך ב{firstMonthLabel}
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ minHeight:'100vh' }} dir="rtl">
-      <div className="no-print" style={{ background:'var(--surface)', borderBottom:'1px solid var(--line)', padding:'18px 20px' }}>
-        <div style={{ maxWidth:1100, margin:'0 auto', display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
-          <div style={{ flex:1, minWidth:200 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:9 }}>
-              <span className="title-bar" />
-              <h1 style={{ fontSize:23, fontWeight:800, color:'var(--text)', letterSpacing:'-0.025em' }}>אישור רשתי — {monthLabel}</h1>
-            </div>
-            <p style={{ fontSize:13, color:'var(--text3)', marginTop:2, marginInlineStart:13 }}>
-              {waiting.length > 0
-                ? `${nWorkers(waiting.length)} ממתינות · עלות מעסיק ${totalCost.toLocaleString('he-IL')} ₪ לחודש · ${(totalCost * 12).toLocaleString('he-IL')} ₪ לשנה`
-                : others.length ? `סיימת את שלך · ${othersNote}` : 'הכול מאושר'}
-            </p>
-          </div>
-          {waiting.length > 0 && (
-            <button className="apple-btn apple-btn-blue" onClick={() => confirmAnd(waiting, scopeLabel)}>
-              <ShieldCheck size={15} strokeWidth={2.3} />
-              אישור {scopeLabel}
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div style={{ maxWidth:1100, margin:'0 auto', padding:'20px 20px 40px' }}>
-        {grouped.length === 0 ? (
-          <div className="apple-card" style={{ textAlign:'center', padding:'64px 20px' }}>
-            <div style={{ width:56, height:56, borderRadius:17, background:'var(--ok-bg)', margin:'0 auto 14px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <Check size={26} strokeWidth={2.4} color="var(--ok)" />
-            </div>
-            <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>אין מה לאשר כרגע</p>
-            <p style={{ fontSize:13, color:'var(--text3)', marginTop:4 }}>
-              עובדות מגיעות לכאן אחרי שהשליח אישר אותן.
-            </p>
-            {othersNote && <p style={{ fontSize:12.5, color:'var(--text3)', marginTop:10 }}>{othersNote}</p>}
-          </div>
-        ) : grouped.map(({ school, list }, i) => {
-          const open = openSchool === school.id;
-          const cost = list.reduce((s, x) => s + calcEmployer(x).total, 0);
-          return (
-            <div key={school.id} className="apple-card spring-enter" style={{ marginBottom:12, animationDelay:`${i*50}ms` }}>
-              <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 18px', flexWrap:'wrap' }}>
-                <button onClick={() => setOpenSchool(open ? null : school.id)}
-                  style={{ flex:1, minWidth:180, textAlign:'right', background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:'inherit' }}>
-                  <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)' }}>{school.name}</p>
-                  <p style={{ fontSize:12.5, color:'var(--text3)', marginTop:2 }}>
-                    {nWorkers(list.length)} · {cost.toLocaleString('he-IL')} ₪ לחודש · {open ? 'הסתר' : 'הצג פירוט'}
-                  </p>
-                </button>
-                <button className="apple-btn apple-btn-ghost" onClick={() => confirmAnd(list, school.name)}>
-                  <ShieldCheck size={14} strokeWidth={2.3} />
-                  אישור בית הספר
-                </button>
-              </div>
-
-              {open && (
-                <div className="sheet-scroll" style={{ maxHeight:'none', borderTop:'1px solid var(--line)' }}>
-                  <table className="apple-table" style={{ fontSize:13 }}>
-                    <thead>
-                      <tr>
-                        <th>שם עובדת</th>
-                        <th style={{ textAlign:'center' }}>מסלול</th>
-                        <th style={{ textAlign:'center' }}>% משרה</th>
-                        <th style={{ textAlign:'center' }}>פרונטלי</th>
-                        <th style={{ textAlign:'center' }}>בסיס</th>
-                        <th style={{ textAlign:'center' }}>תוספת בית חב"ד</th>
-                        <th style={{ textAlign:'center' }}>ברוטו</th>
-                        <th style={{ textAlign:'center', color:'var(--purple)' }}>סה״כ למעסיק</th>
-                        <th style={{ width:110 }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {list.map(x => {
-                        const emp = calcEmployer(x);
-                        const d   = deriveHours(x);
-                        return (
-                          <tr key={x.id}>
-                            <td style={{ fontWeight:600, color:'var(--text)' }}>
-                              {x.name}
-                              {isPrincipalRow(x) && <span className="apple-badge badge-purple" style={{ fontSize:10.5, padding:'2px 8px', marginInlineStart:6 }}>מנהלת</span>}
-                            </td>
-                            <td style={{ textAlign:'center' }}>{reformLabel(x.reform)}</td>
-                            <td style={{ textAlign:'center' }}>{effectiveScope(x)}%</td>
-                            <td style={{ textAlign:'center' }}>{d ? d.frontal : (x.frontalHours || '—')}</td>
-                            <td style={{ textAlign:'center' }}>{emp.base.toLocaleString('he-IL')}</td>
-                            <td style={{ textAlign:'center', color:'var(--purple)', fontWeight:600 }}>
-                              {emp.supplement ? emp.supplement.toLocaleString('he-IL') : '—'}
-                            </td>
-                            <td style={{ textAlign:'center', fontWeight:700, color:'var(--text)' }}>{emp.gross.toLocaleString('he-IL')}</td>
-                            <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)', cursor:'help' }}
-                              title={emp.isEstimate
-                                ? `אומדן ${emp.pct}% מעל הברוטו — ${emp.parts.filter(x => x.amount).map(x => `${x.label} ${x.amount.toLocaleString('he-IL')}`).join(' · ')}`
-                                : 'סכום בפועל מהנהלת החשבונות'}>
-                              {emp.isEstimate && <span style={{ color:'var(--warn)' }}>~</span>}
-                              {emp.total.toLocaleString('he-IL')} ₪
-                            </td>
-                            <td>
-                              <button className="apple-btn apple-btn-green" style={{ padding:'0 11px', minHeight:30, fontSize:12.5 }}
-                                onClick={() => confirmAnd([x], x.name)}>
-                                <Check size={13} strokeWidth={2.8} />
-                                אישור
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {(() => {
-                    // מה בתוך העלות. בלי זה שתי עובדות בברוטו זהה הציגו הפרש
-                    // של מאות שקלים בלי שום עמודה שמסבירה אותו — הוותק
-                    // (הבראה) ואחוז המשרה (ביגוד) נכנסים לעלות ולא לברוטו.
-                    const sums = {};
-                    for (const x of list) for (const part of calcEmployer(x).parts) sums[part.label] = (sums[part.label] || 0) + part.amount;
-                    return (
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:'4px 14px', padding:'9px 18px', borderTop:'1px solid var(--line)', background:'var(--fill)', fontSize:11.5, color:'var(--text3)' }}>
-                        <span style={{ fontWeight:700, color:'var(--text2)' }}>הוצאות מעביד:</span>
-                        {Object.entries(sums).filter(([, v]) => v).map(([k, v]) => (
-                          <span key={k}>{k} <b style={{ color:'var(--text2)' }}>{v.toLocaleString('he-IL')}</b></span>
-                        ))}
-                        <span style={{ marginInlineStart:'auto' }}>שנתי <b style={{ color:'var(--purple)' }}>{(cost * 12).toLocaleString('he-IL')} ₪</b></span>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:14, lineHeight:1.7 }}>
-          הסימון ~ מציין שעלות המעסיק היא אומדן שממתין לסכום מהנהלת החשבונות.<br/>
-          האומדן לפי רכיבי החוק: פנסיה ופיצויים 14.83% · קרן השתלמות 8.4% · מס שכר 7.5% · ביטוח לאומי מדורג · הבראה לפי ותק · ביגוד לפי משרה.
-          לכן שתי עובדות בברוטו זהה יכולות לעלות אחרת — הוותק ואחוז המשרה נכנסים לעלות.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════════════
    APPROVAL VIEW (coordinator only)
@@ -2852,7 +2658,7 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
 /* ═══════════════════════════════════════════════════════════════
    SCHOOL DETAIL
 ═══════════════════════════════════════════════════════════════ */
-function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn, isFirstMonth, approvers = [], userId }) {
+function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn, userId }) {
   const [search, setSearch]           = useState('');
   const [showReport, setShowReport]   = useState(false);
   const [showAbsence, setShowAbsence] = useState(false);
@@ -2861,7 +2667,6 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   const [details, setDetails]        = useState(null);   // נתוני העסקה לחתימה
   const [linkModal, setLinkModal]    = useState(false);  // קישור אישי למנהלת
   const schoolReform = school.reform || 'ofek';
-  const approverName = approverFor(approvers, school.id).name;
   const [editingId, setEditingId]   = useState(null);   // teacher id or 'new'
   const [editData,  setEditData]    = useState(null);
   const ts       = teachers.filter(t => t.schoolId === school.id);
@@ -3470,14 +3275,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           </span>
                         )}
                         {t._agreedGross && <span className="apple-badge badge-teal" style={{ fontSize:10.5, padding:'2px 8px' }} title="ברוטו מוסכם — לא מסימולציה">שכר מוסכם</span>}
-                        {needsNetApproval(t, isFirstMonth) && (
-                          <span className="apple-badge badge-orange" style={{ fontSize:10.5, padding:'2px 8px' }}
-                            title={`אושר בידי השליח, ממתין לאישור של ${approverName}`}>
-                            <ShieldCheck size={10} strokeWidth={2.5} />
-                            אצל {approverName}
-                          </span>
-                        )}
-                        {fullyApproved(t, isFirstMonth) && (
+                        {fullyApproved(t) && (
                           <span className="apple-badge badge-green" style={{ fontSize:10.5, padding:'2px 8px' }}
                             title="מאושר סופית — אפשר להפיק לה נתוני העסקה לחתימה">
                             <Check size={10} strokeWidth={3} />
@@ -3710,7 +3508,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       <div style={{ display:'flex', gap:4 }}>
                         <button className="apple-btn apple-btn-ghost" title="עריכה מהירה בשורה" onClick={() => startEdit(t)} style={{ padding:'0 9px', minHeight:30 }}><Pencil size={13} strokeWidth={2.2} /></button>
                         <button className="apple-btn apple-btn-ghost" title="פרטים מלאים — תפקיד, שלב, קבוצת גיל, שינויי משרה וקבצים" onClick={() => setFullEdit(t)} style={{ padding:'0 9px', minHeight:30 }}><Users size={13} strokeWidth={2.2} /></button>
-                        {fullyApproved(t, isFirstMonth) && (
+                        {fullyApproved(t) && (
                           <button className="apple-btn apple-btn-ghost" disabled={!hasContact(t)}
                             title={hasContact(t)
                               ? 'נתוני העסקה לחתימת העובדת'
@@ -3804,7 +3602,98 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 /* ═══════════════════════════════════════════════════════════════
    NETWORK REPORT
 ═══════════════════════════════════════════════════════════════ */
+// פירוט המשרות של בית ספר אחד, נפתח מתוך שורת הדוח. קריאה בלבד —
+// כל שינוי נעשה במסך בית הספר עצמו, שם יושבות ההרשאות והזרימה.
+function SchoolPositions({ school }) {
+  const ts = [...(school.ts || [])].sort((a, b) => calcEmployer(b).total - calcEmployer(a).total);
+  const nis = v => (v > 0 ? Math.round(v).toLocaleString('he-IL') + ' ₪' : '—');
+  const status = t => {
+    if (needsSim(t))      return { label: 'ממתין לסימולציה', cls: 'badge-orange' };
+    if (needsApproval(t)) return { label: 'ממתין לאישור השליח', cls: 'badge-orange' };
+    return { label: 'מאושר', cls: 'badge-green' };
+  };
+  const tot = ts.reduce((a, t) => {
+    const e = calcEmployer(t);
+    if (simComplete(t)) { a.gross += e.gross; a.total += e.total; }
+    a.hours += Number(t.frontalHours) || 0;
+    return a;
+  }, { gross: 0, total: 0, hours: 0 });
+
+  return (
+    <div style={{ padding:'14px 18px 18px' }}>
+      <p style={{ fontSize:12, fontWeight:700, color:'var(--text2)', marginBottom:8 }}>
+        פירוט המשרות — {school.name} · {ts.length} עובדי הוראה
+      </p>
+      <div className="sheet-wrap">
+        <table className="apple-table" style={{ fontSize:12.5 }}>
+          <thead>
+            <tr>
+              <th>שם</th>
+              <th>תפקיד</th>
+              <th style={{ textAlign:'center' }}>מסלול</th>
+              <th style={{ textAlign:'center' }}>אחוז משרה</th>
+              <th style={{ textAlign:'center' }}>שעות</th>
+              <th style={{ textAlign:'center' }}>ברוטו / חודש</th>
+              <th style={{ textAlign:'center' }}>ברוטו למעסיק</th>
+              <th style={{ textAlign:'center' }}>סטטוס</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ts.length === 0 && (
+              <tr><td colSpan={8} style={{ textAlign:'center', padding:22, color:'var(--text3)' }}>אין עדיין עובדי הוראה</td></tr>
+            )}
+            {ts.map(t => {
+              const emp = calcEmployer(t);
+              const derived = deriveHours(t);
+              const scope = t.reform === 'ofek' ? (derived?.scopePct || t.scopePct || 100) : (t.scope || 100);
+              const st = status(t);
+              const done = simComplete(t);
+              return (
+                <tr key={t.id}>
+                  <td style={{ fontWeight:600 }}>{isPrincipalRow(t) && <Briefcase size={11} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}{t.name}</td>
+                  <td style={{ color:'var(--text2)' }}>{t.role && t.role !== 'none' ? (ROLES.find(x => x.id === t.role)?.label.split('(')[0].trim() || '—') : '—'}</td>
+                  <td style={{ textAlign:'center' }}>{reformLabel(t.reform)}</td>
+                  {/* אחוז שלא נקבע ידנית מוצג באפור — 100 הוא ברירת המחדל במסד ולא בהכרח המצב בפועל */}
+                  <td style={{ textAlign:'center', fontWeight:600,
+                    color: scopeConfirmed(t) ? 'var(--text)' : 'var(--text3)' }}>
+                    {scope}%{!scopeConfirmed(t) && <span title="ברירת מחדל — טרם נקבע אחוז משרה"> *</span>}
+                  </td>
+                  <td style={{ textAlign:'center' }}>{Number(t.frontalHours) || '—'}</td>
+                  {/* בלי סימולציה מלאה אין ברוטו רשמי, ולכן גם אין מה לסכום */}
+                  <td style={{ textAlign:'center', color: done ? 'var(--text)' : 'var(--text3)' }}>{done ? nis(emp.gross) : '—'}</td>
+                  <td style={{ textAlign:'center', fontWeight:700, color: done ? 'var(--text)' : 'var(--text3)' }}>{done ? nis(emp.total) : '—'}</td>
+                  <td style={{ textAlign:'center' }}><span className={`apple-badge ${st.cls}`}>{st.label}</span></td>
+                </tr>
+              );
+            })}
+          </tbody>
+          {ts.length > 0 && (
+            <tfoot>
+              <tr>
+                <td colSpan={4} style={{ fontWeight:800 }}>סה״כ {school.name}</td>
+                <td style={{ textAlign:'center', fontWeight:700 }}>{tot.hours || '—'}</td>
+                <td style={{ textAlign:'center', fontWeight:700 }}>{nis(tot.gross)}</td>
+                <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>{nis(tot.total)}</td>
+                <td style={{ textAlign:'center', fontSize:11, color:'var(--text3)' }}>
+                  {school.officialCount < school.count ? `${school.count - school.officialCount} ללא סימולציה` : 'הכול רשמי'}
+                </td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+      <p style={{ fontSize:11, color:'var(--text3)', marginTop:8, lineHeight:1.7 }}>
+        הסכומים נספרים רק עבור משרות שהסימולציה שלהן הושלמה — לכן סה״כ בית הספר כאן זהה לשורה שבדוח.
+      </p>
+    </div>
+  );
+}
+
+
 function ReportView({ schools, teachers }) {
+  // לחיצה על שורת בית ספר פותחת את פירוט המשרות שלו. פתוח אחד בכל רגע —
+  // הדוח נועד להשוואה בין בתי ספר, לא לקריאה של כולם במקביל.
+  const [openSchool, setOpenSchool] = useState(null);
   const rows = schools.map(s => {
     const ts       = teachers.filter(t => t.schoolId === s.id);
     const tsOff    = ts.filter(simComplete);
@@ -3812,7 +3701,7 @@ function ReportView({ schools, teachers }) {
     const empTot   = tsOff.reduce((sum, t) => sum + calcEmployer(t).total, 0);
     const pending  = ts.filter(isPending).length;
     const usedHours = ts.reduce((sum, t) => sum + (Number(t.frontalHours) || 0), 0);
-    return { ...s, count: ts.length, officialCount: tsOff.length, gross, empTot,
+    return { ...s, ts, count: ts.length, officialCount: tsOff.length, gross, empTot,
              annual: empTot * 12, pending, usedHours, quota: Number(s.hoursQuota) || null };
   }).sort((a,b) => b.empTot - a.empTot);
 
@@ -3900,8 +3789,19 @@ function ReportView({ schools, teachers }) {
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.id}>
-                  <td style={{ fontWeight:700 }}>{r.name}</td>
+                <Fragment key={r.id}>
+                <tr onClick={() => r.count > 0 && setOpenSchool(openSchool === r.id ? null : r.id)}
+                    style={{ cursor: r.count > 0 ? 'pointer' : 'default',
+                             background: openSchool === r.id ? 'var(--purple-100)' : undefined }}
+                    title={r.count > 0 ? 'לפירוט המשרות' : ''}>
+                  <td style={{ fontWeight:700 }}>
+                    {r.count > 0 && (
+                      <ChevronLeft size={13} strokeWidth={2.6} color="var(--purple)"
+                        style={{ display:'inline', verticalAlign:'-2px', marginInlineEnd:5,
+                                 transform: openSchool === r.id ? 'rotate(-90deg)' : 'none', transition:'transform .15s' }} />
+                    )}
+                    {r.name}
+                  </td>
                   <td style={{ color:'var(--apple-text2)', fontSize:13 }}>{r.city||'—'}</td>
                   <td style={{ textAlign:'center', fontWeight:600 }}>
                     {r.count}
@@ -3925,6 +3825,14 @@ function ReportView({ schools, teachers }) {
                       : <span className="apple-badge badge-green"><Check size={12} strokeWidth={2.8} />מעודכן</span>}
                   </td>
                 </tr>
+                {openSchool === r.id && (
+                  <tr>
+                    <td colSpan={8} style={{ padding:0, background:'var(--bg)' }}>
+                      <SchoolPositions school={r} />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
             <tfoot>
@@ -5677,7 +5585,6 @@ export default function App() {
   const [obCode2] = useState(() => new URLSearchParams(window.location.search).get('f') || '');
   const [user,    setUser]    = useState(null);   // הפרופיל: תפקיד, שם, בית ספר
   const [schools, setSchools] = useState([]);
-  const [approvers, setApprovers] = useState([]);   // מי מאשרת כל בית ספר
   const [months,  setMonths]  = useState({});
   const [activeMonth, setActiveMonth] = useState(nowMonthKey());
   const [booting, setBooting] = useState(true);
@@ -5705,7 +5612,6 @@ export default function App() {
     const data = await store.loadAll();
     setSchools(data.schools);
     for (const sc of (data.schools || [])) CHABAD_SUPP.set(sc.id, sc.chabadSupp !== false);
-    setApprovers(data.approvers || []);
     setMonths(data.months);
     MM_REPLACED.clear();
     for (const [mk, rows2] of Object.entries(data.months || {}))
@@ -5754,7 +5660,7 @@ export default function App() {
         setUser(profile);
         // מי שהגיעה עם ?v= בכתובת ביקשה מסך מסוים — לא דורסים אותה
         if (!new URLSearchParams(window.location.search).get('v')) {
-          setView(profile.role === 'clerk' ? 'calc' : profile.role === 'network' ? 'netapprove' : 'schools');
+          setView(profile.role === 'clerk' ? 'calc' : 'schools');
         }
         const data = await refresh();
         landOnFirstMonth(profile, data);
@@ -5775,7 +5681,7 @@ export default function App() {
     setUser(profile);
     // מי שהגיעה עם ?v= בכתובת ביקשה מסך מסוים — לא דורסים אותה
     if (!new URLSearchParams(window.location.search).get('v')) {
-      setView(profile.role === 'clerk' ? 'calc' : profile.role === 'network' ? 'netapprove' : 'schools');
+      setView(profile.role === 'clerk' ? 'calc' : 'schools');
     }
     setBusy(true); setError('');
     try { landOnFirstMonth(profile, await refresh()); }
@@ -5804,7 +5710,6 @@ export default function App() {
 
   const teachers = months[activeMonth] || [];
 
-  const onNetApprove = (ids) => run(() => store.netApprove(ids));
 
   // ── חודש חדש ──
   const openNewMonth = () => {
@@ -5897,22 +5802,9 @@ export default function App() {
 
   const isCoord = user.role === 'coordinator';
   const isClerk = user.role === 'clerk';
-  const isNetApprover = user.role === 'network';
-  // האישור הרשתי נדרש בחודש הראשון שנפתח במערכת
-  const firstMonthKey = Object.keys(months).sort()[0] || activeMonth;
-  const isFirstMonth  = activeMonth === firstMonthKey;
-  const netPendingCount = teachers.filter(t => needsNetApproval(t, isFirstMonth)).length;
-  // לשליח: כמה אצל מי. "אצל רינה" היה שקר על עפולה ורעננה.
-  const netPendingBy = {};
-  for (const t of teachers) {
-    if (!needsNetApproval(t, isFirstMonth)) continue;
-    const who = approverFor(approvers, t.schoolId).name;
-    netPendingBy[who] = (netPendingBy[who] || 0) + 1;
-  }
-  const netPendingTitle = Object.entries(netPendingBy).map(([who, n]) => `${n} אצל ${who}`).join(' · ');
-  // למאשרת: מה מחכה לה בחודש הראשון, גם כשהיא עומדת על חודש אחר
-  const firstMonthPending = (months[firstMonthKey] || []).filter(t => needsNetApproval(t, true)).length;
 
+  // החודש הראשון מסומן בבורר החודשים — זה כל תפקידו מעכשיו
+  const firstMonthKey = Object.keys(months).sort()[0] || activeMonth;
   const needsSimCount      = teachers.filter(needsSim).length;
   const needsApprovalCount = teachers.filter(needsApproval).length;
   const sortedMonthKeys    = Object.keys(months).sort();
@@ -5933,7 +5825,7 @@ export default function App() {
             <div>
               <p style={{ fontWeight:700, fontSize:14.5, color:'var(--text)', letterSpacing:'-0.01em', lineHeight:1.25 }}>מערכת שכר מורים</p>
               <p style={{ fontSize:11.5, color:'var(--text3)', lineHeight:1.3 }}>
-                {isCoord ? 'שליח / מנהל רשת' : isClerk ? 'חשבת שכר' : isNetApprover ? `${user.name} · אישור רשתי${user.schoolId ? ' — ' + (schools.find(s => s.id === user.schoolId)?.name || '') : ''}` : `מנהלת: ${principalSchool?.name || ''}`}
+                {isCoord ? 'שליח / מנהל רשת' : isClerk ? 'חשבת שכר' : `מנהלת: ${principalSchool?.name || ''}`}
                 <span style={{ opacity:.55 }}>{` · גרסה ${BUILD}`}</span>
               </p>
             </div>
@@ -6018,14 +5910,6 @@ export default function App() {
               )}
             </div>
 
-            {isCoord && netPendingCount > 0 && (
-              <span className="apple-badge badge-orange" title={netPendingTitle}
-                style={{ whiteSpace:'nowrap' }}>
-                <ShieldCheck size={12} strokeWidth={2.3} />
-                {Object.keys(netPendingBy).length === 1 ? netPendingTitle : `${netPendingCount} באישור רשתי`}
-              </span>
-            )}
-
             <button className="nav-btn" onClick={() => setShowBackup(true)} title="גיבוי ושחזור">
               <Database size={15} strokeWidth={2.2} />
               גיבוי
@@ -6056,22 +5940,7 @@ export default function App() {
       )}
 
       <div className="flex-1">
-        {/* Clerk: only SimulatorView */}
-        {isNetApprover ? (
-          <NetworkApprovalView
-            schools={schools}
-            approvers={approvers}
-            user={user}
-            firstMonthKey={firstMonthKey}
-            firstMonthLabel={fmtMonth(firstMonthKey)}
-            firstMonthPending={firstMonthPending}
-            onGoToMonth={setActiveMonth}
-            teachers={teachers}
-            isFirstMonth={isFirstMonth}
-            monthLabel={fmtMonth(activeMonth)}
-            onApprove={onNetApprove}
-          />
-        ) : isClerk ? (
+        {isClerk ? (
           <SimulatorView
             teachers={teachers}
             schools={schools}
@@ -6089,7 +5958,7 @@ export default function App() {
           />
         ) : /* Principal: see only their school */
         !isCoord && principalSchool ? (
-          <SchoolView approvers={approvers} userId={user.id}
+          <SchoolView userId={user.id}
             school={principalSchool}
             teachers={teachers}
             userRole={user.role}
@@ -6100,7 +5969,6 @@ export default function App() {
             onImportTeachers={onImportTeachers}
             activeMonth={activeMonth}
             fmtMonthFn={fmtMonth}
-            isFirstMonth={isFirstMonth}
           />
         ) : view === 'calc' ? (
           <SimulatorView
@@ -6121,7 +5989,7 @@ export default function App() {
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} />
         ) : view === 'school' && activeSchool ? (
-          <SchoolView approvers={approvers} userId={user.id}
+          <SchoolView userId={user.id}
             school={activeSchool}
             teachers={teachers}
             userRole={user.role}
@@ -6132,7 +6000,6 @@ export default function App() {
             onImportTeachers={onImportTeachers}
             activeMonth={activeMonth}
             fmtMonthFn={fmtMonth}
-            isFirstMonth={isFirstMonth}
           />
         ) : (
           /* Coordinator: schools list */

@@ -10,7 +10,7 @@ import { ENV_FILE, URL } from './test-env.mjs';
 // חבילות מתקופת localStorage — בודקות אפליקציה שכבר לא קיימת.
 // נשמרות בהיסטוריה, לא רצות. אם צריך אותן: node <שם החבילה>
 const OBSOLETE = new Set([
-  'smoke.mjs', 'smoke-export.mjs', 'smoke-fields.mjs', 'smoke-netapproval.mjs',
+  'smoke.mjs', 'smoke-export.mjs', 'smoke-fields.mjs',
   'smoke-payroll.mjs', 'smoke-principal.mjs', 'smoke-principal-row.mjs',
   'smoke-seed.mjs', 'smoke-simulator.mjs',
 ]);
