@@ -580,3 +580,25 @@ export async function uploadContract(file) {
     .upload('contract/contract.pdf', file, { upsert: true, contentType: 'application/pdf' });
   raise(error, 'העלאת החוזה נכשלה');
 }
+
+/* ── התראות ────────────────────────────────────────────────────
+   הקו ששולח רשום על הנייד של שרה, ולכן התראה אליה לא תגיע בוואטסאפ
+   לעולם — היא נשמרת עם channel='inapp' ומוצגת כאן. השאר יוצאות בתור.
+*/
+export async function listNotifications({ limit = 60 } = {}) {
+  const { data, error } = await supabase.from('notifications')
+    .select('id, kind, to_name, body, month_key, channel, status, sent_at, read_at, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  raise(error, 'טעינת ההתראות נכשלה');
+  return (data || []).map(n => ({
+    id: n.id, kind: n.kind, toName: n.to_name, body: n.body, monthKey: n.month_key,
+    channel: n.channel, status: n.status, sentAt: n.sent_at, readAt: n.read_at, createdAt: n.created_at,
+  }));
+}
+
+export async function markNotificationRead(id) {
+  const { error } = await supabase.from('notifications')
+    .update({ read_at: new Date().toISOString() }).eq('id', id);
+  raise(error, 'סימון ההתראה נכשל');
+}

@@ -4273,6 +4273,102 @@ function ScopePanel({ teachers, schools, onSave }) {
    ואת המסמכים. אף אחת לא רואה את הלשונית של השנייה — לא כדי להסתיר,
    אלא כי שמירה שם הייתה נחסמת בשרת ממילא.
 ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   התראות
+
+   הקו ששולח את הוואטסאפ רשום על הנייד של שרה, ולכן הודעה אליה אינה
+   יכולה להגיע — וואטסאפ אינו מוסר ממספר אל עצמו. שתי הודעות חל"ד
+   אמיתיות הוכיחו זאת: הן נרשמו "נשלחו" ונחתו בצ'אט "הודעות לעצמי".
+
+   לכן ההתראות שלה נשארות כאן. מה שיצא באמת למנהלות ולחשבת מוצג לצידן,
+   עם הסטטוס — כדי שיהיה מקום אחד שאומר מה המערכת אמרה ולמי.
+═══════════════════════════════════════════════════════════════ */
+function NotificationsView() {
+  const [rows, setRows] = useState(null);
+  const [err,  setErr]  = useState('');
+  const [tab,  setTab]  = useState('mine');
+
+  // כל setState קורה אחרי await ולא בגוף האפקט — אפקט שקורא setState
+  // ישירות רץ פעמיים ב-StrictMode ומרנדר מחדש בלי סיבה.
+  const load = useCallback(async () => {
+    try { setRows(await store.listNotifications()); }
+    catch (e) { setErr(e.message); }
+  }, []);
+  useEffect(() => { let alive = true; (async () => { if (alive) await load(); })(); return () => { alive = false; }; }, [load]);
+
+  if (err)   return <p style={{ padding:20, color:'var(--danger)', fontSize:13 }}>{err}</p>;
+  if (!rows) return null;
+
+  const mine = rows.filter(n => n.channel === 'inapp');
+  const sent = rows.filter(n => n.channel !== 'inapp');
+  const list = tab === 'mine' ? mine : sent;
+  const unread = mine.filter(n => !n.readAt).length;
+
+  const KIND_LABEL = {
+    report_due_summary: 'סיכום ה-5 בחודש',
+    payroll_cutoff:     'סגירת ה-6 — מי לא עברה לשכר',
+    maternity_alert:    'חופשת לידה',
+    report_reminder:    'תזכורת דיווח',
+    test_line:          'בדיקת קו',
+  };
+  const when = iso => new Date(iso).toLocaleString('he-IL', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+
+  const markRead = async (n) => {
+    if (n.readAt) return;
+    try { await store.markNotificationRead(n.id); await load(); } catch (e) { setErr(e.message); }
+  };
+
+  return (
+    <div className="fade-in" style={{ maxWidth:820, margin:'0 auto', padding:'18px 20px 40px' }} dir="rtl">
+      <div className="apple-seg" style={{ marginBottom:14 }}>
+        <button onClick={() => setTab('mine')} className={['apple-seg-item', tab === 'mine' ? 'active' : ''].join(' ')}
+          style={{ padding:'6px 13px', fontSize:13 }}>
+          אליי{unread ? ` (${unread})` : ''}
+        </button>
+        <button onClick={() => setTab('sent')} className={['apple-seg-item', tab === 'sent' ? 'active' : ''].join(' ')}
+          style={{ padding:'6px 13px', fontSize:13 }}>
+          מה שנשלח ({sent.length})
+        </button>
+      </div>
+
+      {tab === 'mine' && (
+        <p style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6, marginBottom:12 }}>
+          כאן נשמרת כל התראה שהמערכת הפיקה, גם אחרי שהיא נשלחה בוואטסאפ.
+          הוואטסאפ נעלם בין הודעות; זה נשאר.
+        </p>
+      )}
+
+      {list.length === 0 && (
+        <p style={{ fontSize:13, color:'var(--text3)', textAlign:'center', padding:'40px 0' }}>
+          {tab === 'mine' ? 'אין התראות' : 'טרם נשלחו הודעות'}
+        </p>
+      )}
+
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {list.map(n => (
+          <div key={n.id} className="apple-card" onClick={() => markRead(n)}
+            style={{ padding:'12px 14px', cursor: n.readAt || tab !== 'mine' ? 'default' : 'pointer',
+                     borderRight: !n.readAt && tab === 'mine' ? '3px solid var(--purple)' : '3px solid transparent' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:4 }}>
+              <span style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>
+                {KIND_LABEL[n.kind] || n.kind}
+              </span>
+              {tab === 'sent' && (
+                <span className={`apple-badge badge-${n.status === 'sent' ? 'green' : n.status === 'failed' ? 'orange' : 'purple'}`}
+                  style={{ fontSize:10.5, padding:'2px 8px' }}>
+                  {n.status === 'sent' ? 'נשלח' : n.status === 'failed' ? 'נכשל' : 'ממתין'} · {n.toName || ''}
+                </span>
+              )}
+              <span style={{ fontSize:11, color:'var(--text3)', marginInlineStart:'auto' }}>{when(n.createdAt)}</span>
+            </div>
+            <p style={{ fontSize:12.5, color:'var(--text2)', whiteSpace:'pre-wrap', lineHeight:1.6 }}>{n.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveScope,
                        activeMonth, userRole, userId }) {
   const isClerk = userRole === 'clerk';
@@ -5180,7 +5276,7 @@ export default function App() {
   */
   const [view,          setView]          = useState(() => {
     const v = new URLSearchParams(window.location.search).get('v');
-    return ['schools', 'calc', 'report', 'netapprove'].includes(v) ? v : 'schools';
+    return ['schools', 'calc', 'report', 'alerts'].includes(v) ? v : 'schools';
   });
   const [activeSchool,  setActiveSchool]  = useState(null);
   const [schoolModal,   setSchoolModal]   = useState(null);
@@ -5426,6 +5522,13 @@ export default function App() {
                 דוח רשת
               </button>
             )}
+            {/* מה שהמערכת אמרה ולמי — הוואטסאפ נבלע בין הודעות, זה נשאר */}
+            {(isCoord || isClerk) && (
+              <button className={`nav-btn ${view==='alerts' ? 'active' : ''}`} onClick={() => setView('alerts')}>
+                <Bell size={15} strokeWidth={2.2} />
+                התראות
+              </button>
+            )}
             {(isCoord || isClerk) && (
               <button className={`nav-btn ${view==='calc' ? 'active' : ''}`} onClick={() => setView('calc')} style={{ position:'relative' }}>
                 <Calculator size={15} strokeWidth={2.2} />
@@ -5562,6 +5665,8 @@ export default function App() {
               which === 'gender' ? { id, gender: val }
                 : { id, scopePct: val, scopeSetAt: new Date().toISOString() }, activeMonth))}
           />
+        ) : view === 'alerts' ? (
+          <NotificationsView />
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} />
         ) : view === 'school' && activeSchool ? (

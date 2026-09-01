@@ -26,6 +26,8 @@ export default async function handler(req, res) {
   const { data: rows, error } = await sb.from('notifications')
     .select('id, to_phone, to_name, body, attempts')
     .eq('status', 'pending')
+    // inapp אינה יוצאת לשום מקום — היא מוצגת במסך
+    .eq('channel', 'whatsapp')
     .lte('send_after', new Date().toISOString())
     .order('send_after')
     .limit(MAX_PER_RUN);
