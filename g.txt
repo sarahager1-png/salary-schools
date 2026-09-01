@@ -1,0 +1,8 @@
+מסד: https://dovgircrzeputtkgxdsv.supabase.co  (.env.test)
+חבילות: 2
+
+✓ smoke-align.mjs          PASS  15  FAIL  0  SKIP  0  13s
+✓ smoke-scope.mjs          PASS  16  FAIL  0  SKIP  0  52s
+
+סך הכול: PASS 31  FAIL 0  SKIP 0
+הכול ירוק, בלי דילוגים.

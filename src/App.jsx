@@ -678,7 +678,7 @@ function UpdateBanner() {
       }}
       style={{ position:'fixed', bottom:16, insetInlineStart:16, zIndex:99,
         background:'var(--teal)', color:'#fff', border:'none', borderRadius:12,
-        padding:'10px 18px', fontSize:13.5, fontWeight:700, fontFamily:'inherit',
+        padding:'10px 18px', fontSize:15.5, fontWeight:700, fontFamily:'inherit',
         cursor:'pointer', boxShadow:'0 4px 14px rgba(0,180,204,.35)' }}>
       יש גרסה חדשה — לחצי לרענון
     </button>
@@ -735,8 +735,8 @@ function LoginScreen({ onSignedIn, initialError = '' }) {
         <div style={{ textAlign:'center', marginBottom:26 }}>
           <img src="/logo-chabad.png" alt="רשת חינוך חב״ד"
             style={{ height:56, width:'auto', objectFit:'contain', margin:'0 auto 16px', display:'block' }} />
-          <h1 style={{ fontSize:27, fontWeight:800, letterSpacing:'-0.03em', color:'var(--text)', marginBottom:5 }}>מערכת שכר מורים</h1>
-          <p style={{ fontSize:14, color:'var(--text3)' }}>ניהול תקציב שכר — רשת בתי הספר</p>
+          <h1 style={{ fontSize:31, fontWeight:800, letterSpacing:'-0.03em', color:'var(--text)', marginBottom:5 }}>מערכת שכר מורים</h1>
+          <p style={{ fontSize:16.1, color:'var(--text3)' }}>ניהול תקציב שכר — רשת בתי הספר</p>
         </div>
 
         <div className="apple-card" style={{ padding:'24px 22px' }}>
@@ -755,7 +755,7 @@ function LoginScreen({ onSignedIn, initialError = '' }) {
 
           {linkSent && (
             <div style={{ background:'var(--ok-bg)', border:'1px solid var(--ok-line)', borderRadius:12,
-              padding:'11px 13px', marginBottom:14, fontSize:13, color:'var(--ok)', lineHeight:1.7 }}>
+              padding:'11px 13px', marginBottom:14, fontSize:14.9, color:'var(--ok)', lineHeight:1.7 }}>
               <b>נשלח קישור כניסה ל־{linkSent}</b><br/>
               פתחי אותו <b>מהמכשיר הזה</b>. הקישור תקף לשעה.
             </div>
@@ -763,27 +763,27 @@ function LoginScreen({ onSignedIn, initialError = '' }) {
 
           {error && (
             <div style={{ background:'var(--danger-bg)', border:'1px solid var(--danger-line)', borderRadius:12,
-              padding:'10px 13px', marginBottom:14, fontSize:13, color:'var(--danger)', fontWeight:600 }}>
+              padding:'10px 13px', marginBottom:14, fontSize:14.9, color:'var(--danger)', fontWeight:600 }}>
               {error}
             </div>
           )}
 
           <button type="submit" disabled={busy || !email.trim() || !password}
             className="apple-btn apple-btn-blue"
-            style={{ width:'100%', minHeight:48, fontSize:15.5, fontWeight:700 }}>
+            style={{ width:'100%', minHeight:48, fontSize:17.8, fontWeight:700 }}>
             {busy ? 'מתחברת…' : 'כניסה למערכת'}
             {!busy && <ArrowLeft size={17} strokeWidth={2.5} />}
           </button>
 
           <div style={{ display:'flex', alignItems:'center', gap:10, margin:'16px 0 14px' }}>
             <div style={{ flex:1, height:1, background:'var(--line)' }} />
-            <span style={{ fontSize:11.5, color:'var(--text3)' }}>או בלי סיסמה</span>
+            <span style={{ fontSize:13.2, color:'var(--text3)' }}>או בלי סיסמה</span>
             <div style={{ flex:1, height:1, background:'var(--line)' }} />
           </div>
 
           <button type="button" onClick={sendLink} disabled={busy || !email.trim()}
             className="apple-btn apple-btn-ghost"
-            style={{ width:'100%', minHeight:46, fontSize:14.5, fontWeight:600, gap:8 }}>
+            style={{ width:'100%', minHeight:46, fontSize:16.7, fontWeight:600, gap:8 }}>
             <Send size={16} strokeWidth={2.3} />
             שלחו לי קישור כניסה למייל
           </button>
@@ -793,7 +793,7 @@ function LoginScreen({ onSignedIn, initialError = '' }) {
               <div style={{ height:10 }} />
               <button type="button" onClick={google} disabled={busy}
                 className="apple-btn apple-btn-ghost"
-                style={{ width:'100%', minHeight:48, fontSize:15, fontWeight:600, gap:10 }}>
+                style={{ width:'100%', minHeight:48, fontSize:17.2, fontWeight:600, gap:10 }}>
                 <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
                   <path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.8-2.1 5.1-4.4 6.7v5.5h7.1c4.2-3.8 6.6-9.5 6.6-16.2z"/>
                   <path fill="#34A853" d="M24 46c6 0 11-2 14.6-5.3l-7.1-5.5c-2 1.3-4.5 2.1-7.5 2.1-5.8 0-10.7-3.9-12.4-9.1H4.3v5.7C7.9 41.1 15.4 46 24 46z"/>
@@ -806,7 +806,7 @@ function LoginScreen({ onSignedIn, initialError = '' }) {
           )}
         </div>
 
-        <p style={{ textAlign:'center', fontSize:12, color:'var(--text3)', marginTop:18, lineHeight:1.7 }}>
+        <p style={{ textAlign:'center', fontSize:13.8, color:'var(--text3)', marginTop:18, lineHeight:1.7 }}>
           מנהלות בית ספר נכנסות דרך הקישור האישי שנשלח אליהן.<br/>
           {hasGoogle && <>הכניסה עם גוגל היא לחשבון שהוגדר לך במערכת.<br/></>}
           רשת חינוך חב״ד
@@ -830,7 +830,7 @@ function TeacherDiff({ t }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
       {diffs.map(k => (
-        <div key={k} style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', fontSize:12 }}>
+        <div key={k} style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', fontSize:13.8 }}>
           <span style={{ color:'var(--apple-text2)' }}>{FIELD_LBL[k]}:</span>
           <span style={{ textDecoration:'line-through', color:'var(--apple-red)' }}>{readableVal(k, t._snapshot[k])}</span>
           <span style={{ color:'var(--apple-text3)' }}>→</span>
@@ -873,21 +873,21 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
     <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:100, overflowY:'auto', padding:'24px 16px' }} dir="rtl">
       <div className="apple-card" style={{ maxWidth:640, margin:'0 auto', padding:0 }}>
         <div className="no-print" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'14px 20px', borderBottom:'1px solid var(--line)' }}>
-          <h2 style={{ fontSize:17, fontWeight:800, color:'var(--text)' }}>נתוני העסקה לחתימה</h2>
+          <h2 style={{ fontSize:19.5, fontWeight:800, color:'var(--text)' }}>נתוני העסקה לחתימה</h2>
           <div style={{ display:'flex', gap:8 }}>
-            <button className="apple-btn apple-btn-blue" onClick={() => window.print()} style={{ minHeight:36, fontSize:13 }}>
+            <button className="apple-btn apple-btn-blue" onClick={() => window.print()} style={{ minHeight:36, fontSize:14.9 }}>
               <Printer size={14} strokeWidth={2.2} />
               הדפסה / PDF
             </button>
-            <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ minHeight:36, fontSize:13 }}>סגירה</button>
+            <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ minHeight:36, fontSize:14.9 }}>סגירה</button>
           </div>
         </div>
 
         <div style={{ padding:'24px 28px 28px' }}>
           <div style={{ textAlign:'center', marginBottom:20 }}>
             <img src="/logo-chabad.png" alt="רשת חינוך חב״ד" style={{ height:46, margin:'0 auto 10px', display:'block' }} />
-            <h3 style={{ fontSize:19, fontWeight:800, color:'var(--text)', letterSpacing:'-0.02em' }}>נתוני העסקה</h3>
-            <p style={{ fontSize:13, color:'var(--text3)', marginTop:3 }}>{school?.name} · {monthLabel}</p>
+            <h3 style={{ fontSize:21.8, fontWeight:800, color:'var(--text)', letterSpacing:'-0.02em' }}>נתוני העסקה</h3>
+            <p style={{ fontSize:14.9, color:'var(--text3)', marginTop:3 }}>{school?.name} · {monthLabel}</p>
           </div>
 
           <table className="apple-table" style={{ marginBottom:18 }}>
@@ -906,7 +906,7 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
               <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0',
                 borderTop: i === pay.length - 1 ? '1px solid var(--line)' : undefined,
                 marginTop: i === pay.length - 1 ? 6 : 0, paddingTop: i === pay.length - 1 ? 10 : 5 }}>
-                <span style={{ fontSize:13.5, color:'var(--text2)', fontWeight: i === pay.length - 1 ? 700 : 400 }}>{k}</span>
+                <span style={{ fontSize:15.5, color:'var(--text2)', fontWeight: i === pay.length - 1 ? 700 : 400 }}>{k}</span>
                 <span className="num" style={{ fontSize: i === pay.length - 1 ? 17 : 14,
                   fontWeight: i === pay.length - 1 ? 800 : 600,
                   color: i === pay.length - 1 ? 'var(--purple)' : 'var(--text)' }}>
@@ -916,7 +916,7 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
             ))}
           </div>
 
-          <p style={{ fontSize:12.5, color:'var(--text2)', lineHeight:1.8, marginBottom:20 }}>
+          <p style={{ fontSize:14.4, color:'var(--text2)', lineHeight:1.8, marginBottom:20 }}>
             אני החתומה מטה מאשרת שנתוני ההעסקה המפורטים לעיל נכונים, ושהם משקפים את
             תנאי העסקתי ברשת חינוך חב״ד.
           </p>
@@ -925,12 +925,12 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
             {['חתימת העובדת', 'תאריך'].map(l => (
               <div key={l}>
                 <div style={{ borderBottom:'1px solid var(--text3)', height:44 }} />
-                <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:5 }}>{l}</p>
+                <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:5 }}>{l}</p>
               </div>
             ))}
           </div>
 
-          <p style={{ fontSize:10.5, color:'var(--text3)', marginTop:22, lineHeight:1.7, textAlign:'center' }}>
+          <p style={{ fontSize:12.1, color:'var(--text3)', marginTop:22, lineHeight:1.7, textAlign:'center' }}>
             מסמך פנימי של רשת חינוך חב״ד. אינו מחליף טופס 101.
           </p>
         </div>
@@ -963,31 +963,31 @@ function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
         {/* Header */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
           <div>
-            <h2 style={{ fontSize:20, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)', marginBottom:2 }}>אישור שכר חודשי</h2>
-            <p style={{ fontSize:13, color:'var(--apple-text2)' }}>{readyToApprove.length} ממתינים לאישורך</p>
+            <h2 style={{ fontSize:23, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)', marginBottom:2 }}>אישור שכר חודשי</h2>
+            <p style={{ fontSize:14.9, color:'var(--apple-text2)' }}>{readyToApprove.length} ממתינים לאישורך</p>
           </div>
           <div style={{ display:'flex', gap:8 }}>
             {readyToApprove.length > 0 && (
-              <button className="apple-btn apple-btn-green" onClick={onApproveAll} style={{ fontSize:13 }}>
+              <button className="apple-btn apple-btn-green" onClick={onApproveAll} style={{ fontSize:14.9 }}>
                 אשר הכל ({readyToApprove.length})
               </button>
             )}
-            <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ fontSize:13 }}>סגור</button>
+            <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ fontSize:14.9 }}>סגור</button>
           </div>
         </div>
 
         {/* ממתינים לסימולציה */}
         {waitingSim.length > 0 && (
           <div className="apple-card" style={{ padding:16, marginBottom:16, borderRight:'3px solid var(--apple-orange)' }}>
-            <p style={{ fontWeight:600, fontSize:14, color:'var(--apple-text)', marginBottom:4 }}>
+            <p style={{ fontWeight:600, fontSize:16.1, color:'var(--apple-text)', marginBottom:4 }}>
               {waitingSim.length} מורים ממתינים לסימולציה
             </p>
-            <p style={{ fontSize:12, color:'var(--apple-text2)', marginBottom:10 }}>אחרי שחשבת השכר תזין שכר רשמי, הם יופיעו כאן</p>
+            <p style={{ fontSize:13.8, color:'var(--apple-text2)', marginBottom:10 }}>אחרי שחשבת השכר תזין שכר רשמי, הם יופיעו כאן</p>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               {waitingSim.slice(0, 8).map(t => (
                 <span key={t.id} className="apple-badge badge-orange">{t.name}</span>
               ))}
-              {waitingSim.length > 8 && <span style={{ fontSize:12, color:'var(--apple-text2)' }}>ועוד {waitingSim.length - 8}...</span>}
+              {waitingSim.length > 8 && <span style={{ fontSize:13.8, color:'var(--apple-text2)' }}>ועוד {waitingSim.length - 8}...</span>}
             </div>
           </div>
         )}
@@ -1009,8 +1009,8 @@ function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
             {bySchool.map(({ school, ts }) => (
               <div key={school.id}>
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                  <span style={{ background:'var(--apple-blue)', color:'#fff', fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:10 }}>{ts.length}</span>
-                  <span style={{ fontWeight:600, fontSize:14, color:'var(--apple-text)' }}>{school.name}{school.city ? ` — ${school.city}` : ''}</span>
+                  <span style={{ background:'var(--apple-blue)', color:'#fff', fontSize:12.6, fontWeight:700, padding:'2px 8px', borderRadius:10 }}>{ts.length}</span>
+                  <span style={{ fontWeight:600, fontSize:16.1, color:'var(--apple-text)' }}>{school.name}{school.city ? ` — ${school.city}` : ''}</span>
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   {ts.map(t => {
@@ -1019,19 +1019,19 @@ function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
                       <div key={t.id} className="apple-card" style={{ padding:16 }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
                           <div>
-                            <p style={{ fontWeight:600, fontSize:15, color:'var(--apple-text)', marginBottom:2 }}>{t.name}</p>
-                            {t.tzId && <p style={{ fontSize:12, color:'var(--apple-text3)', fontFamily:'monospace' }}>{t.tzId}</p>}
-                            {t._changedAt && <p style={{ fontSize:12, color:'var(--apple-blue)', marginTop:2 }}>שונה: {new Date(t._changedAt).toLocaleDateString('he-IL')}</p>}
+                            <p style={{ fontWeight:600, fontSize:17.2, color:'var(--apple-text)', marginBottom:2 }}>{t.name}</p>
+                            {t.tzId && <p style={{ fontSize:13.8, color:'var(--apple-text3)', fontFamily:'monospace' }}>{t.tzId}</p>}
+                            {t._changedAt && <p style={{ fontSize:13.8, color:'var(--apple-blue)', marginTop:2 }}>שונה: {new Date(t._changedAt).toLocaleDateString('he-IL')}</p>}
                           </div>
                           <div style={{ textAlign:'left' }}>
-                            <p style={{ fontSize:11, color:'var(--apple-green)', fontWeight:600, marginBottom:2 }}>שכר רשמי</p>
-                            <p style={{ fontWeight:700, fontSize:16, color:'var(--apple-text)' }}>{emp.gross.toLocaleString()} ₪</p>
-                            <p style={{ fontSize:11, color:'var(--apple-text3)' }}>למעסיק: {emp.total.toLocaleString()} ₪</p>
+                            <p style={{ fontSize:12.6, color:'var(--apple-green)', fontWeight:600, marginBottom:2 }}>שכר רשמי</p>
+                            <p style={{ fontWeight:700, fontSize:18.4, color:'var(--apple-text)' }}>{emp.gross.toLocaleString()} ₪</p>
+                            <p style={{ fontSize:12.6, color:'var(--apple-text3)' }}>למעסיק: {emp.total.toLocaleString()} ₪</p>
                           </div>
                         </div>
                         <div style={{ marginBottom:12 }}><TeacherDiff t={t} /></div>
                         <div style={{ display:'flex', justifyContent:'flex-end' }}>
-                          <button className="apple-btn apple-btn-green" onClick={() => onApprove(t.id)} style={{ fontSize:13, padding:'7px 16px' }}>
+                          <button className="apple-btn apple-btn-green" onClick={() => onApprove(t.id)} style={{ fontSize:14.9, padding:'7px 16px' }}>
                             אשר
                           </button>
                         </div>
@@ -1043,7 +1043,7 @@ function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
             ))}
           </div>
         )}
-        <p style={{ fontSize:12, color:'var(--apple-text3)', textAlign:'center', marginTop:32 }}>
+        <p style={{ fontSize:13.8, color:'var(--apple-text3)', textAlign:'center', marginTop:32 }}>
           לאחר אישור, הנתונים מוכנים לחישוב משכורות חודשי
         </p>
       </div>
@@ -1071,7 +1071,7 @@ function ScopeChangeModal({ teacher, onSave, onClose }) {
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(6px)' }}>
       <div className="apple-card" style={{ width:'100%', maxWidth:360, padding:24 }}>
-        <h3 style={{ fontWeight:700, fontSize:17, letterSpacing:'-0.01em', color:'var(--apple-text)', marginBottom:20 }}>שינוי משרה — {teacher.name}</h3>
+        <h3 style={{ fontWeight:700, fontSize:19.5, letterSpacing:'-0.01em', color:'var(--apple-text)', marginBottom:20 }}>שינוי משרה — {teacher.name}</h3>
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
           <div>
             <p className="apple-label">תאריך השינוי</p>
@@ -1086,7 +1086,7 @@ function ScopeChangeModal({ teacher, onSave, onClose }) {
             <div style={{ display:'flex', gap:4, marginTop:8, flexWrap:'wrap' }}>
               {[50,67,75,100,112,125,140].map(v => (
                 <button key={v} onClick={() => syncFromScope(v)} style={{
-                  flex:1, minWidth:0, padding:'5px 4px', borderRadius:8, border:'none', fontSize:12, fontWeight:600, cursor:'pointer',
+                  flex:1, minWidth:0, padding:'5px 4px', borderRadius:8, border:'none', fontSize:13.8, fontWeight:600, cursor:'pointer',
                   background: c.scopePct===v ? 'var(--apple-blue)' : 'var(--apple-fill)',
                   color: c.scopePct===v ? '#fff' : 'var(--apple-text2)',
                 }}>{v}%</button>
@@ -1107,7 +1107,7 @@ function ScopeChangeModal({ teacher, onSave, onClose }) {
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
               {REASON_TYPES.map(r => (
                 <button key={r.id} onClick={() => set('reasonType', r.id)} style={{
-                  padding:'10px 14px', borderRadius:10, border:'none', fontSize:14, fontWeight: c.reasonType===r.id?600:400,
+                  padding:'10px 14px', borderRadius:10, border:'none', fontSize:16.1, fontWeight: c.reasonType===r.id?600:400,
                   background: c.reasonType===r.id ? 'rgba(0,122,255,0.1)' : 'var(--apple-fill)',
                   color: c.reasonType===r.id ? 'var(--apple-blue)' : 'var(--apple-text)',
                   cursor:'pointer', textAlign:'right',
@@ -1396,55 +1396,55 @@ function ImportModal({ schoolId, schoolName, onImport, onClose }) {
     <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', padding:16, overflowY:'auto' }}>
       <div className="apple-card" style={{ width:'100%', maxWidth:640, padding:24, margin:'16px auto' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <h2 style={{ fontWeight:700, fontSize:17, color:'var(--apple-text)', letterSpacing:'-0.01em' }}>ייבוא מורים — {schoolName}</h2>
-          <button onClick={onClose} style={{ background:'var(--apple-fill)', border:'none', borderRadius:8, width:28, height:28, cursor:'pointer', fontSize:14, color:'var(--apple-text2)', display:'flex', alignItems:'center', justifyContent:'center' }}><X size={15} strokeWidth={2.4} /></button>
+          <h2 style={{ fontWeight:700, fontSize:19.5, color:'var(--apple-text)', letterSpacing:'-0.01em' }}>ייבוא מורים — {schoolName}</h2>
+          <button onClick={onClose} style={{ background:'var(--apple-fill)', border:'none', borderRadius:8, width:28, height:28, cursor:'pointer', fontSize:16.1, color:'var(--apple-text2)', display:'flex', alignItems:'center', justifyContent:'center' }}><X size={15} strokeWidth={2.4} /></button>
         </div>
 
         {/* שלב 1 */}
         <div style={{ background:'rgba(0,122,255,0.06)', borderRadius:14, padding:16, marginBottom:12, border:'1px solid rgba(0,122,255,0.15)' }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
             <div>
-              <p style={{ fontWeight:700, fontSize:14, color:'var(--apple-blue)', marginBottom:2 }}>שלב 1 — הורד תבנית למילוי</p>
-              <p style={{ fontSize:12, color:'var(--apple-text2)' }}>קובץ CSV עם כל השדות + שורות לדוגמה</p>
+              <p style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-blue)', marginBottom:2 }}>שלב 1 — הורד תבנית למילוי</p>
+              <p style={{ fontSize:13.8, color:'var(--apple-text2)' }}>קובץ CSV עם כל השדות + שורות לדוגמה</p>
             </div>
-            <button className="apple-btn apple-btn-blue" onClick={() => downloadTemplate(schoolName)} style={{ fontSize:13, padding:'8px 14px', whiteSpace:'nowrap' }}>⬇️ הורד תבנית</button>
+            <button className="apple-btn apple-btn-blue" onClick={() => downloadTemplate(schoolName)} style={{ fontSize:14.9, padding:'8px 14px', whiteSpace:'nowrap' }}>⬇️ הורד תבנית</button>
           </div>
-          <div style={{ marginTop:10, fontSize:12, color:'var(--apple-blue)', background:'rgba(0,122,255,0.08)', borderRadius:10, padding:'8px 12px', lineHeight:1.7 }}>
+          <div style={{ marginTop:10, fontSize:13.8, color:'var(--apple-blue)', background:'rgba(0,122,255,0.08)', borderRadius:10, padding:'8px 12px', lineHeight:1.7 }}>
             שם · ת.ז. · מייל · רפורמה · דרגה · ותק · % משרה · תפקיד · שיבוץ זמני · תאריך התחלה/סיום
           </div>
         </div>
 
         {/* שלב 2 */}
         <div style={{ background:'var(--apple-fill)', borderRadius:14, padding:16, marginBottom:12 }}>
-          <p style={{ fontWeight:700, fontSize:13, color:'var(--apple-text2)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.04em' }}>שלב 2 — העלי קובץ</p>
+          <p style={{ fontWeight:700, fontSize:14.9, color:'var(--apple-text2)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.04em' }}>שלב 2 — העלי קובץ</p>
           <label style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', border:'2px dashed var(--apple-fill2)', borderRadius:12, padding:24, cursor:'pointer', transition:'border-color 0.15s', background:'var(--apple-surface)' }}>
             <FolderOpen size={28} strokeWidth={1.8} color="var(--text3)" style={{ marginBottom:9 }} />
-            <span style={{ fontWeight:600, fontSize:14, color:'var(--apple-text)' }}>לחצי להעלאת קובץ CSV</span>
-            <span style={{ fontSize:12, color:'var(--apple-text3)', marginTop:4 }}>או גררי לכאן</span>
+            <span style={{ fontWeight:600, fontSize:16.1, color:'var(--apple-text)' }}>לחצי להעלאת קובץ CSV</span>
+            <span style={{ fontSize:13.8, color:'var(--apple-text3)', marginTop:4 }}>או גררי לכאן</span>
             <input type="file" accept=".csv,.txt" onChange={handleFile} style={{ display:'none' }} />
           </label>
           {text && (
-            <p style={{ fontSize:12, color:'var(--apple-green)', fontWeight:600, textAlign:'center', marginTop:10 }}>
+            <p style={{ fontSize:13.8, color:'var(--apple-green)', fontWeight:600, textAlign:'center', marginTop:10 }}>
               קובץ נקרא — {text.split('\n').filter(l=>l.trim()).length} שורות
             </p>
           )}
         </div>
 
         {error && (
-          <div style={{ background:'rgba(255,59,48,0.08)', border:'1px solid rgba(255,59,48,0.2)', borderRadius:10, padding:'10px 14px', marginBottom:12, fontSize:13, color:'var(--apple-red)', fontWeight:600 }}>
+          <div style={{ background:'rgba(255,59,48,0.08)', border:'1px solid rgba(255,59,48,0.2)', borderRadius:10, padding:'10px 14px', marginBottom:12, fontSize:14.9, color:'var(--apple-red)', fontWeight:600 }}>
             {error}
           </div>
         )}
 
         {preview ? (
           <div>
-            <p style={{ fontWeight:700, fontSize:14, color:'var(--apple-text)', marginBottom:10 }}>שלב 3 — אישור: נמצאו {preview.length} מורים</p>
-            <div style={{ background:'rgba(255,159,10,0.08)', border:'1px solid rgba(255,159,10,0.2)', borderRadius:10, padding:'8px 12px', marginBottom:12, fontSize:12, color:'var(--warn)' }}>
+            <p style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-text)', marginBottom:10 }}>שלב 3 — אישור: נמצאו {preview.length} מורים</p>
+            <div style={{ background:'rgba(255,159,10,0.08)', border:'1px solid rgba(255,159,10,0.2)', borderRadius:10, padding:'8px 12px', marginBottom:12, fontSize:13.8, color:'var(--warn)' }}>
               <Lightbulb size={13} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-2px', marginInlineEnd:4 }} />
             לאחר הייבוא — כנסי לסימולטור והזיני את השכר הרשמי לכל מורה
             </div>
             <div style={{ overflowX:'auto', border:'1px solid var(--apple-fill2)', borderRadius:12, maxHeight:220, overflowY:'auto' }}>
-              <table className="apple-table" style={{ fontSize:12 }}>
+              <table className="apple-table" style={{ fontSize:13.8 }}>
                 <thead>
                   <tr>
                     {['שם','ת.ז.','מייל','רפורמה','דרגה','ותק','% משרה','תפקיד','זמני','תאריך התחלה'].map(h => (
@@ -1456,29 +1456,29 @@ function ImportModal({ schoolId, schoolName, onImport, onClose }) {
                   {preview.map((t,i) => (
                     <tr key={i}>
                       <td style={{ fontWeight:600 }}>{t.name}</td>
-                      <td style={{ fontFamily:'monospace', fontSize:11 }}>{t.tzId||'—'}</td>
-                      <td style={{ fontSize:11, color:'var(--apple-text2)' }}>{t.email||'—'}</td>
+                      <td style={{ fontFamily:'monospace', fontSize:12.6 }}>{t.tzId||'—'}</td>
+                      <td style={{ fontSize:12.6, color:'var(--apple-text2)' }}>{t.email||'—'}</td>
                       <td>{reformLabel(t.reform)}</td>
                       <td>{t.grade==='intern'?'מתמחה':t.grade}</td>
                       <td>{t.seniority}</td>
                       <td>{t.scopePct}%</td>
-                      <td style={{ fontSize:11 }}>{ROLES.find(r=>r.id===t.role)?.label.split('(')[0].trim()||'—'}</td>
+                      <td style={{ fontSize:12.6 }}>{ROLES.find(r=>r.id===t.role)?.label.split('(')[0].trim()||'—'}</td>
                       <td style={{ textAlign:'center' }}>{t.isTemp?'כן':'—'}</td>
-                      <td style={{ fontSize:11 }}>{t.startDate||'—'}</td>
+                      <td style={{ fontSize:12.6 }}>{t.startDate||'—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <div style={{ display:'flex', gap:8, marginTop:16 }}>
-              <button className="apple-btn apple-btn-ghost" onClick={() => setPrev(null)} style={{ flex:1, fontSize:14 }}><ArrowRight size={15} strokeWidth={2.4} />חזרה</button>
-              <button className="apple-btn apple-btn-green" onClick={() => onImport(preview)} style={{ flex:1, fontSize:14 }}>ייבא {preview.length} מורים<Check size={15} strokeWidth={2.6} /></button>
+              <button className="apple-btn apple-btn-ghost" onClick={() => setPrev(null)} style={{ flex:1, fontSize:16.1 }}><ArrowRight size={15} strokeWidth={2.4} />חזרה</button>
+              <button className="apple-btn apple-btn-green" onClick={() => onImport(preview)} style={{ flex:1, fontSize:16.1 }}>ייבא {preview.length} מורים<Check size={15} strokeWidth={2.6} /></button>
             </div>
           </div>
         ) : (
           <div style={{ display:'flex', gap:8 }}>
-            <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ flex:1, fontSize:14 }}>ביטול</button>
-            <button className="apple-btn apple-btn-blue" onClick={handlePreview} disabled={!text.trim()} style={{ flex:1, fontSize:14 }}>תצוגה מקדימה<ArrowLeft size={15} strokeWidth={2.4} /></button>
+            <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ flex:1, fontSize:16.1 }}>ביטול</button>
+            <button className="apple-btn apple-btn-blue" onClick={handlePreview} disabled={!text.trim()} style={{ flex:1, fontSize:16.1 }}>תצוגה מקדימה<ArrowLeft size={15} strokeWidth={2.4} /></button>
           </div>
         )}
       </div>
@@ -1518,14 +1518,14 @@ function FileAttachSection({ files, onChange }) {
           קבצים מצורפים
         </span>
         <label style={{ cursor:'pointer' }}>
-          <span className="apple-btn apple-btn-ghost" style={{ fontSize:12, padding:'5px 12px', display:'inline-flex', alignItems:'center', gap:4 }}>
+          <span className="apple-btn apple-btn-ghost" style={{ fontSize:13.8, padding:'5px 12px', display:'inline-flex', alignItems:'center', gap:4 }}>
             + הוסף קובץ
           </span>
           <input type="file" style={{ display:'none' }} onChange={handleAdd} />
         </label>
       </div>
       {files.length === 0 ? (
-        <p style={{ fontSize:12, color:'var(--apple-text3)', textAlign:'center', padding:'12px 0' }}>אין קבצים מצורפים</p>
+        <p style={{ fontSize:13.8, color:'var(--apple-text3)', textAlign:'center', padding:'12px 0' }}>אין קבצים מצורפים</p>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
           {files.map(f => (
@@ -1536,11 +1536,11 @@ function FileAttachSection({ files, onChange }) {
                   : f.type?.includes('pdf') ? <FileText size={15} strokeWidth={2} /> : <Paperclip size={15} strokeWidth={2} />}
               </span>
               <div style={{ flex:1, minWidth:0 }}>
-                <p style={{ fontSize:13, fontWeight:600, color:'var(--apple-text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{f.name}</p>
-                <p style={{ fontSize:11, color:'var(--apple-text3)' }}>{new Date(f.uploadedAt).toLocaleDateString('he-IL')}</p>
+                <p style={{ fontSize:14.9, fontWeight:600, color:'var(--apple-text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{f.name}</p>
+                <p style={{ fontSize:12.6, color:'var(--apple-text3)' }}>{new Date(f.uploadedAt).toLocaleDateString('he-IL')}</p>
               </div>
-              <button onClick={() => download(f)} style={{ fontSize:12, color:'var(--apple-blue)', background:'none', border:'none', cursor:'pointer', fontWeight:600, padding:'4px 8px' }}>הורד</button>
-              <button onClick={() => onChange(files.filter(x => x.id !== f.id))} style={{ fontSize:13, color:'var(--apple-red)', background:'none', border:'none', cursor:'pointer', padding:'4px 6px' }}><X size={15} strokeWidth={2.4} /></button>
+              <button onClick={() => download(f)} style={{ fontSize:13.8, color:'var(--apple-blue)', background:'none', border:'none', cursor:'pointer', fontWeight:600, padding:'4px 8px' }}>הורד</button>
+              <button onClick={() => onChange(files.filter(x => x.id !== f.id))} style={{ fontSize:14.9, color:'var(--apple-red)', background:'none', border:'none', cursor:'pointer', padding:'4px 6px' }}><X size={15} strokeWidth={2.4} /></button>
             </div>
           ))}
         </div>
@@ -1596,8 +1596,8 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
         ? { width:'45%', display:'flex', flexDirection:'column', background:'#fff', overflowY:'auto' }
         : { background:'#fff', borderRadius:18, width:'100%', maxWidth:520, margin:'24px auto', boxShadow:'var(--apple-shadow)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 24px', borderBottom:'0.5px solid var(--apple-fill2)' }}>
-          <h2 style={{ fontSize:17, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)' }}>{t.id ? 'עריכת עובד/ת הוראה' : 'הוספת עובד/ת הוראה'}</h2>
-          <button onClick={onClose} style={{ background:'var(--apple-fill)', border:'none', borderRadius:'50%', width:28, height:28, fontSize:14, cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center' }}><X size={15} strokeWidth={2.4} /></button>
+          <h2 style={{ fontSize:19.5, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)' }}>{t.id ? 'עריכת עובד/ת הוראה' : 'הוספת עובד/ת הוראה'}</h2>
+          <button onClick={onClose} style={{ background:'var(--apple-fill)', border:'none', borderRadius:'50%', width:28, height:28, fontSize:16.1, cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center' }}><X size={15} strokeWidth={2.4} /></button>
         </div>
         <div style={{ padding:'20px 24px', display:'flex', flexDirection:'column', gap:16 }}>
 
@@ -1644,8 +1644,8 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 <div className="apple-toggle-track" />
               </label>
               <div>
-                <p style={{ fontWeight:600, fontSize:14, color:'var(--apple-text)' }}>שיבוץ זמני (מילוי מקום)</p>
-                {t.isTemp && <p style={{ fontSize:12, color:'var(--apple-orange)' }}>תאריך סיום — חובה</p>}
+                <p style={{ fontWeight:600, fontSize:16.1, color:'var(--apple-text)' }}>שיבוץ זמני (מילוי מקום)</p>
+                {t.isTemp && <p style={{ fontSize:13.8, color:'var(--apple-orange)' }}>תאריך סיום — חובה</p>}
               </div>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
@@ -1680,7 +1680,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:4 }}>
                   {OFEK_GRADES.map(g => (
                     <button key={g.id} onClick={() => set('grade', g.id)} style={{
-                      padding:'7px 2px', borderRadius:8, border:'none', fontSize:12, fontWeight:700, cursor:'pointer',
+                      padding:'7px 2px', borderRadius:8, border:'none', fontSize:13.8, fontWeight:700, cursor:'pointer',
                       background: t.grade===g.id ? 'var(--apple-blue)' : 'var(--apple-fill)',
                       color: t.grade===g.id ? '#fff' : 'var(--apple-text2)',
                     }}>{g.label}</button>
@@ -1692,7 +1692,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                   {Object.entries(LEVELS).map(([k,v]) => (
                     <button key={k} onClick={() => set('level', k)} style={{
-                      padding:'8px 12px', borderRadius:8, border:'none', fontSize:13, fontWeight:600, cursor:'pointer', textAlign:'right',
+                      padding:'8px 12px', borderRadius:8, border:'none', fontSize:14.9, fontWeight:600, cursor:'pointer', textAlign:'right',
                       background: t.level===k ? 'var(--apple-blue)' : 'var(--apple-fill)',
                       color: t.level===k ? '#fff' : 'var(--apple-text)',
                     }}>{v.label}</button>
@@ -1706,7 +1706,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 {Object.entries(AGE_RED).map(([k,v]) => (
                   <button key={k} onClick={() => set('ageGroup', k)} style={{
-                    padding:'8px 12px', borderRadius:8, border:'none', fontSize:12, fontWeight:600, cursor:'pointer', textAlign:'right',
+                    padding:'8px 12px', borderRadius:8, border:'none', fontSize:13.8, fontWeight:600, cursor:'pointer', textAlign:'right',
                     background: t.ageGroup===k ? 'var(--apple-orange)' : 'var(--apple-fill)',
                     color: t.ageGroup===k ? '#fff' : 'var(--apple-text)',
                   }}>{v.label}</button>
@@ -1718,14 +1718,14 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               <p className="apple-label" style={{ marginBottom:0 }}>משרה</p>
               <div>
                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                  <span style={{ fontSize:13, color:'var(--apple-text2)' }}>אחוז משרה</span>
+                  <span style={{ fontSize:14.9, color:'var(--apple-text2)' }}>אחוז משרה</span>
                   <span style={{ fontWeight:700, color:'var(--apple-blue)' }}>{t.scopePct}%</span>
                 </div>
                 <input type="range" min={1} max={140} value={t.scopePct} onChange={e => syncFromScope(+e.target.value)} style={{ accentColor:'var(--apple-blue)' }} />
                 <div style={{ display:'flex', gap:4, marginTop:8, flexWrap:'wrap' }}>
                   {[50,67,75,100,112,125,140].map(v => (
                     <button key={v} onClick={() => syncFromScope(v)} style={{
-                      flex:1, minWidth:0, padding:'5px 2px', borderRadius:8, border:'none', fontSize:11, fontWeight:600, cursor:'pointer',
+                      flex:1, minWidth:0, padding:'5px 2px', borderRadius:8, border:'none', fontSize:12.6, fontWeight:600, cursor:'pointer',
                       background: t.scopePct===v ? 'var(--apple-blue)' : '#fff',
                       color: t.scopePct===v ? '#fff' : 'var(--apple-text2)',
                     }}>{v}%</button>
@@ -1734,7 +1734,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               </div>
               <div>
                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                  <span style={{ fontSize:13, color:'var(--apple-text2)' }}>שעות פרונטליות (מ-{baseFrontal})</span>
+                  <span style={{ fontSize:14.9, color:'var(--apple-text2)' }}>שעות פרונטליות (מ-{baseFrontal})</span>
                   <span style={{ fontWeight:700, color:'var(--apple-blue)' }}>{t.frontalHours}</span>
                 </div>
                 <input type="range" min={0} max={40} value={t.frontalHours} onChange={e => syncFromFrontal(+e.target.value)} style={{ accentColor:'var(--apple-blue)' }} />
@@ -1748,8 +1748,8 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                     { label: 'שהייה',   val: derived.presence },
                   ].map(c => (
                     <div key={c.label} style={{ background:'#fff', borderRadius:10, padding:'8px 4px' }}>
-                      <p style={{ fontSize:11, color:'var(--apple-text3)', marginBottom:2 }}>{c.label}</p>
-                      <p style={{ fontWeight:700, color:'var(--apple-blue)', fontSize:14 }}>{c.val}</p>
+                      <p style={{ fontSize:12.6, color:'var(--apple-text3)', marginBottom:2 }}>{c.label}</p>
+                      <p style={{ fontWeight:700, color:'var(--apple-blue)', fontSize:16.1 }}>{c.val}</p>
                     </div>
                   ))}
                 </div>
@@ -1760,22 +1760,22 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             <div>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
                 <p className="apple-label" style={{ marginBottom:0 }}>שינויי משרה</p>
-                <button className="apple-btn apple-btn-blue" onClick={() => setShowScopeChange(true)} style={{ fontSize:12, padding:'5px 12px' }}>+ הוסף</button>
+                <button className="apple-btn apple-btn-blue" onClick={() => setShowScopeChange(true)} style={{ fontSize:13.8, padding:'5px 12px' }}>+ הוסף</button>
               </div>
               {sortedChanges.length === 0 ? (
-                <p style={{ fontSize:12, color:'var(--apple-text3)', textAlign:'center', padding:'8px 0' }}>אין שינויים רשומים</p>
+                <p style={{ fontSize:13.8, color:'var(--apple-text3)', textAlign:'center', padding:'8px 0' }}>אין שינויים רשומים</p>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                   {sortedChanges.map(c => (
                     <div key={c.id} style={{ display:'flex', alignItems:'center', gap:8, background:'#fff', borderRadius:10, padding:'8px 12px' }}>
-                      <div style={{ flex:1, fontSize:12 }}>
+                      <div style={{ flex:1, fontSize:13.8 }}>
                         <span style={{ fontWeight:700, color:'var(--apple-blue)' }}>{c.scopePct}%</span>
                         {c.frontalHours && <span style={{ color:'var(--apple-text2)' }}> · {c.frontalHours} פר׳</span>}
                         <span style={{ color:'var(--apple-text3)' }}> · {fmt(c.date)}</span>
                         <span style={{ color:'var(--apple-orange)' }}> · {REASON_TYPES.find(r=>r.id===c.reasonType)?.label}</span>
                         {c.detail && <span style={{ color:'var(--apple-text2)' }}> ({c.detail})</span>}
                       </div>
-                      <button onClick={() => removeScopeChange(c.id)} style={{ background:'none', border:'none', color:'var(--apple-red)', cursor:'pointer', fontSize:14 }}><X size={15} strokeWidth={2.4} /></button>
+                      <button onClick={() => removeScopeChange(c.id)} style={{ background:'none', border:'none', color:'var(--apple-red)', cursor:'pointer', fontSize:16.1 }}><X size={15} strokeWidth={2.4} /></button>
                     </div>
                   ))}
                 </div>
@@ -1790,7 +1790,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 {[['intern','מתמחה'],['BA','תואר ראשון'],['MA','תואר שני']].map(([v,l]) => (
                   <button key={v} onClick={() => set('degree', v)} style={{
-                    padding:'10px 12px', borderRadius:10, border:'none', fontSize:13, fontWeight:600, cursor:'pointer',
+                    padding:'10px 12px', borderRadius:10, border:'none', fontSize:14.9, fontWeight:600, cursor:'pointer',
                     background: t.degree===v ? 'var(--apple-purple)' : 'var(--apple-fill)',
                     color: t.degree===v ? '#fff' : 'var(--apple-text)',
                   }}>{l}</button>
@@ -1799,7 +1799,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             </div>
             <div>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                <span style={{ fontSize:13, color:'var(--apple-text2)' }}>אחוז משרה</span>
+                <span style={{ fontSize:14.9, color:'var(--apple-text2)' }}>אחוז משרה</span>
                 <span style={{ fontWeight:700, color:'var(--apple-blue)' }}>{t.scope}%</span>
               </div>
               {/* scope ו-scopePct הם אותו נתון בשני שמות. רק scope_pct
@@ -1826,12 +1826,12 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               {onLeave(t) && (
                 <>
                   <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 120px' }}>
-                    <span style={{ fontSize:11, color:'var(--text3)' }}>מתאריך</span>
+                    <span style={{ fontSize:12.6, color:'var(--text3)' }}>מתאריך</span>
                     <input type="date" className="apple-input" dir="ltr" value={String(t.leaveFrom ?? '').slice(0,10)}
                       onChange={e => set('leaveFrom', e.target.value || null)} />
                   </label>
                   <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 120px' }}>
-                    <span style={{ fontSize:11, color:'var(--text3)' }}>עד תאריך (אם ידוע)</span>
+                    <span style={{ fontSize:12.6, color:'var(--text3)' }}>עד תאריך (אם ידוע)</span>
                     <input type="date" className="apple-input" dir="ltr" value={String(t.leaveTo ?? '').slice(0,10)}
                       onChange={e => set('leaveTo', e.target.value || null)} />
                   </label>
@@ -1843,7 +1843,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
           {/* ותק */}
           <div>
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-              <span style={{ fontSize:13, color:'var(--apple-text2)' }}>שנות ותק</span>
+              <span style={{ fontSize:14.9, color:'var(--apple-text2)' }}>שנות ותק</span>
               <span style={{ fontWeight:700, color:'var(--apple-blue)' }}>{t.seniority}</span>
             </div>
             <input type="range" min={1} max={40} value={Math.max(1, t.seniority || 1)} onChange={e => set('seniority', +e.target.value)} style={{ accentColor:'var(--apple-blue)' }} />
@@ -1879,10 +1879,10 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
           <div style={{ background:'rgba(88,86,214,0.06)', borderRadius:14, padding:14 }}>
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
               <div style={{ flex:1 }}>
-                <p style={{ fontSize:13, fontWeight:600, color:'var(--purple)', marginBottom:2 }}>
+                <p style={{ fontSize:14.9, fontWeight:600, color:'var(--purple)', marginBottom:2 }}>
                   {t.reform === 'pre' ? 'תוספת אם עובדת' : 'ילדים עד גיל 18'}
                 </p>
-                <p style={{ fontSize:12, color:'var(--text2)' }}>
+                <p style={{ fontSize:13.8, color:'var(--text2)' }}>
                   {t.reform === 'pre'
                     ? 'ילדים עד גיל 18 (זכאות מ-79% משרה)'
                     : 'באופק חדש אינה רכיב שכר — נאסף כמידע בלבד'}
@@ -1890,20 +1890,20 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <button onClick={() => set('childrenUnder18', Math.max(0, (t.childrenUnder18||0)-1))}
-                  style={{ width:28, height:28, borderRadius:'50%', border:'1px solid var(--apple-fill2)', background:'var(--apple-fill)', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>−</button>
-                <span style={{ fontWeight:800, fontSize:18, color:'var(--apple-purple)', minWidth:20, textAlign:'center' }}>{t.childrenUnder18||0}</span>
+                  style={{ width:28, height:28, borderRadius:'50%', border:'1px solid var(--apple-fill2)', background:'var(--apple-fill)', fontSize:18.4, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>−</button>
+                <span style={{ fontWeight:800, fontSize:20.7, color:'var(--apple-purple)', minWidth:20, textAlign:'center' }}>{t.childrenUnder18||0}</span>
                 <button onClick={() => set('childrenUnder18', (t.childrenUnder18||0)+1)}
-                  style={{ width:28, height:28, borderRadius:'50%', border:'1px solid var(--apple-fill2)', background:'var(--apple-fill)', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>+</button>
+                  style={{ width:28, height:28, borderRadius:'50%', border:'1px solid var(--apple-fill2)', background:'var(--apple-fill)', fontSize:18.4, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>+</button>
               </div>
             </div>
             {momBonusEligible(t) && (
-              <p style={{ fontSize:12, color:'var(--apple-purple)', fontWeight:600, marginTop:8 }}>
+              <p style={{ fontSize:13.8, color:'var(--apple-purple)', fontWeight:600, marginTop:8 }}>
                 זכאית לתוספת אם — {t.childrenUnder18} ילדים עד גיל 18
                 {` · ${effectiveScope(t)}% משרה — כולל תוספת אם`}
               </p>
             )}
             {t.reform === 'pre' && (t.childrenUnder18||0) > 0 && !momBonusEligible(t) && (
-              <p style={{ fontSize:12, color:'var(--apple-orange)', marginTop:8 }}>
+              <p style={{ fontSize:13.8, color:'var(--apple-orange)', marginTop:8 }}>
                 {!t.gender ? 'חסר מין — תוספת אם ניתנת לאם בלבד'
                   : t.gender !== 'f' ? 'תוספת אם ניתנת לאם בלבד'
                   : `אחוז משרה ${computedBaseScope(t)}% — התוספת ניתנת מעל ${MOM_MIN_SCOPE}%`}
@@ -1913,14 +1913,14 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 גברים ברשת הופיעו כזכאים. השדה נשאל כאן, ליד הילדים. */}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginTop:10 }}>
               <div>
-                <p style={{ fontSize:13.5, fontWeight:600, color:'var(--text)' }}>מין</p>
-                <p style={{ fontSize:12, color:'var(--text2)' }}>קובע את הזכאות לתוספת אם</p>
+                <p style={{ fontSize:15.5, fontWeight:600, color:'var(--text)' }}>מין</p>
+                <p style={{ fontSize:13.8, color:'var(--text2)' }}>קובע את הזכאות לתוספת אם</p>
               </div>
               <div style={{ display:'flex', gap:6 }}>
                 {[{ v:'f', l:'אישה' }, { v:'m', l:'גבר' }].map(o => (
                   <button key={o.v} onClick={() => set('gender', t.gender === o.v ? null : o.v)}
                     className={`apple-btn ${t.gender === o.v ? 'apple-btn-blue' : 'apple-btn-ghost'}`}
-                    style={{ minHeight:32, padding:'0 14px', fontSize:12.5 }}>
+                    style={{ minHeight:32, padding:'0 14px', fontSize:14.4 }}>
                     {o.l}
                   </button>
                 ))}
@@ -1934,8 +1934,8 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               והחלון נסגר בלי הודעה. */}
           {userRole === 'principal' ? (
             <div style={{ background:'var(--fill2)', borderRadius:14, padding:16 }}>
-              <p style={{ fontSize:13, fontWeight:600, color:'var(--text2)', marginBottom:4 }}>שכר</p>
-              <p style={{ fontSize:12, color:'var(--text3)' }}>
+              <p style={{ fontSize:14.9, fontWeight:600, color:'var(--text2)', marginBottom:4 }}>שכר</p>
+              <p style={{ fontSize:13.8, color:'var(--text3)' }}>
                 {simComplete(t)
                   ? 'הוזן על ידי חשבת השכר. שינוי בוותק, בדרגה, בתואר או בשעות יחזיר אותה לחישוב מחדש.'
                   : 'ממתין לחשבת השכר.'}
@@ -1944,26 +1944,26 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
           ) : (
           <div style={{ background:'rgba(52,199,89,0.08)', borderRadius:14, padding:16 }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-              <p style={{ fontSize:13, fontWeight:600, color:'#1a7a38' }}>שכר משולב מהסימולטור</p>
-              <button className="apple-btn apple-btn-green" onClick={() => setShowSimulator(v => !v)} style={{ fontSize:12, padding:'6px 12px' }}>
+              <p style={{ fontSize:14.9, fontWeight:600, color:'#1a7a38' }}>שכר משולב מהסימולטור</p>
+              <button className="apple-btn apple-btn-green" onClick={() => setShowSimulator(v => !v)} style={{ fontSize:13.8, padding:'6px 12px' }}>
                 {showSimulator ? 'סגור' : 'פתח סימולטור'}
               </button>
             </div>
-            <p style={{ fontSize:12, color:'var(--ok)', marginBottom:10 }}>הריצי את הסימולטור → הכניסי כאן את "השכר המשולב"</p>
+            <p style={{ fontSize:13.8, color:'var(--ok)', marginBottom:10 }}>הריצי את הסימולטור → הכניסי כאן את "השכר המשולב"</p>
 
             {/* עלות מעביד בפועל — הנהלת החשבונות מחליפה את האומדן */}
             {userRole !== 'principal' && simComplete(t) && (
               <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:12, padding:12, marginBottom:10 }}>
                 <p className="apple-label" style={{ marginBottom:4 }}>עלות מעביד בפועל — הנהלת חשבונות</p>
                 <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-                  <input type="number" className="apple-input" dir="ltr" style={{ fontSize:13.5 }}
+                  <input type="number" className="apple-input" dir="ltr" style={{ fontSize:15.5 }}
                     value={t._actualEmployerCost || ''}
                     onChange={e => set('_actualEmployerCost', e.target.value ? Number(e.target.value) : null)}
                     placeholder={`אומדן: ${emp.estimate.toLocaleString('he-IL')} ₪`} />
                   {t._actualEmployerCost && <button onClick={() => set('_actualEmployerCost', null)}
                     style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer' }}><X size={15} strokeWidth={2.4} /></button>}
                 </div>
-                <p style={{ fontSize:11, color:'var(--text3)', marginTop:6, lineHeight:1.6 }}>
+                <p style={{ fontSize:12.6, color:'var(--text3)', marginTop:6, lineHeight:1.6 }}>
                   בחודש הראשון העלות היא אומדן לפי רכיבי החוק — פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד — עד שהנהלת החשבונות מזינה את הסכום בפועל.
                   משהוזן כאן סכום, הוא גובר עליו בכל הדוחות.
                 </p>
@@ -1984,8 +1984,8 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                     <input type="number" className="apple-input" dir="ltr" autoFocus
                       value={t._agreedGross || ''}
                       onChange={e => set('_agreedGross', e.target.value ? Number(e.target.value) : '')}
-                      placeholder="ברוטו מוסכם" style={{ fontSize:14 }} />
-                    <p style={{ fontSize:11, color:'var(--text3)', marginTop:6, lineHeight:1.6 }}>
+                      placeholder="ברוטו מוסכם" style={{ fontSize:16.1 }} />
+                    <p style={{ fontSize:12.6, color:'var(--text3)', marginTop:6, lineHeight:1.6 }}>
                       מחליף את הברוטו ואת הסימולציה. השורה לא תמתין לחשבת השכר.
                     </p>
                   </>
@@ -1996,43 +1996,43 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             {/* אופק חדש — שני שדות. למנהלת סימולציית ניהול אחת. */}
             {isPrincipalRow(t) ? (
               <div>
-                <p style={{ fontSize:11, fontWeight:700, color:'var(--purple)', marginBottom:4 }}>סימולציית אופק — ניהול</p>
+                <p style={{ fontSize:12.6, fontWeight:700, color:'var(--purple)', marginBottom:4 }}>סימולציית אופק — ניהול</p>
                 <div style={{ display:'flex', gap:4, alignItems:'center' }}>
-                  <input type="number" className="apple-input" dir="ltr" style={{ fontSize:13 }}
+                  <input type="number" className="apple-input" dir="ltr" style={{ fontSize:14.9 }}
                     value={t._officialGross || ''}
                     onChange={e => set('_officialGross', e.target.value ? Number(e.target.value) : null)}
                     placeholder="שכר ניהול..." disabled={!!t._agreedGross} />
                   {t._officialGross && <button onClick={() => set('_officialGross', null)} style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer' }}><X size={15} strokeWidth={2.4} /></button>}
                 </div>
-                <p style={{ fontSize:11, color:'var(--text3)', marginTop:5 }}>
+                <p style={{ fontSize:12.6, color:'var(--text3)', marginTop:5 }}>
                   הסכום הזה הוא הבסיס במלואו — אין למנהלת רכיב תוספת בית חב"ד.
                 </p>
               </div>
             ) : t.reform === 'ofek' ? (<>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
                 <div>
-                  <p style={{ fontSize:11, fontWeight:700, color:'#1a7a38', marginBottom:4 }}>סימולציית אופק חדש</p>
+                  <p style={{ fontSize:12.6, fontWeight:700, color:'#1a7a38', marginBottom:4 }}>סימולציית אופק חדש</p>
                   <div style={{ display:'flex', gap:4, alignItems:'center' }}>
-                    <input type="number" className="apple-input" dir="ltr" style={{ fontSize:13 }}
+                    <input type="number" className="apple-input" dir="ltr" style={{ fontSize:14.9 }}
                       value={t._officialGross || ''}
                       onChange={e => set('_officialGross', e.target.value ? Number(e.target.value) : null)}
                       placeholder="שכר אופק..." />
-                    {t._officialGross && <button onClick={() => set('_officialGross', null)} style={{ background:'none', border:'none', color:'var(--apple-red)', cursor:'pointer', fontSize:14 }}><X size={15} strokeWidth={2.4} /></button>}
+                    {t._officialGross && <button onClick={() => set('_officialGross', null)} style={{ background:'none', border:'none', color:'var(--apple-red)', cursor:'pointer', fontSize:16.1 }}><X size={15} strokeWidth={2.4} /></button>}
                   </div>
                 </div>
                 <div>
-                  <p style={{ fontSize:11, fontWeight:700, color:'var(--purple)', marginBottom:4 }}>סימולציית עולם ישן</p>
+                  <p style={{ fontSize:12.6, fontWeight:700, color:'var(--purple)', marginBottom:4 }}>סימולציית עולם ישן</p>
                   <div style={{ display:'flex', gap:4, alignItems:'center' }}>
-                    <input type="number" className="apple-input" dir="ltr" style={{ fontSize:13 }}
+                    <input type="number" className="apple-input" dir="ltr" style={{ fontSize:14.9 }}
                       value={t._officialGrossPre || ''}
                       onChange={e => set('_officialGrossPre', e.target.value ? Number(e.target.value) : null)}
                       placeholder="שכר טרום..." />
-                    {t._officialGrossPre && <button onClick={() => set('_officialGrossPre', null)} style={{ background:'none', border:'none', color:'var(--apple-red)', cursor:'pointer', fontSize:14 }}><X size={15} strokeWidth={2.4} /></button>}
+                    {t._officialGrossPre && <button onClick={() => set('_officialGrossPre', null)} style={{ background:'none', border:'none', color:'var(--apple-red)', cursor:'pointer', fontSize:16.1 }}><X size={15} strokeWidth={2.4} /></button>}
                   </div>
                 </div>
               </div>
               {t._officialGross && t._officialGrossPre && (
-                <div style={{ background:'rgba(88,86,214,0.1)', borderRadius:10, padding:'8px 12px', fontSize:12, color:'var(--apple-purple)', fontWeight:600 }}>
+                <div style={{ background:'rgba(88,86,214,0.1)', borderRadius:10, padding:'8px 12px', fontSize:13.8, color:'var(--apple-purple)', fontWeight:600 }}>
                   תוספת בית חב"ד: {(Number(t._officialGross) - Number(t._officialGrossPre)).toLocaleString()} ₪
                   <span style={{ fontWeight:400, color:'var(--apple-text2)', marginRight:6 }}>(= אופק − טרום)</span>
                 </div>
@@ -2043,7 +2043,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                   value={t._officialGross || ''}
                   onChange={e => set('_officialGross', e.target.value ? Number(e.target.value) : null)}
                   placeholder="שכר משולב..." />
-                {t._officialGross && <button onClick={() => set('_officialGross', null)} style={{ background:'none', border:'none', color:'var(--apple-red)', cursor:'pointer', fontSize:16 }}><X size={15} strokeWidth={2.4} /></button>}
+                {t._officialGross && <button onClick={() => set('_officialGross', null)} style={{ background:'none', border:'none', color:'var(--apple-red)', cursor:'pointer', fontSize:18.4 }}><X size={15} strokeWidth={2.4} /></button>}
               </div>
             )}
           </div>
@@ -2052,7 +2052,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
           {/* פירוק התשלום — נתון רשמי בלבד */}
           {simComplete(t) ? (
             <div className="apple-section" style={{ background:'var(--ok-bg)', border:'1px solid var(--ok-line)' }}>
-              <p style={{ fontSize:11, fontWeight:700, color:'var(--ok)', textAlign:'center', marginBottom:12, letterSpacing:'0.04em' }}>
+              <p style={{ fontSize:12.6, fontWeight:700, color:'var(--ok)', textAlign:'center', marginBottom:12, letterSpacing:'0.04em' }}>
                 פירוק התשלום — לפי הסימולציה הרשמית
               </p>
               {[
@@ -2063,11 +2063,11 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                   emp.isEstimate ? `אומדן ${emp.pct}%` : 'סכום בפועל מהנהלת החשבונות'],
               ].map(([label, val, note]) => (
                 <div key={label} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10, padding:'5px 0' }}>
-                  <span style={{ fontSize:12.5, color:'var(--text2)' }}>
+                  <span style={{ fontSize:14.4, color:'var(--text2)' }}>
                     {label}
-                    {note && <span style={{ fontSize:11, color:'var(--text3)', marginInlineStart:6 }}>{note}</span>}
+                    {note && <span style={{ fontSize:12.6, color:'var(--text3)', marginInlineStart:6 }}>{note}</span>}
                   </span>
-                  <span className="num" style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>{val.toLocaleString('he-IL')} ₪</span>
+                  <span className="num" style={{ fontSize:16.1, fontWeight:700, color:'var(--text)' }}>{val.toLocaleString('he-IL')} ₪</span>
                 </div>
               ))}
               {/* מה בתוך הוצאות המעביד. קודם היה כאן מספר אחד, 40%, שאיש
@@ -2077,15 +2077,15 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                   borderInlineStart:'2px solid var(--ok-line)' }}>
                   {emp.parts.filter(x => x.amount).map(x => (
                     <div key={x.key} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, padding:'2px 0' }}>
-                      <span style={{ fontSize:11.5, color:'var(--text3)' }}>
+                      <span style={{ fontSize:13.2, color:'var(--text3)' }}>
                         {x.label}
                         {x.rate && <span style={{ marginInlineStart:5, opacity:.75 }}>{(x.rate * 100).toFixed(2).replace(/\.?0+$/, '')}%</span>}
                       </span>
-                      <span className="num" style={{ fontSize:11.5, color:'var(--text3)' }}>{x.amount.toLocaleString('he-IL')} ₪</span>
+                      <span className="num" style={{ fontSize:13.2, color:'var(--text3)' }}>{x.amount.toLocaleString('he-IL')} ₪</span>
                     </div>
                   ))}
                   {emp.supplement > 0 && (
-                    <p style={{ fontSize:10.5, color:'var(--text3)', marginTop:4, opacity:.8 }}>
+                    <p style={{ fontSize:12.1, color:'var(--text3)', marginTop:4, opacity:.8 }}>
                       מזה {emp.employerSupp.toLocaleString('he-IL')} ₪ על תוספת בית חב"ד — היא נושאת מס שכר וביטוח לאומי בלבד
                     </p>
                   )}
@@ -2093,17 +2093,17 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               )}
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10,
                 borderTop:'1px solid var(--ok-line)', marginTop:7, paddingTop:9 }}>
-                <span style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>סה״כ למעסיק</span>
-                <span className="num" style={{ fontSize:18, fontWeight:800, color:'var(--purple)' }}>{emp.total.toLocaleString('he-IL')} ₪</span>
+                <span style={{ fontSize:14.9, fontWeight:700, color:'var(--text)' }}>סה״כ למעסיק</span>
+                <span className="num" style={{ fontSize:20.7, fontWeight:800, color:'var(--purple)' }}>{emp.total.toLocaleString('he-IL')} ₪</span>
               </div>
-              <p style={{ fontSize:11, color:'var(--text3)', textAlign:'center', marginTop:8 }}>
+              <p style={{ fontSize:12.6, color:'var(--text3)', textAlign:'center', marginTop:8 }}>
                 נטו משוער {calcNet(emp.gross).toLocaleString('he-IL')} ₪
               </p>
             </div>
           ) : (
             <div style={{ background:'#FFF3E0', border:'1px dashed #FFB74D', borderRadius:12, padding:16, textAlign:'center' }}>
-              <p style={{ fontSize:13, fontWeight:600, color:'#E65100', marginBottom:6 }}>נדרשת סימולציה במחשבון משרד החינוך</p>
-              <p style={{ fontSize:12, color:'#999' }}>הזיני את השכר המשולב בשדה למעלה לאחר ביצוע הסימולציה</p>
+              <p style={{ fontSize:14.9, fontWeight:600, color:'#E65100', marginBottom:6 }}>נדרשת סימולציה במחשבון משרד החינוך</p>
+              <p style={{ fontSize:13.8, color:'#999' }}>הזיני את השכר המשולב בשדה למעלה לאחר ביצוע הסימולציה</p>
             </div>
           )}
         </div>
@@ -2136,7 +2136,7 @@ function SchoolModal({ school, onSave, onClose }) {
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(6px)' }}>
       <div className="apple-card" style={{ width:'100%', maxWidth:360, padding:24 }}>
-        <h2 style={{ fontSize:17, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)', marginBottom:20 }}>
+        <h2 style={{ fontSize:19.5, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)', marginBottom:20 }}>
           {s.id ? 'עריכת בית ספר' : 'הוספת בית ספר'}
         </h2>
         <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
@@ -2153,7 +2153,7 @@ function SchoolModal({ school, onSave, onClose }) {
                 </button>
               ))}
             </div>
-            <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:6, lineHeight:1.5 }}>
+            <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:6, lineHeight:1.5 }}>
               קובע את ברירת המחדל למורות חדשות ואת המחשבון הרשמי שייפתח. אפשר לשנות מסלול למורה בודדת.
             </p>
           </div>
@@ -2163,7 +2163,7 @@ function SchoolModal({ school, onSave, onClose }) {
               value={s.hoursQuota ?? ''}
               onChange={e => setS(p => ({ ...p, hoursQuota: e.target.value === '' ? null : Number(e.target.value) }))}
               placeholder="לא הוגדרה" style={{ textAlign:'center' }} />
-            <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:6, lineHeight:1.5 }}>
+            <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:6, lineHeight:1.5 }}>
               סך השעות הפרונטליות שמותר להקצות בבית הספר. אי אפשר לשמור מורה שתחרוג מהמכסה.
               מכסה שלא הוגדרה אינה חוסמת.
             </p>
@@ -2242,11 +2242,11 @@ function SchoolReport({ school, teachers, onClose }) {
         </div>
 
         <div style={{ borderBottom:'2px solid var(--apple-text)', paddingBottom:16, marginBottom:24 }}>
-          <h1 style={{ fontSize:24, fontWeight:800, letterSpacing:'-0.02em', color:'var(--apple-text)', marginBottom:4 }}>דוח שכר עובדי הוראה</h1>
-          <h2 style={{ fontSize:17, fontWeight:600, color:'var(--apple-text2)', marginBottom:4 }}>{school.name}{school.city ? ` — ${school.city}` : ''}</h2>
-          <p style={{ fontSize:13, color:'var(--apple-text3)' }}>הופק: {new Date().toLocaleDateString('he-IL')}</p>
+          <h1 style={{ fontSize:27.6, fontWeight:800, letterSpacing:'-0.02em', color:'var(--apple-text)', marginBottom:4 }}>דוח שכר עובדי הוראה</h1>
+          <h2 style={{ fontSize:19.5, fontWeight:600, color:'var(--apple-text2)', marginBottom:4 }}>{school.name}{school.city ? ` — ${school.city}` : ''}</h2>
+          <p style={{ fontSize:14.9, color:'var(--apple-text3)' }}>הופק: {new Date().toLocaleDateString('he-IL')}</p>
           {pendingCount > 0 && (
-            <div style={{ marginTop:8, display:'inline-flex', alignItems:'center', gap:6, background:'rgba(255,159,10,0.12)', border:'1px solid rgba(255,159,10,0.3)', borderRadius:8, padding:'4px 12px', fontSize:13, fontWeight:600, color:'var(--warn)' }}>
+            <div style={{ marginTop:8, display:'inline-flex', alignItems:'center', gap:6, background:'rgba(255,159,10,0.12)', border:'1px solid rgba(255,159,10,0.3)', borderRadius:8, padding:'4px 12px', fontSize:14.9, fontWeight:600, color:'var(--warn)' }}>
               <Bell size={13} strokeWidth={2.3} style={{ display:'inline', verticalAlign:'-2px', marginInlineEnd:5 }} />
             {pendingCount} שינויים ממתינים לאישור
             </div>
@@ -2262,12 +2262,12 @@ function SchoolReport({ school, teachers, onClose }) {
           ].map(c => (
             <div key={c.label} className="apple-stat" style={{ textAlign:'center' }}>
               <p className="apple-stat-label">{c.label}</p>
-              <p className="apple-stat-value" style={{ fontSize:18 }}>{c.val}</p>
+              <p className="apple-stat-value" style={{ fontSize:20.7 }}>{c.val}</p>
             </div>
           ))}
         </div>
 
-        <table className="apple-table" style={{ fontSize:12, marginBottom:24 }}>
+        <table className="apple-table" style={{ fontSize:13.8, marginBottom:24 }}>
           <thead>
             <tr>
               <th>שם</th><th>ת.ז.</th><th style={{ textAlign:'center' }}>רפורמה</th>
@@ -2288,7 +2288,7 @@ function SchoolReport({ school, teachers, onClose }) {
               return (
                 <tr key={t.id} style={pending ? { background:'rgba(255,159,10,0.08)' } : {}}>
                   <td style={{ fontWeight:600, color:'var(--text)' }}>{pending && <Bell size={12} strokeWidth={2.4} color="var(--warn)" style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:5 }} />}{t.name}</td>
-                  <td style={{ fontFamily:'monospace', fontSize:11 }}>{t.tzId||'—'}</td>
+                  <td style={{ fontFamily:'monospace', fontSize:12.6 }}>{t.tzId||'—'}</td>
                   <td style={{ textAlign:'center' }}>{reformLabel(t.reform)}</td>
                   <td style={{ textAlign:'center', fontWeight:700 }}>{grade}</td>
                   <td style={{ textAlign:'center' }}>{t.seniority}</td>
@@ -2296,7 +2296,7 @@ function SchoolReport({ school, teachers, onClose }) {
                   <td style={{ textAlign:'center' }}>{derived ? derived.frontal : (t.frontalHours ?? '—')}</td>
                   <td style={{ textAlign:'center' }}>{derived ? derived.individual : '—'}</td>
                   <td style={{ textAlign:'center' }}>{derived ? derived.presence : '—'}</td>
-                  <td style={{ fontSize:11 }}>{t.role!=='none' ? ROLES.find(r=>r.id===t.role)?.label.split('(')[0].trim() : '—'}</td>
+                  <td style={{ fontSize:12.6 }}>{t.role!=='none' ? ROLES.find(r=>r.id===t.role)?.label.split('(')[0].trim() : '—'}</td>
                   <td style={{ textAlign:'center' }}>{fmt(t.startDate)}</td>
                   <td style={{ textAlign:'center' }}>{fmt(t.endDate)}</td>
                   <td style={{ fontWeight: t._officialGross ? 700 : 400, color: t._officialGross ? 'var(--apple-green)' : '#bbb' }}>
@@ -2321,8 +2321,8 @@ function SchoolReport({ school, teachers, onClose }) {
 
         {ts.some(t => t.scopeChanges?.length > 0) && (
           <div style={{ marginBottom:24 }}>
-            <h3 style={{ fontWeight:700, fontSize:14, color:'var(--apple-text)', marginBottom:12, paddingBottom:8, borderBottom:'1px solid var(--apple-fill2)' }}>שינויי משרה במהלך השנה</h3>
-            <table className="apple-table" style={{ fontSize:12 }}>
+            <h3 style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-text)', marginBottom:12, paddingBottom:8, borderBottom:'1px solid var(--apple-fill2)' }}>שינויי משרה במהלך השנה</h3>
+            <table className="apple-table" style={{ fontSize:13.8 }}>
               <thead>
                 <tr>
                   <th>מורה</th><th style={{ textAlign:'center' }}>תאריך</th>
@@ -2347,7 +2347,7 @@ function SchoolReport({ school, teachers, onClose }) {
           </div>
         )}
 
-        <div style={{ marginTop:16, padding:14, background:'var(--apple-fill)', borderRadius:12, fontSize:12, color:'var(--apple-text2)', lineHeight:1.8 }}>
+        <div style={{ marginTop:16, padding:14, background:'var(--apple-fill)', borderRadius:12, fontSize:13.8, color:'var(--apple-text2)', lineHeight:1.8 }}>
           <strong style={{ color:'var(--text)' }}>מבנה התשלום:</strong> התשלומים רצים במערכת של עולם ישן.
           הפער עד שכר האופק משולם כתוספת בית חב"ד.<br/>
           ברוטו למעסיק = ברוטו לעובדת + פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד<br/>
@@ -2392,12 +2392,12 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
         {/* Header */}
         <div style={{ background:'linear-gradient(135deg, var(--purple), #6A47A8)', borderRadius:'20px 20px 0 0', padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap', color:'#fff' }}>
           <div>
-            <h2 style={{ fontWeight:800, fontSize:20, marginBottom:2 }}>דוח ממ"מ והעדרויות</h2>
-            <p style={{ fontSize:13, opacity:.85 }}>{school.name} — {monthLabel}</p>
+            <h2 style={{ fontWeight:800, fontSize:23, marginBottom:2 }}>דוח ממ"מ והעדרויות</h2>
+            <p style={{ fontSize:14.9, opacity:.85 }}>{school.name} — {monthLabel}</p>
           </div>
           <div style={{ display:'flex', gap:8 }}>
-            <button onClick={exportCSV} disabled={withAbsence.length === 0} style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:10, padding:'7px 13px', color:'#fff', cursor: withAbsence.length ? 'pointer' : 'not-allowed', opacity: withAbsence.length ? 1 : .5, fontWeight:600, fontSize:13, fontFamily:'inherit', display:'inline-flex', alignItems:'center', gap:6 }}><FileSpreadsheet size={14} strokeWidth={2.2} />ייצוא CSV</button>
-            <button onClick={() => window.print()} style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:10, padding:'7px 13px', color:'#fff', cursor:'pointer', fontWeight:600, fontSize:13, fontFamily:'inherit', display:'inline-flex', alignItems:'center', gap:6 }}><Printer size={14} strokeWidth={2.2} />הדפסה</button>
+            <button onClick={exportCSV} disabled={withAbsence.length === 0} style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:10, padding:'7px 13px', color:'#fff', cursor: withAbsence.length ? 'pointer' : 'not-allowed', opacity: withAbsence.length ? 1 : .5, fontWeight:600, fontSize:14.9, fontFamily:'inherit', display:'inline-flex', alignItems:'center', gap:6 }}><FileSpreadsheet size={14} strokeWidth={2.2} />ייצוא CSV</button>
+            <button onClick={() => window.print()} style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:10, padding:'7px 13px', color:'#fff', cursor:'pointer', fontWeight:600, fontSize:14.9, fontFamily:'inherit', display:'inline-flex', alignItems:'center', gap:6 }}><Printer size={14} strokeWidth={2.2} />הדפסה</button>
             <button onClick={onClose} title="סגירה" style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:10, padding:'8px 10px', color:'#fff', cursor:'pointer', display:'inline-flex' }}><X size={16} strokeWidth={2.4} /></button>
           </div>
         </div>
@@ -2410,8 +2410,8 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
             { label:'סה"כ תוספות',      val: totExtras.toLocaleString()+' ₪', color:'#27ae60' },
           ].map(c => (
             <div key={c.label} style={{ background:'#f9f9f9', borderRadius:12, padding:'12px 16px', textAlign:'center' }}>
-              <div style={{ fontSize:11, color:'#888', fontWeight:600, marginBottom:4 }}>{c.label}</div>
-              <div style={{ fontSize:22, fontWeight:800, color: c.color }}>{c.val}</div>
+              <div style={{ fontSize:12.6, color:'#888', fontWeight:600, marginBottom:4 }}>{c.label}</div>
+              <div style={{ fontSize:25.3, fontWeight:800, color: c.color }}>{c.val}</div>
             </div>
           ))}
         </div>
@@ -2419,7 +2419,7 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
         {/* Table */}
         <div style={{ padding:'0 24px 24px', overflowX:'auto' }}>
           {withAbsence.length === 0 ? (
-            <div style={{ textAlign:'center', padding:'32px', color:'#aaa', fontSize:14 }}>אין העדרויות או ממ"מ לחודש זה</div>
+            <div style={{ textAlign:'center', padding:'32px', color:'#aaa', fontSize:16.1 }}>אין העדרויות או ממ"מ לחודש זה</div>
           ) : (
             <table className="apple-table">
               <thead>
@@ -2442,11 +2442,11 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
                     <td style={{ textAlign:'center', fontWeight:700, color: (t.mmHours||0)>0 ? '#8e44ad' : '#ccc' }}>
                       {(t.mmHours||0) > 0 ? t.mmHours : '—'}
                     </td>
-                    <td style={{ fontSize:13, color:'#555' }}>{t.mmFor||'—'}</td>
+                    <td style={{ fontSize:14.9, color:'#555' }}>{t.mmFor||'—'}</td>
                     <td style={{ textAlign:'center', fontWeight: (t.monthlyExtras||0)>0 ? 700 : 400, color: (t.monthlyExtras||0)>0 ? '#27ae60' : '#ccc' }}>
                       {(t.monthlyExtras||0) > 0 ? Number(t.monthlyExtras).toLocaleString()+' ₪' : '—'}
                     </td>
-                    <td style={{ fontSize:12, color:'#888' }}>
+                    <td style={{ fontSize:13.8, color:'#888' }}>
                       {(t.sickFiles||[]).length > 0
                         ? <span style={{ color:'var(--danger)', fontWeight:600, display:'inline-flex', alignItems:'center', gap:4 }}><Paperclip size={12} strokeWidth={2.2} />{t.sickFiles.length} קבצים</span>
                         : '—'}
@@ -2512,16 +2512,16 @@ function ReportMonth({ school, teachers, monthKey, due, onReport }) {
     <div className="apple-card" style={{ padding:'14px 16px', marginBottom:14 }} dir="rtl">
       <div style={{ display:'flex', alignItems:'center', gap:9, flexWrap:'wrap', marginBottom:4 }}>
         <CalendarClock size={15} strokeWidth={2.3} color="var(--purple)" />
-        <p style={{ fontSize:13.5, fontWeight:700, color:'var(--text)' }}>הדיווח החודשי — {fmtMonth(monthKey)}</p>
+        <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)' }}>הדיווח החודשי — {fmtMonth(monthKey)}</p>
         {reported
-          ? <span className="apple-badge badge-green" style={{ fontSize:10.5, padding:'2px 8px' }}>נמסר</span>
+          ? <span className="apple-badge badge-green" style={{ fontSize:12.1, padding:'2px 8px' }}>נמסר</span>
           : past
-            ? <span className="apple-badge badge-orange" style={{ fontSize:10.5, padding:'2px 8px' }}>אחרי המועד</span>
-            : daysLeft != null && <span className="apple-badge badge-purple" style={{ fontSize:10.5, padding:'2px 8px' }}>
+            ? <span className="apple-badge badge-orange" style={{ fontSize:12.1, padding:'2px 8px' }}>אחרי המועד</span>
+            : daysLeft != null && <span className="apple-badge badge-purple" style={{ fontSize:12.1, padding:'2px 8px' }}>
                 {daysLeft === 0 ? 'היום המועד האחרון' : `נותרו ${daysLeft} ימים`}
               </span>}
       </div>
-      <p style={{ fontSize:11.5, color:'var(--text3)', lineHeight:1.6, marginBottom:10 }}>
+      <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.6, marginBottom:10 }}>
         העדרויות, מילוי מקום וחופשות לידה. {due?.report
           ? `המועד האחרון ${String(due.report).split('-').reverse().join('/')} — דיווח שיגיע אחריו לא ייכנס לשכר החודש.`
           : ''}
@@ -2530,7 +2530,7 @@ function ReportMonth({ school, teachers, monthKey, due, onReport }) {
       {changed.length > 0 && (
         <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:10 }}>
           {changed.map(t => (
-            <p key={t.id} style={{ fontSize:12, color:'var(--text2)' }}>
+            <p key={t.id} style={{ fontSize:13.8, color:'var(--text2)' }}>
               · <b>{t.name}</b>
               {(t.absenceDays || 0) > 0 && ` · ${t.absenceDays} ימי היעדרות`}
               {(t.mmHours || 0) > 0 && ` · ${t.mmHours} ש׳ מילוי מקום${t.mmFor ? ` במקום ${t.mmFor}` : ''}`}
@@ -2540,9 +2540,9 @@ function ReportMonth({ school, teachers, monthKey, due, onReport }) {
         </div>
       )}
 
-      {err  && <p style={{ fontSize:12.5, color:'var(--danger)', marginBottom:8 }}>{err}</p>}
+      {err  && <p style={{ fontSize:14.4, color:'var(--danger)', marginBottom:8 }}>{err}</p>}
       {done && (
-        <p style={{ fontSize:12.5, color: done === 'late' ? 'var(--warn)' : 'var(--ok)', fontWeight:600, marginBottom:8 }}>
+        <p style={{ fontSize:14.4, color: done === 'late' ? 'var(--warn)' : 'var(--ok)', fontWeight:600, marginBottom:8 }}>
           {done === 'late'
             ? 'הדיווח נמסר אחרי המועד — הוא מסומן, ויעבור לשכר רק באישור מפורש.'
             : 'הדיווח נמסר. תודה.'}
@@ -2550,7 +2550,7 @@ function ReportMonth({ school, teachers, monthKey, due, onReport }) {
       )}
 
       <button className="apple-btn apple-btn-blue" onClick={send} disabled={busy || reported}
-        style={{ minHeight:38, padding:'0 18px', fontSize:13, opacity: reported ? .5 : 1 }}>
+        style={{ minHeight:38, padding:'0 18px', fontSize:14.9, opacity: reported ? .5 : 1 }}>
         {busy ? 'שולח…' : reported ? 'הדיווח נמסר' : changed.length ? 'שליחת הדיווח' : 'אין שינוי החודש — שליחה'}
       </button>
     </div>
@@ -2714,7 +2714,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
     const numCell = (key, bg) => (
       <td><input type="number" className="apple-input" dir="ltr" value={v[key] || ''}
         onChange={e => setF(key, e.target.value ? Number(e.target.value) : null)} placeholder="—"
-        style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center',
+        style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center',
                  background: bg || undefined }} /></td>
     );
     const supplies = !isPrincipalRow(v) && schoolPaysSupp(v.schoolId);
@@ -2743,7 +2743,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 
           <div style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom:15, flexWrap:'wrap' }}>
             {onBack && (
-              <button className="apple-btn apple-btn-ghost" onClick={onBack} style={{ minHeight:38, padding:'0 13px', fontSize:13.5 }}>
+              <button className="apple-btn apple-btn-ghost" onClick={onBack} style={{ minHeight:38, padding:'0 13px', fontSize:15.5 }}>
                 <ArrowRight size={15} strokeWidth={2.4} />
                 חזרה
               </button>
@@ -2751,14 +2751,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
             <div style={{ flex:1, minWidth:170 }}>
               <div style={{ display:'flex', alignItems:'center', gap:9 }}>
                 <span className="title-bar" />
-                <h1 style={{ fontSize:23, fontWeight:800, color:'var(--text)', letterSpacing:'-0.025em', lineHeight:1.2 }}>{school.name}</h1>
+                <h1 style={{ fontSize:26.4, fontWeight:800, color:'var(--text)', letterSpacing:'-0.025em', lineHeight:1.2 }}>{school.name}</h1>
               </div>
-              <p style={{ fontSize:13, color:'var(--text3)', marginInlineStart:13 }}>
+              <p style={{ fontSize:14.9, color:'var(--text3)', marginInlineStart:13 }}>
                 {school.city}{school.city ? ' · ' : ''}מסלול ברירת מחדל לעובד/ת הוראה חדש/ה: {reformLabel(school.reform)}
               </p>
               {!hoursQuota && extraHours > 0 && (
                 <div style={{ marginInlineStart:13, marginTop:8 }}>
-                  <span className="apple-badge badge-teal" style={{ fontSize:11.5 }}
+                  <span className="apple-badge badge-teal" style={{ fontSize:13.2 }}
                     title="נשמרות בנפרד מהמכסה; כשתוגדר מכסה בסיסית הן יתווספו אליה">
                     +{extraHours} שעות הוראה נוספות — {school.extraHoursNote || 'אושרו'} · נוצלו {usedHours.toLocaleString('he-IL')}
                   </span>
@@ -2766,7 +2766,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               )}
               {hoursQuota && (
                 <div style={{ marginInlineStart:13, marginTop:8, maxWidth:320 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:4 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:13.8, marginBottom:4 }}>
                     <span style={{ color:'var(--text3)' }}>שעות עובדי הוראה{extraHours ? ` (כולל +${extraHours} — ${school.extraHoursNote || 'שעות נוספות'})` : ''}</span>
                     <span style={{ fontWeight:700, color: freeHours < 0 ? 'var(--danger)' : 'var(--text)' }}>
                       {usedHours.toLocaleString('he-IL')} / {hoursQuota.toLocaleString('he-IL')}
@@ -2801,10 +2801,10 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               <Search size={15} strokeWidth={2.2}
                 style={{ position:'absolute', insetInlineStart:12, top:'50%', transform:'translateY(-50%)', color:'var(--text3)', pointerEvents:'none' }} />
               <input value={search} onChange={e => setSearch(e.target.value)} className="apple-input"
-                placeholder="חיפוש לפי שם / ת.ז." style={{ fontSize:13.5, minHeight:38, paddingInlineStart:34 }} />
+                placeholder="חיפוש לפי שם / ת.ז." style={{ fontSize:15.5, minHeight:38, paddingInlineStart:34 }} />
             </div>
 
-            <button className="apple-btn apple-btn-blue" onClick={startNew} style={{ minHeight:38, fontSize:13.5 }}>
+            <button className="apple-btn apple-btn-blue" onClick={startNew} style={{ minHeight:38, fontSize:15.5 }}>
               <Plus size={15} strokeWidth={2.6} />
               הוספת עובד/ת הוראה
             </button>
@@ -2816,14 +2816,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               title={(isCoord ? school.principalEmail : school.coordinatorEmail)
                 ? `שלח ל: ${isCoord ? school.principalEmail : school.coordinatorEmail}`
                 : (isCoord ? 'לא הוגדר מייל מנהלת' : 'לא הוגדר מייל שליח')}
-              style={{ minHeight:38, fontSize:13.5 }}>
+              style={{ minHeight:38, fontSize:15.5 }}>
               <Send size={14} strokeWidth={2.2} />
               {isCoord ? 'שלח לאישור' : 'שלח לשליח'}
             </button>
             {isCoord && (
               <button className="apple-btn apple-btn-ghost" onClick={() => setLinkModal(true)}
                 title="מנפיק למנהלת קישור אישי חדש ופותח וואטסאפ עם ההודעה מוכנה"
-                style={{ minHeight:38, fontSize:13.5 }}>
+                style={{ minHeight:38, fontSize:15.5 }}>
                 <MessageCircle size={14} strokeWidth={2.2} />
                 קישור למנהלת
               </button>
@@ -2831,24 +2831,24 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 
             <span aria-hidden style={{ width:1, height:22, background:'var(--line)', marginInline:2 }} />
 
-            <button className="apple-btn apple-btn-ghost" onClick={() => setShowReport(true)} style={{ minHeight:38, fontSize:13.5 }}>
+            <button className="apple-btn apple-btn-ghost" onClick={() => setShowReport(true)} style={{ minHeight:38, fontSize:15.5 }}>
               <Printer size={14} strokeWidth={2.2} />
               דוח שכר
             </button>
-            <button className="apple-btn apple-btn-ghost" onClick={() => setShowAbsence(true)} style={{ minHeight:38, fontSize:13.5 }}>
+            <button className="apple-btn apple-btn-ghost" onClick={() => setShowAbsence(true)} style={{ minHeight:38, fontSize:15.5 }}>
               <CalendarClock size={14} strokeWidth={2.2} />
               ממ"מ והעדרויות
             </button>
             <button className="apple-btn apple-btn-ghost" onClick={exportCSV} disabled={ts.length === 0}
-              title={ts.length === 0 ? 'אין עובדי הוראה לייצוא' : 'ייצוא הטבלה לקובץ CSV'} style={{ minHeight:38, fontSize:13.5 }}>
+              title={ts.length === 0 ? 'אין עובדי הוראה לייצוא' : 'ייצוא הטבלה לקובץ CSV'} style={{ minHeight:38, fontSize:15.5 }}>
               <FileSpreadsheet size={14} strokeWidth={2.2} />
               ייצוא CSV
             </button>
-            <button className="apple-btn apple-btn-ghost" onClick={() => downloadTemplate(school.name)} style={{ minHeight:38, fontSize:13.5 }}>
+            <button className="apple-btn apple-btn-ghost" onClick={() => downloadTemplate(school.name)} style={{ minHeight:38, fontSize:15.5 }}>
               <Download size={14} strokeWidth={2.2} />
               תבנית
             </button>
-            <button className="apple-btn apple-btn-ghost" onClick={() => setShowImport(true)} style={{ minHeight:38, fontSize:13.5 }}>
+            <button className="apple-btn apple-btn-ghost" onClick={() => setShowImport(true)} style={{ minHeight:38, fontSize:15.5 }}>
               <Upload size={14} strokeWidth={2.2} />
               ייבוא
             </button>
@@ -2869,7 +2869,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               <div key={c.label} className="apple-stat spring-enter" style={{ animationDelay: `${i*55}ms` }}>
                 <p className="apple-stat-label">{c.label}</p>
                 <p className={`apple-stat-value ${c.hero ? 'grad-num' : ''}`}>{c.val}</p>
-                {c.sub && <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:3 }}>{c.sub}</p>}
+                {c.sub && <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:3 }}>{c.sub}</p>}
               </div>
             ))}
           </div>
@@ -2880,7 +2880,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         <div style={{ maxWidth:1400, margin:'0 auto', padding:'18px 20px 0' }}>
           <div style={{ background:'var(--teal-100)', border:'1px solid #B8EAF2', borderRadius:14, padding:'11px 14px', display:'flex', gap:9, alignItems:'flex-start' }}>
             <Calculator size={15} strokeWidth={2.2} color="var(--teal-700)" style={{ flexShrink:0, marginTop:2 }} />
-            <p style={{ fontSize:12.5, color:'var(--teal-700)', lineHeight:1.6 }}>
+            <p style={{ fontSize:14.4, color:'var(--teal-700)', lineHeight:1.6 }}>
               מזיני את פרטי המורה ואת <strong>השעות הפרונטליות</strong> — אחוז המשרה מחושב מהן,
               והשכר נקבע בסימולציה במחשבון הרשמי אצל חשבת השכר.
             </p>
@@ -2899,14 +2899,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
             שההזנה השוטפת צריכה; ההסתרה ב-CSS לפי מיקום, כותרת ותא יחד. */}
         <div style={{ display:'flex', justifyContent:'flex-end', alignItems:'center', gap:10, marginBottom:8 }}>
           {saveState === 'saving' ? (
-            <span style={{ fontSize:12.5, color:'var(--text3)', fontWeight:600 }}>שומר…</span>
+            <span style={{ fontSize:14.4, color:'var(--text3)', fontWeight:600 }}>שומר…</span>
           ) : saveState ? (
-            <span style={{ fontSize:12.5, color:'var(--ok, #22C55E)', fontWeight:700 }}>
+            <span style={{ fontSize:14.4, color:'var(--ok, #22C55E)', fontWeight:700 }}>
               ✓ נשמר {saveState.toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit' })}
             </span>
           ) : null}
           {/* סוגר שדה פתוח — ה-blur מפעיל את השמירה שלו — ומאשר */}
-          <button className="apple-btn apple-btn-blue" style={{ minHeight:32, padding:'0 16px', fontSize:12.5 }}
+          <button className="apple-btn apple-btn-blue" style={{ minHeight:32, padding:'0 16px', fontSize:14.4 }}
             onClick={() => {
               if (document.activeElement?.tagName === 'INPUT') document.activeElement.blur();
               setSaveState(s2 => s2 === 'saving' ? s2 : new Date());
@@ -2914,13 +2914,13 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
             שמירה
           </button>
           <button className="apple-btn apple-btn-ghost" onClick={() => setAllCols(v => !v)}
-            style={{ minHeight:32, padding:'0 12px', fontSize:12.5 }}>
+            style={{ minHeight:32, padding:'0 12px', fontSize:14.4 }}>
             {allCols ? 'תצוגה מצומצמת' : `כל העמודות (${26})`}
           </button>
         </div>
         <div className="sheet-wrap">
           <div className="sheet-scroll">
-            <table className={`apple-table sticky-head${allCols ? '' : ' compact-cols'}${school.chabadSupp === false ? ' no-supp' : ''}`} style={{ fontSize:13, minWidth: allCols ? 1330 : 0 }}>
+            <table className={`apple-table sticky-head${allCols ? '' : ' compact-cols'}${school.chabadSupp === false ? ' no-supp' : ''}`} style={{ fontSize:14.9, minWidth: allCols ? 1330 : 0 }}>
             <thead>
               <tr>
                 <th>שם עובדת</th>
@@ -2955,12 +2955,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               {/* New row */}
               {editingId === 'new' && editData && (
                 <tr style={{ background:'var(--purple-100)', borderBottom:'2px solid var(--purple)' }}>
-                  <td><input className="apple-input" value={editData.name} onChange={e=>setF('name',e.target.value)} placeholder="שם מלא *" style={{ fontSize:12, padding:'4px 8px', borderRadius:6 }} /></td>
-                  <td><input className="apple-input" dir="ltr" value={editData.tzId||''} onChange={e=>setF('tzId',e.target.value)} placeholder="ת.ז." style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>
-                  <td><input className="apple-input" value={editData.email||''} onChange={e=>setF('email',e.target.value)} placeholder="מייל" dir="ltr" style={{ fontSize:12, padding:'4px 8px', borderRadius:6 }} /></td>
-                  <td><input className="apple-input" value={editData.phone||''} onChange={e=>setF('phone',e.target.value)} placeholder="טלפון" dir="ltr" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:110 }} /></td>
+                  <td><input className="apple-input" value={editData.name} onChange={e=>setF('name',e.target.value)} placeholder="שם מלא *" style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6 }} /></td>
+                  <td><input className="apple-input" dir="ltr" value={editData.tzId||''} onChange={e=>setF('tzId',e.target.value)} placeholder="ת.ז." style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>
+                  <td><input className="apple-input" value={editData.email||''} onChange={e=>setF('email',e.target.value)} placeholder="מייל" dir="ltr" style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6 }} /></td>
+                  <td><input className="apple-input" value={editData.phone||''} onChange={e=>setF('phone',e.target.value)} placeholder="טלפון" dir="ltr" style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:110 }} /></td>
                   <td style={{ textAlign:'center' }}>
-                    <select value={editData.reform} onChange={e=>setF('reform',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
+                    <select value={editData.reform} onChange={e=>setF('reform',e.target.value)} className="apple-select" style={{ fontSize:13.8, padding:'4px 8px' }}>
                       {REFORMS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                     </select>
                   </td>
@@ -2972,11 +2972,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         const pct = Number(e.target.value);
                         setEditData(p => ({ ...p, scopePct: pct, scope: pct }));
                       }}
-                      style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:58, textAlign:'center', fontWeight:700 }} />
-                    <span style={{ display:'block', fontSize:10.5, color:'var(--text3)' }}>% משרה</span>
+                      style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:58, textAlign:'center', fontWeight:700 }} />
+                    <span style={{ display:'block', fontSize:12.1, color:'var(--text3)' }}>% משרה</span>
                   </td>
                   <td>
-                    <select value={editData.degree||'BA'} onChange={e=>setF('degree',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
+                    <select value={editData.degree||'BA'} onChange={e=>setF('degree',e.target.value)} className="apple-select" style={{ fontSize:13.8, padding:'4px 8px' }}>
                       <option value="intern">מתמחה</option>
                       <option value="unlicensed">לא מוסמך</option>
                       <option value="senior">בכיר</option>
@@ -2986,12 +2986,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                   </td>
                   <td style={{ textAlign:'center' }}>
                     {editData.reform==='ofek'
-                      ? <select value={editData.grade||1} onChange={e=>setF('grade',Number(e.target.value))} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
+                      ? <select value={editData.grade||1} onChange={e=>setF('grade',Number(e.target.value))} className="apple-select" style={{ fontSize:13.8, padding:'4px 8px' }}>
                           {[1,2,3,4,5,6,7,8,9].map(g=><option key={g} value={g}>דרגה {g}</option>)}
                         </select>
                       : <span style={{ color:'var(--text3)' }}>—</span>}
                   </td>
-                  <td><input type="number" min="1" className="apple-input" dir="ltr" value={editData.seniority??1} onChange={e=>setF('seniority',Math.max(1, Number(e.target.value)||1))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td><input type="number" min="1" className="apple-input" dir="ltr" value={editData.seniority??1} onChange={e=>setF('seniority',Math.max(1, Number(e.target.value)||1))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td><input type="number" className="apple-input" dir="ltr" min="0" value={editData.frontalHours ?? baseFrontalFor(editData)}
                       max={hoursCeiling(editData) ?? 40}
                       onChange={e => {
@@ -2999,19 +2999,19 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         // שגתה, ושרה מזינה אותו בעצמה.
                         setEditData(p => ({ ...p, frontalHours: Number(e.target.value) }));
                       }}
-                      style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                      style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td style={{ textAlign:'center' }}>
-                    <select value={editData.role || 'none'} onChange={e=>setF('role',e.target.value)} className="apple-select" style={{ fontSize:11.5, padding:'4px 6px', maxWidth:130 }}>
+                    <select value={editData.role || 'none'} onChange={e=>setF('role',e.target.value)} className="apple-select" style={{ fontSize:13.2, padding:'4px 6px', maxWidth:130 }}>
                       {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
                     </select>
                   </td>
                   <td style={{ textAlign:'center' }}>
-                    <select value={editData.level || 'elementary'} onChange={e=>setF('level',e.target.value)} className="apple-select" style={{ fontSize:11.5, padding:'4px 6px' }}>
+                    <select value={editData.level || 'elementary'} onChange={e=>setF('level',e.target.value)} className="apple-select" style={{ fontSize:13.2, padding:'4px 6px' }}>
                       {Object.entries(LEVELS).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
                     </select>
                   </td>
                   <td style={{ textAlign:'center' }}>
-                    <select value={editData.ageGroup || 'none'} onChange={e=>setF('ageGroup',e.target.value)} className="apple-select" style={{ fontSize:11.5, padding:'4px 6px' }}>
+                    <select value={editData.ageGroup || 'none'} onChange={e=>setF('ageGroup',e.target.value)} className="apple-select" style={{ fontSize:13.2, padding:'4px 6px' }}>
                       {Object.entries(AGE_RED).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
                     </select>
                   </td>
@@ -3021,18 +3021,18 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       <span className="apple-toggle-track"></span>
                     </label>
                   </td>
-                  <td><input type="number" className="apple-input" dir="ltr" value={editData.childrenUnder18??0} onChange={e=>setF('childrenUnder18',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                  <td><input type="number" className="apple-input" dir="ltr" value={editData.absenceDays??0} onChange={e=>setF('absenceDays',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                  <td><input type="number" className="apple-input" dir="ltr" value={editData.travelDays??0} onChange={e=>setF('travelDays',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                  <td><input type="number" className="apple-input" dir="ltr" value={editData.daycareChildren??0} onChange={e=>setF('daycareChildren',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                  <td><input type="number" className="apple-input" dir="ltr" value={editData.mmHours??0} onChange={e=>setF('mmHours',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                  <td><input className="apple-input" value={editData.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם עובד/ת ההוראה" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
-                  <td><input type="number" className="apple-input" dir="ltr" value={editData.monthlyExtras??0} onChange={e=>setF('monthlyExtras',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:70, textAlign:'center' }} /></td>
+                  <td><input type="number" className="apple-input" dir="ltr" value={editData.childrenUnder18??0} onChange={e=>setF('childrenUnder18',Number(e.target.value))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td><input type="number" className="apple-input" dir="ltr" value={editData.absenceDays??0} onChange={e=>setF('absenceDays',Number(e.target.value))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td><input type="number" className="apple-input" dir="ltr" value={editData.travelDays??0} onChange={e=>setF('travelDays',Number(e.target.value))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td><input type="number" className="apple-input" dir="ltr" value={editData.daycareChildren??0} onChange={e=>setF('daycareChildren',Number(e.target.value))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td><input type="number" className="apple-input" dir="ltr" value={editData.mmHours??0} onChange={e=>setF('mmHours',Number(e.target.value))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                  <td><input className="apple-input" value={editData.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם עובד/ת ההוראה" style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
+                  <td><input type="number" className="apple-input" dir="ltr" value={editData.monthlyExtras??0} onChange={e=>setF('monthlyExtras',Number(e.target.value))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:70, textAlign:'center' }} /></td>
                   {moneyEditCells(editData)}
                   <td>
                     <div style={{ display:'flex', gap:4 }}>
-                      <button className="apple-btn apple-btn-blue" onClick={saveEdit} style={{ padding:'4px 10px', fontSize:12 }}>שמור</button>
-                      <button className="apple-btn apple-btn-ghost" onClick={cancelEdit} style={{ padding:'4px 10px', fontSize:12 }}>ביטול</button>
+                      <button className="apple-btn apple-btn-blue" onClick={saveEdit} style={{ padding:'4px 10px', fontSize:13.8 }}>שמור</button>
+                      <button className="apple-btn apple-btn-ghost" onClick={cancelEdit} style={{ padding:'4px 10px', fontSize:13.8 }}>ביטול</button>
                     </div>
                   </td>
                 </tr>
@@ -3057,12 +3057,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
 
                 if (isEditing) return (
                   <tr key={t.id} style={{ background:'var(--purple-100)', borderBottom:'2px solid var(--purple)' }}>
-                    <td><input className="apple-input" value={d.name} onChange={e=>setF('name',e.target.value)} style={{ fontSize:12, padding:'4px 8px', borderRadius:6 }} /></td>
-                    <td><input className="apple-input" dir="ltr" value={d.tzId||''} onChange={e=>setF('tzId',e.target.value)} placeholder="ת.ז." style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>
-                    <td><input className="apple-input" value={d.email||''} onChange={e=>setF('email',e.target.value)} dir="ltr" placeholder="מייל" style={{ fontSize:12, padding:'4px 8px', borderRadius:6 }} /></td>
-                    <td><input className="apple-input" value={d.phone||''} onChange={e=>setF('phone',e.target.value)} dir="ltr" placeholder="טלפון" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:110 }} /></td>
+                    <td><input className="apple-input" value={d.name} onChange={e=>setF('name',e.target.value)} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6 }} /></td>
+                    <td><input className="apple-input" dir="ltr" value={d.tzId||''} onChange={e=>setF('tzId',e.target.value)} placeholder="ת.ז." style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center' }} /></td>
+                    <td><input className="apple-input" value={d.email||''} onChange={e=>setF('email',e.target.value)} dir="ltr" placeholder="מייל" style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6 }} /></td>
+                    <td><input className="apple-input" value={d.phone||''} onChange={e=>setF('phone',e.target.value)} dir="ltr" placeholder="טלפון" style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:110 }} /></td>
                     <td style={{ textAlign:'center' }}>
-                      <select value={d.reform} onChange={e=>setF('reform',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
+                      <select value={d.reform} onChange={e=>setF('reform',e.target.value)} className="apple-select" style={{ fontSize:13.8, padding:'4px 8px' }}>
                         {REFORMS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                       </select>
                     </td>
@@ -3074,11 +3074,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           const pct = Number(e.target.value);
                           setEditData(p => ({ ...p, scopePct: pct, scope: pct }));
                         }}
-                        style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:58, textAlign:'center', fontWeight:700 }} />
-                      <span style={{ display:'block', fontSize:10.5, color:'var(--text3)' }}>% משרה</span>
+                        style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:58, textAlign:'center', fontWeight:700 }} />
+                      <span style={{ display:'block', fontSize:12.1, color:'var(--text3)' }}>% משרה</span>
                     </td>
                     <td>
-                      <select value={d.degree||'BA'} onChange={e=>setF('degree',e.target.value)} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
+                      <select value={d.degree||'BA'} onChange={e=>setF('degree',e.target.value)} className="apple-select" style={{ fontSize:13.8, padding:'4px 8px' }}>
                         <option value="intern">מתמחה</option>
                         <option value="unlicensed">לא מוסמך</option>
                         <option value="senior">בכיר</option>
@@ -3088,12 +3088,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     </td>
                     <td style={{ textAlign:'center' }}>
                       {d.reform==='ofek'
-                        ? <select value={d.grade||1} onChange={e=>setF('grade',Number(e.target.value))} className="apple-select" style={{ fontSize:12, padding:'4px 8px' }}>
+                        ? <select value={d.grade||1} onChange={e=>setF('grade',Number(e.target.value))} className="apple-select" style={{ fontSize:13.8, padding:'4px 8px' }}>
                             {[1,2,3,4,5,6,7,8,9].map(g=><option key={g} value={g}>דרגה {g}</option>)}
                           </select>
                         : <span style={{ color:'var(--text3)' }}>—</span>}
                     </td>
-                    <td><input type="number" min="1" className="apple-input" dir="ltr" value={d.seniority??1} onChange={e=>setF('seniority',Math.max(1, Number(e.target.value)||1))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                    <td><input type="number" min="1" className="apple-input" dir="ltr" value={d.seniority??1} onChange={e=>setF('seniority',Math.max(1, Number(e.target.value)||1))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                     <td><input type="number" className="apple-input" dir="ltr" min="0" value={d.frontalHours ?? baseFrontalFor(d)}
                       max={hoursCeiling(editData) ?? 40}
                       onChange={e => {
@@ -3101,19 +3101,19 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         // שגתה, ושרה מזינה אותו בעצמה.
                         setEditData(p => ({ ...p, frontalHours: Number(e.target.value) }));
                       }}
-                      style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                      style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
                   <td style={{ textAlign:'center' }}>
-                    <select value={d.role || 'none'} onChange={e=>setF('role',e.target.value)} className="apple-select" style={{ fontSize:11.5, padding:'4px 6px', maxWidth:130 }}>
+                    <select value={d.role || 'none'} onChange={e=>setF('role',e.target.value)} className="apple-select" style={{ fontSize:13.2, padding:'4px 6px', maxWidth:130 }}>
                       {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
                     </select>
                   </td>
                   <td style={{ textAlign:'center' }}>
-                    <select value={d.level || 'elementary'} onChange={e=>setF('level',e.target.value)} className="apple-select" style={{ fontSize:11.5, padding:'4px 6px' }}>
+                    <select value={d.level || 'elementary'} onChange={e=>setF('level',e.target.value)} className="apple-select" style={{ fontSize:13.2, padding:'4px 6px' }}>
                       {Object.entries(LEVELS).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
                     </select>
                   </td>
                   <td style={{ textAlign:'center' }}>
-                    <select value={d.ageGroup || 'none'} onChange={e=>setF('ageGroup',e.target.value)} className="apple-select" style={{ fontSize:11.5, padding:'4px 6px' }}>
+                    <select value={d.ageGroup || 'none'} onChange={e=>setF('ageGroup',e.target.value)} className="apple-select" style={{ fontSize:13.2, padding:'4px 6px' }}>
                       {Object.entries(AGE_RED).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
                     </select>
                   </td>
@@ -3123,18 +3123,18 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         <span className="apple-toggle-track"></span>
                       </label>
                     </td>
-                    <td><input type="number" className="apple-input" dir="ltr" value={d.childrenUnder18??0} onChange={e=>setF('childrenUnder18',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                    <td><input type="number" className="apple-input" dir="ltr" value={d.absenceDays??0} onChange={e=>setF('absenceDays',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                    <td><input type="number" className="apple-input" dir="ltr" value={d.travelDays??0} onChange={e=>setF('travelDays',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                    <td><input type="number" className="apple-input" dir="ltr" value={d.daycareChildren??0} onChange={e=>setF('daycareChildren',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                    <td><input type="number" className="apple-input" dir="ltr" value={d.mmHours??0} onChange={e=>setF('mmHours',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
-                    <td><input className="apple-input" value={d.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם עובד/ת ההוראה" style={{ fontSize:12, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
-                    <td><input type="number" className="apple-input" dir="ltr" value={d.monthlyExtras??0} onChange={e=>setF('monthlyExtras',Number(e.target.value))} style={{ fontSize:12, padding:'4px 8px', borderRadius:6, width:70, textAlign:'center' }} /></td>
+                    <td><input type="number" className="apple-input" dir="ltr" value={d.childrenUnder18??0} onChange={e=>setF('childrenUnder18',Number(e.target.value))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                    <td><input type="number" className="apple-input" dir="ltr" value={d.absenceDays??0} onChange={e=>setF('absenceDays',Number(e.target.value))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                    <td><input type="number" className="apple-input" dir="ltr" value={d.travelDays??0} onChange={e=>setF('travelDays',Number(e.target.value))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                    <td><input type="number" className="apple-input" dir="ltr" value={d.daycareChildren??0} onChange={e=>setF('daycareChildren',Number(e.target.value))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                    <td><input type="number" className="apple-input" dir="ltr" value={d.mmHours??0} onChange={e=>setF('mmHours',Number(e.target.value))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:60, textAlign:'center' }} /></td>
+                    <td><input className="apple-input" value={d.mmFor||''} onChange={e=>setF('mmFor',e.target.value)} placeholder="שם עובד/ת ההוראה" style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, minWidth:80 }} /></td>
+                    <td><input type="number" className="apple-input" dir="ltr" value={d.monthlyExtras??0} onChange={e=>setF('monthlyExtras',Number(e.target.value))} style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:70, textAlign:'center' }} /></td>
                     {moneyEditCells(d)}
                     <td>
                       <div style={{ display:'flex', gap:4 }}>
-                        <button className="apple-btn apple-btn-blue" onClick={saveEdit} style={{ padding:'4px 10px', fontSize:12 }}>שמור</button>
-                        <button className="apple-btn apple-btn-ghost" onClick={cancelEdit} style={{ padding:'4px 10px', fontSize:12 }}>ביטול</button>
+                        <button className="apple-btn apple-btn-blue" onClick={saveEdit} style={{ padding:'4px 10px', fontSize:13.8 }}>שמור</button>
+                        <button className="apple-btn apple-btn-ghost" onClick={cancelEdit} style={{ padding:'4px 10px', fontSize:13.8 }}>ביטול</button>
                       </div>
                     </td>
                   </tr>
@@ -3152,14 +3152,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         {isAppr && <ClipboardCheck size={13} strokeWidth={2.4} color="var(--teal-700)" aria-label="ממתין לאישור" />}
                         <span style={{ color: t.name === PRINCIPAL_PLACEHOLDER ? 'var(--text3)' : undefined }}>{t.name}</span>
                         {!hasContact(t) && (
-                          <span className="apple-badge badge-orange" style={{ fontSize:10.5, padding:'2px 8px' }}
+                          <span className="apple-badge badge-orange" style={{ fontSize:12.1, padding:'2px 8px' }}
                             title="בלי טלפון ומייל אי אפשר לשלוח את נתוני ההעסקה לחתימה">
                             חסרים פרטי קשר
                           </span>
                         )}
                         {onLeave(t) && (
                           <span className={`apple-badge ${t.leaveType === 'maternity' && hasSubstitute(t) ? 'badge-teal' : 'badge-orange'}`}
-                            style={{ fontSize:10.5, padding:'2px 8px' }} title={leaveText(t)}>
+                            style={{ fontSize:12.1, padding:'2px 8px' }} title={leaveText(t)}>
                             {leaveLabel(t.leaveType)}{t.leaveFrom ? ` ${fmtDay(t.leaveFrom)}` : ''}
                             {t.leaveType === 'maternity'
                               ? (hasSubstitute(t) ? ' · שובצה מחליפה — הפרשות בלבד' : ' · השכר נשמר עד שיבוץ')
@@ -3167,14 +3167,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           </span>
                         )}
                         {isPrincipalRow(t) && (
-                          <span className="apple-badge badge-purple" style={{ fontSize:10.5, padding:'2px 8px', cursor:'help' }}
+                          <span className="apple-badge badge-purple" style={{ fontSize:12.1, padding:'2px 8px', cursor:'help' }}
                             title="נוצרה אוטומטית עם פתיחת בית הספר, עם 26 שעות כברירת מחדל — השעות נספרות במכסה. עדכני את שעותיה ואת פרטיה.">
                             מנהלת
                           </span>
                         )}
-                        {t._agreedGross && <span className="apple-badge badge-teal" style={{ fontSize:10.5, padding:'2px 8px' }} title="ברוטו מוסכם — לא מסימולציה">שכר מוסכם</span>}
+                        {t._agreedGross && <span className="apple-badge badge-teal" style={{ fontSize:12.1, padding:'2px 8px' }} title="ברוטו מוסכם — לא מסימולציה">שכר מוסכם</span>}
                         {fullyApproved(t) && (
-                          <span className="apple-badge badge-green" style={{ fontSize:10.5, padding:'2px 8px' }}
+                          <span className="apple-badge badge-green" style={{ fontSize:12.1, padding:'2px 8px' }}
                             title="מאושר סופית — אפשר להפיק לה נתוני העסקה לחתימה">
                             <Check size={10} strokeWidth={3} />
                             מאושר
@@ -3182,9 +3182,9 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         )}
                       </div>
                     </td>
-                    <td style={{ textAlign:'center', fontFamily:'monospace', fontSize:12, color:'var(--apple-text2)' }}>{t.tzId||'—'}</td>
-                    <td style={{ fontSize:12, color:'var(--apple-text3)' }}>{t.email||'—'}</td>
-                    <td style={{ fontSize:12, color:'var(--apple-text3)', direction:'ltr', textAlign:'right' }}>{t.phone||'—'}</td>
+                    <td style={{ textAlign:'center', fontFamily:'monospace', fontSize:13.8, color:'var(--apple-text2)' }}>{t.tzId||'—'}</td>
+                    <td style={{ fontSize:13.8, color:'var(--apple-text3)' }}>{t.email||'—'}</td>
+                    <td style={{ fontSize:13.8, color:'var(--apple-text3)', direction:'ltr', textAlign:'right' }}>{t.phone||'—'}</td>
                     <td style={{ textAlign:'center' }}>
                       <span className={`apple-badge ${t.reform==='ofek' ? 'badge-blue' : 'badge-gray'}`}>
                         {reformLabel(t.reform)}
@@ -3204,7 +3204,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           if (!Number.isFinite(pct) || pct === scope) return;
                           saveRow({ ...t, scopePct: pct, scope: pct, scopeSetAt: new Date().toISOString() });
                         }}
-                        style={{ width:56, textAlign:'center', fontWeight:700, fontSize:13,
+                        style={{ width:68, textAlign:'center', fontWeight:700, fontSize:14.9,
                           border:`1px solid ${scopeConfirmed(t) ? 'var(--line)' : 'var(--warn)'}`, borderRadius:7, padding:'3px 4px',
                           background: scopeConfirmed(t) ? 'var(--surface)' : 'var(--warn-bg)',
                           color:'var(--text)', fontFamily:'inherit' }} />
@@ -3215,17 +3215,17 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         <button
                           title="לפי הנוסחה: שעות (ועוד 3 למחנכת בעולם ישן) חלקי 30, או 26 באופק. לחיצה מיישרת, ותוספת האם מעל."
                           onClick={e => { e.stopPropagation(); const v = suggestedScope(t); saveRow({ ...t, scopePct: v, scope: v, scopeSetAt: new Date().toISOString() }); }}
-                          style={{ display:'block', margin:'3px auto 0', fontSize:10.5, color:'#fff',
+                          style={{ display:'block', margin:'3px auto 0', fontSize:12.1, color:'#fff',
                             background:'var(--teal)', border:'none', cursor:'pointer', fontFamily:'inherit',
                             fontWeight:700, padding:'2px 8px', borderRadius:999, whiteSpace:'nowrap' }}>
                           {`תקני ל-${suggestedScope(t)}`}
                         </button>
                       ) : momBonus ? (
-                        <span style={{ display:'block', fontSize:10, color:'var(--purple)', fontWeight:700, marginTop:2 }}>
+                        <span style={{ display:'block', fontSize:11.5, color:'var(--purple)', fontWeight:700, marginTop:2 }}>
                           {`כולל +${MOM_SCOPE_BONUS} אם`}
                         </span>
                       ) : momUnderThreshold(t) ? (
-                        <span style={{ display:'block', fontSize:10, color:'var(--text3)', marginTop:2 }}
+                        <span style={{ display:'block', fontSize:11.5, color:'var(--text3)', marginTop:2 }}
                           title={`תוספת אם ניתנת ממשרה של ${MOM_MIN_SCOPE}% ומעלה`}>
                           {`אם · מתחת ל-${MOM_MIN_SCOPE}%`}
                         </span>
@@ -3241,14 +3241,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         onClick={e => e.stopPropagation()}
                         onChange={e => saveRow({ ...t, role: e.target.value })}
                         className="apple-select"
-                        style={{ fontSize:12, padding:'4px 6px', width:150,
+                        style={{ fontSize:13.8, padding:'4px 6px', width:150,
                           fontWeight: t.role && t.role !== 'none' ? 700 : 400,
                           color: t.role && t.role !== 'none' ? 'var(--text)' : 'var(--text3)' }}>
                         {ROLES.map(r => <option key={r.id} value={r.id}>{ROLE_SHORT[r.id] || r.label}</option>)}
                       </select>
                     </td>
-                    <td style={{ textAlign:'center', fontSize:12 }}>{LEVELS[t.level]?.label || '—'}</td>
-                    <td style={{ textAlign:'center', fontSize:12 }}>
+                    <td style={{ textAlign:'center', fontSize:13.8 }}>{LEVELS[t.level]?.label || '—'}</td>
+                    <td style={{ textAlign:'center', fontSize:13.8 }}>
                       {t.ageGroup && t.ageGroup !== 'none'
                         ? (AGE_RED[t.ageGroup]?.label || t.ageGroup)
                         : <span style={{ color:'var(--text3)' }}>—</span>}
@@ -3270,11 +3270,11 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           if (n === (t.childrenUnder18 ?? 0)) return;
                           saveRow({ ...t, childrenUnder18: n });
                         }}
-                        style={{ width:44, textAlign:'center', fontWeight:700, fontSize:13,
+                        style={{ width:44, textAlign:'center', fontWeight:700, fontSize:14.9,
                           border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
                           background: momBonus ? 'var(--purple-100)' : 'var(--surface)',
                           color:'var(--text)', fontFamily:'inherit' }} />
-                      {momBonus && <span style={{ display:'block', fontSize:9.5, color:'var(--purple)', fontWeight:700 }}>אם</span>}
+                      {momBonus && <span style={{ display:'block', fontSize:10.9, color:'var(--purple)', fontWeight:700 }}>אם</span>}
                     </td>
                     <td style={{ textAlign:'center', color: (t.absenceDays||0)>0 ? 'var(--danger)' : 'var(--text3)', fontWeight: (t.absenceDays||0)>0 ? 700 : 400 }}>
                       {(t.absenceDays||0) > 0 ? t.absenceDays : '—'}
@@ -3305,7 +3305,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           if (v2 === (t.mmFor || '')) return;
                           saveRow({ ...t, mmFor: v2 });
                         }}
-                        style={{ width:110, textAlign:'center', fontSize:12,
+                        style={{ width:124, textAlign:'center', fontSize:13.8,
                           border:'1px solid var(--line)', borderRadius:7, padding:'3px 5px',
                           background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
                     </td>
@@ -3328,7 +3328,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           if ((v2 ?? null) === (t._officialGross ?? null)) return;
                           saveRow({ ...t, _officialGross: v2 });
                         }}
-                        style={{ width:92, textAlign:'center', fontWeight:700, fontSize:13,
+                        style={{ width:112, textAlign:'center', fontWeight:700, fontSize:14.9,
                           border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
                           background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
                     </td>
@@ -3348,7 +3348,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                               if ((v2 ?? null) === (t._chabadSupp ?? null)) return;
                               saveRow({ ...t, _chabadSupp: v2 });
                             }}
-                            style={{ width:84, textAlign:'center', fontWeight:700, fontSize:12.5,
+                            style={{ width:102, textAlign:'center', fontWeight:700, fontSize:14.4,
                               border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
                               background:'var(--purple-100)', color:'var(--text)', fontFamily:'inherit' }} />}
                     </td>}
@@ -3367,7 +3367,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     </td>}
                     {!isPrincipal && <td style={{ textAlign:'center', fontWeight:800, color: done ? 'var(--purple)' : 'var(--text3)' }}>
                       {done ? emp.total.toLocaleString('he-IL')+' ₪'
-                        : <span style={{ fontSize:11.5, color:'var(--text3)' }}>
+                        : <span style={{ fontSize:13.2, color:'var(--text3)' }}>
                             {t.reform === 'ofek' && t._officialGross && !t._officialGrossPre ? 'חסר עולם ישן' : 'חסר ברוטו'}
                           </span>}
                     </td>}
@@ -3488,11 +3488,11 @@ function SchoolPositions({ school }) {
 
   return (
     <div style={{ padding:'14px 18px 18px' }}>
-      <p style={{ fontSize:12, fontWeight:700, color:'var(--text2)', marginBottom:8 }}>
+      <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text2)', marginBottom:8 }}>
         פירוט המשרות — {school.name} · {ts.length} עובדי הוראה
       </p>
       <div className="sheet-wrap">
-        <table className="apple-table" style={{ fontSize:12.5 }}>
+        <table className="apple-table" style={{ fontSize:14.4 }}>
           <thead>
             <tr>
               <th>שם</th>
@@ -3541,7 +3541,7 @@ function SchoolPositions({ school }) {
                 <td style={{ textAlign:'center', fontWeight:700 }}>{tot.hours || '—'}</td>
                 <td style={{ textAlign:'center', fontWeight:700 }}>{nis(tot.gross)}</td>
                 <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>{nis(tot.total)}</td>
-                <td style={{ textAlign:'center', fontSize:11, color:'var(--text3)' }}>
+                <td style={{ textAlign:'center', fontSize:12.6, color:'var(--text3)' }}>
                   {school.officialCount < school.count ? `${school.count - school.officialCount} ללא סימולציה` : 'הכול רשמי'}
                 </td>
               </tr>
@@ -3549,7 +3549,7 @@ function SchoolPositions({ school }) {
           )}
         </table>
       </div>
-      <p style={{ fontSize:11, color:'var(--text3)', marginTop:8, lineHeight:1.7 }}>
+      <p style={{ fontSize:12.6, color:'var(--text3)', marginTop:8, lineHeight:1.7 }}>
         הסכומים נספרים רק עבור משרות שהסימולציה שלהן הושלמה — לכן סה״כ בית הספר כאן זהה לשורה שבדוח.
       </p>
     </div>
@@ -3610,16 +3610,16 @@ function ReportView({ schools, teachers }) {
         <div style={{ flex:1, minWidth:200 }}>
           <div style={{ display:'flex', alignItems:'center', gap:9 }}>
             <span className="title-bar" />
-            <h1 style={{ fontSize:23, fontWeight:800, color:'var(--text)', letterSpacing:'-0.025em' }}>דוח רשת — סימולציית שכר תשפ״ו</h1>
+            <h1 style={{ fontSize:26.4, fontWeight:800, color:'var(--text)', letterSpacing:'-0.025em' }}>דוח רשת — סימולציית שכר תשפ״ו</h1>
           </div>
-          <p style={{ fontSize:13, color:'var(--text3)', marginTop:2, marginInlineStart:13 }}>{rows.filter(r=>r.count>0).length} בתי ספר · {totCount} מורות</p>
+          <p style={{ fontSize:14.9, color:'var(--text3)', marginTop:2, marginInlineStart:13 }}>{rows.filter(r=>r.count>0).length} בתי ספר · {totCount} מורות</p>
         </div>
         {totPending > 0 && <span className="apple-badge badge-orange"><Bell size={12} strokeWidth={2.3} />{totPending} ממתינים לאישור</span>}
-        <button className="apple-btn apple-btn-ghost" onClick={exportCSV} disabled={rows.length === 0} style={{ fontSize:13 }}>
+        <button className="apple-btn apple-btn-ghost" onClick={exportCSV} disabled={rows.length === 0} style={{ fontSize:14.9 }}>
           <FileSpreadsheet size={14} strokeWidth={2.2} />
           ייצוא CSV
         </button>
-        <button className="apple-btn apple-btn-ghost" onClick={() => window.print()} style={{ fontSize:13 }}><Printer size={14} strokeWidth={2.2} />הדפסה</button>
+        <button className="apple-btn apple-btn-ghost" onClick={() => window.print()} style={{ fontSize:14.9 }}><Printer size={14} strokeWidth={2.2} />הדפסה</button>
       </div>
 
       {/* Stat cards */}
@@ -3669,11 +3669,11 @@ function ReportView({ schools, teachers }) {
                     )}
                     {r.name}
                   </td>
-                  <td style={{ color:'var(--apple-text2)', fontSize:13 }}>{r.city||'—'}</td>
+                  <td style={{ color:'var(--apple-text2)', fontSize:14.9 }}>{r.city||'—'}</td>
                   <td style={{ textAlign:'center', fontWeight:600 }}>
                     {r.count}
                     {r.count > 0 && r.officialCount < r.count && (
-                      <span title="מספר עובדי ההוראה שכבר עברו סימולציה" style={{ fontSize:11, color:'var(--warn)', fontWeight:600, marginInlineStart:5 }}>
+                      <span title="מספר עובדי ההוראה שכבר עברו סימולציה" style={{ fontSize:12.6, color:'var(--warn)', fontWeight:600, marginInlineStart:5 }}>
                         ({r.officialCount} רשמי)
                       </span>
                     )}
@@ -3716,7 +3716,7 @@ function ReportView({ schools, teachers }) {
           </table>
           </div>
         </div>
-        <p style={{ fontSize:11, color:'var(--text3)', marginTop:10, padding:'0 4px', lineHeight:1.7 }}>
+        <p style={{ fontSize:12.6, color:'var(--text3)', marginTop:10, padding:'0 4px', lineHeight:1.7 }}>
           התשלומים רצים במערכת של עולם ישן. הפער עד שכר האופק משולם כתוספת בית חב"ד.<br/>
           ברוטו למעסיק = ברוטו לעובדת + פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד
         </p>
@@ -3735,13 +3735,13 @@ function SimStep({ n, label, calcLabel, active, onFocus, value, onChange, onEnte
     <div style={{ marginBottom:8 }}>
       <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4 }}>
         <span style={{
-          width:18, height:18, borderRadius:'50%', flexShrink:0, fontSize:11, fontWeight:800,
+          width:18, height:18, borderRadius:'50%', flexShrink:0, fontSize:12.6, fontWeight:800,
           display:'flex', alignItems:'center', justifyContent:'center',
           background: value ? 'var(--ok)' : active ? 'var(--purple)' : 'var(--fill2)',
           color: (value || active) ? '#fff' : 'var(--text3)',
         }}>{value ? '✓' : n}</span>
-        <span style={{ fontSize:12, fontWeight:700, color:'var(--text2)' }}>{label}</span>
-        {active && <span style={{ fontSize:10.5, color:'var(--purple)' }}>← {calcLabel}</span>}
+        <span style={{ fontSize:13.8, fontWeight:700, color:'var(--text2)' }}>{label}</span>
+        {active && <span style={{ fontSize:12.1, color:'var(--purple)' }}>← {calcLabel}</span>}
       </div>
       <input type="number" className="apple-input" dir="ltr" autoFocus={autoFocus} ref={inputRef}
         placeholder={`שכר משולב מ${calcLabel}`}
@@ -3749,7 +3749,7 @@ function SimStep({ n, label, calcLabel, active, onFocus, value, onChange, onEnte
         onFocus={onFocus}
         onChange={e => onChange(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onEnter(); } }}
-        style={{ fontSize:14, minHeight:38, borderColor: active ? 'var(--purple)' : undefined }} />
+        style={{ fontSize:16.1, minHeight:38, borderColor: active ? 'var(--purple)' : undefined }} />
     </div>
   );
 }
@@ -3800,7 +3800,7 @@ function FillProgress({ schools, month, onOpenSchool }) {
   }, [month]);
   useEffect(() => { let alive = true; (async () => { if (alive) await load(); })(); return () => { alive = false; }; }, [load]);
 
-  if (err)   return <p style={{ fontSize:12.5, color:'var(--danger)' }}>{err}</p>;
+  if (err)   return <p style={{ fontSize:14.4, color:'var(--danger)' }}>{err}</p>;
   if (!rows) return null;
 
   const name = id => schools.find(s => s.id === id)?.name || '';
@@ -3826,12 +3826,12 @@ function FillProgress({ schools, month, onOpenSchool }) {
     <div className="apple-card" style={{ padding:'14px 16px', marginBottom:14 }}>
       <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:3, flexWrap:'wrap' }}>
         <ClipboardCheck size={15} strokeWidth={2.3} color="var(--purple)" />
-        <p style={{ fontSize:13.5, fontWeight:700, color:'var(--text)' }}>מעקב מילוי — {fmtMonth(month)}</p>
-        <button onClick={load} title="רענון" style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text3)', fontSize:11.5, padding:0 }}>
+        <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)' }}>מעקב מילוי — {fmtMonth(month)}</p>
+        <button onClick={load} title="רענון" style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text3)', fontSize:13.2, padding:0 }}>
           רענון
         </button>
       </div>
-      <p style={{ fontSize:11.5, color:'var(--text3)', marginBottom:11 }}>
+      <p style={{ fontSize:13.2, color:'var(--text3)', marginBottom:11 }}>
         {waiting ? `${waiting} בתי ספר ממתינים לך · ` : 'כל בתי הספר סיימו · '}
         {totalT} עובדי הוראה הוזנו
       </p>
@@ -3841,14 +3841,14 @@ function FillProgress({ schools, month, onOpenSchool }) {
           <button key={r.schoolId} onClick={() => onOpenSchool?.(r.schoolId)}
             style={{ display:'flex', alignItems:'center', gap:9, padding:'7px 10px', background:'var(--fill)',
               border:'none', borderRadius:10, cursor:'pointer', textAlign:'right', fontFamily:'inherit', width:'100%' }}>
-            <span className={`apple-badge badge-${r.st.tone}`} style={{ fontSize:10.5, padding:'2px 8px', flexShrink:0, minWidth:96, justifyContent:'center' }}>
+            <span className={`apple-badge badge-${r.st.tone}`} style={{ fontSize:12.1, padding:'2px 8px', flexShrink:0, minWidth:96, justifyContent:'center' }}>
               {r.st.label}
             </span>
-            <span style={{ flex:1, minWidth:0, fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+            <span style={{ flex:1, minWidth:0, fontSize:14.9, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
               {name(r.schoolId)}
               {r.principal && <span style={{ fontWeight:400, color:'var(--text3)' }}> · {r.principal}</span>}
             </span>
-            <span style={{ fontSize:11.5, color:'var(--text3)', flexShrink:0 }}>
+            <span style={{ fontSize:13.2, color:'var(--text3)', flexShrink:0 }}>
               {r.teachers > 0 && `${r.teachers} עובדים`}
               {r.ago && ` · ${r.ago}`}
             </span>
@@ -3904,26 +3904,26 @@ function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, use
     <div className="apple-card" style={{ padding: '14px 16px', marginTop: 14 }} dir="rtl">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <Paperclip size={15} strokeWidth={2.3} color="var(--purple)" />
-        <p style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
+        <p style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--text)' }}>
           {title || `מסמכים מהנהלת החשבונות — ${fmtMonth(monthKey)}`}
         </p>
-        {docs.length > 0 && <span className="apple-badge badge-purple" style={{ fontSize: 10.5, padding: '2px 8px' }}>{docs.length}</span>}
+        {docs.length > 0 && <span className="apple-badge badge-purple" style={{ fontSize: 12.1, padding: '2px 8px' }}>{docs.length}</span>}
       </div>
-      <p style={{ fontSize: 11.5, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.6 }}>
+      <p style={{ fontSize: 13.2, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.6 }}>
         דוח השכר, סיכום עלות מעביד או כל קובץ שיצא ממערכת השכר. גלוי לרשת, לחשבת השכר ולמאשרות — לא למנהלות.
       </p>
 
       {canWrite && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10 }}>
           {!schoolId && (
-            <select className="apple-select" value={pickSchool} onChange={e => setPickSchool(e.target.value)} style={{ fontSize: 12.5, minHeight: 36 }}>
+            <select className="apple-select" value={pickSchool} onChange={e => setPickSchool(e.target.value)} style={{ fontSize: 14.4, minHeight: 36 }}>
               <option value="">כל בתי הספר</option>
               {schools.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
             </select>
           )}
           <input className="apple-input" value={note} onChange={e => setNote(e.target.value)}
-            placeholder="הערה (לא חובה)" style={{ fontSize: 12.5, minHeight: 36, flex: '1 1 160px' }} />
-          <label className="apple-btn apple-btn-blue" style={{ minHeight: 36, fontSize: 12.5, cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1 }}>
+            placeholder="הערה (לא חובה)" style={{ fontSize: 14.4, minHeight: 36, flex: '1 1 160px' }} />
+          <label className="apple-btn apple-btn-blue" style={{ minHeight: 36, fontSize: 14.4, cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1 }}>
             <Upload size={14} strokeWidth={2.3} />
             {busy ? 'מעלה…' : 'העלאת קובץ'}
             <input ref={fileRef} type="file" onChange={onPick} disabled={busy} style={{ display: 'none' }}
@@ -3931,10 +3931,10 @@ function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, use
           </label>
         </div>
       )}
-      {err && <p style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 8 }}>{err}</p>}
+      {err && <p style={{ fontSize: 13.8, color: 'var(--danger)', marginBottom: 8 }}>{err}</p>}
 
       {docs.length === 0 ? (
-        <p style={{ fontSize: 12.5, color: 'var(--text3)' }}>אין עדיין מסמכים לחודש הזה.</p>
+        <p style={{ fontSize: 14.4, color: 'var(--text3)' }}>אין עדיין מסמכים לחודש הזה.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {docs.map(d => (
@@ -3942,8 +3942,8 @@ function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, use
               <FileText size={15} strokeWidth={2.2} color="var(--text3)" />
               <button onClick={() => open(d)} title="פתיחה"
                 style={{ flex: 1, minWidth: 0, textAlign: 'right', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fileName}</p>
-                <p style={{ fontSize: 11, color: 'var(--text3)' }}>
+                <p style={{ fontSize: 14.9, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fileName}</p>
+                <p style={{ fontSize: 12.6, color: 'var(--text3)' }}>
                   {[d.schoolId ? schoolName(d.schoolId) : 'כל בתי הספר', fmtSize(d.size), fmtWhen(d.uploadedAt), d.note].filter(Boolean).join(' · ')}
                 </p>
               </button>
@@ -4012,10 +4012,10 @@ function PrincipalLinkModal({ school, onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,11,53,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, backdropFilter: 'blur(6px)' }} dir="rtl" onClick={onClose}>
       <div className="apple-card" style={{ width: '100%', maxWidth: 420, padding: 24 }} onClick={e => e.stopPropagation()}>
-        <h2 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>קישור אישי — {school.name}</h2>
-        {st.error && <p style={{ fontSize: 13, color: 'var(--danger)', lineHeight: 1.6 }}>{st.error}</p>}
+        <h2 style={{ fontSize: 19.5, fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>קישור אישי — {school.name}</h2>
+        {st.error && <p style={{ fontSize: 14.9, color: 'var(--danger)', lineHeight: 1.6 }}>{st.error}</p>}
         {pr && (
-          <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 12 }}>
+          <p style={{ fontSize: 14.9, color: 'var(--text2)', marginBottom: 12 }}>
             {pr.fullName}{pr.phone ? ` · ${pr.phone.replace('+972', '0')}` : ' · אין טלפון על הפרופיל'}
           </p>
         )}
@@ -4025,7 +4025,7 @@ function PrincipalLinkModal({ school, onClose }) {
               <MessageCircle size={15} strokeWidth={2.3} />
               {st.loading ? 'מנפיק…' : 'הנפקת קישור חדש'}
             </button>
-            <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 10, lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13.2, color: 'var(--text3)', marginTop: 10, lineHeight: 1.6 }}>
               הקישור הקודם שלה יבוטל. מי שמחזיק בקישור נכנס בשמה — לשלוח רק לה.
             </p>
           </>
@@ -4033,7 +4033,7 @@ function PrincipalLinkModal({ school, onClose }) {
         {st.link && (
           <>
             <input readOnly value={st.link} dir="ltr" className="apple-input" onFocus={e => e.target.select()}
-              style={{ fontSize: 12, marginBottom: 12, fontFamily: 'monospace' }} />
+              style={{ fontSize: 13.8, marginBottom: 12, fontFamily: 'monospace' }} />
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {st.wa && (
                 <a href={st.wa} target="_blank" rel="noreferrer" className="apple-btn apple-btn-green" style={{ flex: 1, minHeight: 40, textDecoration: 'none' }}>
@@ -4045,7 +4045,7 @@ function PrincipalLinkModal({ school, onClose }) {
                 {copied ? '✓ הועתק' : 'העתקת הקישור'}
               </button>
             </div>
-            <p style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 12, lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13.2, color: 'var(--text3)', marginTop: 12, lineHeight: 1.6 }}>
               הקישור הקודם בוטל. {!st.wa && 'כדי לקבל כפתור וואטסאפ, שמרי לה טלפון בפרופיל.'}
             </p>
           </>
@@ -4087,20 +4087,20 @@ function ActualCostPanel({ teachers, schools, onSave }) {
 
   if (!rows.length) return (
     <div style={{ textAlign:'center', padding:'48px 16px' }}>
-      <p style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>אין עדיין עובדי הוראה עם סימולציה בחודש הזה</p>
-      <p style={{ fontSize:12.5, color:'var(--text3)', marginTop:4 }}>עלות בפועל מוזנת אחרי שהשכר חושב.</p>
+      <p style={{ fontSize:16.1, fontWeight:700, color:'var(--text)' }}>אין עדיין עובדי הוראה עם סימולציה בחודש הזה</p>
+      <p style={{ fontSize:14.4, color:'var(--text3)', marginTop:4 }}>עלות בפועל מוזנת אחרי שהשכר חושב.</p>
     </div>
   );
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-      <p style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6 }}>
+      <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6 }}>
         הסכום מהנהלת החשבונות מחליף את האומדן בכל מקום — בדוחות, אצל השליח ואצל המאשרת.
         ריק = חזרה לאומדן. {missing > 0 ? `${missing} ללא עלות בפועל.` : 'לכולן יש עלות בפועל.'}
       </p>
       {bySchool.map(({ school, list }) => (
         <div key={school.id}>
-          <div style={{ fontSize:12, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
+          <div style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
             <School size={13} strokeWidth={2.2} />
             {school.name}
           </div>
@@ -4112,8 +4112,8 @@ function ActualCostPanel({ teachers, schools, onSave }) {
               return (
                 <div key={t.id} className="apple-card" style={{ padding:'10px 12px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
                   <div style={{ flex:'1 1 150px', minWidth:0 }}>
-                    <p style={{ fontSize:13.5, fontWeight:600, color:'var(--text)' }}>{t.name}</p>
-                    <p style={{ fontSize:11.5, color:'var(--text3)' }}>
+                    <p style={{ fontSize:15.5, fontWeight:600, color:'var(--text)' }}>{t.name}</p>
+                    <p style={{ fontSize:13.2, color:'var(--text3)' }}>
                       אומדן {emp.estimate.toLocaleString('he-IL')} ₪ ({emp.pct}%)
                       {diff !== null && <span style={{ marginInlineStart:6, color: Math.abs(diff) > 10 ? 'var(--warn)' : 'var(--text3)' }}>· בפועל {diff > 0 ? '+' : ''}{diff}%</span>}
                     </p>
@@ -4122,7 +4122,7 @@ function ActualCostPanel({ teachers, schools, onSave }) {
                     value={cur}
                     onChange={e => setVals(v => ({ ...v, [t.id]: e.target.value }))}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(t); } }}
-                    style={{ width:130, fontSize:14, minHeight:38, textAlign:'center' }} />
+                    style={{ width:130, fontSize:16.1, minHeight:38, textAlign:'center' }} />
                   <button className="apple-btn apple-btn-blue" onClick={() => save(t)} style={{ minHeight:38, padding:'0 14px' }}>
                     {flash[t.id] ? '✓' : 'שמור'}
                   </button>
@@ -4198,11 +4198,11 @@ function ScopePanel({ teachers, schools, onSave }) {
       <div style={{ width:56, height:56, borderRadius:17, background:'var(--ok-bg)', margin:'0 auto 14px', display:'flex', alignItems:'center', justifyContent:'center' }}>
         <Check size={26} strokeWidth={2.4} color="var(--ok)" />
       </div>
-      <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>כל אחוזי המשרה נקבעו</p>
-      <p style={{ fontSize:13, color:'var(--text3)', marginTop:3 }}>אפשר לעבור להזנת השכר הרשמי</p>
+      <p style={{ fontSize:17.2, fontWeight:700, color:'var(--text)' }}>כל אחוזי המשרה נקבעו</p>
+      <p style={{ fontSize:14.9, color:'var(--text3)', marginTop:3 }}>אפשר לעבור להזנת השכר הרשמי</p>
       {!showAll && (
         <button className="apple-btn apple-btn-ghost" onClick={() => setShowAll(true)}
-          style={{ marginTop:14, minHeight:36, fontSize:12.5 }}>
+          style={{ marginTop:14, minHeight:36, fontSize:14.4 }}>
           לשינוי אחוז שכבר נקבע
         </button>
       )}
@@ -4212,7 +4212,7 @@ function ScopePanel({ teachers, schools, onSave }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
-        <p style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6, flex:'1 1 220px' }}>
+        <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6, flex:'1 1 220px' }}>
           {showAll
             ? `${rows.length} עובדות — כולל מי שאחוזה כבר נקבע. הקלדה דורסת את הקיים.`
             : `${rows.length} עובדות שאחוז המשרה שלהן עדיין ברירת המחדל — 100 שאיש לא בחר.`}
@@ -4221,19 +4221,19 @@ function ScopePanel({ teachers, schools, onSave }) {
         <div className="apple-seg" style={{ flexShrink:0 }}>
           <button onClick={() => setShowAll(false)}
             className={['apple-seg-item', !showAll ? 'active' : ''].join(' ')}
-            style={{ padding:'5px 11px', fontSize:12 }}>
+            style={{ padding:'5px 11px', fontSize:13.8 }}>
             {`ממתינות (${missing.length})`}
           </button>
           <button onClick={() => setShowAll(true)}
             className={['apple-seg-item', showAll ? 'active' : ''].join(' ')}
-            style={{ padding:'5px 11px', fontSize:12 }}>
+            style={{ padding:'5px 11px', fontSize:13.8 }}>
             כל העובדות
           </button>
         </div>
       </div>
       {bySchool.map(({ school, list }) => (
         <div key={school.id}>
-          <div style={{ fontSize:12, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
+          <div style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
             <School size={13} strokeWidth={2.2} />
             {school.name} · {list.length}
           </div>
@@ -4257,9 +4257,9 @@ function ScopePanel({ teachers, schools, onSave }) {
               ];
               return (
                 <div key={t.id} className="apple-card" style={{ padding:'10px 12px' }}>
-                  <p style={{ fontSize:13.5, fontWeight:600, color:'var(--text)', marginBottom:2 }}>
+                  <p style={{ fontSize:15.5, fontWeight:600, color:'var(--text)', marginBottom:2 }}>
                     {t.name}
-                    <span style={{ fontWeight:400, fontSize:11.5, color:'var(--text3)' }}>
+                    <span style={{ fontWeight:400, fontSize:13.2, color:'var(--text3)' }}>
                       {' · '}{reformLabel(t.reform)}
                       {` · ${DEGREE_LABELS[t.degree] || t.degree || 'בלי תואר'}`}
                       {` · ${t.seniority ?? 1} שנות ותק`}
@@ -4268,7 +4268,7 @@ function ScopePanel({ teachers, schools, onSave }) {
                   </p>
                   {/* הגמול משנה את האחוז — מחנכת מקבלת 3 שעות מעליו, ושאר
                       הגמולים אחוז מהשכר. בלי לראות אותו אי אפשר להחליט. */}
-                  <p style={{ fontSize:11.5, color:'var(--text3)', marginBottom:4 }}>
+                  <p style={{ fontSize:13.2, color:'var(--text3)', marginBottom:4 }}>
                     {t.role && t.role !== 'none'
                       ? <span style={{ color:'var(--purple)', fontWeight:600 }}>{ROLE_SHORT[t.role] || t.role}</span>
                       : <span>ללא גמול תפקיד</span>}
@@ -4282,7 +4282,7 @@ function ScopePanel({ teachers, schools, onSave }) {
                       תוספת אם קיימת. */}
                   {(t.childrenUnder18 || 0) > 0 && (
                     <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:4 }}>
-                      <span style={{ fontSize:11.5, color: t.gender ? 'var(--text3)' : 'var(--warn)', fontWeight: t.gender ? 400 : 700 }}>
+                      <span style={{ fontSize:13.2, color: t.gender ? 'var(--text3)' : 'var(--warn)', fontWeight: t.gender ? 400 : 700 }}>
                         {`${t.childrenUnder18} ילדים עד 18 · `}
                         {t.gender === 'f' ? 'אֵם' : t.gender === 'm' ? 'גבר — אין תוספת אם' : 'מי היא?'}
                         {t.gender === 'f' && isOfek ? ' — רלוונטי לאחוז בעולם הישן' : ''}
@@ -4291,11 +4291,11 @@ function ScopePanel({ teachers, schools, onSave }) {
                       {[{ v:'f', l:'אישה' }, { v:'m', l:'גבר' }].map(o => (
                         <button key={o.v} onClick={() => saveGender(t, o.v)}
                           className={`apple-btn ${t.gender === o.v ? 'apple-btn-blue' : 'apple-btn-ghost'}`}
-                          style={{ minHeight:28, padding:'0 11px', fontSize:11.5 }}>
+                          style={{ minHeight:28, padding:'0 11px', fontSize:13.2 }}>
                           {o.l}
                         </button>
                       ))}
-                      {flash[`${t.id}|gender`] && <span style={{ fontSize:11, color:'var(--ok)', fontWeight:700 }}>✓</span>}
+                      {flash[`${t.id}|gender`] && <span style={{ fontSize:12.6, color:'var(--ok)', fontWeight:700 }}>✓</span>}
                     </div>
                   )}
                   {fields.map(f => {
@@ -4304,18 +4304,18 @@ function ScopePanel({ teachers, schools, onSave }) {
                     return (
                       <div key={f.which} style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:6 }}>
                         <div style={{ flex:'1 1 150px', minWidth:0 }}>
-                          <p style={{ fontSize:12, fontWeight:600, color: f.done ? 'var(--text2)' : 'var(--warn)' }}>
+                          <p style={{ fontSize:13.8, fontWeight:600, color: f.done ? 'var(--text2)' : 'var(--warn)' }}>
                             {f.label}
                             {f.done && <span style={{ color:'var(--ok)', fontWeight:700 }}>{` · ${f.now}%`}</span>}
-                            {flash[key] && <span style={{ marginInlineStart:6, fontSize:11, color:'var(--ok)', fontWeight:700 }}>✓ נקבע</span>}
+                            {flash[key] && <span style={{ marginInlineStart:6, fontSize:12.6, color:'var(--ok)', fontWeight:700 }}>✓ נקבע</span>}
                           </p>
-                          <p style={{ fontSize:11, color:'var(--text3)' }}>{f.hint}</p>
+                          <p style={{ fontSize:12.6, color:'var(--text3)' }}>{f.hint}</p>
                         </div>
                         <input type="number" inputMode="numeric" className="apple-input" dir="ltr" placeholder="%"
                           value={cur}
                           onChange={e => setVals(v => ({ ...v, [key]: e.target.value }))}
                           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(t, f.which, cur); } }}
-                          style={{ width:82, fontSize:14, minHeight:36, textAlign:'center' }} />
+                          style={{ width:82, fontSize:16.1, minHeight:36, textAlign:'center' }} />
                         <button className="apple-btn apple-btn-blue" onClick={() => save(t, f.which, cur)}
                           disabled={String(cur).trim() === ''}
                           style={{ minHeight:36, padding:'0 13px', opacity: String(cur).trim() === '' ? .45 : 1 }}>
@@ -4326,12 +4326,12 @@ function ScopePanel({ teachers, schools, onSave }) {
                         {f.sugg != null && (
                           <button className="apple-btn apple-btn-ghost" onClick={() => save(t, f.which, f.sugg)}
                             title="מחושב מהשעות שהמנהלת הזינה. אפשר להתעלם ולהקליד מספר אחר."
-                            style={{ minHeight:36, padding:'0 11px', fontSize:12 }}>
+                            style={{ minHeight:36, padding:'0 11px', fontSize:13.8 }}>
                             {`לפי השעות · ${f.sugg}%`}
                           </button>
                         )}
                         <button className="apple-btn apple-btn-ghost" onClick={() => save(t, f.which, 100)}
-                          style={{ minHeight:36, padding:'0 11px', fontSize:12 }}>
+                          style={{ minHeight:36, padding:'0 11px', fontSize:13.8 }}>
                           100%
                         </button>
                       </div>
@@ -4383,7 +4383,7 @@ function NotificationsView() {
   }, []);
   useEffect(() => { let alive = true; (async () => { if (alive) await load(); })(); return () => { alive = false; }; }, [load]);
 
-  if (err)   return <p style={{ padding:20, color:'var(--danger)', fontSize:13 }}>{err}</p>;
+  if (err)   return <p style={{ padding:20, color:'var(--danger)', fontSize:14.9 }}>{err}</p>;
   if (!rows) return null;
 
   const mine = rows.filter(n => n.channel === 'inapp');
@@ -4409,24 +4409,24 @@ function NotificationsView() {
     <div className="fade-in" style={{ maxWidth:820, margin:'0 auto', padding:'18px 20px 40px' }} dir="rtl">
       <div className="apple-seg" style={{ marginBottom:14 }}>
         <button onClick={() => setTab('mine')} className={['apple-seg-item', tab === 'mine' ? 'active' : ''].join(' ')}
-          style={{ padding:'6px 13px', fontSize:13 }}>
+          style={{ padding:'6px 13px', fontSize:14.9 }}>
           אליי{unread ? ` (${unread})` : ''}
         </button>
         <button onClick={() => setTab('sent')} className={['apple-seg-item', tab === 'sent' ? 'active' : ''].join(' ')}
-          style={{ padding:'6px 13px', fontSize:13 }}>
+          style={{ padding:'6px 13px', fontSize:14.9 }}>
           מה שנשלח ({sent.length})
         </button>
       </div>
 
       {tab === 'mine' && (
-        <p style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6, marginBottom:12 }}>
+        <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6, marginBottom:12 }}>
           כאן נשמרת כל התראה שהמערכת הפיקה, גם אחרי שהיא נשלחה בוואטסאפ.
           הוואטסאפ נעלם בין הודעות; זה נשאר.
         </p>
       )}
 
       {list.length === 0 && (
-        <p style={{ fontSize:13, color:'var(--text3)', textAlign:'center', padding:'40px 0' }}>
+        <p style={{ fontSize:14.9, color:'var(--text3)', textAlign:'center', padding:'40px 0' }}>
           {tab === 'mine' ? 'אין התראות' : 'טרם נשלחו הודעות'}
         </p>
       )}
@@ -4437,18 +4437,18 @@ function NotificationsView() {
             style={{ padding:'12px 14px', cursor: n.readAt || tab !== 'mine' ? 'default' : 'pointer',
                      borderRight: !n.readAt && tab === 'mine' ? '3px solid var(--purple)' : '3px solid transparent' }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:4 }}>
-              <span style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>
+              <span style={{ fontSize:14.9, fontWeight:700, color:'var(--text)' }}>
                 {KIND_LABEL[n.kind] || n.kind}
               </span>
               {tab === 'sent' && (
                 <span className={`apple-badge badge-${n.status === 'sent' ? 'green' : n.status === 'failed' ? 'orange' : 'purple'}`}
-                  style={{ fontSize:10.5, padding:'2px 8px' }}>
+                  style={{ fontSize:12.1, padding:'2px 8px' }}>
                   {n.status === 'sent' ? 'נשלח' : n.status === 'failed' ? 'נכשל' : 'ממתין'} · {n.toName || ''}
                 </span>
               )}
-              <span style={{ fontSize:11, color:'var(--text3)', marginInlineStart:'auto' }}>{when(n.createdAt)}</span>
+              <span style={{ fontSize:12.6, color:'var(--text3)', marginInlineStart:'auto' }}>{when(n.createdAt)}</span>
             </div>
-            <p style={{ fontSize:12.5, color:'var(--text2)', whiteSpace:'pre-wrap', lineHeight:1.6 }}>{n.body}</p>
+            <p style={{ fontSize:14.4, color:'var(--text2)', whiteSpace:'pre-wrap', lineHeight:1.6 }}>{n.body}</p>
           </div>
         ))}
       </div>
@@ -4472,21 +4472,21 @@ function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveSco
       <div className="apple-seg" style={{ marginBottom:14, flexWrap:'wrap' }}>
         {canSetScope && (
           <button onClick={() => setTab('scope')} className={['apple-seg-item', tab === 'scope' ? 'active' : ''].join(' ')}
-            style={{ padding:'6px 13px', fontSize:13 }}>
+            style={{ padding:'6px 13px', fontSize:14.9 }}>
             <Percent size={12} strokeWidth={2.6} style={{ marginInlineEnd:4 }} />
             אחוזי משרה{scopeTodo > 0 ? ` (${scopeTodo})` : ''}
           </button>
         )}
         <button onClick={() => setTab('entry')} className={['apple-seg-item', tab === 'entry' ? 'active' : ''].join(' ')}
-          style={{ padding:'6px 13px', fontSize:13 }}>
+          style={{ padding:'6px 13px', fontSize:14.9 }}>
           הזנת שכר{missingGross > 0 ? ` (${missingGross})` : ''}
         </button>
         <button onClick={() => setTab('cost')} className={['apple-seg-item', tab === 'cost' ? 'active' : ''].join(' ')}
-          style={{ padding:'6px 13px', fontSize:13 }}>
+          style={{ padding:'6px 13px', fontSize:14.9 }}>
           עלות מעביד בפועל{missingCost > 0 ? ` (${missingCost})` : ''}
         </button>
         <button onClick={() => setTab('docs')} className={['apple-seg-item', tab === 'docs' ? 'active' : ''].join(' ')}
-          style={{ padding:'6px 13px', fontSize:13 }}>
+          style={{ padding:'6px 13px', fontSize:14.9 }}>
           תלושים ומסמכים
         </button>
       </div>
@@ -4533,7 +4533,7 @@ function PayrollEntry({ teachers, schools, onSave }) {
   const num = v => (String(v).trim() === '' ? null : Math.round(Number(v)));
 
   if (!teachers.length) return (
-    <p style={{ fontSize:13, color:'var(--text3)', textAlign:'center', padding:'48px 16px' }}>
+    <p style={{ fontSize:14.9, color:'var(--text3)', textAlign:'center', padding:'48px 16px' }}>
       אין עובדות בחודש הזה
     </p>
   );
@@ -4541,31 +4541,31 @@ function PayrollEntry({ teachers, schools, onSave }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
-        <p style={{ fontSize:12, color:'var(--text3)', lineHeight:1.6, flex:'1 1 240px' }}>
+        <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6, flex:'1 1 240px' }}>
           הברוטו שאת מזינה הוא מה שרץ בתשלומים. תוספת בית חב"ד היא החלק שאינו
           פנסיוני ואינו נושא קרן השתלמות — הוא נושא מס שכר וביטוח לאומי בלבד.
         </p>
         <div className="apple-seg" style={{ flexShrink:0 }}>
           <button onClick={() => setOnlyMissing(true)} className={['apple-seg-item', onlyMissing ? 'active' : ''].join(' ')}
-            style={{ padding:'5px 11px', fontSize:12 }}>ממתינות</button>
+            style={{ padding:'5px 11px', fontSize:13.8 }}>ממתינות</button>
           <button onClick={() => setOnlyMissing(false)} className={['apple-seg-item', !onlyMissing ? 'active' : ''].join(' ')}
-            style={{ padding:'5px 11px', fontSize:12 }}>כל העובדות</button>
+            style={{ padding:'5px 11px', fontSize:13.8 }}>כל העובדות</button>
         </div>
       </div>
-      {err && <p style={{ fontSize:12.5, color:'var(--danger)' }}>{err}</p>}
+      {err && <p style={{ fontSize:14.4, color:'var(--danger)' }}>{err}</p>}
 
       {bySchool.length === 0 && (
         <div style={{ textAlign:'center', padding:'48px 16px' }}>
           <div style={{ width:56, height:56, borderRadius:17, background:'var(--ok-bg)', margin:'0 auto 14px', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <Check size={26} strokeWidth={2.4} color="var(--ok)" />
           </div>
-          <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>כל הברוטו הוזן</p>
+          <p style={{ fontSize:17.2, fontWeight:700, color:'var(--text)' }}>כל הברוטו הוזן</p>
         </div>
       )}
 
       {bySchool.map(({ school, list }) => (
         <div key={school.id}>
-          <div style={{ fontSize:12, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
+          <div style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
             <School size={13} strokeWidth={2.2} />
             {school.name}
             {school.chabadSupp === false && <span style={{ fontWeight:400 }}> · בלי תוספת בית חב"ד</span>}
@@ -4578,17 +4578,17 @@ function PayrollEntry({ teachers, schools, onSave }) {
               const noSupp = school.chabadSupp === false || isPrincipalRow(t);
               return (
                 <div key={t.id} className="apple-card" style={{ padding:'10px 12px' }}>
-                  <p style={{ fontSize:13.5, fontWeight:600, color:'var(--text)' }}>
+                  <p style={{ fontSize:15.5, fontWeight:600, color:'var(--text)' }}>
                     {t.name}
-                    <span style={{ fontWeight:400, fontSize:11.5, color:'var(--text3)' }}>
+                    <span style={{ fontWeight:400, fontSize:13.2, color:'var(--text3)' }}>
                       {` · ${reformLabel(t.reform)} · ${DEGREE_LABELS[t.degree] || t.degree || '—'}`}
                       {` · ותק ${t.seniority ?? 1} · ${effectiveScope(t)}% משרה`}
                       {t.role && t.role !== 'none' ? ` · ${ROLE_SHORT[t.role] || t.role}` : ''}
                     </span>
-                    {flash[t.id] && <span style={{ marginInlineStart:6, fontSize:11.5, color:'var(--ok)', fontWeight:700 }}>✓ נשמר</span>}
+                    {flash[t.id] && <span style={{ marginInlineStart:6, fontSize:13.2, color:'var(--ok)', fontWeight:700 }}>✓ נשמר</span>}
                   </p>
                   <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:6 }}>
-                    <label style={{ fontSize:11.5, color:'var(--text3)' }}>
+                    <label style={{ fontSize:13.2, color:'var(--text3)' }}>
                       ברוטו
                       <input type="number" min="0" dir="ltr" className="apple-input"
                         value={gCur}
@@ -4598,7 +4598,7 @@ function PayrollEntry({ teachers, schools, onSave }) {
                         style={{ width:104, minHeight:36, textAlign:'center', fontWeight:700, marginInlineStart:6 }} />
                     </label>
                     {!noSupp && (
-                      <label style={{ fontSize:11.5, color:'var(--text3)' }}>
+                      <label style={{ fontSize:13.2, color:'var(--text3)' }}>
                         תוספת בית חב"ד
                         <input type="number" min="0" dir="ltr" className="apple-input"
                           value={sCur}
@@ -4610,12 +4610,12 @@ function PayrollEntry({ teachers, schools, onSave }) {
                       </label>
                     )}
                     {simComplete(t) && (
-                      <span style={{ fontSize:11.5, color:'var(--text3)' }}>
+                      <span style={{ fontSize:13.2, color:'var(--text3)' }}>
                         {`עלות מעביד לפי הנוסחה: ${emp.estimate.toLocaleString('he-IL')} ₪ (${emp.pct}%)`}
                         {` · סה״כ ${emp.total.toLocaleString('he-IL')} ₪`}
                       </span>
                     )}
-                    {busy === t.id && <span style={{ fontSize:11.5, color:'var(--text3)' }}>שומר…</span>}
+                    {busy === t.id && <span style={{ fontSize:13.2, color:'var(--text3)' }}>שומר…</span>}
                   </div>
                 </div>
               );
@@ -4648,8 +4648,8 @@ function BackupModal({ schools, months, onClose }) {
 
         <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, marginBottom:18 }}>
           <div>
-            <h2 style={{ fontSize:18, fontWeight:800, letterSpacing:'-0.02em', color:'var(--text)', marginBottom:3 }}>ייצוא נתונים</h2>
-            <p style={{ fontSize:12.5, color:'var(--text3)', lineHeight:1.5 }}>הנתונים שמורים בשרת ומשותפים לכל המשתמשות. הייצוא כאן הוא עותק לעיון — לא נדרש לגיבוי.</p>
+            <h2 style={{ fontSize:20.7, fontWeight:800, letterSpacing:'-0.02em', color:'var(--text)', marginBottom:3 }}>ייצוא נתונים</h2>
+            <p style={{ fontSize:14.4, color:'var(--text3)', lineHeight:1.5 }}>הנתונים שמורים בשרת ומשותפים לכל המשתמשות. הייצוא כאן הוא עותק לעיון — לא נדרש לגיבוי.</p>
           </div>
           <button onClick={onClose} title="סגירה" style={{ background:'var(--fill)', border:'none', borderRadius:'50%', width:30, height:30, cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
             <X size={15} strokeWidth={2.4} />
@@ -4658,13 +4658,13 @@ function BackupModal({ schools, months, onClose }) {
 
       <div style={{ background:'var(--warn-bg)', border:'1px solid var(--warn-line)', borderRadius:12, padding:'11px 13px', marginBottom:16, display:'flex', gap:9 }}>
         <ShieldAlert size={16} strokeWidth={2.2} color="var(--warn)" style={{ flexShrink:0, marginTop:1 }} />
-        <p style={{ fontSize:12.5, color:'var(--warn)', lineHeight:1.6 }}>
+        <p style={{ fontSize:14.4, color:'var(--warn)', lineHeight:1.6 }}>
           ניקוי היסטוריית הדפדפן או מחיקת נתוני האתר ימחקו את כל תקציב השכר — ואין דרך לשחזר בלי קובץ גיבוי.
         </p>
       </div>
 
       <div className="apple-section" style={{ marginBottom:14 }}>
-        <p style={{ fontSize:12.5, color:'var(--text2)', marginBottom:10, lineHeight:1.6 }}>
+        <p style={{ fontSize:14.4, color:'var(--text2)', marginBottom:10, lineHeight:1.6 }}>
           במערכת כרגע: <strong style={{ color:'var(--text)' }}>{schools.length}</strong> בתי ספר ·{' '}
           <strong style={{ color:'var(--text)' }}>{teacherRecords}</strong> רשומות עובדי הוראה ·{' '}
           <strong style={{ color:'var(--text)' }}>{monthKeys.length}</strong> חודשים
@@ -4677,7 +4677,7 @@ function BackupModal({ schools, months, onClose }) {
       </div>
 
       {done && (
-        <div style={{ background:'var(--ok-bg)', border:'1px solid var(--ok-line)', borderRadius:12, padding:'10px 13px', marginTop:14, fontSize:13, color:'var(--ok)', fontWeight:600, display:'flex', gap:7, alignItems:'center' }}>
+        <div style={{ background:'var(--ok-bg)', border:'1px solid var(--ok-line)', borderRadius:12, padding:'10px 13px', marginTop:14, fontSize:14.9, color:'var(--ok)', fontWeight:600, display:'flex', gap:7, alignItems:'center' }}>
           <Check size={15} strokeWidth={2.6} />
           {done}
         </div>
@@ -4704,7 +4704,7 @@ function BackupModal({ schools, months, onClose }) {
 function LinkField({ label, value, onChange, type = 'number', hint }) {
   return (
     <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 96px', minWidth:96 }}>
-      <span style={{ fontSize:11, fontWeight:600, color:'var(--text3)' }}>{label}</span>
+      <span style={{ fontSize:12.6, fontWeight:600, color:'var(--text3)' }}>{label}</span>
       <input
         type={type} inputMode={type === 'number' ? 'numeric' : undefined}
         className="apple-input" dir={type === 'text' ? 'rtl' : 'ltr'}
@@ -4712,7 +4712,7 @@ function LinkField({ label, value, onChange, type = 'number', hint }) {
         onChange={e => onChange(type === 'number'
           ? (e.target.value === '' ? null : Number(e.target.value))
           : e.target.value)}
-        style={{ fontSize:15, minHeight:42, textAlign: type === 'number' ? 'center' : 'right' }} />
+        style={{ fontSize:17.2, minHeight:42, textAlign: type === 'number' ? 'center' : 'right' }} />
     </label>
   );
 }
@@ -4720,9 +4720,9 @@ function LinkField({ label, value, onChange, type = 'number', hint }) {
 function LinkSelect({ label, value, onChange, options }) {
   return (
     <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 120px', minWidth:120 }}>
-      <span style={{ fontSize:11, fontWeight:600, color:'var(--text3)' }}>{label}</span>
+      <span style={{ fontSize:12.6, fontWeight:600, color:'var(--text3)' }}>{label}</span>
       <select className="apple-select" value={value ?? ''} onChange={e => onChange(e.target.value)}
-        style={{ fontSize:15, minHeight:42 }}>
+        style={{ fontSize:17.2, minHeight:42 }}>
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
     </label>
@@ -4826,7 +4826,7 @@ function LinkNewCard({ schoolReform, onAdd, male }) {
 
   return (
     <div className="apple-card" style={{ padding:'14px 15px', border:'1px dashed var(--purple)' }}>
-      <p style={{ fontSize:14, fontWeight:700, color:'var(--purple)', marginBottom:10 }}>עובד/ת הוראה חדש/ה</p>
+      <p style={{ fontSize:16.1, fontWeight:700, color:'var(--purple)', marginBottom:10 }}>עובד/ת הוראה חדש/ה</p>
       <LinkTeacherFields draft={draft} apply={apply} />
       <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginTop:9 }}>
         <LinkField label="שעות פרונטליות" value={draft.frontalHours} onChange={v => apply({ frontalHours: v })} />
@@ -4839,7 +4839,7 @@ function LinkNewCard({ schoolReform, onAdd, male }) {
         </button>
         <button className="apple-btn apple-btn-ghost" onClick={() => { setOpen(false); setDraft(blank); setState(''); }}
           style={{ minHeight:40 }}>ביטול</button>
-        {state && state !== 'saving' && <span style={{ fontSize:12, color:'var(--danger)' }}>{state}</span>}
+        {state && state !== 'saving' && <span style={{ fontSize:13.8, color:'var(--danger)' }}>{state}</span>}
       </div>
     </div>
   );
@@ -4877,11 +4877,11 @@ function LinkCard({ teacher, locked, onSave }) {
   return (
     <div className="apple-card" style={{ padding:'14px 15px' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, marginBottom:10 }}>
-        <p style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>{teacher.name}</p>
-        <span style={{ fontSize:11.5, color:'var(--text3)' }}>
+        <p style={{ fontSize:17.2, fontWeight:700, color:'var(--text)' }}>{teacher.name}</p>
+        <span style={{ fontSize:13.2, color:'var(--text3)' }}>
           {reformLabel(draft.reform)}{draft.scopePct ? ` · ${draft.scopePct}% משרה` : ''}
           {onLeave(teacher) && (
-            <span className="apple-badge badge-orange" style={{ fontSize:10.5, padding:'2px 8px', marginInlineStart:6 }}>
+            <span className="apple-badge badge-orange" style={{ fontSize:12.1, padding:'2px 8px', marginInlineStart:6 }}>
               {leaveText(teacher)}
             </span>
           )}
@@ -4905,10 +4905,10 @@ function LinkCard({ teacher, locked, onSave }) {
           onClick={save} style={{ minHeight:40, paddingInline:20, opacity: (!dirty || locked) ? .45 : 1 }}>
           {state === 'saving' ? 'שומר…' : 'שמירה'}
         </button>
-        {state === 'saved' && <span style={{ fontSize:12.5, color:'var(--ok)', fontWeight:600 }}>✓ נשמר</span>}
+        {state === 'saved' && <span style={{ fontSize:14.4, color:'var(--ok)', fontWeight:600 }}>✓ נשמר</span>}
         {state && state !== 'saving' && state !== 'saved' &&
-          <span style={{ fontSize:12, color:'var(--danger)' }}>{state}</span>}
-        {!dirty && !state && <span style={{ fontSize:11.5, color:'var(--text3)' }}>אין שינוי</span>}
+          <span style={{ fontSize:13.8, color:'var(--danger)' }}>{state}</span>}
+        {!dirty && !state && <span style={{ fontSize:13.2, color:'var(--text3)' }}>אין שינוי</span>}
       </div>
     </div>
   );
@@ -4939,7 +4939,7 @@ function SignaturePad({ onChange }) {
         onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
         onTouchStart={start} onTouchMove={move} onTouchEnd={end}
         style={{ width:'100%', maxWidth:400, height:140, background:'#fff', border:'2px dashed var(--line)', borderRadius:12, touchAction:'none', display:'block' }} />
-      <button type="button" onClick={clear} className="apple-btn apple-btn-ghost" style={{ marginTop:6, minHeight:30, padding:'0 12px', fontSize:12 }}>ניקוי חתימה</button>
+      <button type="button" onClick={clear} className="apple-btn apple-btn-ghost" style={{ marginTop:6, minHeight:30, padding:'0 12px', fontSize:13.8 }}>ניקוי חתימה</button>
     </div>
   );
 }
@@ -4954,8 +4954,8 @@ function ObUpload({ label, hint, done, onFile }) {
         {done ? <Check size={20} strokeWidth={2.6} color="var(--ok)" /> : <Upload size={18} strokeWidth={2.2} color="var(--purple)" />}
       </div>
       <div style={{ flex:1 }}>
-        <p style={{ fontWeight:700, fontSize:14, color:'var(--text)' }}>{label}</p>
-        <p style={{ fontSize:12, color:'var(--text3)' }}>{busy ? 'מעלה…' : done ? 'הועלה ✓ — אפשר להחליף' : hint}</p>
+        <p style={{ fontWeight:700, fontSize:16.1, color:'var(--text)' }}>{label}</p>
+        <p style={{ fontSize:13.8, color:'var(--text3)' }}>{busy ? 'מעלה…' : done ? 'הועלה ✓ — אפשר להחליף' : hint}</p>
       </div>
     </label>
   );
@@ -5025,30 +5025,30 @@ function OnboardingView({ code }) {
     <div style={{ minHeight:'100vh', background:'var(--bg)', paddingBottom:60 }} dir="rtl">
       <header className="app-header"><div style={{ maxWidth:640, margin:'0 auto', padding:'12px 16px', display:'flex', alignItems:'center', gap:11 }}>
         <img src="/logo-chabad.png" alt="לוגו" style={{ height:34 }} />
-        <div><p style={{ fontWeight:700, fontSize:14.5 }}>קליטת עובדת הוראה</p>
-        <p style={{ fontSize:11.5, color:'var(--text3)' }}>{me.name} · {me.school_name}</p></div>
+        <div><p style={{ fontWeight:700, fontSize:16.7 }}>קליטת עובדת הוראה</p>
+        <p style={{ fontSize:13.2, color:'var(--text3)' }}>{me.name} · {me.school_name}</p></div>
       </div></header>
 
       <div style={{ maxWidth:640, margin:'0 auto', padding:'14px 16px', display:'flex', flexDirection:'column', gap:14 }}>
         {/* דדליין */}
         <div style={{ background:'var(--warn-bg)', border:'1px solid #FFB74D', borderRadius:12, padding:'10px 14px' }}>
-          <p style={{ fontSize:13, fontWeight:700, color:'#E65100' }}>להשלמה עד {OB_DEADLINE}</p>
-          <p style={{ fontSize:12, color:'#E65100' }}>רק מי שתשלים את כל השלבים עד למועד תקבל משכורת על חודש ספטמבר.</p>
+          <p style={{ fontSize:14.9, fontWeight:700, color:'#E65100' }}>להשלמה עד {OB_DEADLINE}</p>
+          <p style={{ fontSize:13.8, color:'#E65100' }}>רק מי שתשלים את כל השלבים עד למועד תקבל משכורת על חודש ספטמבר.</p>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ flex:1, height:8, background:'var(--fill)', borderRadius:99 }}>
             <div style={{ width:(totalSteps ? Math.round(doneCount / totalSteps * 100) : 0) + '%', height:'100%', background:'var(--teal)', borderRadius:99, transition:'width .3s' }} />
           </div>
-          <span style={{ fontSize:12.5, fontWeight:700, color:'var(--text2)' }}>{doneCount} / {totalSteps}</span>
+          <span style={{ fontSize:14.4, fontWeight:700, color:'var(--text2)' }}>{doneCount} / {totalSteps}</span>
         </div>
 
         {/* ── שלב 1: טופס 101 ── */}
         <div className="apple-card" style={{ padding:18 }}>
-          <p style={{ fontWeight:800, fontSize:16, marginBottom:2 }}>1 · טופס 101 — כרטיס עובד</p>
+          <p style={{ fontWeight:800, fontSize:18.4, marginBottom:2 }}>1 · טופס 101 — כרטיס עובד</p>
           {me.form101_signed ? (
-            <p style={{ color:'var(--ok)', fontWeight:700, fontSize:13.5, marginTop:6 }}>✓ מולא ונחתם. תודה!</p>
+            <p style={{ color:'var(--ok)', fontWeight:700, fontSize:15.5, marginTop:6 }}>✓ מולא ונחתם. תודה!</p>
           ) : (<>
-            <p style={{ fontSize:12.5, color:'var(--text3)', marginBottom:12 }}>שנת המס 2026 · המעסיקה: רשת חינוך חב"ד</p>
+            <p style={{ fontSize:14.4, color:'var(--text3)', marginBottom:12 }}>שנת המס 2026 · המעסיקה: רשת חינוך חב"ד</p>
             <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
               {field('firstName','שם פרטי')}
               {field('lastName','שם משפחה')}
@@ -5069,13 +5069,13 @@ function OnboardingView({ code }) {
                   <option value="yes">יש — אמציא תיאום מס</option>
                 </select></div>
             </div>
-            <label style={{ display:'flex', gap:8, alignItems:'flex-start', marginTop:12, fontSize:12.5, color:'var(--text2)' }}>
+            <label style={{ display:'flex', gap:8, alignItems:'flex-start', marginTop:12, fontSize:14.4, color:'var(--text2)' }}>
               <input type="checkbox" checked={!!form.declare} onChange={e => setF('declare', e.target.checked)} style={{ marginTop:2 }} />
               <span>אני מצהירה כי הפרטים שמסרתי בטופס זה מלאים ונכונים, וידוע לי שמסירת פרטים לא נכונים היא עבירה על פקודת מס הכנסה.</span>
             </label>
             <p className="apple-label" style={{ marginTop:12 }}>חתימה (בתוך המסגרת, באצבע או בעכבר)</p>
             <SignaturePad onChange={setSig} />
-            {msg && <p style={{ color:'var(--danger)', fontSize:12.5, fontWeight:600, marginTop:8 }}>{msg}</p>}
+            {msg && <p style={{ color:'var(--danger)', fontSize:14.4, fontWeight:600, marginTop:8 }}>{msg}</p>}
             <button className="apple-btn apple-btn-blue" onClick={() => sign101().catch(e => setMsg(e.message))} style={{ marginTop:12, width:'100%', minHeight:44 }}>
               חתימה ושליחת טופס 101
             </button>
@@ -5089,11 +5089,11 @@ function OnboardingView({ code }) {
 
         {/* ── שלב 5: חוזה ── */}
         <div className="apple-card" style={{ padding:18 }}>
-          <p style={{ fontWeight:800, fontSize:16 }}>5 · חוזה העסקה</p>
+          <p style={{ fontWeight:800, fontSize:18.4 }}>5 · חוזה העסקה</p>
           {!me.contract_available ? (
-            <p style={{ fontSize:13, color:'var(--text3)', marginTop:6 }}>החוזה יעלה בקרוב — תקבלי הודעה כשיהיה מוכן לחתימה.</p>
+            <p style={{ fontSize:14.9, color:'var(--text3)', marginTop:6 }}>החוזה יעלה בקרוב — תקבלי הודעה כשיהיה מוכן לחתימה.</p>
           ) : me.contract_signed ? (
-            <p style={{ color:'var(--ok)', fontWeight:700, fontSize:13.5, marginTop:6 }}>✓ נחתם. תודה!</p>
+            <p style={{ color:'var(--ok)', fontWeight:700, fontSize:15.5, marginTop:6 }}>✓ נחתם. תודה!</p>
           ) : (<>
             {contractUrl && <a href={contractUrl} target="_blank" rel="noreferrer" className="apple-btn apple-btn-ghost" style={{ margin:'10px 0', textDecoration:'none' }}>
               <ExternalLink size={14} /> פתיחת החוזה לקריאה</a>}
@@ -5105,7 +5105,7 @@ function OnboardingView({ code }) {
           </>)}
         </div>
 
-        <p style={{ fontSize:11.5, color:'var(--text3)', textAlign:'center' }}>שאלות? שרה הגר · רשת חינוך חב"ד</p>
+        <p style={{ fontSize:13.2, color:'var(--text3)', textAlign:'center' }}>שאלות? שרה הגר · רשת חינוך חב"ד</p>
       </div>
     </div>
   );
@@ -5147,14 +5147,14 @@ function OnboardingAdmin({ activeMonth, onClose }) {
       <div className="apple-card" onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:860, padding:22, marginTop:20 }} dir="rtl">
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:4 }}>
           <div>
-            <p style={{ fontWeight:800, fontSize:18 }}>קליטת עובדות — טופס 101, מסמכים וחוזה</p>
-            <p style={{ fontSize:12.5, color:'var(--text3)' }}>דדליין: {OB_DEADLINE} · הושלמו {complete} / {total}</p>
+            <p style={{ fontWeight:800, fontSize:20.7 }}>קליטת עובדות — טופס 101, מסמכים וחוזה</p>
+            <p style={{ fontSize:14.4, color:'var(--text3)' }}>דדליין: {OB_DEADLINE} · הושלמו {complete} / {total}</p>
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            <button className="apple-btn apple-btn-blue" onClick={makeLinks} style={{ minHeight:36, fontSize:12.5 }}>
+            <button className="apple-btn apple-btn-blue" onClick={makeLinks} style={{ minHeight:36, fontSize:14.4 }}>
               יצירת קישורים לכל העובדות
             </button>
-            <label className="apple-btn apple-btn-ghost" style={{ minHeight:36, fontSize:12.5, cursor:'pointer' }}>
+            <label className="apple-btn apple-btn-ghost" style={{ minHeight:36, fontSize:14.4, cursor:'pointer' }}>
               <Upload size={14} /> העלאת החוזה (PDF)
               <input type="file" accept="application/pdf" style={{ display:'none' }}
                 onChange={e => { const f = e.target.files?.[0]; if (f) uploadContract(f); }} />
@@ -5162,19 +5162,19 @@ function OnboardingAdmin({ activeMonth, onClose }) {
             <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ minHeight:36 }}>סגירה</button>
           </div>
         </div>
-        {busy && <p style={{ fontSize:12.5, color:'var(--text3)' }}>{busy}</p>}
+        {busy && <p style={{ fontSize:14.4, color:'var(--text3)' }}>{busy}</p>}
 
         {rows === null ? <p style={{ color:'var(--text3)', padding:20 }}>טוען…</p> :
          !rows.length ? (
           <div style={{ textAlign:'center', padding:'30px 10px' }}>
             <p style={{ fontWeight:700 }}>אין עדיין קישורי קליטה</p>
-            <p style={{ fontSize:12.5, color:'var(--text3)' }}>לחיצה על "יצירת קישורים" תפיק קישור אישי לכל עובדת בכל בתי הספר, מתוך חודש {fmtMonth(activeMonth)}.</p>
+            <p style={{ fontSize:14.4, color:'var(--text3)' }}>לחיצה על "יצירת קישורים" תפיק קישור אישי לכל עובדת בכל בתי הספר, מתוך חודש {fmtMonth(activeMonth)}.</p>
           </div>
         ) : Object.entries(bySchool).map(([sn, list]) => (
           <div key={sn} style={{ marginTop:14 }}>
-            <p style={{ fontSize:12, fontWeight:700, color:'var(--purple)', marginBottom:6 }}>{sn} · {list.filter(r => doneOf(r) >= 5).length}/{list.length} הושלמו</p>
+            <p style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:6 }}>{sn} · {list.filter(r => doneOf(r) >= 5).length}/{list.length} הושלמו</p>
             <div style={{ overflowX:'auto' }}>
-              <table className="apple-table" style={{ fontSize:12 }}>
+              <table className="apple-table" style={{ fontSize:13.8 }}>
                 <thead><tr>
                   <th>עובדת</th><th style={{ textAlign:'center' }}>101</th><th style={{ textAlign:'center' }}>ת.ז.</th>
                   <th style={{ textAlign:'center' }}>נתוני שכר</th><th style={{ textAlign:'center' }}>תיק משה"ח</th>
@@ -5194,7 +5194,7 @@ function OnboardingAdmin({ activeMonth, onClose }) {
                         <td style={{ textAlign:'center' }}>{C(r.ministry_file_path)}</td>
                         <td style={{ textAlign:'center' }}>{C(r.contract_signed_at)}</td>
                         <td style={{ textAlign:'center' }}>
-                          <button className="apple-btn apple-btn-ghost" onClick={() => copy(r.code, r.name)} style={{ minHeight:28, padding:'0 10px', fontSize:11.5 }}>
+                          <button className="apple-btn apple-btn-ghost" onClick={() => copy(r.code, r.name)} style={{ minHeight:28, padding:'0 10px', fontSize:13.2 }}>
                             {copied === r.name ? 'הועתק ✓' : 'העתקה'}
                           </button>
                         </td>
@@ -5206,7 +5206,7 @@ function OnboardingAdmin({ activeMonth, onClose }) {
             </div>
           </div>
         ))}
-        <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:14 }}>
+        <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:14 }}>
           השליחה בוואטסאפ נעשית דרך scripts/send-onboarding.mjs — הרצה יבשה קודם, שליחה רק באישורך.
         </p>
       </div>
@@ -5271,8 +5271,8 @@ function LinkView({ code }) {
   if (fatal) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }} dir="rtl">
       <div className="apple-card" style={{ padding:26, maxWidth:380, textAlign:'center' }}>
-        <p style={{ fontSize:16, fontWeight:700, color:'var(--danger)', marginBottom:8 }}>{fatal}</p>
-        <p style={{ fontSize:13, color:'var(--text3)' }}>פנו לרשת לקבלת קישור חדש.</p>
+        <p style={{ fontSize:18.4, fontWeight:700, color:'var(--danger)', marginBottom:8 }}>{fatal}</p>
+        <p style={{ fontSize:14.9, color:'var(--text3)' }}>פנו לרשת לקבלת קישור חדש.</p>
       </div>
     </div>
   );
@@ -5287,18 +5287,18 @@ function LinkView({ code }) {
             <img src="/logo-chabad.png" alt="רשת חינוך חב״ד"
               style={{ height:38, width:'auto', objectFit:'contain', flexShrink:0 }} />
             <div style={{ minWidth:0 }}>
-              <p style={{ fontSize:14.5, fontWeight:800, color:'var(--text)', lineHeight:1.25 }}>מערכת שכר עובדי הוראה</p>
-              <p style={{ fontSize:11.5, color:'var(--text3)', lineHeight:1.3 }}>רשת חינוך חב״ד</p>
+              <p style={{ fontSize:16.7, fontWeight:800, color:'var(--text)', lineHeight:1.25 }}>מערכת שכר עובדי הוראה</p>
+              <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.3 }}>רשת חינוך חב״ד</p>
             </div>
           </div>
-          <p style={{ fontSize:16, fontWeight:800, color:'var(--text)' }}>{me?.schoolName || 'טוען…'}</p>
-          <p style={{ fontSize:12.5, color:'var(--text3)', marginTop:1 }}>
+          <p style={{ fontSize:18.4, fontWeight:800, color:'var(--text)' }}>{me?.schoolName || 'טוען…'}</p>
+          <p style={{ fontSize:14.4, color:'var(--text3)', marginTop:1 }}>
             {me?.fullName}{me ? ' · הזנת נתוני העסקה' : ''}
           </p>
           {/* חודש אחד, כטקסט. בורר הזמין מילוי לחודש שכבר נסגר, וחשף
               כל חודש שקיים במסד — כולל חודשי בדיקה. */}
           {month && (
-            <p style={{ fontSize:12.5, fontWeight:700, color:'var(--purple)', marginTop:8,
+            <p style={{ fontSize:14.4, fontWeight:700, color:'var(--purple)', marginTop:8,
               background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999,
               display:'inline-block', padding:'3px 12px' }}>
               {fmtMonth(month)}
@@ -5310,17 +5310,17 @@ function LinkView({ code }) {
       <main style={{ maxWidth:760, margin:'0 auto', padding:'16px 16px 40px' }}>
         {locked && (
           <div style={{ background:'var(--warn-bg)', border:'1px solid var(--warn)', borderRadius:12, padding:'11px 14px', marginBottom:14 }}>
-            <p style={{ fontSize:13, fontWeight:600, color:'var(--warn)' }}>החודש נעול — אי אפשר לשנות נתונים.</p>
+            <p style={{ fontSize:14.9, fontWeight:600, color:'var(--warn)' }}>החודש נעול — אי אפשר לשנות נתונים.</p>
           </div>
         )}
 
         {loading ? (
-          <p style={{ fontSize:14, color:'var(--text3)', textAlign:'center', padding:'40px 0' }}>טוען…</p>
+          <p style={{ fontSize:16.1, color:'var(--text3)', textAlign:'center', padding:'40px 0' }}>טוען…</p>
         ) : !rows.length ? (
           <>
             <div className="apple-card" style={{ padding:24, textAlign:'center', marginBottom:12 }}>
-              <p style={{ fontSize:15, fontWeight:700, color:'var(--text)', marginBottom:6 }}>אין עדיין עובדי הוראה בחודש הזה</p>
-              <p style={{ fontSize:13, color:'var(--text3)' }}>
+              <p style={{ fontSize:17.2, fontWeight:700, color:'var(--text)', marginBottom:6 }}>אין עדיין עובדי הוראה בחודש הזה</p>
+              <p style={{ fontSize:14.9, color:'var(--text3)' }}>
                 {heSaid(male, 'הוסיפי', 'הוסף')} את עובדי ההוראה של בית הספר — כולל {heSaid(male, 'את עצמך', 'אותך')}.
                 שם, ת.ז., מסלול, ותק ושעות. {heSaid(male, 'הצמדי', 'הצמד')} למספר השעות שאושר בבניית התקציב.
               </p>
@@ -5329,7 +5329,7 @@ function LinkView({ code }) {
           </>
         ) : (
           <>
-            <p style={{ fontSize:12.5, color:'var(--text3)', marginBottom:11 }}>
+            <p style={{ fontSize:14.4, color:'var(--text3)', marginBottom:11 }}>
               {rows.length} עובדי הוראה · שינוי בוותק, בדרגה, בתואר או בשעות מחזיר לחישוב שכר מחדש
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:11 }}>
@@ -5469,7 +5469,7 @@ export default function App() {
   if (booting) {
     return (
       <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center' }} dir="rtl">
-        <p style={{ fontSize:14, color:'var(--text3)', fontWeight:600 }}>טוען…</p>
+        <p style={{ fontSize:16.1, color:'var(--text3)', fontWeight:600 }}>טוען…</p>
       </div>
     );
   }
@@ -5591,8 +5591,8 @@ export default function App() {
             style={{ display:'flex', alignItems:'center', gap:11, cursor: isCoord ? 'pointer' : 'default', padding:'9px 0' }}>
             <img src="/logo-chabad.png" alt="לוגו רשת" style={{ height:36, width:'auto', objectFit:'contain' }} />
             <div>
-              <p style={{ fontWeight:700, fontSize:14.5, color:'var(--text)', letterSpacing:'-0.01em', lineHeight:1.25 }}>מערכת שכר מורים</p>
-              <p style={{ fontSize:11.5, color:'var(--text3)', lineHeight:1.3 }}>
+              <p style={{ fontWeight:700, fontSize:16.7, color:'var(--text)', letterSpacing:'-0.01em', lineHeight:1.25 }}>מערכת שכר מורים</p>
+              <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.3 }}>
                 {isCoord ? 'שליח / מנהל רשת' : isClerk ? 'חשבת שכר' : `מנהלת: ${principalSchool?.name || ''}`}
                 <span style={{ opacity:.55 }}>{` · גרסה ${BUILD}`}</span>
               </p>
@@ -5625,7 +5625,7 @@ export default function App() {
                 סימולציה
                 {needsSimCount > 0 && (
                   <span style={{ background:'var(--warn-bg)', color:'var(--warn)', border:'1px solid var(--warn-line)',
-                    fontSize:11, fontWeight:700, borderRadius:999, minWidth:19, height:19, padding:'0 5px',
+                    fontSize:12.6, fontWeight:700, borderRadius:999, minWidth:19, height:19, padding:'0 5px',
                     display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
                     {needsSimCount}
                   </span>
@@ -5661,14 +5661,14 @@ export default function App() {
                   מסוים, ואין סימן שיש לאן לחזור. */}
               {sortedMonthKeys.length > 1 ? (
                 <select value={activeMonth} onChange={e => setActiveMonth(e.target.value)} title="בחירת חודש"
-                  style={{ fontSize:12.5, fontWeight:700, color:'var(--text)', background:'none', border:'none',
+                  style={{ fontSize:14.4, fontWeight:700, color:'var(--text)', background:'none', border:'none',
                     cursor:'pointer', fontFamily:'inherit', textAlign:'center', minWidth:92, appearance:'auto' }}>
                   {sortedMonthKeys.map(k => (
                     <option key={k} value={k}>{fmtMonth(k)}{k === firstMonthKey ? ' · ראשון' : ''}</option>
                   ))}
                 </select>
               ) : (
-                <span style={{ fontSize:12.5, fontWeight:700, color:'var(--text)', minWidth:92, textAlign:'center' }}>{fmtMonth(activeMonth)}</span>
+                <span style={{ fontSize:14.4, fontWeight:700, color:'var(--text)', minWidth:92, textAlign:'center' }}>{fmtMonth(activeMonth)}</span>
               )}
               <button title="חודש הבא"
                 onClick={() => { const i=sortedMonthKeys.indexOf(activeMonth); if(i<sortedMonthKeys.length-1) setActiveMonth(sortedMonthKeys[i+1]); }}
@@ -5677,7 +5677,7 @@ export default function App() {
               </button>
               {isCoord && sortedMonthKeys.indexOf(activeMonth) === sortedMonthKeys.length-1 && (
                 <button onClick={openNewMonth} title="פתיחת חודש חדש"
-                  style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11.5, padding:'4px 9px', background:'var(--teal)',
+                  style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:13.2, padding:'4px 9px', background:'var(--teal)',
                     border:'none', borderRadius:8, color:'#fff', cursor:'pointer', fontWeight:700, fontFamily:'inherit', marginInlineStart:2 }}>
                   <Plus size={12} strokeWidth={3} />
                   {Object.keys(months).length ? 'חודש' : 'פתיחת המערכת'}
@@ -5700,7 +5700,7 @@ export default function App() {
 
       {(busy || error) && (
         <div className="no-print" style={{
-          position:'sticky', top:62, zIndex:39, padding:'8px 16px', fontSize:13, fontWeight:600,
+          position:'sticky', top:62, zIndex:39, padding:'8px 16px', fontSize:14.9, fontWeight:600,
           display:'flex', alignItems:'center', justifyContent:'center', gap:8,
           background: error ? 'var(--danger-bg)' : 'var(--teal-100)',
           color: error ? 'var(--danger)' : 'var(--teal-700)',
@@ -5709,7 +5709,7 @@ export default function App() {
           {error
             ? <><AlertTriangle size={14} strokeWidth={2.3} />{error}
                 <button onClick={() => setError('')} className="apple-btn apple-btn-ghost"
-                  style={{ minHeight:26, padding:'0 9px', fontSize:12, marginInlineStart:6 }}>סגירה</button></>
+                  style={{ minHeight:26, padding:'0 9px', fontSize:13.8, marginInlineStart:6 }}>סגירה</button></>
             : <>שומר…</>}
         </div>
       )}
@@ -5782,9 +5782,9 @@ export default function App() {
               <div>
                 <div style={{ display:'flex', alignItems:'center', gap:9 }}>
                   <span className="title-bar" />
-                  <h2 style={{ fontSize:23, fontWeight:800, letterSpacing:'-0.025em', color:'var(--text)' }}>בתי הספר</h2>
+                  <h2 style={{ fontSize:26.4, fontWeight:800, letterSpacing:'-0.025em', color:'var(--text)' }}>בתי הספר</h2>
                 </div>
-                <p style={{ fontSize:13, color:'var(--text3)', marginInlineStart:13 }}>{schools.length} בתי ספר ברשת</p>
+                <p style={{ fontSize:14.9, color:'var(--text3)', marginInlineStart:13 }}>{schools.length} בתי ספר ברשת</p>
               </div>
               <button className="apple-btn apple-btn-blue" onClick={() => setSchoolModal({ id:'', name:'', city:'', reform:'ofek' })}>
                 <Plus size={15} strokeWidth={2.6} />
@@ -5802,8 +5802,8 @@ export default function App() {
                 <div style={{ width:64, height:64, borderRadius:18, background:'var(--purple-100)', margin:'0 auto 16px', display:'flex', alignItems:'center', justifyContent:'center' }}>
                   <School size={30} strokeWidth={1.8} color="var(--purple)" />
                 </div>
-                <p style={{ fontWeight:600, fontSize:16, color:'var(--apple-text)', marginBottom:6 }}>אין בתי ספר עדיין</p>
-                <p style={{ fontSize:14, color:'var(--apple-text2)' }}>לחצי על "הוסף בית ספר" להתחלה</p>
+                <p style={{ fontWeight:600, fontSize:18.4, color:'var(--apple-text)', marginBottom:6 }}>אין בתי ספר עדיין</p>
+                <p style={{ fontSize:16.1, color:'var(--apple-text2)' }}>לחצי על "הוסף בית ספר" להתחלה</p>
               </div>
             ) : (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:16 }}>
@@ -5824,8 +5824,8 @@ export default function App() {
                       onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='var(--shadow)'; }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
                         <div>
-                          <h3 style={{ fontWeight:700, fontSize:16, color:'var(--apple-text)', marginBottom:2, letterSpacing:'-0.01em' }}>{s.name}</h3>
-                          {s.city && <p style={{ fontSize:13, color:'var(--apple-text2)' }}>{s.city}</p>}
+                          <h3 style={{ fontWeight:700, fontSize:18.4, color:'var(--apple-text)', marginBottom:2, letterSpacing:'-0.01em' }}>{s.name}</h3>
+                          {s.city && <p style={{ fontSize:14.9, color:'var(--apple-text2)' }}>{s.city}</p>}
                           <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
                             {/* המסלול הוא של המורה, לא של בית הספר. בבית ספר
                                 אופק יש גם מורות בעולם ישן, ולכן מוצג התמהיל
@@ -5856,22 +5856,22 @@ export default function App() {
                       </div>
                       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
                         <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-                          <p style={{ fontSize:11, color:'var(--text2)', marginBottom:2 }}>מורים</p>
-                          <p className="num" style={{ fontWeight:800, fontSize:22, color:'var(--text)', letterSpacing:'-0.02em' }}>{ts.length}</p>
+                          <p style={{ fontSize:12.6, color:'var(--text2)', marginBottom:2 }}>מורים</p>
+                          <p className="num" style={{ fontWeight:800, fontSize:25.3, color:'var(--text)', letterSpacing:'-0.02em' }}>{ts.length}</p>
                         </div>
                         <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-                          <p style={{ fontSize:11, color:'var(--text2)', marginBottom:2 }}>שעות</p>
-                          <p className="num" style={{ fontWeight:700, fontSize:14, color: overQuota ? 'var(--danger)' : 'var(--text)' }}>
+                          <p style={{ fontSize:12.6, color:'var(--text2)', marginBottom:2 }}>שעות</p>
+                          <p className="num" style={{ fontWeight:700, fontSize:16.1, color: overQuota ? 'var(--danger)' : 'var(--text)' }}>
                             {quota ? `${used} / ${quota}` : used || '—'}
                           </p>
                         </div>
                         <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-                          <p style={{ fontSize:11, color:'var(--text2)', marginBottom:2 }}>למעסיק/חודש</p>
-                          <p className="num" style={{ fontWeight:700, fontSize:14, color:'var(--text)', letterSpacing:'-0.01em' }}>{empTot > 0 ? empTot.toLocaleString('he-IL')+' ₪' : '—'}</p>
+                          <p style={{ fontSize:12.6, color:'var(--text2)', marginBottom:2 }}>למעסיק/חודש</p>
+                          <p className="num" style={{ fontWeight:700, fontSize:16.1, color:'var(--text)', letterSpacing:'-0.01em' }}>{empTot > 0 ? empTot.toLocaleString('he-IL')+' ₪' : '—'}</p>
                         </div>
                       </div>
                       <button className="apple-btn apple-btn-ghost" onClick={e => { e.stopPropagation(); setTeacherModal({ ...EMPTY_TEACHER, schoolId: s.id, reform: s.reform || 'ofek' }); }}
-                        style={{ width:'100%', fontSize:13, borderRadius:10, border:'1.5px dashed var(--apple-fill2)' }}>
+                        style={{ width:'100%', fontSize:14.9, borderRadius:10, border:'1.5px dashed var(--apple-fill2)' }}>
                         + הוספת עובד/ת הוראה
                       </button>
                     </div>

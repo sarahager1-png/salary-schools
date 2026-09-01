@@ -74,7 +74,7 @@ html {
 
 body {
   font-family: 'Heebo', system-ui, -apple-system, sans-serif;
-  font-size: 15px;
+  font-size: 17.2px;
   line-height: 1.55;
   color: var(--text);
   background: var(--bg);
@@ -103,7 +103,7 @@ body {
   border-radius: var(--r-input);
   padding: 10px 14px;
   min-height: 42px;
-  font-size: 15px;
+  font-size: 17.2px;
   font-family: inherit;
   color: var(--text);
   outline: none;
@@ -143,7 +143,7 @@ body {
   min-height: 42px;
   border-radius: var(--r-btn);
   border: 1px solid transparent;
-  font-size: 14px;
+  font-size: 16.1px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
@@ -173,7 +173,7 @@ body {
   padding: 6px 14px;
   border-radius: 8px;
   border: none;
-  font-size: 13px;
+  font-size: 14.9px;
   font-weight: 600;
   font-family: inherit;
   color: var(--text3);
@@ -192,7 +192,7 @@ body {
 /* ── Label ── */
 .apple-label {
   display: block;
-  font-size: 12px;
+  font-size: 13.8px;
   font-weight: 600;
   letter-spacing: .03em;
   color: var(--text3);
@@ -214,7 +214,7 @@ body {
   padding: 4px 11px;
   border-radius: 999px;
   border: 1px solid transparent;
-  font-size: 12px;
+  font-size: 13.8px;
   font-weight: 600;
   line-height: 1.4;
   white-space: nowrap;
@@ -272,7 +272,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* ── Table ── */
 .apple-table { width: 100%; border-collapse: collapse; }
 .apple-table th {
-  font-size: 11px;
+  font-size: 12.6px;
   font-weight: 700;
   letter-spacing: .04em;
   color: var(--text3);
@@ -284,7 +284,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 }
 .apple-table td {
   padding: 12px 14px;
-  font-size: 14px;
+  font-size: 16.1px;
   color: var(--text2);
   border-bottom: 1px solid var(--line-soft);
 }
@@ -307,8 +307,8 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   transition: box-shadow .2s, transform .2s;
 }
 .apple-stat:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
-.apple-stat-label { font-size: 12px; color: var(--text3); font-weight: 600; margin-bottom: 5px; }
-.apple-stat-value { font-size: 26px; font-weight: 800; letter-spacing: -.02em; color: var(--text); line-height: 1.1; }
+.apple-stat-label { font-size: 13.8px; color: var(--text3); font-weight: 600; margin-bottom: 5px; }
+.apple-stat-value { font-size: 29.9px; font-weight: 800; letter-spacing: -.02em; color: var(--text); line-height: 1.1; }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -372,11 +372,11 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   .sheet-scroll .sticky-head th:nth-last-child(2),
   .sheet-scroll .sticky-head td:nth-last-child(2) { position: static; box-shadow: none; }
 }
-.sheet-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.sheet-table { width: 100%; border-collapse: collapse; font-size: 14.9px; font-variant-numeric: tabular-nums; }
 .sheet-table th {
   background: var(--bg);
   color: var(--text3);
-  font-size: 11px; font-weight: 700; letter-spacing: .03em;
+  font-size: 12.6px; font-weight: 700; letter-spacing: .03em;
   padding: 10px;
   text-align: right;
   border: none;
@@ -390,7 +390,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   border-bottom: 1px solid var(--line-soft);
   vertical-align: middle;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 14.9px;
   color: var(--text2);
 }
 .sheet-table tbody tr:last-child td { border-bottom: none; }
@@ -427,7 +427,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 
 .sheet-btn {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 10px;
+  padding: 8px 14px; font-size: 14.9px; font-weight: 600; border-radius: 10px;
   border: 1px solid var(--line); cursor: pointer;
   background: var(--surface); color: var(--text2);
   font-family: inherit;
@@ -460,7 +460,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   display: inline-flex; align-items: center; gap: 6px;
   height: 36px; padding: 0 13px; border-radius: 10px;
   border: 1px solid transparent; background: transparent;
-  color: var(--text2); font-family: inherit; font-size: 13.5px; font-weight: 600;
+  color: var(--text2); font-family: inherit; font-size: 15.5px; font-weight: 600;
   cursor: pointer; white-space: nowrap;
   transition: background .15s, color .15s;
 }
@@ -513,9 +513,9 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* ── Mobile ── */
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 @media (max-width: 767px) {
-  body { font-size: 14.5px; }
+  body { font-size: 16.7px; }
   .apple-stat { padding: 14px 15px; }
-  .apple-stat-value { font-size: 21px; }
+  .apple-stat-value { font-size: 24.1px; }
   .sheet-header, .sheet-toolbar { padding-inline: 14px; }
 }
 
