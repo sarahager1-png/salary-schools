@@ -83,6 +83,8 @@ const PRINCIPAL_ROLE = 'principal';
 // מחזירים את אותו מספר במחשבון הניהול (הוראת שרה, 1.9.2026). כל מה
 // שמעבר לו נקבע בהסכם מראש ונרשם כשכר מוסכם.
 const PRINCIPAL_OFEK_GROSS = 19087;
+// תוספת בית חב"ד של מנהלת — סכום קבוע, מתוך השכר (שרה, 2.9.2026)
+const PRINCIPAL_CHABAD_SUPP = 4700;
 const isPrincipalRow = t => t?.role === PRINCIPAL_ROLE;
 // דרגת הניהול היא א..ד ואינה סולם המורים. נשמרת כמספר 1..4.
 const NIHUL_GRADES = [{ v:1, l:'א' }, { v:2, l:'ב' }, { v:3, l:'ג' }, { v:4, l:'ד' }];
@@ -372,11 +374,17 @@ function payBreakdown(t) {
   const supp0  = Math.max(0, Number(t._chabadSupp) || 0);
   const agreed = Number(t._agreedGross) || 0;
 
-  // מנהלת: מספר אחד, תשלום ישיר — אין תוספת בית חב"ד. באופק המספר קבוע
-  // (19,087), וכל מה שמעבר לו על פי הסכם מראש שנרשם כשכר מוסכם.
+  /*
+    מנהלת: באופק המספר קבוע (19,087), וכל מה שמעבר לו על פי הסכם מראש
+    שנרשם כשכר מוסכם. "גם למנהלות יש תוספת בית חב"ד על סך 4,700"
+    (שרה, 2.9) — מתוך השכר, כמו אצל המורות: עליה מפרישים רק את
+    החובה (מס שכר וביטוח לאומי), בלי פנסיה ובלי קרן השתלמות.
+    בבית ספר שאינו משלם תוספת (מזכרת בתיה) — אין.
+  */
   if (isPrincipalRow(t)) {
     const gross = agreed || gross0 || (t.reform === 'ofek' ? PRINCIPAL_OFEK_GROSS : 0);
-    return { base: gross, mom: 0, supplement: 0, gross, agreed: !!agreed };
+    const psupp = schoolPaysSupp(t.schoolId) ? Math.min(PRINCIPAL_CHABAD_SUPP, gross) : 0;
+    return { base: gross - psupp, mom: 0, supplement: psupp, gross, agreed: !!agreed };
   }
 
   const gross = agreed || gross0;
