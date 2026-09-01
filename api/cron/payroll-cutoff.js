@@ -8,7 +8,7 @@
 
   אין מחיקה ואין ביטול. השורה ממתינה לחודש הבא או להכרעה ידנית.
 */
-import { db, guard, monthKeyNow, monthOf, cycleStarted } from '../_lib/db.js';
+import { db, guard, monthKeyNow, workMonth, cycleStarted } from '../_lib/db.js';
 
 const KIND = 'payroll_cutoff';
 
@@ -17,8 +17,8 @@ export default async function handler(req, res) {
   if (bad) return res.status(403).json({ error: bad });
 
   const sb = db();
-  const key = monthOf(req);
-  if (!cycleStarted(key)) {
+  const key = workMonth(req);   // חודש העבודה שהסתיים
+  if (!cycleStarted()) {
     return res.status(200).json({ ok: true, month: key, skipped: 'המחזור עוד לא התחיל בחודש הזה' });
   }
 

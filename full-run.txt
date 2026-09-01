@@ -1,0 +1,3 @@
+מסד: https://dovgircrzeputtkgxdsv.supabase.co  (.env.test)
+חבילות: 21
+

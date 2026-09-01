@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
   const sb = db();
   const key = monthOf(req);
-  if (!cycleStarted(key)) {
+  if (!cycleStarted()) {
     return res.status(200).json({ ok: true, month: key, skipped: 'המחזור עוד לא התחיל בחודש הזה' });
   }
   const { data: rows } = await sb.from('teacher_months')

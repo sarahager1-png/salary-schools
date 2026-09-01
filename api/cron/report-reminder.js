@@ -5,7 +5,7 @@
   שנכתבת שורה חדשה. "כל דיווח שיעלה עד ה-5 ישולם, מה שלא יעלה לא ישולם"
   — התזכורת היא ההזדמנות, לא ההודעה על התוצאה.
 */
-import { db, guard, monthKeyNow, monthOf, cycleStarted } from '../_lib/db.js';
+import { db, guard, monthKeyNow, workMonth, cycleStarted } from '../_lib/db.js';
 
 const KIND = 'report_reminder';
 
@@ -14,8 +14,8 @@ export default async function handler(req, res) {
   if (bad) return res.status(403).json({ error: bad });
 
   const sb = db();
-  const key = monthOf(req);
-  if (!cycleStarted(key)) {
+  const key = workMonth(req);   // חודש העבודה שהסתיים
+  if (!cycleStarted()) {
     return res.status(200).json({ ok: true, month: key, skipped: 'המחזור עוד לא התחיל בחודש הזה' });
   }
   const { data: month } = await sb.from('months').select('key, report_due').eq('key', key).maybeSingle();

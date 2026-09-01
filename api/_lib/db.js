@@ -49,8 +49,28 @@ export function monthOf(req) {
 
   CYCLE_START_MONTH ריק = הכול פעיל. זו ברירת המחדל אחרי שהמעבר יושלם.
 */
-export function cycleStarted(monthKey) {
+export function cycleStarted() {
   const from = String(process.env.CYCLE_START_MONTH || '').trim();
   if (!/^\d{4}-\d{2}$/.test(from)) return true;
-  return monthKey >= from;
+  return monthKeyNow() >= from;
+}
+
+/*
+  החודש שמדווחים עליו עכשיו — חודש העבודה שהסתיים.
+
+  בספטמבר משולם שכר אוגוסט (שרה, 1.9): חודש עבודה נסגר, ובחודש שאחריו
+  מדווחים עליו, מאשרים ומשלמים. לכן התזכורת ב-3, הסגירה ב-5 והמעבר
+  לשכר ב-6 — כולן עוסקות בחודש הקודם, לא בזה שעל הלוח.
+*/
+export function workMonth(req) {
+  const q = new URL(req.url, 'http://x').searchParams.get('month');
+  return /^\d{4}-\d{2}$/.test(q || '') ? q : monthKeyNow(-1);
+}
+
+/** ה-5 וה-6 של החודש שאחרי חודש העבודה */
+export function dueDatesFor(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m, 1));            // החודש הבא
+  const k = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  return { report: `${k}-05`, submit: `${k}-06` };
 }

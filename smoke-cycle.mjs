@@ -73,7 +73,8 @@ try {
   check('החודש נפתח', open.body?.ok && open.body.month === MONTH, JSON.stringify(open.body));
   check('שלוש השורות הועתקו', open.body?.copied === 3, String(open.body?.copied));
   const { data: m } = await admin.from('months').select('report_due, submit_due').eq('key', MONTH).single();
-  check('מועדי הדיווח נקבעו', m.report_due === `${MONTH}-05` && m.submit_due === `${MONTH}-06`,
+  // הדיווח על חודש העבודה מגיע בחודש שאחריו — 2094-12 מדווח ב-05/01/2095
+  check('מועדי הדיווח הם של החודש שאחרי', m.report_due === '2095-01-05' && m.submit_due === '2095-01-06',
     `${m.report_due} / ${m.submit_due}`);
   const { data: copied } = await admin.from('teacher_months')
     .select('name, approved, official_gross, reported_at').eq('month_key', MONTH).order('name');

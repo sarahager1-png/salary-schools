@@ -2512,7 +2512,9 @@ function ReportMonth({ school, teachers, monthKey, due, onReport }) {
     <div className="apple-card" style={{ padding:'14px 16px', marginBottom:14 }} dir="rtl">
       <div style={{ display:'flex', alignItems:'center', gap:9, flexWrap:'wrap', marginBottom:4 }}>
         <CalendarClock size={15} strokeWidth={2.3} color="var(--purple)" />
-        <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)' }}>הדיווח החודשי — {fmtMonth(monthKey)}</p>
+        <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)' }}>
+          הדיווח על {fmtMonth(monthKey)}
+        </p>
         {reported
           ? <span className="apple-badge badge-green" style={{ fontSize:12.1, padding:'2px 8px' }}>נמסר</span>
           : past
@@ -2522,8 +2524,8 @@ function ReportMonth({ school, teachers, monthKey, due, onReport }) {
               </span>}
       </div>
       <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.6, marginBottom:10 }}>
-        העדרויות, מילוי מקום וחופשות לידה. {due?.report
-          ? `המועד האחרון ${String(due.report).split('-').reverse().join('/')} — דיווח שיגיע אחריו לא ייכנס לשכר החודש.`
+        העדרויות, מילוי מקום וחופשות לידה של החודש שהסתיים. {due?.report
+          ? `המועד האחרון ${String(due.report).split('-').reverse().join('/')} — דיווח שיגיע אחריו לא ייכנס לתשלום.`
           : ''}
       </p>
 
