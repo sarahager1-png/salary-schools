@@ -35,6 +35,25 @@ export const kitaFor = (t) => {
 };
 
 /*
+  מחשבון אופק חדש.
+
+  הוא נפרד מהעולם הישן ולא היה ממופה, ולכן כל מורת אופק דולגה. המכשול
+  לא היה בשדות אלא במבנה: המקטע "גמולים" מקופל, ובתוכו אין שדות אלא
+  בורר אחד — "בחר גמולים". השדה KOD_TAFKID_2 אינו קיים כלל עד שבוחרים
+  בו "חינוך כיתה". פתיחת האקורדיון ב-CSS לא עוזרת, ולכן ההרצות הקודמות
+  נראו כאילו הכיתה "לא נקלטת": היא באמת לא נשלחה. חן דאבוש בלי הגמול
+  8,593 ועם הגמול 9,607 — מול 9,606 הרשומים לה.
+
+  דרגה: הרשימה בטופס היא חצאי דרגות, ולכן דרגה g יושבת בערך g*2-1.
+  הבורר נעול עד שנבחרת דרגת השכלה, ולכן הסדר קובע.
+*/
+const OFEK_DERUG = { intern: '100', BA: '101', MA: '102', senior: '104', unlicensed: '106' };
+export const ofekDargaFor = (t) => {
+  const g = t.grade === 'intern' ? 1 : Number(t.grade);
+  return Number.isFinite(g) && g >= 1 && g <= 9 ? String(g * 2 - 1) : null;
+};
+
+/*
   האחוז שנכנס למחשבון — זה שרשום בשורה.
 
   היו כאן שני אחוזים, כי סימולציית הבסיס של מורת אופק רצה בעולם הישן.
@@ -51,19 +70,29 @@ export const targetField = () => 'official_gross';
 
 /** מה נשלח לטופס עבור מורה — או סיבה בעברית למה לא. */
 export function formFields(t) {
-  /*
-    הטופס שאנחנו נוהגים בו הוא מחשבון העולם הישן בלבד. מורת אופק נמדדת
-    במחשבון אחר, שמעולם לא מופה — והרצתה כאן מחזירה מספר נמוך בכ-20%
-    ונראית כמו פער של 2,000 ₪. זו אינה בדיקה אלא רעש, והיא הסתירה את
-    הפערים האמיתיים בעולם הישן.
-  */
-  if (t.reform === 'ofek') return { skip: 'אופק — מחשבון אחר, טרם מופה' };
+  const pctOk = (v) => v != null && v > 0 && v <= 200;
+  if (t.reform === 'ofek') {
+    const derug = OFEK_DERUG[t.degree];
+    if (!derug) return { skip: `אין באופק תואר "${t.degree}"` };
+    const darga = ofekDargaFor(t);
+    if (!darga) return { skip: 'דרגת האופק טרם נקבעה' };
+    const p2 = preScope(t);
+    if (!pctOk(p2)) return { skip: p2 == null ? 'אחוז המשרה טרם נקבע' : `אחוז משרה לא תקין (${p2})` };
+    return {
+      calc: 'ofek', derug, darga,
+      vetek: String(Math.max(1, Math.min(40, Number(t.seniority) || 1))),
+      pct: String(p2),
+      kita: kitaFor(t),
+      field: targetField(),
+    };
+  }
   const darga = dargaFor(t);
   if (!darga) return { skip: `אין במחשבון תואר "${t.degree}"` };
   const pct = preScope(t);
   if (pct == null) return { skip: 'אחוז המשרה טרם נקבע' };
   if (!(pct > 0 && pct <= 200)) return { skip: `אחוז משרה לא תקין (${pct})` };
   return {
+    calc: 'old',
     darga,
     vetek: String(Math.max(1, Math.min(40, Number(t.seniority) || 1))),
     pct: String(pct),
@@ -74,12 +103,6 @@ export function formFields(t) {
 
 /** התכנון המלא של המרַיץ — כולל מי מדולגת ולמה. */
 export function planFor(t) {
-  /*
-    הטופס שאנחנו נוהגים בו הוא מחשבון העולם הישן בלבד. מורת אופק נמדדת
-    במחשבון אחר, שמעולם לא מופה — והרצתה כאן מחזירה מספר נמוך ב-20%
-    ונראית כמו פער של 2,000 ₪. זו אינה בדיקה אלא רעש, והיא הסתירה את
-    חמשת הפערים האמיתיים בעולם הישן.
-  */
   if (t.gamul_role === 'principal') return { skip: 'מנהלת — מחשבון ניהול, לא כאן' };
   if (t.leave_type === 'unpaid')    return { skip: 'חל"ת — אין שכר' };
   if (!scopeConfirmed(t))           return { skip: 'אחוז המשרה טרם נקבע' };
@@ -88,18 +111,60 @@ export function planFor(t) {
 }
 
 // ── הטופס ────────────────────────────────────────────────────
-const CALC = 'https://educalc.unq.co.il/#/Calculators/OldWorld';
+const CALC = {
+  old:  'https://educalc.unq.co.il/#/Calculators/OldWorld',
+  ofek: 'https://educalc.unq.co.il/#/Calculators/OfekHadash',
+};
+let onCalc = null;
 
-export const openForm = async (p) => {
-  await p.goto('https://educalc.unq.co.il/', { waitUntil: 'domcontentloaded' });
-  await p.waitForTimeout(6000);
-  await p.evaluate(u => location.replace(u), CALC);
+export const openForm = async (p, calc = 'old') => {
+  if (onCalc === calc) return;
+  if (onCalc === null) {
+    await p.goto('https://educalc.unq.co.il/', { waitUntil: 'domcontentloaded' });
+    await p.waitForTimeout(6000);
+  }
+  await p.evaluate(u => location.replace(u), CALC[calc]);
   await p.waitForTimeout(5000);
-  // תוסף הנגישות מיירט לחיצות; האקורדיונים מסתירים את כיתת החינוך
+  /*
+    תוסף הנגישות מיירט לחיצות. ה-CSS פותח את האקורדיונים של העולם הישן,
+    שבו השדות קיימים ורק מוסתרים. באופק זה אינו מספיק — שם השדה נוצר רק
+    אחרי בחירה בבורר הגמולים — ולכן שם פותחים בלחיצה אמיתית.
+  */
   await p.addStyleTag({ content: `#vplugin{display:none!important}
     .panel-collapse{display:block!important;height:auto!important}
     .unqAccordionContainer, .unqAccordionContainer > div, .panel-body{display:block!important;height:auto!important}` });
   await p.waitForTimeout(800);
+  onCalc = calc;
+};
+
+/*
+  בחירת גמול במחשבון האופק. הכותרת "גמולים" אינה הפקד הלחיץ — הוא
+  span.collapse-oral שבתוכה, ומצבו נקרא ב-aria-expanded. הרשימה עצמה
+  נפתחת ב-.k-animation-container מחוץ לטופס.
+*/
+const pickGmul = async (p, label) => {
+  const head = p.locator('.panel-heading', { hasText: 'גמולים' }).first().locator('span.collapse-oral').first();
+  if ((await head.getAttribute('aria-expanded')) !== 'true') {
+    await head.scrollIntoViewIfNeeded();
+    await head.click();
+    await p.waitForTimeout(1200);
+  }
+  // ה-k-input הראשון הוא שדה החודש; השני הוא בורר הגמולים
+  const picker = p.locator('input.k-input').nth(1);
+  await picker.scrollIntoViewIfNeeded();
+  await picker.click();
+  await p.waitForTimeout(1200);
+  const h = await p.evaluateHandle((want) => {
+    const c = document.querySelector('.k-animation-container');
+    return c ? [...c.querySelectorAll('li,[role=option]')]
+      .find(x => x.innerText.replace(/\s+/g, ' ').trim() === want) || null : null;
+  }, label);
+  const el = h.asElement();
+  if (!el) throw new Error(`לא נמצא הגמול "${label}" ברשימה`);
+  await el.click();
+  await p.waitForTimeout(1500);
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(700);
 };
 
 // שדה החודש הוא בורר Kendo עם מזהה אקראי בכל טעינה — מאותר לפי הערך
@@ -124,9 +189,36 @@ export const setMonth = async (p, monthKey) => {
 };
 
 export const runOne = async (p, plan, monthKey) => {
+  await openForm(p, plan.calc || 'old');
   // "נקה נתונים" מחזיר גם את החודש לברירת המחדל, ולכן הוא נקבע מחדש
   // לפני כל חישוב ולא פעם אחת בהתחלה.
   await setMonth(p, monthKey);
+  if (plan.calc === 'ofek') {
+    // דרגת ההשכלה קודם — בורר הדרגה נעול ומתמלא רק אחריה
+    await p.selectOption('select[name="DERUG_OFEK"]', plan.derug);
+    await p.waitForTimeout(1200);
+    await p.selectOption('select[name="DARGA1"]', plan.darga);
+    await p.selectOption('select[name="VETEK"]', plan.vetek);
+    await p.fill('input[name="MEKADEM_MISRA_REFORMA"]', plan.pct);
+    if (plan.kita) {
+      await pickGmul(p, 'חינוך כיתה');
+      const sel = p.locator('select[name="KOD_TAFKID_2"]');
+      await sel.scrollIntoViewIfNeeded();
+      await sel.selectOption(plan.kita);
+      const got = await sel.inputValue();
+      if (got !== plan.kita) throw new Error(`כיתת החינוך לא נקלטה: הטופס מציג "${got}"`);
+    }
+    await p.waitForTimeout(400);
+    await p.locator('.btnCalc').first().click();
+    await p.waitForTimeout(5000);
+    const body = (await p.locator('body').innerText()).replace(/\s+/g, ' ');
+    const g = body.match(/סך הכל ברוטו כללי ([\d,]+\.?\d*)/);
+    const gross = g ? Math.round(Number(g[1].replace(/,/g, ''))) : null;
+    await p.evaluate(() => [...document.querySelectorAll('input,button')]
+      .find(x => /נקה נתונים/.test(x.value || x.innerText))?.click());
+    await p.waitForTimeout(1500);
+    return gross;
+  }
   await p.selectOption('select[name="DARGA"]', plan.darga);
   await p.selectOption('select[name="VETEK"]', plan.vetek);
   await p.fill('input[name="MEKADEM_MISRA"]', plan.pct);

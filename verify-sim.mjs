@@ -40,7 +40,7 @@ const sb = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SECRET_KEY ?? env.VI
   { auth: { persistSession: false } });
 
 let q = sb.from('teacher_months')
-  .select('name, reform, degree, seniority, scope_pct, scope_set_at, gamul_role, leave_type, children_under_18, official_gross, official_gross_pre, schools!inner(name)')
+  .select('name, reform, degree, grade, seniority, scope_pct, scope_set_at, gamul_role, leave_type, children_under_18, official_gross, schools!inner(name)')
   .eq('month_key', MONTH);
 if (SCHOOL && SCHOOL !== true) q = q.eq('schools.name', SCHOOL);
 const { data: rows, error } = await q;
@@ -75,7 +75,7 @@ try {
     const delta = got - c.expected;
     const pctOff = c.expected ? Math.abs(delta) / c.expected * 100 : 0;
     const line = `${c.t.name.padEnd(20)} ${(c.t.reform === 'ofek' ? 'אופק' : 'ישן').padEnd(5)} ` +
-      `דרגה ${c.plan.darga} · ותק ${String(c.plan.vetek).padStart(2)} · ${String(c.plan.pct).padStart(3)}%` +
+      `${c.plan.calc === 'ofek' ? 'דרגה ' + c.t.grade : 'דרגה ' + c.plan.darga} · ותק ${String(c.plan.vetek).padStart(2)} · ${String(c.plan.pct).padStart(3)}%` +
       `${c.plan.kita ? ' · מחנכת' : '       '}  רשום ${String(c.expected).padStart(6)} · מחשבון ${String(got).padStart(6)}`;
     if (Math.abs(delta) <= 1) { same.push(c); console.log(`✓ ${line}`); }
     else { diff.push({ ...c, got, delta, pctOff, school }); console.log(`≠ ${line}  · פער ${delta > 0 ? '+' : ''}${delta} (${pctOff.toFixed(1)}%)`); }
@@ -86,14 +86,45 @@ console.log('');
 for (const c of cases.filter(x => x.skip)) console.log(`דילוג  ${c.t.name} — ${c.skip}`);
 console.log(`\nתאמו ${same.length} · נבדלו ${diff.length} · לא נקראו ${failed.length}  (מתוך ${todo.length})`);
 
+/*
+  פער אינו "טעות בברוטו". המחשבון מקבל ותק, דרגה ואחוז משרה, ואם אחד
+  מהם שגוי בשורה — התוצאה תיבדל. הדבר השימושי הוא ההפוך: מהברוטו
+  שנרשם אפשר לחלץ איזה אחוז משרה הוא מכתיב, ולהשוות לזה שבשורה.
+
+  הפילוח הוא מה שהופך את הרשימה לעבודה: קודם השורות שבהן האחוז מעולם
+  לא נקבע ונשאר 100 כברירת מחדל, אחר כך אלה שהברוטו בהן גבוה בדיוק
+  ב-1,000 ₪, ורק בסוף השאר.
+*/
+const impliedScope = (d) => (d.got ? Math.round(Number(d.plan.pct) * d.expected / d.got) : null);
+const bucket = (d) => {
+  const imp = impliedScope(d);
+  if (!d.t.scope_set_at && Number(d.plan.pct) === 100 && imp != null && Math.abs(imp - 100) > 3) return 'scope';
+  if (d.delta === -1000) return 'thousand';
+  return 'other';
+};
+const GROUPS = [
+  ['scope',    'אחוז המשרה מעולם לא נקבע — השורה רצה כ-100%'],
+  ['thousand', 'הברוטו גבוה בדיוק ב-1,000 ₪'],
+  ['other',    'שאר הפערים'],
+];
+
 if (diff.length) {
-  console.log('\nהפערים:');
-  for (const d of diff) {
-    console.log(`  ${d.school} · ${d.t.name}: רשום ${d.expected}, מחשבון ${d.got}, פער ${d.delta > 0 ? '+' : ''}${d.delta} (${d.pctOff.toFixed(1)}%)`);
+  for (const [key, title] of GROUPS) {
+    const g = diff.filter(d => bucket(d) === key);
+    if (!g.length) continue;
+    console.log(`
+${title}  (${g.length})`);
+    for (const d of g) {
+      const tail = key === 'scope'
+        ? `רשום 100% משרה, אבל הברוטו ${d.expected} מכתיב ${impliedScope(d)}%`
+        : `רשום ${d.expected}, מחשבון ${d.got}, פער ${d.delta > 0 ? '+' : ''}${d.delta} (${d.pctOff.toFixed(1)}%)`;
+      console.log(`  ${d.school} · ${d.t.name}: ${tail}`);
+    }
   }
   fs.writeFileSync('verify-sim-diffs.json', JSON.stringify(diff.map(d => ({
     school: d.school, name: d.t.name, reform: d.t.reform, degree: d.t.degree,
     seniority: d.t.seniority, scope_pct: d.t.scope_pct, gamul_role: d.t.gamul_role,
+    scope_set_at: d.t.scope_set_at, implied_scope: impliedScope(d), bucket: bucket(d),
     sent: d.plan, expected: d.expected, got: d.got, delta: d.delta,
   })), null, 1));
   console.log('\nהפירוט המלא: verify-sim-diffs.json');
