@@ -19,13 +19,15 @@
   שבע התוצאות תאמו את אסתר בדיוק בעוד שלוש נפלו ב-2.05% — הפרש של
   חודש שכר, לא של חישוב. כאן הוא נקבע במפורש לחודש שמריצים.
 
-    node run-sim.mjs --month 2026-09 [--school "שם"] [--limit N] [--dry]
+    node run-sim.mjs --month 2026-09 [--live] [--school "שם"] [--limit N] [--dry]
+
+  בלי --live הוא מדבר עם מסד הבדיקות. עם --live — עם המסד שהמנהלות
+  עובדות בו, והשורה הראשונה בפלט אומרת את זה.
 
   נדרשים SIM_EMAIL ו-SIM_PASSWORD של משתמש אמיתי במערכת: הכתיבה עוברת
   דרך אותן הרשאות שבאפליקציה, ולא עוקפת אותן.
 */
 import fs from 'node:fs';
-import { ENV_FILE, URL as DB_URL } from './test-env.mjs';
 import { chromium } from 'file:///C:/tmp/node_modules/playwright/index.mjs';
 import { createClient } from '@supabase/supabase-js';
 
@@ -43,13 +45,40 @@ if (!MONTH || !/^\d{4}-\d{2}$/.test(String(MONTH))) {
   process.exit(2);
 }
 
+/*
+  לאיזה מסד. זו לא הערה טכנית — זו הטעות שקרתה בפועל: כל שאר הכלים כאן
+  טוענים .env.test אם הוא קיים, כי הם בדיקות שיוצרות ומוחקות נתונים.
+  המרַיץ הזה אינו בדיקה, והוא רץ בשקט מול מסד הבדיקות: "הרצתי" ולא קרה
+  כלום, כי שם אין את בתי הספר. לכן המסד נבחר במפורש ונאמר בקול.
+*/
+const LIVE = process.argv.includes('--live');
+const ENV_FILE = LIVE ? '.env.local' : '.env.test';
+if (!fs.existsSync(ENV_FILE)) {
+  console.error(`חסר ${ENV_FILE}.${LIVE ? '' : ' להרצה מול המסד החי: --live'}`);
+  process.exit(2);
+}
 const env = Object.fromEntries(
-  fs.readFileSync(ENV_FILE, 'utf8').split('\n').filter(Boolean).filter(l => !l.startsWith('#'))
-    .map(l => { const i = l.indexOf('='); return [l.slice(0, i), l.slice(i + 1)]; })
+  fs.readFileSync(ENV_FILE, 'utf8').split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith('#'))
+    .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; })
 );
+const DB_URL = env.VITE_SUPABASE_URL;
+const PROD_REF = 'rvkjfjokdhkwiigorysr';
+const isProd = String(DB_URL).includes(PROD_REF);
+if (isProd && !LIVE) {
+  console.error(`עצירה: ${ENV_FILE} מצביע על המסד החי. להרצה מכוונת: --live`);
+  process.exit(2);
+}
+if (LIVE && !isProd) {
+  console.error(`עצירה: ביקשת --live אבל ${ENV_FILE} אינו המסד החי (${DB_URL}).`);
+  process.exit(2);
+}
+
 const EMAIL = process.env.SIM_EMAIL, PASSWORD = process.env.SIM_PASSWORD;
 if (!EMAIL || !PASSWORD) {
-  console.error('חסרים SIM_EMAIL ו-SIM_PASSWORD — משתמש אמיתי במערכת, כדי שהכתיבה תעבור דרך ההרשאות.');
+  console.error(
+    'חסרים SIM_EMAIL ו-SIM_PASSWORD — משתמש אמיתי במערכת, כדי שהכתיבה תעבור דרך ההרשאות.\n' +
+    'ב-PowerShell:  $env:SIM_EMAIL="sarah@reshetch.org.il"; $env:SIM_PASSWORD="..."'
+  );
   process.exit(2);
 }
 
@@ -180,7 +209,7 @@ const plans = rows.map(t => ({ t, plan: planFor(t) }));
 const todo  = plans.filter(x => !x.plan.skip).slice(0, LIMIT || undefined);
 const skips = plans.filter(x => x.plan.skip);
 
-console.log(`מסד: ${DB_URL}`);
+console.log(`מסד: ${DB_URL}  ${isProd ? '★ החי — המנהלות עובדות בו' : '(בדיקות)'}`);
 console.log(`חודש ${MONTH}${SCHOOL && SCHOOL !== true ? ` · ${SCHOOL}` : ''} · ${rows.length} שורות · ${todo.length} לסימולציה${DRY ? ' · יבש, בלי כתיבה' : ''}\n`);
 if (!todo.length) {
   for (const s of skips) console.log(`דילוג  ${s.t.name} — ${s.plan.skip}`);
