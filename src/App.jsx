@@ -2524,9 +2524,11 @@ function ReportMonth({ school, teachers, monthKey, due, onReport }) {
               </span>}
       </div>
       <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.6, marginBottom:10 }}>
-        העדרויות, מילוי מקום וחופשות לידה של החודש שהסתיים. {due?.report
-          ? `המועד האחרון ${String(due.report).split('-').reverse().join('/')} — דיווח שיגיע אחריו לא ייכנס לתשלום.`
+        העדרויות, מילוי מקום וחופשות לידה — ממלאים אותם במהלך החודש, כשהם קורים.
+        {due?.report
+          ? ` הדיווח נסגר ב-${String(due.report).split('-').reverse().join('/')}, ומה שיגיע אחריו לא ייכנס לתשלום.`
           : ''}
+        {' '}הכפתור למטה הוא ההכרזה שסיימת.
       </p>
 
       {changed.length > 0 && (
@@ -4458,6 +4460,54 @@ function NotificationsView() {
   );
 }
 
+/* ── בקשת טפסים מהמורות ────────────────────────────────────────
+   "לאחר אישור שלי תשלח לכל המורות הודעה על מילוי טפסים — 101, נתוני
+   העסקה, הסכם. רק מי שתשלח תקבל שכר בחודש הבא" (שרה, 1.9), ובלחיצה
+   ולא באוטומציה. לכן הכפתור כאן, ליד האישורים, ולא ב-cron.
+*/
+function FormsRequest({ teachers, monthKey }) {
+  const [busy, setBusy] = useState(false);
+  const [res,  setRes]  = useState(null);
+  const [err,  setErr]  = useState('');
+
+  const approved = teachers.filter(t => t._approved && !unpaidThisMonth(t) && t.name);
+  if (!approved.length) return null;
+
+  const send = async () => {
+    setBusy(true); setErr(''); setRes(null);
+    try { setRes(await store.requestTeacherForms(monthKey)); }
+    catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="apple-card" style={{ padding:'12px 14px', marginBottom:14 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+        <Send size={15} strokeWidth={2.3} color="var(--purple)" />
+        <div style={{ flex:'1 1 220px', minWidth:0 }}>
+          <p style={{ fontSize:14.4, fontWeight:700, color:'var(--text)' }}>בקשת טפסים מהמורות</p>
+          <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.6 }}>
+            טופס 101, נתוני העסקה והסכם — קישור אישי לכל אחת.
+            {` ${approved.length} מורות מאושרות החודש.`} רק מי שתשלים תקבל שכר בחודש הבא.
+          </p>
+        </div>
+        <button className="apple-btn apple-btn-blue" onClick={send} disabled={busy}
+          style={{ minHeight:38, padding:'0 16px', fontSize:14.4 }}>
+          {busy ? 'שולח…' : 'שליחה למורות'}
+        </button>
+      </div>
+      {err && <p style={{ fontSize:13.2, color:'var(--danger)', marginTop:8 }}>{err}</p>}
+      {res && (
+        <p style={{ fontSize:13.2, marginTop:8, color: res.queued ? 'var(--ok)' : 'var(--text3)', fontWeight:600 }}>
+          {res.queued ? `${res.queued} הודעות נשלחות` : 'לא נשלחו הודעות חדשות'}
+          {res.done ? ` · ${res.done} כבר השלימו` : ''}
+          {res.noPhone ? ` · ${res.noPhone} בלי נייד — לא ניתן לשלוח אליהן` : ''}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveScope,
                        activeMonth, userRole, userId }) {
   const isClerk = userRole === 'clerk';
@@ -4492,6 +4542,9 @@ function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveSco
           תלושים ומסמכים
         </button>
       </div>
+
+      {/* בקשת הטפסים מהמורות — פעולה של שרה אחרי האישור, לא אוטומציה */}
+      {canSetScope && <FormsRequest teachers={teachers} monthKey={activeMonth} />}
 
       {tab === 'scope' && canSetScope && <ScopePanel teachers={teachers} schools={schools} onSave={onSaveScope} />}
       {tab === 'entry' && <PayrollEntry teachers={rows} schools={schools} onSave={onSavePayroll} />}

@@ -622,3 +622,60 @@ export async function reportMonth(schoolId, monthKey) {
   raise(error, 'שליחת הדיווח נכשלה');
   return { late };
 }
+
+/* ── בקשת טפסים מהמורות ────────────────────────────────────────
+   נשלחת בלחיצה של שרה אחרי שהיא אישרה, ולא באוטומציה (הוראתה, 1.9).
+   ההודעה נכנסת לתור והיוצא נשלח משם — כך שגם לחיצה כפולה אינה מכפילה
+   הודעה, והכול מתועד במסך ההתראות.
+
+   הקישור אישי לכל מורה. מי שאין לה — נוצר לה כאן, אחרת ההודעה הייתה
+   מפנה אותה לשום מקום. מי שאין לה נייד נספרת ומדווחת, כי אין דרך
+   להגיע אליה והשתיקה הזאת חייבת להיראות.
+*/
+export async function requestTeacherForms(monthKey) {
+  const site = window.location.origin;
+
+  const { data: rows, error } = await supabase.from('teacher_months')
+    .select('id, name, tz_id, phone, leave_type')
+    .eq('month_key', monthKey).eq('approved', true);
+  raise(error, 'טעינת המורות נכשלה');
+  const approved = (rows || []).filter(r => r.name && r.leave_type !== 'unpaid');
+
+  const { data: ob } = await supabase.from('teacher_onboarding')
+    .select('id, tz_id, name, code, form101_signed_at');
+  const byKey = new Map((ob || []).map(o => [o.tz_id || o.name, o]));
+
+  const { data: already } = await supabase.from('notifications')
+    .select('teacher_id').eq('kind', 'teacher_forms').eq('month_key', monthKey);
+  const sent = new Set((already || []).map(n => n.teacher_id));
+
+  const queue = [];
+  let done = 0, noPhone = 0;
+  for (const t of approved) {
+    if (sent.has(t.id)) continue;
+    let rec = byKey.get(t.tz_id || t.name);
+    if (rec?.form101_signed_at) { done++; continue; }
+    if (!t.phone) { noPhone++; continue; }
+    if (!rec) {
+      const { data: made, error: e2 } = await supabase.from('teacher_onboarding')
+        .insert({ name: t.name, tz_id: t.tz_id, phone: t.phone, code: obCode() })
+        .select('code').single();
+      raise(e2, 'יצירת קישור אישי נכשלה');
+      rec = made;
+    }
+    if (!rec?.code) continue;
+    queue.push({
+      kind: 'teacher_forms', to_phone: t.phone, to_name: t.name,
+      month_key: monthKey, teacher_id: t.id,
+      body: `${t.name}, שלום.\n` +
+        `כדי שהשכר ייצא בחודש הבא צריך להשלים את הפרטים: טופס 101, נתוני העסקה והסכם.\n` +
+        `הכול בקישור אישי אחד, כמה דקות:\n${site}/?f=${rec.code}\n\n` +
+        `רק מי שתשלים תקבל שכר בחודש הבא.`,
+    });
+  }
+  if (queue.length) {
+    const { error: e3 } = await supabase.from('notifications').insert(queue);
+    raise(e3, 'הכנסת ההודעות לתור נכשלה');
+  }
+  return { queued: queue.length, done, noPhone, approved: approved.length };
+}
