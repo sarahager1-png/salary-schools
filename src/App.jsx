@@ -5581,12 +5581,21 @@ export default function App() {
     const old = teachers.find(x => x.id === t.id);
     let next = { ...t };
     if (old) {
+      /*
+        שינוי בנתון שמשפיע על השכר מחזיר את השורה לאישור — אבל אינו
+        מוחק עוד את הברוטו.
+
+        בעולם הסימולטור זה היה נכון: המספר חושב מהנתונים, ולכן שינוי
+        בהם פסל אותו. מעכשיו חשבת השכר מזינה את המספר ומכירה את התלוש,
+        וגם מתקנת ותק ודרגה בעצמה — מחיקת הברוטו שלה בגלל תיקון שהיא
+        עשתה הייתה מוחקת את עבודתה שלה.
+
+        האישור כן נופל: זו בדיוק "חריגה שקופצת לבדיקה".
+      */
       if (baseFieldsChanged(t, old)) {
-        next._officialGross    = null;
-        next._officialGrossPre = null;
-        next._changedAt        = now;
-        next._approved         = false;
-        next._netApproved      = false;
+        next._changedAt   = now;
+        next._approved    = false;
+        next._netApproved = false;
         if (!old._snapshot) next._snapshot = snapT(old);
       }
       // סימולציה שנמחקה אחרי האישור (עריכה מהירה של השליח) מחזירה את
