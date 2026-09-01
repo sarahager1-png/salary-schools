@@ -520,8 +520,8 @@ const simComplete = t => {
 
 // סטטוס מורה בזרימת העבודה:
 // needs_sim: מנהלת שמרה שינויים, ממתין לסימולציה אצל חשבת שכר
-// needs_approval: הסימולציות הושלמו, ממתין לאישור שליח
-// approved: השליח אישר
+// needs_approval: הנתונים הושלמו, ממתין לאישור שרה
+// approved: שרה אישרה
 const needsSim      = t => Boolean(!unpaidThisMonth(t) && t._changedAt && !t._approved && !simComplete(t));
 const needsApproval = t => Boolean(t._changedAt && !t._approved && simComplete(t));
 const isPending     = t => Boolean(t._changedAt && !t._approved); // = needsSim || needsApproval
@@ -966,7 +966,7 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
    APPROVAL VIEW (coordinator only)
 ═══════════════════════════════════════════════════════════════ */
 function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
-  // רק מורים שסימולציה הושלמה (יש שכר רשמי) → ממתינים לאישור שליח
+  // רק מורים שהנתונים הושלמו (יש שכר רשמי) → ממתינים לאישור שרה
   const readyToApprove = teachers.filter(needsApproval);
   // מורים עדיין ממתינים לסימולציה אצל חשבת שכר
   const waitingSim     = teachers.filter(needsSim);
@@ -3499,7 +3499,7 @@ function SchoolPositions({ school }) {
   const nis = v => (v > 0 ? Math.round(v).toLocaleString('he-IL') + ' ₪' : '—');
   const status = t => {
     if (needsSim(t))      return { label: 'ממתין לסימולציה', cls: 'badge-orange' };
-    if (needsApproval(t)) return { label: 'ממתין לאישור השליח', cls: 'badge-orange' };
+    if (needsApproval(t)) return { label: 'ממתין לאישור שרה', cls: 'badge-orange' };
     return { label: 'מאושר', cls: 'badge-green' };
   };
   const tot = ts.reduce((a, t) => {
