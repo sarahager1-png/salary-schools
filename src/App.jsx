@@ -5660,6 +5660,11 @@ function ContractDoc({ me, form, sigUrl }) {
   const Sec = ({ n, children }) => (
     <p style={{ fontSize:14.9, margin:'7px 0', lineHeight:1.65 }}><b>{n}.</b> {children}</p>
   );
+  // "חסר דגשים" (שרה, 3.9): הפרטים שמולאו אוטומטית מובלטים על רקע רך
+  const Hl = ({ dir, children }) => (
+    <b dir={dir} style={{ background:'#F3EEFB', color:'#4A3A8A', padding:'1px 7px',
+      borderRadius:6, fontWeight:800, boxDecorationBreak:'clone', WebkitBoxDecorationBreak:'clone' }}>{children}</b>
+  );
   const cell = { border:'1px solid #cbc3e3', padding:'5px 7px', textAlign:'center', fontSize:13.2 };
   const head = { ...cell, background:'#EDE8F8', fontWeight:700 };
   // במובייל הטבלאות גוללות בתוך עצמן — העמוד לעולם לא זז הצידה
@@ -5675,15 +5680,15 @@ function ContractDoc({ me, form, sigUrl }) {
       </p>
       <Sec n="1">שם המעביד: <b>רשת גני חב"ד</b> · אישיות משפטית: ע.ר. 58-0141-026 ·
         מען: ת.ד 271 כפר חב"ד (להלן — "המעסיק")<br/>
-        שם העובד/ת: <b>{me.name}</b> · מס' זהות: <b dir="ltr">{me.tz_id || form.tz || '____'}</b> ·
-        כתובת: <b>{[form.address, form.city].filter(Boolean).join(', ') || '____'}</b></Sec>
-      <Sec n="2">תאריך תחילת העבודה: <b>{CONTRACT_FROM}</b> ·
-        תקופת החוזה מיום <b>{CONTRACT_FROM}</b> עד יום <b>{CONTRACT_TO}</b><br/>
+        שם העובד/ת: <Hl>{me.name}</Hl> · מס' זהות: <Hl dir="ltr">{me.tz_id || form.tz || '____'}</Hl> ·
+        כתובת: <Hl>{[form.address, form.city].filter(Boolean).join(', ') || '____'}</Hl></Sec>
+      <Sec n="2">תאריך תחילת העבודה: <Hl>{CONTRACT_FROM}</Hl> ·
+        תקופת החוזה מיום <Hl>{CONTRACT_FROM}</Hl> עד יום <Hl>{CONTRACT_TO}</Hl><br/>
         סיבת קציבת תקופת העבודה: חוסר יציבות כלכלית</Sec>
-      <Sec n="3">תפקידו/ה העיקרי של העובד/ת: <b>{roleLabel}</b> · {me.school_name}</Sec>
+      <Sec n="3">תפקידו/ה העיקרי של העובד/ת: <Hl>{roleLabel}</Hl> · <Hl>{me.school_name}</Hl></Sec>
       <Sec n="4">הממונה הישיר/ה של העובד/ת: {isPrincipal
-        ? 'הנהלת הרשת'
-        : <b>מנהל/ת בית הספר{me.principal_name ? ` — ${me.principal_name}` : ''}</b>}</Sec>
+        ? <Hl>הנהלת הרשת</Hl>
+        : <Hl>מנהל/ת בית הספר{me.principal_name ? ` — ${me.principal_name}` : ''}</Hl>}</Sec>
       <Sec n="5">הבסיס שלפיו משולם השכר: משכורת חודשית</Sec>
       <Sec n="6">שכר עבודתו/ה של העובד/ת נקבע על פי דירוג, בהתאם לטופס נתוני ההעסקה
         <b> מפורטל עובדי הוראה של משרד החינוך</b>.</Sec>
@@ -5700,15 +5705,19 @@ function ContractDoc({ me, form, sigUrl }) {
         </tbody>
       </Twrap>
       <Sec n="7">אורכו של שבוע העבודה הרגיל של העובד/ת: {(() => {
-        if (isPrincipal) return <b>40 שעות</b>;
-        if (me.reform === 'ofek' && Number(me.frontal_hours) > 0) {
-          // "באופק חדש להוסיף כמה פרטני וכמה פרונטלי וסה"כ" (שרה, 3.9)
+        if (isPrincipal) return <Hl>40 שעות</Hl>;
+        const fh = Number(me.frontal_hours) || 0;
+        if (me.reform === 'ofek' && fh > 0) {
+          // הפירוט פרונטלי/פרטני/שהייה — רק לעובדות אופק (שרה, 3.9)
           const d = deriveHours({ reform: 'ofek', level: me.level, frontalHours: me.frontal_hours, scopePct: me.scope_pct, scope: me.scope_pct });
           const ind = d?.individual ?? 0;
           const pres = d?.presence ?? 0;
-          return <b>{me.frontal_hours} שעות פרונטליות + {ind} שעות פרטניות + {pres} שעות שהייה = {Number(me.frontal_hours) + ind + pres} שעות</b>;
+          return <Hl>{fh} שעות פרונטליות + {ind} שעות פרטניות + {pres} שעות שהייה = {fh + ind + pres} שעות</Hl>;
         }
-        return <b>{hours} שעות פרונטליות</b>;
+        // עולם ישן: פרונטליות בלבד; מחנכת — בתוספת 3 שעות חינוך
+        if (fh > 0 && (me.gamul_role || '').startsWith('homeroom'))
+          return <Hl>{fh} שעות פרונטליות + 3 שעות חינוך = {fh + 3} שעות</Hl>;
+        return <Hl>{hours} שעות פרונטליות</Hl>;
       })()}</Sec>
       <Sec n="8">תשלומים בעבור תנאים סוציאליים שהעובד/ת זכאי/ת להם:</Sec>
       <Twrap>
