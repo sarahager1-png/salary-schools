@@ -3918,10 +3918,17 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
 
   const rowFor = (t, paysSupp) => {
     if (isPrincipalRow(t)) {
-      // "למה אין תלוש למנהלים" (שרה, 3.9): יש. שכר קבוע — בסיס +
-      // תוספת בית חב"ד (4,700 מתוך השכר), 40 שעות שבועיות.
       const bd = payBreakdown(t);
       if (!bd.gross) return { skip: 'אין עדיין שכר מנהלת' };
+      // עולם ישן אמיתי כשחושב במחשבון (דרגה+ותק+גמול ניהול, 3.9);
+      // עד אז — הפירוק הקבוע (בסיס + 4,700)
+      const sl = lines[t.id];
+      if (sl?.gross) {
+        const supp = Math.max(0, bd.gross - sl.gross);
+        return { darga: '—', vetek: t.seniority ?? '—', pct: 100, hours: 40,
+          kita: false, base: sl.gross, supp, gross: bd.gross,
+          paysSupp: supp > 0, principal: true, principalCalc: true };
+      }
       return { darga: '—', vetek: t.seniority ?? '—', pct: 100, hours: 40,
         kita: false, base: bd.base, supp: bd.supplement, gross: bd.gross,
         paysSupp: bd.supplement > 0, principal: true };
@@ -4058,7 +4065,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                 <p style={{ fontSize:15.5, fontWeight:600 }}>{t.name}</p>
                 {r.principal ? (
                   <p style={{ fontSize:13.8, color:'var(--text2)', fontWeight:600 }}>
-                    מנהל/ת בית ספר · 40 שעות שבועיות · משרה מלאה
+                    מנהל/ת בית ספר · 40 שעות שבועיות · משרה מלאה{r.principalCalc ? ' · עולם ישן + גמול ניהול' : ''}
                   </p>
                 ) : (<>
                 <p style={{ fontSize:13.8, color:'var(--text2)', fontWeight:600 }}>
@@ -4079,7 +4086,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                   <th style={{ textAlign:'left', padding:'3px 4px' }}>סכום</th>
                 </tr></thead>
                 <tbody>
-                  {r.principal && (
+                  {r.principal && !r.principalCalc && (
                     <tr style={{ borderBottom:'1px solid var(--line)' }}>
                       <td style={{ padding:'4px', color:'var(--text3)', fontSize:13.2 }}></td>
                       <td style={{ padding:'4px' }}>שכר מנהל/ת בית ספר</td>
@@ -4093,7 +4100,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                       <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(ln.amount).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
-                  {!r.principal && (
+                  {(!r.principal || r.principalCalc) && (
                   <tr style={{ borderBottom:'1px solid var(--line)', fontWeight:700 }}>
                     <td style={{ padding:'4px' }}></td>
                     <td style={{ padding:'4px' }}>סה"כ עולם ישן</td>

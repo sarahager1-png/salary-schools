@@ -104,9 +104,30 @@ export function formFields(t) {
   };
 }
 
+/*
+  "למנהלים תעשה חישוב תלוש לפי עולם ישן עם תוספת בית חב"ד" (שרה, 3.9):
+  מנהל/ת בעולם הישן = בסיס לפי דרגה+ותק ב-100% + גמול ניהול (תפקיד
+  "מנהל", ותק ניהול = ותק בהוראה — הכרעת שרה, מספר כיתות מהתקציב).
+  התוספת = הברוטו בפועל פחות התוצאה כאן — כמו אצל המורות.
+*/
+export const PRINCIPAL_CLASSES = {
+  'בית חינוך עפולה': 5, 'בית חינוך רעננה': 10, 'שלהבות אור עקיבא': 4,
+  'שלהבות אשקלון': 5, 'שלהבות גני תקוה': 9, 'שלהבות ירושלים': 4,
+  'שלהבות מזכרת בתיה': 3, 'שלהבות רמת ישי': 4,
+};
+export function principalPlanFor(t, schoolName) {
+  const classes = PRINCIPAL_CLASSES[schoolName];
+  if (!classes) return { skip: `אין מספר כיתות ל"${schoolName}"` };
+  const darga = dargaFor(t);
+  if (!darga) return { skip: `דרגה לא ממופה (${t.degree})` };
+  const vetek = String(Math.max(1, Math.min(40, Number(t.seniority) || 1)));
+  return { calc: 'old', darga, vetek, pct: '100', kita: null,
+    nihul: { vetek, classes: String(classes) }, field: targetField() };
+}
+
 /** התכנון המלא של המרַיץ — כולל מי מדולגת ולמה. */
 export function planFor(t) {
-  if (t.gamul_role === 'principal') return { skip: 'מנהלת — מחשבון ניהול, לא כאן' };
+  if (t.gamul_role === 'principal') return { skip: 'מנהלת — מסלול נפרד (principalPlanFor)' };
   if (t.leave_type === 'unpaid')    return { skip: 'חל"ת — אין שכר' };
   // "מי שעדיין עם 0 שעות נחכה לעדכון המנהלות" (שרה, 1.9) — לא מריצים
   // ולא ממלאים שורה בלי שעות; היא עוד לא דווחה באמת.
@@ -193,6 +214,34 @@ const pickGmul = async (p, label, { expectOff = false } = {}) => {
     if (chips.includes(label) !== expectOff) return;
   }
   throw new Error(`הגמול "${label}" לא ${expectOff ? 'ירד מהבורר' : 'נקלט בבורר'} גם אחרי שלושה ניסיונות`);
+};
+
+/* צ'יפ "גמול ניהול" במולטיסלקט "ניהול או ייעוץ" של העולם הישן —
+   האמת היחידה שהמודל קיבל את הגמול (אותו כלל כמו chipOn באופק). */
+const pickNihulChip = async (p) => {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const done = await p.evaluate(async () => {
+      const mss = [...document.querySelectorAll('.k-multiselect')];
+      const ms = mss.find(m => (m.closest('.form-group, .row, div')?.innerText || '').includes('ניהול או ייעוץ'));
+      if (!ms) return 'אין מולטיסלקט';
+      if (ms.innerText.includes('גמול ניהול')) return 'on';
+      const inp = ms.querySelector('input.k-input, .k-multiselect-wrap');
+      inp.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      inp.click?.();
+      await new Promise(r => setTimeout(r, 1000));
+      const c = [...document.querySelectorAll('.k-animation-container')].find(x => x.innerText.includes('גמול ניהול'));
+      if (!c) return 'רשימה לא נפתחה';
+      const item = [...c.querySelectorAll('li,[role=option]')].find(x => x.innerText.trim() === 'גמול ניהול');
+      if (!item) return 'אין פריט';
+      item.click();
+      await new Promise(r => setTimeout(r, 1200));
+      return ms.innerText.includes('גמול ניהול') ? 'on' : 'צ׳יפ לא נדלק';
+    });
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(600);
+    if (done === 'on') return;
+    if (attempt === 3) throw new Error(`גמול ניהול לא נקלט בבורר: ${done}`);
+  }
 };
 
 // שדה החודש הוא בורר Kendo עם מזהה אקראי בכל טעינה — מאותר לפי הערך
@@ -349,12 +398,29 @@ export const runOne = async (p, plan, monthKey, attempt = 1) => {
   // כיתת חינוך נקבעת רק כשיש — בחירת ריק אינה מלכלכת את המודל, ובדף
   // נקי (טעינה מלאה לכל שורה) אין שריד לנקות
   if (plan.kita) await bindSelect(p, 'select[name="KITAT_CHINUCH"]', plan.kita);
+  if (plan.nihul) {
+    /*
+      מנהל/ת: כמו הגמולים באופק, הרדיו בטופס הוא תפאורה — המודל מציית
+      רק לצ'יפ במולטיסלקט "ניהול או ייעוץ" (נמדד 3.9: מילוי כל השדות
+      עם הרדיו לא שינה את התוצאה באגורה; דרך הצ'יפ — גמול ניהול 1,541
+      ברכיבים). אחרי הצ'יפ: תפקיד=מנהל, ותק ניהול, כיתות ביסודי.
+    */
+    await pickNihulChip(p);
+    await bindSelect(p, 'select[name="KOD_TAFKID_1"]', '1');
+    await bindSelect(p, 'select[name="VETEK_NIHUL"]', plan.nihul.vetek);
+    await typePct(p, 'input[name="MIS_KITOT_YESODI"]', plan.nihul.classes);
+  }
   await p.waitForTimeout(400);
   await p.locator('.btnCalc').first().click();
   await p.waitForTimeout(4500);
   const res = await readResults(p);
   const g = res.match(/סך הכל ברוטו כללי ([\d,]+\.?\d*)/);
   const gross = g ? Math.round(Number(g[1].replace(/,/g, ''))) : null;
+  if (plan.nihul && gross != null && !/ניהול/.test(res)) {
+    // אותה מלכודת כמו גמול החינוך באופק: ערך מוצג אך לא נקלט במודל.
+    if (attempt < 3) return runOne(p, plan, monthKey, attempt + 1);
+    throw new Error('גמול ניהול נשלח אבל אינו ברכיבי התוצאה — פעמיים · ' + res.slice(0, 220));
+  }
   /*
     בעולם הישן אין לְמה להשוות רכיבים: גמול החינוך מובלע בשורות
     המשולבות (נמדד: יוכבד דובקין 7,666.1 — תואמת בדיוק, ואין 'חינוך'
