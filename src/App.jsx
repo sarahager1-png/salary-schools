@@ -6913,7 +6913,9 @@ export default function App() {
       )}
 
       <div className="flex-1">
-        {isClerk ? (
+        {/* לחשבת יש כפתורי תלושים/התראות בניווט, אבל הענף הזה רונדר תמיד
+            לפניהם — הכפתורים היו מתים (ממצא QA, 3.9). עכשיו הם עוברים. */}
+        {isClerk && view !== 'slips' && view !== 'alerts' ? (
           <PayrollDesk
             teachers={teachers}
             schools={schools}
