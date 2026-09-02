@@ -692,13 +692,14 @@ export async function requestTeacherForms(monthKey) {
    והמסך כלל אינו מוצג לו. תקציב וייעול שנתיים, בהקלדה ידנית. */
 export async function loadFinance() {
   const { data, error } = await supabase.from('school_finance')
-    .select('school_id, ministry_budget, yieul, teaching_sim, note, src, updated_at');
+    .select('school_id, ministry_budget, yieul, teaching_sim, network_support, note, src, updated_at');
   raise(error, 'טעינת נתוני התקציב נכשלה');
   return (data || []).map(r => ({
     schoolId: r.school_id,
     ministryBudget: r.ministry_budget == null ? null : Number(r.ministry_budget),
     yieul: r.yieul == null ? null : Number(r.yieul),
     teachingSim: r.teaching_sim == null ? null : Number(r.teaching_sim),
+    networkSupport: r.network_support == null ? null : Number(r.network_support),
     src: r.src || {},
     note: r.note,
     updatedAt: r.updated_at,
@@ -711,6 +712,7 @@ export async function saveFinance(schoolId, f) {
     ministry_budget: f.ministryBudget ?? null,
     yieul: f.yieul ?? null,
     teaching_sim: f.teachingSim ?? null,
+    network_support: f.networkSupport ?? null,
     src: f.src ?? {},
     note: f.note ?? null,
     updated_at: new Date().toISOString(),

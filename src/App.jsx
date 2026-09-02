@@ -3484,8 +3484,10 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const f = fin?.[sc.id] || {};
     const monthly = monthlyCost(sc.id);
     const annual  = monthly * 12;
+    // "תוסיף השתתפות רשת מרינה" (שרה, 3.9) — מצטרפת ליתרה בחיוב,
+    // כמו בנוסחת דף הפגישה: משרד − ייעול − שכר + השתתפות
     const left = (f.ministryBudget != null || f.yieul != null)
-      ? (f.ministryBudget || 0) - (f.yieul || 0) - annual
+      ? (f.ministryBudget || 0) - (f.yieul || 0) - annual + (f.networkSupport || 0)
       : null;
     /*
       "עשיתי סימולציית שכר לפני הסימולציה האמיתית — חשוב לי לדעת מה
@@ -3504,7 +3506,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     left: a.left + (r.left || 0),
     sim: a.sim + (r.f.teachingSim || 0),
     simGap: a.simGap + (r.simGap || 0),
-  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, left: 0, sim: 0, simGap: 0 });
+    support: a.support + (r.f.networkSupport || 0),
+  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, left: 0, sim: 0, simGap: 0, support: 0 });
 
   const TH = ({ children }) => (
     <th style={{ padding:'10px 8px', fontSize:13.8, fontWeight:700, color:'var(--text2)',
@@ -3562,12 +3565,13 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <TH>עלות שכר · שנה</TH>
               <TH>הסימולציה שלך · שנתי</TH>
               <TH>פער סימולציה מול בפועל</TH>
+              <TH>השתתפות רשת · רינה</TH>
               <TH>יתרה לאחר שכר</TH>
             </tr>
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={8} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+              <tr><td colSpan={9} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
             ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
@@ -3581,6 +3585,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   title="הסימולציה שלך פחות העלות בפועל · חיובי = זול מהמתוכנן">
                   {simGap == null ? '—' : (simGap > 0 ? '+' : '') + money(simGap).replace('₪', '₪')}
                 </td>
+                <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'networkSupport', f.networkSupport)}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
                   {left == null ? '—' : money(left)}
@@ -3599,6 +3604,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.sim)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800,
                   color: tot.simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{(tot.simGap > 0 ? '+' : '') + money(tot.simGap)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.support)}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(tot.left)}</td>
               </tr>
