@@ -114,7 +114,11 @@ const FIELDS = [
   { key:'frontalHours',    label:'שעות פרונטלי',   base:true,  tracked:true },
   { key:'scope',           label:'% משרה',         base:true,  tracked:false, fmt: v => `${v}%` },
   // משפיע על השכר בעולם ישן בלבד — באופק אין לו ביטוי בשכר
-  { key:'childrenUnder18', label:'ילדים עד 18',    base: t => t.reform === 'pre', tracked:true },
+  // מין וילדים קובעים את תוספת האם בתלוש (24 שעות לאם = 90%) — בכל
+  // המסלולים, כי התלוש נבנה בעולם ישן גם למורת אופק (שרה, 3.9)
+  { key:'childrenUnder18', label:'ילדים עד 18',    base: true, tracked:true },
+  { key:'gender',          label:'מין',            base: true, tracked:true,
+    fmt: v => (v === 'f' ? 'נקבה' : v === 'm' ? 'זכר' : '—') },
   { key:'leaveType',       label:'סטטוס',          base:true,  tracked:true,  fmt: v => leaveLabel(v) },
   { key:'leaveFrom',       label:'יציאה לחופשה',   base:true,  tracked:true,  fmt: v => fmtDay(v) },
   { key:'leaveTo',         label:'חזרה מחופשה',    base:true,  tracked:true,  fmt: v => fmtDay(v) },
@@ -3617,7 +3621,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
    התלוש הנגזרים מהשעות, והסה"כ — שהוא בדיוק השכר המאומת. הכול חי
    מהנתונים; שינוי במערכת משתקף כאן מיד. כפתור הדפסה בכל בית ספר.
 ═══════════════════════════════════════════════════════════════ */
-function SlipsView({ schools, teachers, monthKey, fmtMonthFn }) {
+function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
   const money = v => (v == null ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
   /*
     "לא רואים את התלוש רק עלויות" (שרה, 3.9): שורות הרכיבים המלאות —
@@ -3689,6 +3693,8 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn }) {
                   <th>שם</th>
                   <th style={{ textAlign:'center' }}>דרגה</th>
                   <th style={{ textAlign:'center' }}>ותק</th>
+                  <th style={{ textAlign:'center' }} title="קובע את תוספת האם: 24 שעות לאם = 90%">מין</th>
+                  <th style={{ textAlign:'center' }}>ילדים עד 18</th>
                   <th style={{ textAlign:'center' }}>שעות לתלוש</th>
                   <th style={{ textAlign:'center' }}>אחוז</th>
                   <th style={{ textAlign:'center' }}>גמול חינוך</th>
@@ -3700,7 +3706,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn }) {
                   {rows.map(({ t, r }) => r.skip ? (
                     <tr key={t.id} style={{ color:'var(--text3)' }}>
                       <td style={{ fontWeight:600 }}>{t.name}</td>
-                      <td colSpan={8} style={{ fontSize:13.8 }}>{r.skip}</td>
+                      <td colSpan={10} style={{ fontSize:13.8 }}>{r.skip}</td>
                     </tr>
                   ) : (
                     <tr key={t.id} onClick={() => lines[t.id] && setOpenSlip({ t, r })}
@@ -3709,6 +3715,29 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn }) {
                       <td style={{ fontWeight:600 }}>{t.name}{lines[t.id] && <FileText size={12} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-1px', marginInlineStart:5, color:'var(--purple)' }} />}</td>
                       <td style={{ textAlign:'center' }}>{r.darga || '—'}</td>
                       <td style={{ textAlign:'center' }}>{r.vetek}</td>
+                      <td style={{ textAlign:'center' }} onClick={e => e.stopPropagation()}>
+                        {onSaveTeacher ? (
+                          <select className="apple-select" value={t.gender || ''}
+                            onChange={e => onSaveTeacher({ ...t, gender: e.target.value || null })}
+                            style={{ fontSize:13.8, padding:'3px 6px', minWidth:64,
+                              background: t.gender ? undefined : 'var(--warn-bg, #FFF6E5)' }}>
+                            <option value="">—</option>
+                            <option value="f">נקבה</option>
+                            <option value="m">זכר</option>
+                          </select>
+                        ) : (t.gender === 'f' ? 'נקבה' : t.gender === 'm' ? 'זכר' : '—')}
+                      </td>
+                      <td style={{ textAlign:'center' }} onClick={e => e.stopPropagation()}>
+                        {onSaveTeacher ? (
+                          <input type="number" min="0" dir="ltr" className="apple-input" inputMode="numeric"
+                            key={`slip-kids-${t.id}-${t.childrenUnder18 ?? ''}`}
+                            defaultValue={t.childrenUnder18 ?? ''}
+                            placeholder="—"
+                            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                            onBlur={e => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (t.childrenUnder18 ?? null)) onSaveTeacher({ ...t, childrenUnder18: v }); }}
+                            style={{ width:52, textAlign:'center', fontSize:14.4, padding:'3px 5px' }} />
+                        ) : (t.childrenUnder18 ?? '—')}
+                      </td>
                       <td style={{ textAlign:'center' }}>{r.hours}</td>
                       <td style={{ textAlign:'center', fontWeight:600 }}>{r.pct}%</td>
                       <td style={{ textAlign:'center' }}>{r.kita ? '✓' : ''}</td>
@@ -3719,7 +3748,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn }) {
                   ))}
                 </tbody>
                 <tfoot><tr style={{ background:'var(--apple-fill)', fontWeight:800 }}>
-                  <td colSpan={6}>סה"כ {sc.name}</td>
+                  <td colSpan={8}>סה"כ {sc.name}</td>
                   <td style={{ textAlign:'center' }}>{money(tot.base)}</td>
                   <td style={{ textAlign:'center' }}>{money(tot.supp)}</td>
                   <td style={{ textAlign:'center' }}>{money(tot.gross)}</td>
@@ -6496,7 +6525,7 @@ export default function App() {
         ) : view === 'finance' && user.role === 'coordinator' ? (
           <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} />
         ) : view === 'slips' ? (
-          <SlipsView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} />
+          <SlipsView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} onSaveTeacher={user.role === 'coordinator' ? onSaveTeacher : null} />
         ) : view === 'school' && activeSchool ? (
           <SchoolView userId={user.id}
             school={activeSchool}
