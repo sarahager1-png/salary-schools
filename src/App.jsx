@@ -3216,7 +3216,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   ביציאה מהשדה, דרך אותו onSaveTeacher של מסך בית הספר — אותה זרימה,
   אותם אישורים, בלי מסלול צדדי. ההרשאות ממילא נאכפות במסד.
 */
-function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute }) {
+function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute, onDelete }) {
   const ts = [...(school.ts || [])].sort((a, b) => calcEmployer(b).total - calcEmployer(a).total);
   const nis = v => (v > 0 ? Math.round(v).toLocaleString('he-IL') + ' ₪' : '—');
   const status = t => {
@@ -3352,6 +3352,14 @@ function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute
                           <Calculator size={13} strokeWidth={2.2} />חשב
                         </button>
                       )
+                    )}
+                    {/* "תן אפשרות מחיקה" (שרה, 3.9) — עם שם מלא באישור, שלא תימחק שכנה */}
+                    {onDelete && (
+                      <button className="apple-btn apple-btn-ghost" title="מחיקת השורה"
+                        onClick={() => { if (window.confirm(`למחוק את ${t.name}?`)) onDelete(t.id); }}
+                        style={{ padding:'3px 8px', minHeight:30, marginInlineStart:6, color:'var(--danger)' }}>
+                        <Trash2 size={13} strokeWidth={2.2} />
+                      </button>
                     )}
                   </td>
                 </tr>
@@ -3599,7 +3607,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   );
 }
 
-function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onCompute }) {
+function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onCompute, onDelete }) {
   // לחיצה על שורת בית ספר פותחת את פירוט המשרות שלו. פתוח אחד בכל רגע —
   // הדוח נועד להשוואה בין בתי ספר, לא לקריאה של כולם במקביל.
   const [openSchool, setOpenSchool] = useState(null);
@@ -3737,7 +3745,7 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
                 {openSchool === r.id && (
                   <tr>
                     <td colSpan={8} style={{ padding:0, background:'var(--bg)' }}>
-                      <SchoolPositions onSaveTeacher={onSaveTeacher} onApprove={onApprove} simState={simState} onCompute={onCompute} school={r} />
+                      <SchoolPositions onSaveTeacher={onSaveTeacher} onApprove={onApprove} simState={simState} onCompute={onCompute} onDelete={onDelete} school={r} />
                     </td>
                   </tr>
                 )}
@@ -6034,6 +6042,18 @@ export default function App() {
         next._approved    = false;
         next._netApproved = false;
         if (!old._snapshot) next._snapshot = snapT(old);
+        /*
+          "חושב לא נכון — מייד עלה לאישור וחושב מחדש" (שרה, 3.9):
+          שינוי נתון שכר לא רק מפיל את האישור — הוא שולח מעצמו בקשת
+          חישוב לתור. המספר הטרי נכנס לברוטו, והשורה ממתינה לאישורה.
+          נשלח רק כשיש מה להריץ: לא מנהלת, לא בחופשה, יש שעות.
+        */
+        if (user?.role === 'coordinator' && t.id && !isPrincipalRow(next)
+            && (next.leaveType ?? 'none') === 'none' && Number(next.frontalHours) > 0) {
+          store.requestSim(t.id)
+            .then(() => setSimState(m => ({ ...m, [t.id]: 'pending' })))
+            .catch(() => { /* התור לא זמין — הכפתור הידני עדיין שם */ });
+        }
       }
       // סימולציה שנמחקה אחרי האישור (עריכה מהירה של השליח) מחזירה את
       // השורה לתור — אחרת היא הגיעה לאישור רשתי עם בסיס 0.
@@ -6269,7 +6289,7 @@ export default function App() {
         ) : view === 'alerts' ? (
           <NotificationsView />
         ) : view === 'report' ? (
-          <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} onApprove={onApproveTeacher} simState={simState} onCompute={onCompute} />
+          <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} onApprove={onApproveTeacher} simState={simState} onCompute={onCompute} onDelete={onDeleteTeacher} />
         ) : view === 'finance' && user.role === 'coordinator' ? (
           <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} />
         ) : view === 'school' && activeSchool ? (
