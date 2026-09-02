@@ -739,6 +739,11 @@ export async function fetchHubBudget() {
    (sim-watcher) מריץ את מחשבון משרד החינוך וכותב את התוצאה לבקשה;
    הדפדפן של שרה קורא אותה, שומר את השכר בהרשאות שלה, ומוחק. */
 export async function requestSim(teacherMonthId) {
+  // בקשה ממתינה על אותה שורה כבר תרוץ על הנתונים העדכניים — אין
+  // טעם לערום עוד אחת; עריכות מהירות ברצף היו ממלאות את התור.
+  const { data: open } = await supabase.from('sim_requests')
+    .select('id').eq('teacher_month_id', teacherMonthId).in('status', ['pending', 'running']).limit(1);
+  if (open?.length) return;
   const { data: session } = await supabase.auth.getUser();
   const { error } = await supabase.from('sim_requests')
     .insert({ teacher_month_id: teacherMonthId, requested_by: session?.user?.id ?? null });
