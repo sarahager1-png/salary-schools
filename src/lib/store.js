@@ -713,3 +713,15 @@ export async function saveFinance(schoolId, f) {
   });
   raise(error, 'שמירת נתוני התקציב נכשלה');
 }
+
+/* משיכת תקציב וייעול ממבט-רשת — דרך שרת הביניים של המערכת, שמחזיק
+   את קוד הגישה ומוודא שהמבקשת היא שרה. */
+export async function fetchHubBudget() {
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error('פג תוקף ההתחברות — התחברי מחדש');
+  const r = await fetch('/api/hub-budget', { headers: { authorization: `Bearer ${token}` } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `מבט-רשת: שגיאה ${r.status}`);
+  return j.schools || [];
+}

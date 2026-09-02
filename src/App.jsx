@@ -3669,6 +3669,36 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   const [fin, setFin]     = useState(null);   // null: עוד נטען
   const [err, setErr]     = useState('');
   const [flash, setFlash] = useState(0);
+  const [pulling, setPulling] = useState(false);
+
+  /*
+    משיכה ממבט-רשת: "מערכות תקציב מבט רשת נותנות הכנסות שכר" (שרה,
+    2.9). ההתאמה לפי שם מנורמל; מה שלא נמצא — נשאר להקלדה. ערך שכבר
+    הוקלד ידנית אינו נדרס — המשיכה ממלאת רק תאים ריקים, כדי שהחלטה
+    ידנית של שרה לא תוחלף בשקט במספר של מערכת אחרת.
+  */
+  const norm = (n) => String(n || '').replace(/["'\u05f4\u05f3־-]/g, '').replace(/\s+/g, ' ').trim();
+  const pullFromHub = async () => {
+    setPulling(true); setErr('');
+    try {
+      const hub = await store.fetchHubBudget();
+      const byName = new Map(hub.map(h => [norm(h.name), h]));
+      let filled = 0, skippedManual = 0; const misses = [];
+      for (const sc of schools) {
+        const h = byName.get(norm(sc.name));
+        if (!h) { misses.push(sc.name); continue; }
+        const cur = fin?.[sc.id] || {};
+        const patch = {};
+        if (cur.ministryBudget == null && h.ministry > 0) patch.ministryBudget = h.ministry;
+        else if (cur.ministryBudget != null) skippedManual++;
+        if (cur.yieul == null && h.yieul != null) patch.yieul = h.yieul;
+        if (Object.keys(patch).length) { await save(sc.id, patch); filled++; }
+      }
+      setErr(misses.length ? `לא נמצאו במבט-רשת: ${misses.join(', ')}` : '');
+      setFlash(Date.now());
+    } catch (e) { setErr(e.message); }
+    finally { setPulling(false); }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -3740,6 +3770,12 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         {flash > 0 && Date.now() - flash < 4000 && (
           <span style={{ fontSize:13.8, color:'var(--ok, #2e7d32)', fontWeight:700 }}>נשמר ✓</span>
         )}
+        <button className="apple-btn apple-btn-ghost" onClick={pullFromHub} disabled={pulling}
+          title="הכנסות משרד החינוך והייעול שנבחר, מתוך מבט-רשת. ממלא רק תאים ריקים."
+          style={{ marginInlineStart:'auto', fontSize:14.5 }}>
+          <Download size={14} strokeWidth={2.2} />
+          {pulling ? 'מושך ממבט-רשת…' : 'משיכה ממבט-רשת'}
+        </button>
       </div>
       <p style={{ fontSize:15.5, color:'var(--text2)', marginBottom:16, lineHeight:1.55 }}>
         תקציב הכנסות משרד החינוך פחות ייעול פחות עלות השכר. התקציב והייעול שנתיים ומוקלדים כאן;
