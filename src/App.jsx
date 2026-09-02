@@ -3805,63 +3805,6 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           </div>
         );
       })()}
-      <h2 className="section-head">תקציב נוסף</h2>
-      <p className="section-sub">הכנסות מול הוצאות ללא עלות הוראה ומשרד החינוך.</p>
-      {fin !== null && rows.map(({ sc, f }) => {
-        const d = f.detail;
-        if (!d && f.incomeTotal == null) return null;
-        const incLines = mergeLines(d?.income);
-        const expLines = mergeLines(d?.expenses);
-        const incSum = incLines.reduce((a, x) => a + x.amount, 0) || (f.incomeTotal || 0);
-        const expSum = expLines.reduce((a, x) => a + x.amount, 0) || (f.expensesOther || 0);
-        const diff = incSum - expSum;
-        const line = (x, k) => (
-          <div key={k} style={{ display:'flex', justifyContent:'space-between', gap:10,
-            padding:'4px 0', borderBottom:'1px dashed var(--line)', fontSize:14.9 }}>
-            <span>{x.name}</span><b style={{ whiteSpace:'nowrap' }}>{money(per(x.amount))}</b>
-          </div>
-        );
-        const isOpen = !!openInc[sc.id];
-        return (
-          <div key={sc.id} className="apple-card" style={{ padding:'12px 18px', marginBottom:10, cursor:'pointer' }}
-            onClick={() => setOpenInc(m => ({ ...m, [sc.id]: !m[sc.id] }))}>
-            <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-              {isOpen ? <ChevronLeft size={16} strokeWidth={2.4} style={{ transform:'rotate(-90deg)', color:'var(--text3)' }} />
-                      : <ChevronLeft size={16} strokeWidth={2.4} style={{ color:'var(--text3)' }} />}
-              <p style={{ fontSize:16.7, fontWeight:800 }}>{sc.name}</p>
-              <span style={{ fontSize:13.8, color:'var(--text3)' }}>
-                הכנסות {money(per(incSum))} · הוצאות {money(per(expSum))}
-              </span>
-              <span style={{ fontSize:15.5, fontWeight:800, marginInlineStart:'auto',
-                color: diff < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
-                הפרש: {money(per(diff))}
-              </span>
-            </div>
-            {isOpen && (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:18, marginTop:10 }}>
-              <div>
-                <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text2)', marginBottom:4 }}>הכנסות (ללא משרד החינוך)</p>
-                {incLines.map(line)}
-                <div style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', fontSize:14.9, fontWeight:800 }}>
-                  <span>סה"כ הכנסות</span><span>{money(per(incSum))}</span>
-                </div>
-              </div>
-              <div>
-                <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text2)', marginBottom:4 }}>הוצאות (ללא שכר הוראה)</p>
-                {expLines.map(line)}
-                <div style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', fontSize:14.9, fontWeight:800 }}>
-                  <span>סה"כ הוצאות</span><span>{money(per(expSum))}</span>
-                </div>
-              </div>
-            </div>
-            )}
-          </div>
-        );
-      })}
-      <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:8 }}>
-        מהתקציב במבט-רשת: מענק, שכ"ל/תל"ן ומקורות נוספים — מול כל ההוצאות מלבד שכר הוראה,
-        מנהלת וייעוץ (משרד החינוך ושכר ההוראה חיים בטבלה העליונה). מתרענן במשיכה.
-      </p>
     </div>
   );
 }
