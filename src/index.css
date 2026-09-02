@@ -576,7 +576,14 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .nav-scroll::-webkit-scrollbar { display: none; }
 
 @media (max-width: 640px) {
-  .apple-table input, .apple-table select { min-height: 38px; font-size: 16px; }
+  /* !important בכוונה: השדות בתאים נושאים fontSize ידני (13.8–14.9)
+     שגובר על stylesheet, ו-iOS עושה זום-קפיצה על כל שדה מתחת ל-16px.
+     כלל הנגישות כאן חזק מהעיצוב הנקודתי. */
+  .apple-table input, .apple-table select { min-height: 38px; font-size: 16px !important; }
   .apple-table button[title] { min-width: 40px; min-height: 38px; }
-  .pb-safe-bottom { padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
 }
+
+/* מחוץ למדיה — הריפוד הידני (40px) על ה-main גובר על הכלל, ולכן
+   הכלל דורס אותו בפירוש: בדסקטופ env=0 והתוצאה זהה (40px), ובאייפון
+   עם home-indicator נוספים ~34px כדי שהכפתור האחרון לא ייגע בפס. */
+.pb-safe-bottom { padding-bottom: calc(40px + env(safe-area-inset-bottom)) !important; }

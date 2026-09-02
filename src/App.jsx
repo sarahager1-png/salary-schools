@@ -3628,7 +3628,7 @@ function SchoolPositions({ school, onSaveTeacher }) {
                     {onSaveTeacher ? (
                       <select className="apple-select" value={t.role || 'none'}
                         onChange={e => onSaveTeacher({ ...t, role: e.target.value })}
-                        style={{ fontSize:13.8, padding:'3px 7px', maxWidth:150, minWidth:86 }}>
+                        style={{ fontSize:13.8, padding:'3px 7px', maxWidth:150, minWidth:96 }}>
                         {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
                       </select>
                     ) : (t.role && t.role !== 'none' ? (ROLES.find(x => x.id === t.role)?.label.split('(')[0].trim() || '—') : '—')}
@@ -3637,7 +3637,7 @@ function SchoolPositions({ school, onSaveTeacher }) {
                     {onSaveTeacher ? (
                       <select className="apple-select" value={t.reform}
                         onChange={e => onSaveTeacher({ ...t, reform: e.target.value })}
-                        style={{ fontSize:13.8, padding:'3px 7px' }}>
+                        style={{ fontSize:13.8, padding:'3px 7px', minWidth:86 }}>
                         {REFORMS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                       </select>
                     ) : reformLabel(t.reform)}
@@ -4212,7 +4212,9 @@ function FillProgress({ schools, month, onOpenSchool }) {
 }
 
 function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, userId, title }) {
-  const [docs, setDocs] = useState([]);
+  // null = עוד לא נטען. "אין עדיין מסמכים" בזמן טעינה הוא מצב-ריק
+  // שקרי — מהסוג שכבר שיקר פעם בפורטל (הבודקת, 2.9).
+  const [docs, setDocs] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err,  setErr]  = useState('');
   const [note, setNote] = useState('');
@@ -4259,7 +4261,7 @@ function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, use
         <p style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--text)' }}>
           {title || `מסמכים מהנהלת החשבונות — ${fmtMonth(monthKey)}`}
         </p>
-        {docs.length > 0 && <span className="apple-badge badge-purple" style={{ fontSize: 12.1, padding: '2px 8px' }}>{docs.length}</span>}
+        {(docs?.length ?? 0) > 0 && <span className="apple-badge badge-purple" style={{ fontSize: 12.1, padding: '2px 8px' }}>{docs.length}</span>}
       </div>
       <p style={{ fontSize: 13.2, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.6 }}>
         דוח השכר, סיכום עלות מעביד או כל קובץ שיצא ממערכת השכר. גלוי לרשת, לחשבת השכר ולמאשרות — לא למנהלות.
@@ -4285,7 +4287,9 @@ function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, use
       )}
       {err && <p style={{ fontSize: 13.8, color: 'var(--danger)', marginBottom: 8 }}>{err}</p>}
 
-      {docs.length === 0 ? (
+      {docs === null ? (
+        <p style={{ fontSize: 15.5, color: 'var(--text3)' }}>טוען…</p>
+      ) : docs.length === 0 ? (
         <p style={{ fontSize: 14.4, color: 'var(--text3)' }}>אין עדיין מסמכים לחודש הזה.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
