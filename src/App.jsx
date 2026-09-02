@@ -3440,8 +3440,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         const cur = fin?.[sc.id] || {};
         const src = { ...(cur.src || {}) };
         const patch = {};
-        const want = { ministryBudget: h.ministry > 0 ? h.ministry : null, yieul: h.yieul, teachingSim: h.teachingSim };
-        for (const k of ['ministryBudget', 'yieul', 'teachingSim']) {
+        const want = { ministryBudget: h.ministry > 0 ? h.ministry : null, yieul: h.yieul, teachingSim: h.teachingSim,
+          incomeTotal: h.incomeTotal > 0 ? h.incomeTotal : null, expensesOther: h.expensesOther > 0 ? h.expensesOther : null };
+        for (const k of ['ministryBudget', 'yieul', 'teachingSim', 'incomeTotal', 'expensesOther']) {
           if (src[k] === 'manual') continue;
           if (want[k] != null && want[k] !== cur[k]) { patch[k] = want[k]; src[k] = 'hub'; }
         }
@@ -3604,6 +3605,58 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       </div>
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10 }}>
         חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
+      </p>
+
+      {/* "לכל בית ספר תעשה הכנסות מול הוצאות ללא עלות הוראה" (שרה, 3.9) —
+          התמונה התפעולית מהתקציב במבט-רשת: כל ההכנסות מול כל ההוצאות
+          שאינן שכר הוראה וייעוץ. */}
+      <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>הכנסות מול הוצאות · ללא עלות הוראה</h2>
+      <div className="apple-card" style={{ padding:0, overflowX:'auto' }}>
+        <table style={{ width:'100%', borderCollapse:'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
+              <TH>בית ספר</TH>
+              <TH>סה"כ הכנסות · שנתי</TH>
+              <TH>הוצאות ללא הוראה · שנתי</TH>
+              <TH>הפרש</TH>
+            </tr>
+          </thead>
+          <tbody>
+            {fin !== null && rows.map(({ sc, f }) => {
+              const diff = (f.incomeTotal != null || f.expensesOther != null)
+                ? (f.incomeTotal || 0) - (f.expensesOther || 0) : null;
+              return (
+                <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
+                  <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
+                  <td style={{ textAlign:'center', fontSize:16.1 }}>{money(f.incomeTotal)}</td>
+                  <td style={{ textAlign:'center', fontSize:16.1 }}>{money(f.expensesOther)}</td>
+                  <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
+                    color: diff == null ? 'var(--text3)' : diff < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
+                    {diff == null ? '—' : money(diff)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          {fin !== null && rows.length > 1 && (() => {
+            const ti = rows.reduce((a, r) => a + (r.f.incomeTotal || 0), 0);
+            const te = rows.reduce((a, r) => a + (r.f.expensesOther || 0), 0);
+            return (
+              <tfoot>
+                <tr style={{ borderTop:'2px solid var(--line)', background:'var(--apple-fill)', fontWeight:800 }}>
+                  <td style={{ padding:'11px 12px', fontSize:15.5 }}>סה"כ הרשת</td>
+                  <td style={{ textAlign:'center', fontSize:16.1 }}>{money(ti)}</td>
+                  <td style={{ textAlign:'center', fontSize:16.1 }}>{money(te)}</td>
+                  <td style={{ textAlign:'center', fontSize:16.7,
+                    color: ti - te < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(ti - te)}</td>
+                </tr>
+              </tfoot>
+            );
+          })()}
+        </table>
+      </div>
+      <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:8 }}>
+        מהתקציב במבט-רשת: כל מקורות ההכנסה מול כל ההוצאות מלבד שכר הוראה וייעוץ. מתרענן במשיכה.
       </p>
     </div>
   );
