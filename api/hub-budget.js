@@ -41,21 +41,32 @@ export default async function handler(req, res) {
     if (!r.ok) return res.status(502).json({ error: `מבט-רשת החזיר ${r.status}` });
     const data = await r.json();
 
-    const schools = (data.schools || []).filter(s => !s.empty && !s.error).map(s => {
+    const mapped = (data.schools || []).filter(s => !s.empty && !s.error).map(s => {
       const inc = s.income || {};
       // הכסף שמקורו במשרד: תקן + מענק + לתלמיד + תל"ן. שכר לימוד ותרומות לא.
       const ministry = (inc.ministry || 0) + (inc.grant || 0) + (inc.perStudent || 0) + (inc.talan || 0);
       return {
         name: s.name,
         ministry,
-        parts: { ministry: inc.ministry || 0, grant: inc.grant || 0, perStudent: inc.perStudent || 0, talan: inc.talan || 0 },
         incomeTotal: inc.total || 0,
         yieul: s.efficiency?.saved === true ? (s.efficiency?.total || 0) : null,
-        yieulOffered: s.efficiency?.total || 0,
-        yieulChosen: s.efficiency?.saved === true,
       };
     });
-    return res.status(200).json({ schools, fetchedAt: new Date().toISOString() });
+    /*
+      "תאחד את רעננה" (שרה, 2.9): במבט-רשת בית חינוך רעננה מפוצל
+      ל"בנים" ו"בנות", ובמערכת השכר הוא אחד. כל פיצול מגדרי כזה מסוכם
+      לשם הבסיס — תקציב מחובר, ייעול מחובר (null רק כשאף צד לא בחר).
+    */
+    const byBase = new Map();
+    for (const s of mapped) {
+      const base = s.name.replace(/\s*-\s*(בנים|בנות)\s*$/, '');
+      const cur = byBase.get(base);
+      if (!cur) { byBase.set(base, { ...s, name: base }); continue; }
+      cur.ministry += s.ministry;
+      cur.incomeTotal += s.incomeTotal;
+      cur.yieul = (cur.yieul == null && s.yieul == null) ? null : (cur.yieul || 0) + (s.yieul || 0);
+    }
+    return res.status(200).json({ schools: [...byBase.values()], fetchedAt: new Date().toISOString() });
   } catch (e) {
     return res.status(500).json({ error: e.message || 'שגיאה בשרת' });
   }
