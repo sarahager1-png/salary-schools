@@ -5678,8 +5678,8 @@ function ContractDoc({ me, form, sigUrl }) {
       <p style={{ textAlign:'center', fontSize:17.2, fontWeight:800, textDecoration:'underline', marginBottom:12 }}>
         הודעה בדבר פירוט תנאי עבודה / עובדי הוראה
       </p>
-      <Sec n="1">שם המעביד: <b>רשת גני חב"ד</b> · אישיות משפטית: ע.ר. 58-0141-026 ·
-        מען: ת.ד 271 כפר חב"ד (להלן — "המעסיק")<br/>
+      <Sec n="1">שם המעסיקה: <b>רשת גני חב"ד</b> · אישיות משפטית: ע.ר. 58-0141-026 ·
+        מען: ת.ד 271 כפר חב"ד (להלן — "המעסיקה")<br/>
         שם העובד/ת: <Hl>{me.name}</Hl> · מס' זהות: <Hl dir="ltr">{me.tz_id || form.tz || '____'}</Hl> ·
         כתובת: <Hl>{[form.address, form.city].filter(Boolean).join(', ') || '____'}</Hl></Sec>
       <Sec n="2">תאריך תחילת העבודה: <Hl>{CONTRACT_FROM}</Hl> ·
@@ -5724,7 +5724,7 @@ function ContractDoc({ me, form, sigUrl }) {
         <thead>
           <tr>
             <th style={head}>סוג התשלום</th><th style={head}>הגוף המקבל ושם התוכנית</th>
-            <th style={head}>הפרשת העובד</th><th style={head}>הפרשת המעביד</th><th style={head}>תחילת התשלום</th>
+            <th style={head}>הפרשת העובד/ת</th><th style={head}>הפרשת המעסיקה</th><th style={head}>תחילת התשלום</th>
           </tr>
         </thead>
         <tbody>
