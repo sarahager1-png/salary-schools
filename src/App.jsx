@@ -5660,10 +5660,16 @@ function ContractDoc({ me, form, sigUrl }) {
   const Sec = ({ n, children }) => (
     <p style={{ fontSize:14.9, margin:'7px 0', lineHeight:1.65 }}><b>{n}.</b> {children}</p>
   );
-  const cell = { border:'1px solid #cbc3e3', padding:'5px 9px', textAlign:'center', fontSize:13.8 };
+  const cell = { border:'1px solid #cbc3e3', padding:'5px 7px', textAlign:'center', fontSize:13.2 };
   const head = { ...cell, background:'#EDE8F8', fontWeight:700 };
+  // במובייל הטבלאות גוללות בתוך עצמן — העמוד לעולם לא זז הצידה
+  const Twrap = ({ children }) => (
+    <div style={{ overflowX:'auto', margin:'8px 0' }}>
+      <table style={{ width:'100%', minWidth:420, borderCollapse:'collapse' }}>{children}</table>
+    </div>
+  );
   return (
-    <div style={{ background:'#fff', border:'1px solid var(--line)', borderRadius:12, padding:'20px 22px', margin:'10px 0' }}>
+    <div style={{ background:'#fff', border:'1px solid var(--line)', borderRadius:12, padding:'16px clamp(10px, 4vw, 22px)', margin:'10px 0' }}>
       <p style={{ textAlign:'center', fontSize:17.2, fontWeight:800, textDecoration:'underline', marginBottom:12 }}>
         הודעה בדבר פירוט תנאי עבודה / עובדי הוראה
       </p>
@@ -5681,7 +5687,7 @@ function ContractDoc({ me, form, sigUrl }) {
       <Sec n="5">הבסיס שלפיו משולם השכר: משכורת חודשית</Sec>
       <Sec n="6">שכר עבודתו/ה של העובד/ת נקבע על פי דירוג, בהתאם לטופס נתוני ההעסקה
         <b> מפורטל עובדי הוראה של משרד החינוך</b>.</Sec>
-      <table style={{ width:'100%', borderCollapse:'collapse', margin:'8px 0' }}>
+      <Twrap>
         <thead>
           <tr><th style={head} colSpan={2}>תשלומים קבועים</th></tr>
           <tr><th style={head}>סוג התשלום</th><th style={head}>מועד התשלום</th></tr>
@@ -5692,7 +5698,7 @@ function ContractDoc({ me, form, sigUrl }) {
           <tr><td style={cell}>הבראה חודשית</td><td style={cell}>9 לחודש</td></tr>
           <tr><td style={cell}>ביגוד חודשית (לעובדי הוראה ומינהל בלבד)</td><td style={cell}>9 לחודש</td></tr>
         </tbody>
-      </table>
+      </Twrap>
       <Sec n="7">אורכו של שבוע העבודה הרגיל של העובד/ת: {(() => {
         if (isPrincipal) return <b>40 שעות</b>;
         if (me.reform === 'ofek' && Number(me.frontal_hours) > 0) {
@@ -5705,7 +5711,7 @@ function ContractDoc({ me, form, sigUrl }) {
         return <b>{hours} שעות פרונטליות</b>;
       })()}</Sec>
       <Sec n="8">תשלומים בעבור תנאים סוציאליים שהעובד/ת זכאי/ת להם:</Sec>
-      <table style={{ width:'100%', borderCollapse:'collapse', margin:'8px 0' }}>
+      <Twrap>
         <thead>
           <tr>
             <th style={head}>סוג התשלום</th><th style={head}>הגוף המקבל ושם התוכנית</th>
@@ -5716,7 +5722,7 @@ function ContractDoc({ me, form, sigUrl }) {
           <tr><td style={cell}>פנסיה</td><td style={cell}>קרן פנסיה ברירת מחדל</td><td style={cell}>6%</td><td style={cell}>7%</td><td style={cell}>תחילת העסקה</td></tr>
           <tr><td style={cell}>קרן השתלמות</td><td style={cell}>קרן השתלמות של עובדי הוראה</td><td style={cell}>4.2%</td><td style={cell}>8.4%</td><td style={cell}>תחילת העסקה</td></tr>
         </tbody>
-      </table>
+      </Twrap>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginTop:16, gap:20 }}>
         <div>
           <p style={{ fontSize:12.6, color:'var(--text3)' }}>תאריך</p>
@@ -5845,7 +5851,7 @@ function OnboardingView({ code }) {
   );
 
   return (
-    <div style={{ minHeight:'100vh', background:'var(--bg)', paddingBottom:60 }} dir="rtl">
+    <div className="ob-page pb-safe-bottom" style={{ minHeight:'100vh', background:'var(--bg)', paddingBottom:60 }} dir="rtl">
       <header className="app-header"><div style={{ maxWidth:640, margin:'0 auto', padding:'12px 16px', display:'flex', alignItems:'center', gap:11 }}>
         <img src="/logo-chabad.png" alt="לוגו" style={{ height:34 }} />
         <div><p style={{ fontWeight:700, fontSize:16.7 }}>קליטת עובדת הוראה</p>

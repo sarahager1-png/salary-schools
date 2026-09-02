@@ -587,3 +587,13 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
    הכלל דורס אותו בפירוש: בדסקטופ env=0 והתוצאה זהה (40px), ובאייפון
    עם home-indicator נוספים ~34px כדי שהכפתור האחרון לא ייגע בפס. */
 .pb-safe-bottom { padding-bottom: calc(40px + env(safe-area-inset-bottom)) !important; }
+
+/* ── טפסי הקליטה במובייל ("תסדר את כל הטפסים למובייל", שרה 3.9) ──
+   שדות בגובה מגע מלא, צ'קבוקסים גדולים, וקנבס החתימה על כל הרוחב. */
+@media (max-width: 640px) {
+  .ob-page input, .ob-page select { min-height: 44px; font-size: 16px !important; }
+  .ob-page input[type="checkbox"] { width: 20px; height: 20px; min-height: 20px; }
+  .ob-page canvas { width: 100% !important; touch-action: none; }
+  .ob-page .apple-card { padding: 14px !important; }
+  .ob-page button { min-height: 46px; }
+}
