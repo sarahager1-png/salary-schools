@@ -3884,7 +3884,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           <tbody>
             {fin === null ? (
               <tr><td colSpan={8} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : rows.map(({ sc, f, monthly, annual, left }) => (
+            ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:16.1, fontWeight:700 }}>{sc.name}</td>
                 <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'ministryBudget', f.ministryBudget)}</td>
