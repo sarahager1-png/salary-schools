@@ -3478,7 +3478,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     .reduce((a, t) => a + Number(t.frontalHours), 0) * 100;
   const monthlyCost = (sid) => teachers
     .filter(t => t.schoolId === sid)
-    .reduce((sum, t) => sum + calcEmployer(t).total, 0) + mmProvision(sid);
+    .reduce((sum, t) => sum + calcEmployer(t).total, 0);
 
 
   const save = async (sid, patch) => {
@@ -3494,10 +3494,11 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const f = fin?.[sc.id] || {};
     const monthly = monthlyCost(sc.id);
     const annual  = monthly * 12;
+    const mmAnnual = mmProvision(sc.id) * 12;
     // "תוסיף השתתפות רשת מרינה" (שרה, 3.9) — מצטרפת ליתרה בחיוב,
     // כמו בנוסחת דף הפגישה: משרד − ייעול − שכר + השתתפות
     const left = (f.ministryBudget != null || f.yieul != null)
-      ? (f.ministryBudget || 0) - (f.yieul || 0) - annual + (f.networkSupport || 0)
+      ? (f.ministryBudget || 0) - (f.yieul || 0) - annual - mmAnnual + (f.networkSupport || 0)
       : null;
     /*
       "עשיתי סימולציית שכר לפני הסימולציה האמיתית — חשוב לי לדעת מה
@@ -3517,7 +3518,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     sim: a.sim + (r.f.teachingSim || 0),
     simGap: a.simGap + (r.simGap || 0),
     support: a.support + (r.f.networkSupport || 0),
-  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, left: 0, sim: 0, simGap: 0, support: 0 });
+    mm: a.mm + (r.mmAnnual || 0),
+  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, left: 0, sim: 0, simGap: 0, support: 0, mm: 0 });
 
   const TH = ({ children }) => (
     <th style={{ padding:'10px 8px', fontSize:13.8, fontWeight:700, color:'var(--text2)',
@@ -3573,13 +3575,14 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <TH>ייעול · שנתי</TH>
               <TH>עלות שכר · חודש</TH>
               <TH>עלות שכר · שנה</TH>
+              <TH>הפרשת מילוי מקום · שנתי</TH>
               <TH>השתתפות הרשת</TH>
               <TH>יתרה לאחר שכר</TH>
             </tr>
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={7} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+              <tr><td colSpan={8} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
             ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
@@ -3587,6 +3590,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'yieul', f.yieul)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1 }}>{money(monthly)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(annual)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1 }}>{money(mmAnnual)}</td>
                 <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'networkSupport', f.networkSupport)}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
@@ -3603,6 +3607,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.yieul)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.monthly)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.annual)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.mm)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.support)}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(tot.left)}</td>
@@ -3612,8 +3617,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         </table>
       </div>
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10 }}>
-        חל"ת אינו נספר בעלות. עלות השכר כוללת הפרשת מילוי מקום — שעת מ"מ חודשית לכל
-        שעה שבועית, 100 ₪ לשעה. שינוי נשמר ביציאה מהשדה.
+        חל"ת אינו נספר בעלות. הפרשת מילוי מקום — עמודה נפרדת: שעת מ"מ חודשית לכל
+        שעה שבועית, 100 ₪ לשעה; נכללת ביתרה. שינוי נשמר ביציאה מהשדה.
       </p>
 
       {/* "לכל בית ספר תעשה הכנסות מול הוצאות ללא עלות הוראה" (שרה, 3.9) —
@@ -3628,10 +3633,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         const ts = teachers.filter(t => t.schoolId === sc.id && !isPrincipalRow(t)
           && (t.leaveType ?? 'none') === 'none' && Number(t.frontalHours) > 0);
         const hours = ts.reduce((a, t) => a + Number(t.frontalHours), 0);
-        const mmAnnual = hours * 100 * 12;
-        // annual כבר כולל את ההפרשה (monthlyCost) — הכרטיס רק מפרק אותה
+        const mmAnnualCard = hours * 100 * 12;
         const teachIncome = (f.ministryBudget || 0) - (f.yieul || 0) + (f.networkSupport || 0);
-        const teachCost = annual;
+        const teachCost = annual + mmAnnualCard;
         const teachDiff = (f.ministryBudget != null) ? teachIncome - teachCost : null;
         // צד התפעול
         const incLines = f.detail?.income || [];
@@ -3671,8 +3675,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   {f.networkSupport ? dline('השתתפות הרשת', f.networkSupport) : null}
                   {dline('סה"כ הכנסות הוראה', teachIncome, true)}
                   <div style={{ height:8 }} />
-                  {dline(`שכר הוראה (מורות, מנהלת, תוספות)`, annual - mmAnnual)}
-                  {dline(`הפרשת מילוי מקום — ${hours} שעות × 100 ₪ × 12`, mmAnnual)}
+                  {dline(`שכר הוראה (מורות, מנהלת, תוספות)`, annual)}
+                  {dline(`הפרשת מילוי מקום — ${hours} שעות × 100 ₪ × 12`, mmAnnualCard)}
                   {dline('סה"כ הוצאות הוראה', teachCost, true)}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
                     borderTop:'2px solid var(--line)', color: gapColor(teachDiff) }}>
