@@ -3563,15 +3563,13 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <TH>ייעול · שנתי</TH>
               <TH>עלות שכר · חודש</TH>
               <TH>עלות שכר · שנה</TH>
-              <TH>הסימולציה שלך · שנתי</TH>
-              <TH>פער סימולציה מול בפועל</TH>
               <TH>השתתפות הרשת</TH>
               <TH>יתרה לאחר שכר</TH>
             </tr>
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={9} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+              <tr><td colSpan={7} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
             ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
@@ -3579,12 +3577,6 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'yieul', f.yieul)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1 }}>{money(monthly)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(annual)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1 }}>{money(f.teachingSim)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
-                  color: simGap == null ? 'var(--text3)' : simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}
-                  title="הסימולציה שלך פחות העלות בפועל · חיובי = זול מהמתוכנן">
-                  {simGap == null ? '—' : (simGap > 0 ? '+' : '') + money(simGap).replace('₪', '₪')}
-                </td>
                 <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'networkSupport', f.networkSupport)}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
@@ -3601,9 +3593,6 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.yieul)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.monthly)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.annual)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.sim)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800,
-                  color: tot.simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{(tot.simGap > 0 ? '+' : '') + money(tot.simGap)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.support)}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(tot.left)}</td>
