@@ -2290,7 +2290,7 @@ function ReportMonth({ school, teachers, monthKey, due, onReport }) {
   );
 }
 
-function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn, userId, monthDue, onReportMonth }) {
+function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn, userId, monthDue, onReportMonth, simState, onCompute }) {
   const [search, setSearch]           = useState('');
   const [showReport, setShowReport]   = useState(false);
   const [showAbsence, setShowAbsence] = useState(false);
@@ -3119,6 +3119,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         {isCoord && isAppr && onApproveTeacher && (
                           <button className="apple-btn apple-btn-green" title="אישור" onClick={() => onApproveTeacher(t.id)} style={{ padding:'0 9px', minHeight:30 }}><Check size={14} strokeWidth={2.8} /></button>
                         )}
+                        {isCoord && onCompute && !isPrincipalRow(t) && (
+                          simState?.[t.id] === 'pending' || simState?.[t.id] === 'running'
+                            ? <span className="apple-badge badge-purple" style={{ alignSelf:'center' }}>מחשב…</span>
+                            : <button className="apple-btn apple-btn-ghost" title="חישוב במחשבון משרד החינוך — התוצאה תיכנס לברוטו"
+                                onClick={() => onCompute(t)} style={{ padding:'0 9px', minHeight:30 }}>
+                                <Calculator size={13} strokeWidth={2.2} />
+                              </button>
+                        )}
                         {isCoord && onDeleteTeacher && (
                           <button className="apple-btn apple-btn-ghost" onClick={() => { if (window.confirm('למחוק?')) onDeleteTeacher(t.id); }}
                             title="מחיקה" style={{ padding:'0 9px', minHeight:30, color:'var(--danger)' }}><Trash2 size={13} strokeWidth={2.2} /></button>
@@ -3208,7 +3216,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   ביציאה מהשדה, דרך אותו onSaveTeacher של מסך בית הספר — אותה זרימה,
   אותם אישורים, בלי מסלול צדדי. ההרשאות ממילא נאכפות במסד.
 */
-function SchoolPositions({ school, onSaveTeacher }) {
+function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute }) {
   const ts = [...(school.ts || [])].sort((a, b) => calcEmployer(b).total - calcEmployer(a).total);
   const nis = v => (v > 0 ? Math.round(v).toLocaleString('he-IL') + ' ₪' : '—');
   const status = t => {
@@ -3324,7 +3332,28 @@ function SchoolPositions({ school, onSaveTeacher }) {
                     ) : (done ? nis(emp.gross) : '—')}
                   </td>
                   <td style={{ textAlign:'center', fontWeight:700, color: done ? 'var(--text)' : 'var(--text3)' }}>{done ? nis(emp.total) : '—'}</td>
-                  <td style={{ textAlign:'center' }}><span className={`apple-badge ${st.cls}`}>{st.label}</span></td>
+                  <td style={{ textAlign:'center', whiteSpace:'nowrap' }}>
+                    {/* "אין לי איפה לאשר" (שרה, 3.9) — האישור כאן, איפה שהיא עובדת */}
+                    {onApprove && needsApproval(t) ? (
+                      <button className="apple-btn apple-btn-green" onClick={() => onApprove(t.id)}
+                        style={{ padding:'3px 12px', fontSize:13.8, minHeight:30 }}>
+                        <Check size={13} strokeWidth={2.8} />אישור
+                      </button>
+                    ) : (
+                      <span className={`apple-badge ${st.cls}`}>{st.label}</span>
+                    )}
+                    {onCompute && !isPrincipalRow(t) && (
+                      simState?.[t.id] === 'pending' || simState?.[t.id] === 'running' ? (
+                        <span className="apple-badge badge-purple" style={{ marginInlineStart:6 }}>מחשב…</span>
+                      ) : (
+                        <button className="apple-btn apple-btn-ghost" title="חישוב במחשבון משרד החינוך — התוצאה תיכנס לברוטו"
+                          onClick={() => onCompute(t)}
+                          style={{ padding:'3px 10px', fontSize:13.8, minHeight:30, marginInlineStart:6 }}>
+                          <Calculator size={13} strokeWidth={2.2} />חשב
+                        </button>
+                      )
+                    )}
+                  </td>
                 </tr>
               );
             })}
@@ -3570,7 +3599,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   );
 }
 
-function ReportView({ schools, teachers, onSaveTeacher }) {
+function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onCompute }) {
   // לחיצה על שורת בית ספר פותחת את פירוט המשרות שלו. פתוח אחד בכל רגע —
   // הדוח נועד להשוואה בין בתי ספר, לא לקריאה של כולם במקביל.
   const [openSchool, setOpenSchool] = useState(null);
@@ -3708,7 +3737,7 @@ function ReportView({ schools, teachers, onSaveTeacher }) {
                 {openSchool === r.id && (
                   <tr>
                     <td colSpan={8} style={{ padding:0, background:'var(--bg)' }}>
-                      <SchoolPositions onSaveTeacher={onSaveTeacher} school={r} />
+                      <SchoolPositions onSaveTeacher={onSaveTeacher} onApprove={onApprove} simState={simState} onCompute={onCompute} school={r} />
                     </td>
                   </tr>
                 )}
@@ -5875,6 +5904,50 @@ export default function App() {
     finally { setBusy(false); }
   };
 
+  /*
+    "אין לי איפה לחשב" (שרה, 3.9). הלחיצה שולחת בקשה; sim-watcher
+    שרץ על המחשב במשרד מריץ את מחשבון משרד החינוך וכותב תוצאה;
+    כאן — הדפדפן של שרה — התוצאה נקלטת, נשמרת לברוטו בהרשאות שלה,
+    והבקשה נמחקת. השרת לא נוגע בשכר.
+  */
+  const [simState, setSimState] = useState({});
+  const onCompute = async (t) => {
+    try {
+      await store.requestSim(t.id);
+      setSimState(m => ({ ...m, [t.id]: 'pending' }));
+    } catch (e) { setError(e.message); }
+  };
+  useEffect(() => {
+    if (user?.role !== 'coordinator') return undefined;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const reqs = await store.openSimRequests();
+        if (!alive) return;
+        const st = {};
+        for (const r of reqs) {
+          if (r.status === 'done' && r.result_gross != null) {
+            const row = (months[activeMonth] || []).find(x => x.id === r.teacher_month_id);
+            await store.deleteSimRequest(r.id);
+            if (row && row._officialGross !== r.result_gross) {
+              await store.saveTeacher({ id: row.id, _officialGross: r.result_gross }, activeMonth);
+              await refresh();
+            }
+          } else if (r.status === 'failed') {
+            setError('החישוב נכשל: ' + (r.error || 'סיבה לא ידועה'));
+            await store.deleteSimRequest(r.id);
+          } else {
+            st[r.teacher_month_id] = r.status;
+          }
+        }
+        if (alive) setSimState(st);
+      } catch { /* רשת רגעית — הסבב הבא ידביק */ }
+    };
+    const iv = setInterval(tick, 7000);
+    tick();
+    return () => { alive = false; clearInterval(iv); };
+  }, [user?.role, months, activeMonth]);
+
   const onSignOut = async () => {
     await store.signOut();
     setUser(null); setSchools([]); setMonths({}); setActiveSchool(null);
@@ -5891,6 +5964,7 @@ export default function App() {
       </div>
     );
   }
+
 
   if (!user) return <LoginScreen onSignedIn={onSignedIn} initialError={error} />;
 
@@ -5980,6 +6054,7 @@ export default function App() {
   const onImportTeachers = (ts) => run(async () => {
     for (const x of ts) await store.saveTeacher({ ...x, id: null, _changedAt: new Date().toISOString() }, activeMonth);
   });
+
 
   const onApproveTeacher = (id) => run(async () => {
     await store.approve([id]);
@@ -6194,7 +6269,7 @@ export default function App() {
         ) : view === 'alerts' ? (
           <NotificationsView />
         ) : view === 'report' ? (
-          <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} />
+          <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} onApprove={onApproveTeacher} simState={simState} onCompute={onCompute} />
         ) : view === 'finance' && user.role === 'coordinator' ? (
           <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} />
         ) : view === 'school' && activeSchool ? (
@@ -6206,6 +6281,8 @@ export default function App() {
             onSaveTeacher={onSaveTeacher}
             onDeleteTeacher={onDeleteTeacher}
             onApproveTeacher={onApproveTeacher}
+            simState={simState}
+            onCompute={onCompute}
             onImportTeachers={onImportTeachers}
             activeMonth={activeMonth}
             fmtMonthFn={fmtMonth}

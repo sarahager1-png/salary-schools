@@ -28,3 +28,5 @@ computed-sims.json
 unexplained-gaps.json
 verify-sim-diffs.json
 recomputed.json
+sim-watcher.log
+sim-watcher.err

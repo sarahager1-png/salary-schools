@@ -733,3 +733,27 @@ export async function fetchHubBudget() {
   if (!r.ok) throw new Error(j.error || `מבט-רשת: שגיאה ${r.status}`);
   return j.schools || [];
 }
+
+/* ── בקשות חישוב מהמסך ─────────────────────────────────────────
+   "אין לי איפה לחשב" (שרה, 3.9). הלחיצה יוצרת בקשה; שירות מקומי
+   (sim-watcher) מריץ את מחשבון משרד החינוך וכותב את התוצאה לבקשה;
+   הדפדפן של שרה קורא אותה, שומר את השכר בהרשאות שלה, ומוחק. */
+export async function requestSim(teacherMonthId) {
+  const { data: session } = await supabase.auth.getUser();
+  const { error } = await supabase.from('sim_requests')
+    .insert({ teacher_month_id: teacherMonthId, requested_by: session?.user?.id ?? null });
+  raise(error, 'שליחת בקשת החישוב נכשלה');
+}
+
+export async function openSimRequests() {
+  const { data, error } = await supabase.from('sim_requests')
+    .select('id, teacher_month_id, status, result_gross, error, created_at')
+    .order('created_at', { ascending: false }).limit(100);
+  raise(error, 'טעינת בקשות החישוב נכשלה');
+  return data || [];
+}
+
+export async function deleteSimRequest(id) {
+  const { error } = await supabase.from('sim_requests').delete().eq('id', id);
+  raise(error, 'מחיקת בקשת החישוב נכשלה');
+}
