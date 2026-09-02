@@ -5652,7 +5652,7 @@ function ObUpload({ label, hint, done, onFile }) {
    למורה לפני החתימה, והחתימה נטבעת על אותו מסמך.
 ═══════════════════════════════════════════════════════════════ */
 const CONTRACT_FROM = '01.09.2026';
-const CONTRACT_TO   = '30.08.2027';
+const CONTRACT_TO   = '31.08.2027';
 function ContractDoc({ me, form, sigUrl }) {
   const isPrincipal = me.gamul_role === 'principal';
   const hours = isPrincipal ? 40 : (Number(me.frontal_hours) || '____');
@@ -5675,7 +5675,9 @@ function ContractDoc({ me, form, sigUrl }) {
         תקופת החוזה מיום <b>{CONTRACT_FROM}</b> עד יום <b>{CONTRACT_TO}</b><br/>
         סיבת קציבת תקופת העבודה: חוסר יציבות כלכלית</Sec>
       <Sec n="3">תפקידו/ה העיקרי של העובד/ת: <b>{roleLabel}</b> · {me.school_name}</Sec>
-      <Sec n="4">הממונה הישיר/ה של העובד/ת: {isPrincipal ? 'הנהלת הרשת' : 'מנהל/ת בית הספר'}</Sec>
+      <Sec n="4">הממונה הישיר/ה של העובד/ת: {isPrincipal
+        ? 'הנהלת הרשת'
+        : <b>מנהל/ת בית הספר{me.principal_name ? ` — ${me.principal_name}` : ''}</b>}</Sec>
       <Sec n="5">הבסיס שלפיו משולם השכר: משכורת חודשית</Sec>
       <Sec n="6">שכר עבודתו/ה של העובד/ת נקבע על פי דירוג, בהתאם לטופס נתוני ההעסקה
         <b> מפורטל עובדי הוראה של משרד החינוך</b>.</Sec>
