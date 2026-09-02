@@ -291,6 +291,8 @@ function calcReimb(t) {
   לכן אין כאן שיעור כולל קבוע. כל רכיב מחושב על הבסיס שלו, והשיעור
   הכולל נגזר מהתוצאה ומשתנה לפי הוותק, אחוז המשרה וגובה השכר.
 */
+// שעת מילוי מקום — נגזרת מ-90 שעות למשרה מלאה (שרה, 3.9)
+const MM_HOUR_RATE = 100;
 const PENSION_RATE   = 0.1483;  // תגמולי מעסיק 6.5% + פיצויים 8.33%
 const KEREN_RATE     = 0.084;   // קרן השתלמות עובדי הוראה — חלק המעסיק
 const MAS_SACHAR     = 0.075;   // מס שכר למלכ"ר (מחליף מע"מ)
@@ -432,10 +434,19 @@ function calcEmployer(t) {
   const employerBase = estimate - employerSupp;
   const actual   = Number(t._actualEmployerCost) || 0;
   const social   = actual || estimate;
+  /*
+    מילוי מקום: 100 ₪ לשעה (משרה מלאה = 90 שעות בחודש — שרה, 3.9).
+    התשלום למ"מ אינו נכנס לתלוש — הוא מתווסף לעלות ההוראה בלבד,
+    על השורה של הממלאת. הנעדרת אינה מנוכה.
+  */
+  const mmPay = (Number(t.mmHours) || 0) * MM_HOUR_RATE;
+  if (mmPay > 0) parts.push({ key: 'mm',
+    label: `מילוי מקום (${t.mmHours} שעות × ${MM_HOUR_RATE} ₪)`,
+    rate: null, on: null, amount: mmPay });
   return {
     gross, base, mom, supplement, employerBase, employerSupp, social,
-    estimate, isEstimate: !actual,
-    total: gross + social,
+    estimate, isEstimate: !actual, mmPay,
+    total: gross + social + mmPay,
     parts,                                    // הפירוט המלא, שורה לכל רכיב
     // השיעור בפועל, מעל הברוטו לעובדת. עם רצפת ה-140% הוא לא יורד מ-40%,
     // ועולה מעליה במורה שרוב שכרה בסיס (פנסיה וקרן חלות על הבסיס בלבד).
@@ -445,6 +456,7 @@ function calcEmployer(t) {
 }
 
 export {
+  MM_HOUR_RATE,
   LEVELS,
   AGE_RED,
   CHABAD_SUPP,
