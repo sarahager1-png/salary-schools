@@ -494,6 +494,66 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   background: linear-gradient(to bottom, var(--purple), var(--teal));
 }
 
+/* ── מבנה עמוד אחיד ──
+   כל מסך ראשי יושב באותו מעטפת: אותו ריווח עליון, אותם שוליים, אותו
+   מרחק נשימה בתחתית. רוחב מרבי נקבע פר-מסך (טבלה רחבה מול רשימה צרה). */
+.page-wrap {
+  width: 100%;
+  margin: 0 auto;
+  padding: 22px 20px 48px;
+}
+@media (max-width: 640px) { .page-wrap { padding: 16px 14px 40px; } }
+
+/* כותרת עמוד אחידה: פס-כותרת, h1 באותו גודל ומשקל בכל המסכים,
+   שורת משנה שמסבירה מה המסך, ופעולות בקצה השמאלי. */
+.page-head {
+  display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.page-head-main { flex: 1 1 240px; min-width: 0; }
+.page-head-row  { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.page-head h1 {
+  font-size: 26.4px; font-weight: 800; letter-spacing: -0.025em;
+  color: var(--text); line-height: 1.2;
+}
+.page-sub {
+  font-size: 14.9px; color: var(--text3); line-height: 1.55;
+  margin-top: 3px; margin-inline-start: 13px; max-width: 66ch;
+}
+.page-actions {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-inline-start: auto;
+}
+@media (max-width: 640px) {
+  .page-head h1 { font-size: 23px; }
+  .page-actions { margin-inline-start: 0; width: 100%; }
+}
+
+/* כותרת ביניים בתוך עמוד — מדורגת מתחת ל-h1, מרווח קבוע מעל ומתחת */
+.section-head {
+  font-size: 19.5px; font-weight: 800; color: var(--text);
+  letter-spacing: -0.015em; margin: 30px 0 4px;
+}
+.section-sub { font-size: 13.8px; color: var(--text3); line-height: 1.55; margin: 0 0 12px; }
+
+/* שורת כלים של מסך: פעולות שחלות על כל העמוד, מעל התוכן */
+.page-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  padding: 9px 12px;
+  margin-bottom: 14px;
+}
+
+/* מפריד דק בין קבוצות בסרגל הניווט */
+.nav-sep {
+  width: 1px; height: 20px; flex-shrink: 0;
+  background: var(--line);
+  margin: 0 4px;
+}
+
 /* gradient hero number */
 .grad-num {
   background: linear-gradient(to left, var(--purple), var(--teal));

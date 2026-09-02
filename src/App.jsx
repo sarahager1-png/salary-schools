@@ -318,6 +318,25 @@ function exportBackup(schools, months) {
    באתר, רשת מסוננת) המסך נשאר לבן בלי הסבר. כאן יש מצב טעינה,
    פסק זמן, ותמיד דרך לפתוח את המחשבון בחלון נפרד. */
 
+/* כותרת עמוד אחידה — כל מסך ראשי נפתח באותה צורה: פס-כותרת, h1,
+   שורת משנה שאומרת מה המסך, ופעולות העמוד בקצה. העיצוב ב-index.css
+   (.page-head) כדי שגודל ומרווח יהיו זהים בכל המסכים. */
+function PageHead({ title, subtitle, badge = null, actions = null }) {
+  return (
+    <div className="page-head">
+      <div className="page-head-main">
+        <div className="page-head-row">
+          <span className="title-bar" />
+          <h1>{title}</h1>
+          {badge}
+        </div>
+        {subtitle && <p className="page-sub">{subtitle}</p>}
+      </div>
+      {actions && <div className="page-actions">{actions}</div>}
+    </div>
+  );
+}
+
 // פס "גרסה חדשה" — משווה את הבנדל שבאוויר לזה שנטען
 function UpdateBanner() {
   const [stale, setStale] = useState(false);
@@ -3552,45 +3571,47 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   );
 
   return (
-    <div style={{ maxWidth:1380, margin:'0 auto', padding:'0 16px' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:6, flexWrap:'wrap' }}>
-        <h1 style={{ fontSize:24.2, fontWeight:800, whiteSpace:'nowrap' }}>עלות הוראה מול תקציב</h1>
-        <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700,
-          color:'var(--apple-blue)', background:'rgba(90,110,255,.07)',
-          border:'1px solid rgba(90,110,255,.2)', borderRadius:999, padding:'3px 11px' }}>
-        <ShieldCheck size={14} strokeWidth={2.4} />לעינייך בלבד
-        </span>
+    <div className="page-wrap" style={{ maxWidth:1380 }}>
+      <PageHead
+        title="עלות הוראה מול תקציב"
+        badge={
+          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700,
+            color:'var(--purple)', background:'var(--purple-100)',
+            border:'1px solid #D8CEEF', borderRadius:999, padding:'3px 11px' }}>
+            <ShieldCheck size={14} strokeWidth={2.4} />לעינייך בלבד
+          </span>
+        }
+        subtitle="יתרת תקציב משרד החינוך אחרי עלות השכר ומילוי המקום, בתוספת השתתפות הרשת — לכל בית ספר ולרשת כולה."
+      />
+
+      {/* סרגל הכלים של המסך — משיכה ממבט-רשת, חתך חודשי/שנתי, והתחשיב */}
+      <div className="page-toolbar">
+        <button className="apple-btn apple-btn-ghost" onClick={pullFromHub} disabled={pulling}
+          title="הכנסות משרד החינוך והייעול שנבחר, מתוך מבט-רשת. ממלא רק תאים ריקים."
+          style={{ minHeight:36, fontSize:14.4 }}>
+          <Download size={14} strokeWidth={2.2} />
+          {pulling ? 'מושך ממבט-רשת…' : 'משיכה ממבט-רשת'}
+        </button>
+        <div className="apple-seg">
+          {[['month', 'חודשי'], ['year', 'שנתי']].map(([v, l]) => (
+            <button key={v} onClick={() => setPeriod(v)}
+              className={['apple-seg-item', period === v ? 'active' : ''].join(' ')}
+              style={{ padding:'5px 16px' }}>{l}</button>
+          ))}
+        </div>
         <button onClick={() => setShowSim(v => !v)} className="apple-btn"
-          style={{ padding:'5px 14px', fontSize:13.8, fontWeight:700, borderRadius:8, cursor:'pointer',
+          style={{ minHeight:36, padding:'0 14px', fontSize:13.8, fontWeight:700, borderRadius:10, cursor:'pointer',
             border:'1px solid var(--line)', background: showSim ? 'var(--purple)' : 'transparent',
             color: showSim ? '#fff' : 'var(--text3)' }}>
           {showSim ? 'הסתרת התחשיב מהתקציב' : 'הצגת התחשיב מהתקציב'}
         </button>
-        <div style={{ display:'flex', gap:4, background:'var(--apple-fill)', borderRadius:10, padding:3 }}>
-          {[['month', 'חודשי'], ['year', 'שנתי']].map(([v, l]) => (
-            <button key={v} onClick={() => setPeriod(v)} className="apple-btn"
-              style={{ padding:'5px 16px', fontSize:14.4, fontWeight:700, borderRadius:8, border:'none', cursor:'pointer',
-                background: period === v ? '#fff' : 'transparent',
-                boxShadow: period === v ? '0 1px 4px rgba(0,0,0,.12)' : 'none',
-                color: period === v ? 'var(--purple)' : 'var(--text3)' }}>{l}</button>
-          ))}
-        </div>
         {flash > 0 && Date.now() - flash < 4000 && (
-          <span style={{ fontSize:13.8, color:'var(--ok, #2e7d32)', fontWeight:700 }}>נשמר ✓</span>
+          <span style={{ fontSize:13.8, color:'var(--ok)', fontWeight:700, marginInlineStart:'auto' }}>נשמר ✓</span>
         )}
-        <button className="apple-btn apple-btn-ghost" onClick={pullFromHub} disabled={pulling}
-          title="הכנסות משרד החינוך והייעול שנבחר, מתוך מבט-רשת. ממלא רק תאים ריקים."
-          style={{ marginInlineStart:'auto', fontSize:14.5 }}>
-          <Download size={14} strokeWidth={2.2} />
-          {pulling ? 'מושך ממבט-רשת…' : 'משיכה ממבט-רשת'}
-        </button>
       </div>
-      <p style={{ fontSize:15.5, color:'var(--text2)', marginBottom:16, lineHeight:1.55 }}>
-        תקציב הכנסות משרד החינוך פחות עלות השכר ומילוי מקום (5% מעלות השכר), בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
-        עלות השכר נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
-      </p>
+
       {err && (
-        <div style={{ background:'#fdecec', color:'var(--danger)', borderRadius:10,
+        <div style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'1px solid var(--danger-line)', borderRadius:10,
           padding:'9px 14px', fontSize:14.9, fontWeight:600, marginBottom:12 }}>{err}</div>
       )}
       <div className="apple-card" style={{ padding:0, overflowX:'auto' }}>
@@ -3650,8 +3671,10 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           )}
         </table>
       </div>
-      <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10 }}>
-        חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
+      <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
+        תקציב הכנסות משרד החינוך פחות עלות השכר ומילוי מקום (5% מעלות השכר), בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
+        עלות השכר נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
+        {' '}חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
       </p>
 
       {/* "לכל בית ספר תעשה הכנסות מול הוצאות ללא עלות הוראה" (שרה, 3.9) —
@@ -3661,7 +3684,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           כרטיס מתרחב ומפורט" (שרה, 3.9). שני ההפרשים בכותרת; בפתיחה —
           הפירוט המלא של שני הצדדים. בלי מילוי מקום — "תוריד את כל
           המילויי מקום" (שרה, 3.9). */}
-      <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>כרטיסי בתי הספר · הפרשי עלות הוראה והוצאות</h2>
+      <h2 className="section-head">כרטיסי בתי הספר</h2>
+      <p className="section-sub">הפרשי עלות הוראה והוצאות לכל בית ספר — לחיצה על כרטיס פותחת את הפירוט המלא.</p>
       {fin !== null && rows.map(({ sc, f, monthly, annual }) => {
         const teachIncome = (f.ministryBudget || 0) + (f.networkSupport || 0);
         const mmCost = annual * MM_PCT;
@@ -3777,7 +3801,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           </div>
         );
       })()}
-      <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>תקציב נוסף · הכנסות מול הוצאות ללא עלות הוראה ומשרד החינוך</h2>
+      <h2 className="section-head">תקציב נוסף</h2>
+      <p className="section-sub">הכנסות מול הוצאות ללא עלות הוראה ומשרד החינוך.</p>
       {fin !== null && rows.map(({ sc, f }) => {
         const d = f.detail;
         if (!d && f.incomeTotal == null) return null;
@@ -3896,18 +3921,16 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
   };
 
   return (
-    <div style={{ maxWidth:1180, margin:'0 auto', padding:'0 16px' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
-        <h1 style={{ fontSize:24.2, fontWeight:800 }}>תלושים · {fmtMonthFn ? fmtMonthFn(monthKey) : monthKey}</h1>
-        <button className="apple-btn apple-btn-ghost no-print" onClick={() => window.print()}
-          style={{ marginInlineStart:'auto', fontSize:14.9 }}>
-          <Printer size={15} strokeWidth={2.2} />הדפסה
-        </button>
-      </div>
-      <p className="no-print" style={{ fontSize:15.5, color:'var(--text2)', marginBottom:14, lineHeight:1.55 }}>
-        הבסיס בעולם ישן לפי השעות (מחנכת +3 · אם מעל 79% +10), תוספת בית חב"ד שורה קבועה,
-        והסה"כ הוא השכר המאומת. הכול מתעדכן חי מהנתונים.
-      </p>
+    <div className="page-wrap" style={{ maxWidth:1180 }}>
+      <PageHead
+        title={`תלושים · ${fmtMonthFn ? fmtMonthFn(monthKey) : monthKey}`}
+        subtitle={'הבסיס בעולם ישן לפי השעות (מחנכת +3 · אם מעל 79% +10), תוספת בית חב"ד שורה קבועה, והסה"כ הוא השכר המאומת. הכול מתעדכן חי מהנתונים.'}
+        actions={
+          <button className="apple-btn apple-btn-ghost no-print" onClick={() => window.print()} style={{ fontSize:14.9 }}>
+            <Printer size={15} strokeWidth={2.2} />הדפסה
+          </button>
+        }
+      />
       {bySchool.map(({ sc, ts }) => {
         const paysSupp = sc.chabadSupp !== false;
         const rows = ts.map(t => ({ t, r: rowFor(t, paysSupp) }));
@@ -4126,27 +4149,27 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
   };
 
   return (
-    <div style={{ minHeight:'100vh' }} dir="rtl">
+    <div className="page-wrap" style={{ maxWidth:1400 }} dir="rtl">
 
-      {/* Header */}
-      <div className="no-print" style={{ background:'var(--surface)', borderBottom:'1px solid var(--line)', padding:'18px 20px', display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
-        <div style={{ flex:1, minWidth:200 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:9 }}>
-            <span className="title-bar" />
-            <h1 style={{ fontSize:26.4, fontWeight:800, color:'var(--text)', letterSpacing:'-0.025em' }}>דוח רשת — סימולציית שכר תשפ״ו</h1>
-          </div>
-          <p style={{ fontSize:14.9, color:'var(--text3)', marginTop:2, marginInlineStart:13 }}>{rows.filter(r=>r.count>0).length} בתי ספר · {totCount} עובדי הוראה</p>
-        </div>
-        {totPending > 0 && <span className="apple-badge badge-orange"><Bell size={12} strokeWidth={2.3} />{totPending} ממתינים לאישור</span>}
-        <button className="apple-btn apple-btn-ghost" onClick={exportCSV} disabled={rows.length === 0} style={{ fontSize:14.9 }}>
-          <FileSpreadsheet size={14} strokeWidth={2.2} />
-          ייצוא CSV
-        </button>
-        <button className="apple-btn apple-btn-ghost" onClick={() => window.print()} style={{ fontSize:14.9 }}><Printer size={14} strokeWidth={2.2} />הדפסה</button>
+      <div className="no-print">
+        <PageHead
+          title="דוח רשת — סימולציית שכר תשפ״ו"
+          subtitle={`עלות השכר בכל הרשת, בית ספר מול בית ספר · ${rows.filter(r=>r.count>0).length} בתי ספר · ${totCount} עובדי הוראה`}
+          actions={
+            <>
+              {totPending > 0 && <span className="apple-badge badge-orange"><Bell size={12} strokeWidth={2.3} />{totPending} ממתינים לאישור</span>}
+              <button className="apple-btn apple-btn-ghost" onClick={exportCSV} disabled={rows.length === 0} style={{ fontSize:14.9 }}>
+                <FileSpreadsheet size={14} strokeWidth={2.2} />
+                ייצוא CSV
+              </button>
+              <button className="apple-btn apple-btn-ghost" onClick={() => window.print()} style={{ fontSize:14.9 }}><Printer size={14} strokeWidth={2.2} />הדפסה</button>
+            </>
+          }
+        />
       </div>
 
       {/* Stat cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(155px, 1fr))', gap:12, padding:'20px 20px 0' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(155px, 1fr))', gap:12, marginBottom:20 }}>
         {[
           { label:'סה״כ עובדי הוראה',           val: totCount.toLocaleString('he-IL') },
           { label:'בתי ספר פעילים',       val: rows.filter(r=>r.count>0).length.toLocaleString('he-IL') },
@@ -4161,7 +4184,7 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
       </div>
 
       {/* Table */}
-      <div style={{ padding:'20px 20px 40px' }}>
+      <div>
         <div className="sheet-wrap">
           <div className="sheet-scroll" style={{ maxHeight:'none' }}>
           <table className="apple-table">
@@ -4910,8 +4933,15 @@ function NotificationsView() {
   }, []);
   useEffect(() => { let alive = true; (async () => { if (alive) await load(); })(); return () => { alive = false; }; }, [load]);
 
-  if (err)   return <p style={{ padding:20, color:'var(--danger)', fontSize:14.9 }}>{err}</p>;
-  if (!rows) return <p style={{ padding:20, fontSize:15.5, color:'var(--text3)' }}>טוען…</p>;
+  // מצבי טעינה ושגיאה יושבים באותה מעטפת עמוד — המסך לא קופץ כשהרשימה מגיעה
+  if (err || !rows) return (
+    <div className="page-wrap" style={{ maxWidth:820 }} dir="rtl">
+      <PageHead title="התראות" />
+      <p style={{ fontSize:14.9, color: err ? 'var(--danger)' : 'var(--text3)', padding:'8px 0' }}>
+        {err || 'טוען…'}
+      </p>
+    </div>
+  );
 
   const mine = rows.filter(n => n.channel === 'inapp');
   const sent = rows.filter(n => n.channel !== 'inapp');
@@ -4933,7 +4963,12 @@ function NotificationsView() {
   };
 
   return (
-    <div className="fade-in" style={{ maxWidth:820, margin:'0 auto', padding:'18px 20px 40px' }} dir="rtl">
+    <div className="fade-in page-wrap" style={{ maxWidth:820 }} dir="rtl">
+      <PageHead
+        title="התראות"
+        subtitle="כל התראה שהמערכת הפיקה נשמרת כאן, גם אחרי שנשלחה בוואטסאפ. הוואטסאפ נעלם בין הודעות; זה נשאר."
+      />
+
       <div className="apple-seg" style={{ marginBottom:14 }}>
         <button onClick={() => setTab('mine')} className={['apple-seg-item', tab === 'mine' ? 'active' : ''].join(' ')}
           style={{ padding:'6px 13px', fontSize:14.9 }}>
@@ -4944,13 +4979,6 @@ function NotificationsView() {
           מה שנשלח ({sent.length})
         </button>
       </div>
-
-      {tab === 'mine' && (
-        <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6, marginBottom:12 }}>
-          כאן נשמרת כל התראה שהמערכת הפיקה, גם אחרי שהיא נשלחה בוואטסאפ.
-          הוואטסאפ נעלם בין הודעות; זה נשאר.
-        </p>
-      )}
 
       {list.length === 0 && (
         <p style={{ fontSize:14.9, color:'var(--text3)', textAlign:'center', padding:'40px 0' }}>
@@ -5043,7 +5071,13 @@ function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveSco
   const missingCost  = rows.filter(t => simComplete(t) && !t._actualEmployerCost).length;
 
   return (
-    <div className="fade-in" style={{ maxWidth:1400, margin:'0 auto', padding:'18px 20px 40px' }} dir="rtl">
+    <div className="fade-in page-wrap" style={{ maxWidth:1400 }} dir="rtl">
+      <PageHead
+        title={`שולחן השכר · ${fmtMonth(activeMonth)}`}
+        subtitle={isClerk
+          ? 'הזנת ברוטו ותוספת בית חב"ד, עלות מעביד בפועל, ותלושי החודש.'
+          : 'אחוזי משרה, הזנת שכר, עלות מעביד בפועל, ומסמכי החודש.'}
+      />
       <div className="apple-seg" style={{ marginBottom:14, flexWrap:'wrap' }}>
         {canSetScope && (
           <button onClick={() => setTab('scope')} className={['apple-seg-item', tab === 'scope' ? 'active' : ''].join(' ')}
@@ -6719,7 +6753,7 @@ export default function App() {
       <UpdateBanner />
 
       <header className="app-header no-print">
-        <div style={{ maxWidth:1152, margin:'0 auto', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, minHeight:60, flexWrap:'wrap' }}>
+        <div style={{ maxWidth:1400, margin:'0 auto', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, minHeight:60, flexWrap:'wrap' }}>
 
           <div onClick={() => isCoord && setView('schools')}
             style={{ display:'flex', alignItems:'center', gap:11, cursor: isCoord ? 'pointer' : 'default', padding:'9px 0' }}>
@@ -6734,37 +6768,21 @@ export default function App() {
           </div>
 
           <div className="nav-scroll" style={{ display:'flex', gap:5, alignItems:'center', flexWrap:'nowrap', overflowX:'auto', maxWidth:'100%', paddingBottom:2 }}>
+            {/* הסרגל מקובץ לפי זרימת העבודה: עבודה שוטפת (סימולציה,
+                אישורים, תלושים) · ניתוח (דוח רשת, עלות הוראה) · ניהול
+                (קליטה, התראות) · מערכת (חודש, גיבוי, יציאה). מפריד דק
+                בין קבוצה לקבוצה. */}
             {isCoord && view !== 'schools' && (
-              <button className="nav-btn" onClick={() => setView('schools')}>
-                <ArrowRight size={15} strokeWidth={2.4} />
-                ראשי
-              </button>
+              <>
+                <button className="nav-btn" onClick={() => setView('schools')}>
+                  <ArrowRight size={15} strokeWidth={2.4} />
+                  ראשי
+                </button>
+                <span className="nav-sep" />
+              </>
             )}
-            {isCoord && (
-              <button className={`nav-btn ${view==='report' ? 'active' : ''}`} onClick={() => setView('report')}>
-                <BarChart3 size={15} strokeWidth={2.2} />
-                דוח רשת
-              </button>
-            )}
-            {isCoord && (
-              <button className={`nav-btn ${view==='finance' ? 'active' : ''}`} onClick={() => setView('finance')}>
-                <Wallet size={15} strokeWidth={2.2} />
-                עלות הוראה
-              </button>
-            )}
-            {(isCoord || isClerk) && (
-              <button className={`nav-btn ${view==='slips' ? 'active' : ''}`} onClick={() => setView('slips')}>
-                <FileText size={15} strokeWidth={2.2} />
-                תלושים
-              </button>
-            )}
-            {/* מה שהמערכת אמרה ולמי — הוואטסאפ נבלע בין הודעות, זה נשאר */}
-            {(isCoord || isClerk) && (
-              <button className={`nav-btn ${view==='alerts' ? 'active' : ''}`} onClick={() => setView('alerts')}>
-                <Bell size={15} strokeWidth={2.2} />
-                התראות
-              </button>
-            )}
+
+            {/* ── עבודה שוטפת ── */}
             {(isCoord || isClerk) && (
               <button className={`nav-btn ${view==='calc' ? 'active' : ''}`} onClick={() => setView('calc')} style={{ position:'relative' }}>
                 <Calculator size={15} strokeWidth={2.2} />
@@ -6789,12 +6807,46 @@ export default function App() {
                 {needsApprovalCount > 0 ? `${needsApprovalCount} לאישור` : 'אישורים'}
               </button>
             )}
+            {(isCoord || isClerk) && (
+              <button className={`nav-btn ${view==='slips' ? 'active' : ''}`} onClick={() => setView('slips')}>
+                <FileText size={15} strokeWidth={2.2} />
+                תלושים
+              </button>
+            )}
+            {(isCoord || isClerk) && <span className="nav-sep" />}
+
+            {/* ── ניתוח ── */}
+            {isCoord && (
+              <button className={`nav-btn ${view==='report' ? 'active' : ''}`} onClick={() => setView('report')}>
+                <BarChart3 size={15} strokeWidth={2.2} />
+                דוח רשת
+              </button>
+            )}
+            {isCoord && (
+              <button className={`nav-btn ${view==='finance' ? 'active' : ''}`} onClick={() => setView('finance')}>
+                <Wallet size={15} strokeWidth={2.2} />
+                עלות הוראה
+              </button>
+            )}
+            {isCoord && <span className="nav-sep" />}
+
+            {/* ── ניהול ── */}
             {isCoord && (
               <button className="nav-btn" onClick={() => setShowOnboarding(true)}>
                 <FileText size={15} strokeWidth={2.2} />
                 קליטה
               </button>
             )}
+            {/* מה שהמערכת אמרה ולמי — הוואטסאפ נבלע בין הודעות, זה נשאר */}
+            {(isCoord || isClerk) && (
+              <button className={`nav-btn ${view==='alerts' ? 'active' : ''}`} onClick={() => setView('alerts')}>
+                <Bell size={15} strokeWidth={2.2} />
+                התראות
+              </button>
+            )}
+            {(isCoord || isClerk) && <span className="nav-sep" />}
+
+            {/* ── מערכת ── */}
 
             {/* Month selector */}
             <div style={{ display:'flex', alignItems:'center', gap:2, background:'var(--fill)', border:'1px solid var(--line)', borderRadius:11, padding:'3px 4px', flexShrink:0 }}>
@@ -6929,20 +6981,17 @@ export default function App() {
           />
         ) : (
           /* Coordinator: schools list */
-          <div style={{ maxWidth:1152, margin:'0 auto', padding:'24px 20px' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-              <div>
-                <div style={{ display:'flex', alignItems:'center', gap:9 }}>
-                  <span className="title-bar" />
-                  <h2 style={{ fontSize:26.4, fontWeight:800, letterSpacing:'-0.025em', color:'var(--text)' }}>בתי הספר</h2>
-                </div>
-                <p style={{ fontSize:14.9, color:'var(--text3)', marginInlineStart:13 }}>{schools.length} בתי ספר ברשת</p>
-              </div>
-              <button className="apple-btn apple-btn-blue" onClick={() => setSchoolModal({ id:'', name:'', city:'', reform:'ofek' })}>
-                <Plus size={15} strokeWidth={2.6} />
-                הוסף בית ספר
-              </button>
-            </div>
+          <div className="page-wrap" style={{ maxWidth:1152 }}>
+            <PageHead
+              title="בתי הספר"
+              subtitle={`${schools.length} בתי ספר ברשת · חודש ${fmtMonth(activeMonth)}`}
+              actions={
+                <button className="apple-btn apple-btn-blue" onClick={() => setSchoolModal({ id:'', name:'', city:'', reform:'ofek' })}>
+                  <Plus size={15} strokeWidth={2.6} />
+                  הוסף בית ספר
+                </button>
+              }
+            />
             {/* מעקב מילוי — ראשון, כי זו השאלה הראשונה של השליח בבוקר */}
             {schools.length > 0 && (
               <FillProgress schools={schools} month={activeMonth}
