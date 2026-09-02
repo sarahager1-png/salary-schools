@@ -509,3 +509,17 @@ export {
   payBreakdown,
   calcEmployer,
 };
+
+/* ── גזירת נתוני התלוש (שרה, 3.9) ──────────────────────────────
+   התלוש נבנה בעולם ישן: דרגה מהתואר, אחוז מהשעות (+3 למחנכת,
+   +10 לאם מעל 79%), הבסיס = הברוטו פחות תוספת בית חב"ד. */
+const SLIP_DARGA = { MA: '2', BA: '3', senior: '7', intern: '18', unlicensed: '12' };
+export const slipDarga = (t) => SLIP_DARGA[t.degree] || null;
+export function slipScope(t) {
+  const pseudo = { reform: 'pre', frontalHours: t.frontalHours, role: t.role,
+    gender: t.gender, childrenUnder18: t.childrenUnder18 };
+  const base = computedBaseScope(pseudo);
+  const bonus = momBonusEligible({ ...pseudo, scope: base, scopePct: base }) ? MOM_SCOPE_BONUS : 0;
+  return { base, bonus, total: Math.min(100, base + bonus),
+    hours: (Number(t.frontalHours) || 0) + homeroomHours(pseudo) };
+}

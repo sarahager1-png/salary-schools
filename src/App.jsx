@@ -84,6 +84,8 @@ import {
   supplementCost,
   payBreakdown,
   calcEmployer,
+  slipDarga,
+  slipScope,
 } from './lib/employer.js';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -3607,6 +3609,114 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   );
 }
 
+
+/* ═══════════════════════════════════════════════════════════════
+   מסך התלושים — על המסך, לא להורדה ("אלו הורדות", שרה 3.9)
+
+   לכל מורה: הבסיס בעולם ישן (הברוטו פחות תוספת בית חב"ד), נתוני
+   התלוש הנגזרים מהשעות, והסה"כ — שהוא בדיוק השכר המאומת. הכול חי
+   מהנתונים; שינוי במערכת משתקף כאן מיד. כפתור הדפסה בכל בית ספר.
+═══════════════════════════════════════════════════════════════ */
+function SlipsView({ schools, teachers, monthKey, fmtMonthFn }) {
+  const money = v => (v == null ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
+  const bySchool = schools.map(sc => ({
+    sc,
+    ts: teachers.filter(t => t.schoolId === sc.id),
+  })).filter(x => x.ts.length);
+
+  const rowFor = (t, paysSupp) => {
+    if (isPrincipalRow(t)) return { skip: 'מנהלת — תלוש נפרד' };
+    if (t.leaveType === 'maternity') return { skip: 'חל"ד — הפרשות בלבד, אין תלוש' };
+    if (t.leaveType === 'unpaid') return { skip: 'חל"ת — אין תלוש' };
+    if (!Number(t.frontalHours)) return { skip: '0 שעות — ממתינה לעדכון המנהלת' };
+    const gross = Number(t._agreedGross) || Number(t._officialGross) || 0;
+    if (!gross) return { skip: 'אין עדיין ברוטו' };
+    const supp = paysSupp ? (Number(t._chabadSupp) || 0) : 0;
+    const scope = t.reform === 'ofek' ? slipScope(t) : null;
+    return {
+      darga: slipDarga(t), vetek: t.seniority,
+      pct: scope ? scope.total : (t.scope ?? t.scopePct ?? 100),
+      hours: scope ? scope.hours : t.frontalHours,
+      kita: t.role && /^homeroom/.test(t.role),
+      base: gross - supp, supp, gross, paysSupp,
+    };
+  };
+
+  return (
+    <div style={{ maxWidth:1180, margin:'0 auto', padding:'0 16px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
+        <h1 style={{ fontSize:24.2, fontWeight:800 }}>תלושים · {fmtMonthFn ? fmtMonthFn(monthKey) : monthKey}</h1>
+        <button className="apple-btn apple-btn-ghost no-print" onClick={() => window.print()}
+          style={{ marginInlineStart:'auto', fontSize:14.9 }}>
+          <Printer size={15} strokeWidth={2.2} />הדפסה
+        </button>
+      </div>
+      <p className="no-print" style={{ fontSize:15.5, color:'var(--text2)', marginBottom:14, lineHeight:1.55 }}>
+        הבסיס בעולם ישן לפי השעות (מחנכת +3 · אם מעל 79% +10), תוספת בית חב"ד שורה קבועה,
+        והסה"כ הוא השכר המאומת. הכול מתעדכן חי מהנתונים.
+      </p>
+      {bySchool.map(({ sc, ts }) => {
+        const paysSupp = sc.chabadSupp !== false;
+        const rows = ts.map(t => ({ t, r: rowFor(t, paysSupp) }));
+        const live = rows.filter(x => !x.r.skip);
+        const tot = live.reduce((a, x) => ({ base: a.base + x.r.base, supp: a.supp + x.r.supp, gross: a.gross + x.r.gross }),
+          { base: 0, supp: 0, gross: 0 });
+        return (
+          <div key={sc.id} className="apple-card slip-school" style={{ padding:'14px 16px', marginBottom:18 }}>
+            <p style={{ fontSize:17.2, fontWeight:800, marginBottom:8 }}>
+              {sc.name} · {live.length} תלושים{!paysSupp ? ' · תשלום ישיר (בלי תוספת)' : ''}
+            </p>
+            <div style={{ overflowX:'auto' }}>
+              <table className="apple-table" style={{ fontSize:14.9, minWidth:760 }}>
+                <thead><tr>
+                  <th>שם</th>
+                  <th style={{ textAlign:'center' }}>דרגה</th>
+                  <th style={{ textAlign:'center' }}>ותק</th>
+                  <th style={{ textAlign:'center' }}>שעות לתלוש</th>
+                  <th style={{ textAlign:'center' }}>אחוז</th>
+                  <th style={{ textAlign:'center' }}>גמול חינוך</th>
+                  <th style={{ textAlign:'center' }}>בסיס עולם ישן</th>
+                  <th style={{ textAlign:'center' }}>תוספת בית חב"ד</th>
+                  <th style={{ textAlign:'center' }}>ברוטו לתשלום</th>
+                </tr></thead>
+                <tbody>
+                  {rows.map(({ t, r }) => r.skip ? (
+                    <tr key={t.id} style={{ color:'var(--text3)' }}>
+                      <td style={{ fontWeight:600 }}>{t.name}</td>
+                      <td colSpan={8} style={{ fontSize:13.8 }}>{r.skip}</td>
+                    </tr>
+                  ) : (
+                    <tr key={t.id}>
+                      <td style={{ fontWeight:600 }}>{t.name}</td>
+                      <td style={{ textAlign:'center' }}>{r.darga || '—'}</td>
+                      <td style={{ textAlign:'center' }}>{r.vetek}</td>
+                      <td style={{ textAlign:'center' }}>{r.hours}</td>
+                      <td style={{ textAlign:'center', fontWeight:600 }}>{r.pct}%</td>
+                      <td style={{ textAlign:'center' }}>{r.kita ? '✓' : ''}</td>
+                      <td style={{ textAlign:'center' }}>{money(r.base)}</td>
+                      <td style={{ textAlign:'center' }}>{r.paysSupp ? money(r.supp) : '—'}</td>
+                      <td style={{ textAlign:'center', fontWeight:800 }}>{money(r.gross)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot><tr style={{ background:'var(--apple-fill)', fontWeight:800 }}>
+                  <td colSpan={6}>סה"כ {sc.name}</td>
+                  <td style={{ textAlign:'center' }}>{money(tot.base)}</td>
+                  <td style={{ textAlign:'center' }}>{money(tot.supp)}</td>
+                  <td style={{ textAlign:'center' }}>{money(tot.gross)}</td>
+                </tr></tfoot>
+              </table>
+            </div>
+          </div>
+        );
+      })}
+      <p className="no-print" style={{ fontSize:13.8, color:'var(--text3)' }}>
+        ההפרשות: פנסיה וקרן השתלמות על הבסיס בלבד; על התוספת מס שכר וביטוח לאומי בלבד.
+      </p>
+    </div>
+  );
+}
+
 function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onCompute, onDelete }) {
   // לחיצה על שורת בית ספר פותחת את פירוט המשרות שלו. פתוח אחד בכל רגע —
   // הדוח נועד להשוואה בין בתי ספר, לא לקריאה של כולם במקביל.
@@ -6140,6 +6250,12 @@ export default function App() {
                 עלות הוראה
               </button>
             )}
+            {(isCoord || isClerk) && (
+              <button className={`nav-btn ${view==='slips' ? 'active' : ''}`} onClick={() => setView('slips')}>
+                <FileText size={15} strokeWidth={2.2} />
+                תלושים
+              </button>
+            )}
             {/* מה שהמערכת אמרה ולמי — הוואטסאפ נבלע בין הודעות, זה נשאר */}
             {(isCoord || isClerk) && (
               <button className={`nav-btn ${view==='alerts' ? 'active' : ''}`} onClick={() => setView('alerts')}>
@@ -6292,6 +6408,8 @@ export default function App() {
           <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} onApprove={onApproveTeacher} simState={simState} onCompute={onCompute} onDelete={onDeleteTeacher} />
         ) : view === 'finance' && user.role === 'coordinator' ? (
           <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} />
+        ) : view === 'slips' ? (
+          <SlipsView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} />
         ) : view === 'school' && activeSchool ? (
           <SchoolView userId={user.id}
             school={activeSchool}
