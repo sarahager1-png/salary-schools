@@ -3611,50 +3611,48 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           התמונה התפעולית מהתקציב במבט-רשת: כל ההכנסות מול כל ההוצאות
           שאינן שכר הוראה וייעוץ. */}
       <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>הכנסות מול הוצאות · ללא עלות הוראה ומשרד החינוך</h2>
-      <div className="apple-card" style={{ padding:0, overflowX:'auto' }}>
-        <table style={{ width:'100%', borderCollapse:'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
-              <TH>בית ספר</TH>
-              <TH>הכנסות ללא משרד החינוך · שנתי</TH>
-              <TH>הוצאות ללא שכר הוראה · שנתי</TH>
-              <TH>הפרש</TH>
-            </tr>
-          </thead>
-          <tbody>
-            {fin !== null && rows.map(({ sc, f }) => {
-              const diff = (f.incomeTotal != null || f.expensesOther != null)
-                ? (f.incomeTotal || 0) - (f.expensesOther || 0) : null;
-              return (
-                <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                  <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
-                  <td style={{ textAlign:'center', fontSize:16.1 }}>{money(f.incomeTotal)}</td>
-                  <td style={{ textAlign:'center', fontSize:16.1 }}>{money(f.expensesOther)}</td>
-                  <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
-                    color: diff == null ? 'var(--text3)' : diff < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
-                    {diff == null ? '—' : money(diff)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-          {fin !== null && rows.length > 1 && (() => {
-            const ti = rows.reduce((a, r) => a + (r.f.incomeTotal || 0), 0);
-            const te = rows.reduce((a, r) => a + (r.f.expensesOther || 0), 0);
-            return (
-              <tfoot>
-                <tr style={{ borderTop:'2px solid var(--line)', background:'var(--apple-fill)', fontWeight:800 }}>
-                  <td style={{ padding:'11px 12px', fontSize:15.5 }}>סה"כ הרשת</td>
-                  <td style={{ textAlign:'center', fontSize:16.1 }}>{money(ti)}</td>
-                  <td style={{ textAlign:'center', fontSize:16.1 }}>{money(te)}</td>
-                  <td style={{ textAlign:'center', fontSize:16.7,
-                    color: ti - te < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(ti - te)}</td>
-                </tr>
-              </tfoot>
-            );
-          })()}
-        </table>
-      </div>
+      {fin !== null && rows.map(({ sc, f }) => {
+        const d = f.detail;
+        if (!d && f.incomeTotal == null) return null;
+        const incLines = d?.income || [];
+        const expLines = d?.expenses || [];
+        const incSum = incLines.reduce((a, x) => a + x.amount, 0) || (f.incomeTotal || 0);
+        const expSum = expLines.reduce((a, x) => a + x.amount, 0) || (f.expensesOther || 0);
+        const diff = incSum - expSum;
+        const line = (x, k) => (
+          <div key={k} style={{ display:'flex', justifyContent:'space-between', gap:10,
+            padding:'4px 0', borderBottom:'1px dashed var(--line)', fontSize:14.9 }}>
+            <span>{x.name}</span><b style={{ whiteSpace:'nowrap' }}>{money(x.amount)}</b>
+          </div>
+        );
+        return (
+          <div key={sc.id} className="apple-card" style={{ padding:'14px 18px', marginBottom:14 }}>
+            <div style={{ display:'flex', alignItems:'baseline', gap:12, marginBottom:8, flexWrap:'wrap' }}>
+              <p style={{ fontSize:16.7, fontWeight:800 }}>{sc.name}</p>
+              <span style={{ fontSize:15.5, fontWeight:800, marginInlineStart:'auto',
+                color: diff < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
+                הפרש: {money(diff)}
+              </span>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:18 }}>
+              <div>
+                <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text2)', marginBottom:4 }}>הכנסות (ללא משרד החינוך)</p>
+                {incLines.map(line)}
+                <div style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', fontSize:14.9, fontWeight:800 }}>
+                  <span>סה"כ הכנסות</span><span>{money(incSum)}</span>
+                </div>
+              </div>
+              <div>
+                <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text2)', marginBottom:4 }}>הוצאות (ללא שכר הוראה)</p>
+                {expLines.map(line)}
+                <div style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', fontSize:14.9, fontWeight:800 }}>
+                  <span>סה"כ הוצאות</span><span>{money(expSum)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:8 }}>
         מהתקציב במבט-רשת: מענק, שכ"ל/תל"ן ומקורות נוספים — מול כל ההוצאות מלבד שכר הוראה,
         מנהלת וייעוץ (משרד החינוך ושכר ההוראה חיים בטבלה העליונה). מתרענן במשיכה.

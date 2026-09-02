@@ -60,6 +60,20 @@ export default async function handler(req, res) {
           ולכן ההוצאות בלי הוראה ובלי ייעוץ.
         */
         incomeOther: Math.max(0, (inc.total || 0) - (inc.ministry || 0)),
+        // הפירוט לשורות ("יהיו מפורטים"): הכנסות בלי משרד, הוצאות בלי שכר הוראה
+        detail: {
+          income: [
+            { name: 'מענק לתלמיד', amount: inc.grant || 0 },
+            { name: 'שכר לימוד ותל"ן (גבייה 80%)', amount: (inc.perStudent || 0) + (inc.talan || 0) },
+            ...(inc.sources || []).map(x => ({ name: x.name, amount: Number(x.amount || 0) })),
+          ].filter(x => x.amount > 0),
+          expenses: [
+            { name: 'חוגים', amount: s.expenses?.clubsExpense || 0 },
+            { name: 'הוצאות פר תלמיד', amount: s.expenses?.studentExp || 0 },
+            { name: 'התמקצעות', amount: s.expenses?.profDev || 0 },
+            ...Object.entries(s.expenses?.byCategory || {}).map(([name, amount]) => ({ name, amount: Number(amount || 0) })),
+          ].filter(x => x.amount > 0),
+        },
         expensesOther: Math.max(0, (s.expenses?.total || 0) - (s.expenses?.teaching || 0) - (s.expenses?.counselingCost || 0)),
         // הסימולציה של שרה במערכת התקציב: עלות ההוראה המתוכננת, שנתית.
         // "עלות הוראה חייב לכלול מנהלת" (שרה, 3.9) — שכר המנהלת מהתקציב
@@ -84,6 +98,10 @@ export default async function handler(req, res) {
       cur.teachingSim = (cur.teachingSim == null && s.teachingSim == null) ? null : (cur.teachingSim || 0) + (s.teachingSim || 0);
       cur.expensesOther = (cur.expensesOther || 0) + (s.expensesOther || 0);
       cur.incomeOther = (cur.incomeOther || 0) + (s.incomeOther || 0);
+      if (s.detail) cur.detail = {
+        income: [...(cur.detail?.income || []), ...s.detail.income],
+        expenses: [...(cur.detail?.expenses || []), ...s.detail.expenses],
+      };
       cur.yieul = (cur.yieul == null && s.yieul == null) ? null : (cur.yieul || 0) + (s.yieul || 0);
     }
     return res.status(200).json({ schools: [...byBase.values()], fetchedAt: new Date().toISOString() });
