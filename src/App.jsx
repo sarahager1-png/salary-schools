@@ -625,9 +625,9 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
   ];
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:100, overflowY:'auto', padding:'24px 16px' }} dir="rtl">
-      <div className="apple-card" style={{ maxWidth:640, margin:'0 auto', padding:0 }}>
-        <div className="no-print" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'14px 20px', borderBottom:'1px solid var(--line)' }}>
+    <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:100, overflowY:'auto', padding:'24px 16px' }} dir="rtl">
+      <div className="apple-card modal-card" style={{ maxWidth:640, margin:'0 auto', padding:0 }}>
+        <div className="no-print modal-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'14px 20px', borderBottom:'1px solid var(--line)', background:'var(--surface)' }}>
           <h2 style={{ fontSize:19.5, fontWeight:800, color:'var(--text)' }}>נתוני העסקה לחתימה</h2>
           <div style={{ display:'flex', gap:8 }}>
             <button className="apple-btn apple-btn-blue" onClick={() => window.print()} style={{ minHeight:36, fontSize:14.9 }}>
@@ -713,10 +713,10 @@ function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
   })).filter(g => g.ts.length > 0);
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, overflowY:'auto', backdropFilter:'blur(6px)' }} dir="rtl">
-      <div style={{ maxWidth:680, margin:'0 auto', background:'var(--apple-bg)', minHeight:'100vh', padding:24 }}>
+    <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, overflowY:'auto', backdropFilter:'blur(6px)' }} dir="rtl">
+      <div className="modal-card" style={{ maxWidth:680, margin:'0 auto', background:'var(--apple-bg)', minHeight:'100vh', padding:24 }}>
         {/* Header */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
+        <div className="modal-head" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24, gap:10, flexWrap:'wrap' }}>
           <div>
             <h2 style={{ fontSize:23, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)', marginBottom:2 }}>אישור שכר חודשי</h2>
             <p style={{ fontSize:14.9, color:'var(--apple-text2)' }}>{readyToApprove.length} ממתינים לאישורך</p>
@@ -824,8 +824,8 @@ function ScopeChangeModal({ teacher, onSave, onClose }) {
   const syncFromFrontal = hrs => setC(p => ({...p, frontalHours: hrs,                  scopePct: baseFrontal > 0 ? Math.round((hrs/baseFrontal)*100) : 100 }));
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(6px)' }}>
-      <div className="apple-card" style={{ width:'100%', maxWidth:360, padding:24 }}>
+    <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(6px)', overflowY:'auto' }}>
+      <div className="apple-card modal-card" style={{ width:'100%', maxWidth:360, padding:24 }}>
         <h3 style={{ fontWeight:700, fontSize:19.5, letterSpacing:'-0.01em', color:'var(--apple-text)', marginBottom:20 }}>שינוי משרה — {teacher.name}</h3>
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
           <div>
@@ -1148,9 +1148,9 @@ function ImportModal({ schoolId, schoolName, onImport, onClose }) {
   };
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', padding:16, overflowY:'auto' }}>
-      <div className="apple-card" style={{ width:'100%', maxWidth:640, padding:24, margin:'16px auto' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+    <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', padding:16, overflowY:'auto' }}>
+      <div className="apple-card modal-card" style={{ width:'100%', maxWidth:640, padding:24, margin:'16px auto' }}>
+        <div className="modal-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
           <h2 style={{ fontWeight:700, fontSize:19.5, color:'var(--apple-text)', letterSpacing:'-0.01em' }}>ייבוא עובדי הוראה — {schoolName}</h2>
           <button onClick={onClose} style={{ background:'var(--apple-fill)', border:'none', borderRadius:8, width:28, height:28, cursor:'pointer', fontSize:16.1, color:'var(--apple-text2)', display:'flex', alignItems:'center', justifyContent:'center' }}><X size={15} strokeWidth={2.4} /></button>
         </div>
@@ -1198,7 +1198,7 @@ function ImportModal({ schoolId, schoolName, onImport, onClose }) {
               <Lightbulb size={13} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-2px', marginInlineEnd:4 }} />
             לאחר הייבוא — כנסי לסימולטור והזיני את השכר הרשמי לכל מורה
             </div>
-            <div style={{ overflowX:'auto', border:'1px solid var(--apple-fill2)', borderRadius:12, maxHeight:220, overflowY:'auto' }}>
+            <div className="table-scroll" style={{ overflowX:'auto', border:'1px solid var(--apple-fill2)', borderRadius:12, maxHeight:220, overflowY:'auto' }}>
               <table className="apple-table" style={{ fontSize:13.8 }}>
                 <thead>
                   <tr>
@@ -1344,13 +1344,13 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
   const sortedChanges = [...t.scopeChanges].sort((a,b) => b.date.localeCompare(a.date));
 
   return (
-    <div className={['fixed inset-0 bg-black/50 z-50 flex', showSimulator ? 'flex-row items-stretch' : 'flex-col items-center justify-start overflow-y-auto p-4'].join(' ')}>
+    <div className={['fixed inset-0 bg-black/50 z-50 flex', showSimulator ? 'flex-row items-stretch' : 'flex-col items-center justify-start overflow-y-auto p-4 modal-overlay'].join(' ')}>
 
       {/* טופס — פאנל ימין */}
-      <div style={showSimulator
+      <div className={showSimulator ? undefined : 'modal-card'} style={showSimulator
         ? { width:'45%', display:'flex', flexDirection:'column', background:'#fff', overflowY:'auto' }
         : { background:'#fff', borderRadius:18, width:'100%', maxWidth:520, margin:'24px auto', boxShadow:'var(--apple-shadow)' }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 24px', borderBottom:'0.5px solid var(--apple-fill2)' }}>
+        <div className="modal-head" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 24px', borderBottom:'0.5px solid var(--apple-fill2)', background:'#fff' }}>
           <h2 style={{ fontSize:19.5, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)' }}>{t.id ? 'עריכת עובד/ת הוראה' : 'הוספת עובד/ת הוראה'}</h2>
           <button onClick={onClose} style={{ background:'var(--apple-fill)', border:'none', borderRadius:'50%', width:28, height:28, fontSize:16.1, cursor:'pointer', color:'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center' }}><X size={15} strokeWidth={2.4} /></button>
         </div>
@@ -1889,8 +1889,8 @@ function SchoolModal({ school, onSave, onClose }) {
   // לחיצה כפולה יצרה שני בתי ספר זהים. הכפתור נעול עד שהשמירה חוזרת.
   const [saving, setSaving] = useState(false);
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(6px)' }}>
-      <div className="apple-card" style={{ width:'100%', maxWidth:360, padding:24 }}>
+    <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(6px)', overflowY:'auto' }}>
+      <div className="apple-card modal-card" style={{ width:'100%', maxWidth:360, padding:24 }}>
         <h2 style={{ fontSize:19.5, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)', marginBottom:20 }}>
           {s.id ? 'עריכת בית ספר' : 'הוספת בית ספר'}
         </h2>
@@ -1986,9 +1986,9 @@ function SchoolReport({ school, teachers, onClose }) {
   };
 
   return (
-    <div className="print-sheet" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, overflowY:'auto' }} dir="rtl">
-      <div style={{ maxWidth:1000, margin:'0 auto', background:'var(--apple-surface)', minHeight:'100vh', padding:32 }}>
-        <div className="no-print" style={{ display:'flex', justifyContent:'space-between', marginBottom:24 }}>
+    <div className="print-sheet modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, overflowY:'auto' }} dir="rtl">
+      <div className="modal-card" style={{ maxWidth:1000, margin:'0 auto', background:'var(--apple-surface)', minHeight:'100vh', padding:32 }}>
+        <div className="no-print modal-head" style={{ display:'flex', justifyContent:'space-between', marginBottom:24, gap:8, flexWrap:'wrap' }}>
           <button className="apple-btn apple-btn-ghost" onClick={onClose}><ArrowRight size={15} strokeWidth={2.4} />חזרה</button>
           <div style={{ display:'flex', gap:8 }}>
             <button className="apple-btn apple-btn-ghost" onClick={exportExcel}>הורדה לאקסל</button>
@@ -2022,7 +2022,8 @@ function SchoolReport({ school, teachers, onClose }) {
           ))}
         </div>
 
-        <table className="apple-table" style={{ fontSize:13.8, marginBottom:24 }}>
+        <div className="table-scroll" style={{ marginBottom:24 }}>
+        <table className="apple-table sticky-first" style={{ fontSize:13.8 }}>
           <thead>
             <tr>
               <th>שם</th><th>ת.ז.</th><th style={{ textAlign:'center' }}>רפורמה</th>
@@ -2072,12 +2073,13 @@ function SchoolReport({ school, teachers, onClose }) {
             </tr>
           </tfoot>
         </table>
-
+        </div>
 
         {ts.some(t => t.scopeChanges?.length > 0) && (
           <div style={{ marginBottom:24 }}>
             <h3 style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-text)', marginBottom:12, paddingBottom:8, borderBottom:'1px solid var(--apple-fill2)' }}>שינויי משרה במהלך השנה</h3>
-            <table className="apple-table" style={{ fontSize:13.8 }}>
+            <div className="table-scroll">
+            <table className="apple-table sticky-first" style={{ fontSize:13.8 }}>
               <thead>
                 <tr>
                   <th>מורה</th><th style={{ textAlign:'center' }}>תאריך</th>
@@ -2099,6 +2101,7 @@ function SchoolReport({ school, teachers, onClose }) {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
@@ -2142,10 +2145,10 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
   };
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:100, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'24px 16px', overflowY:'auto' }} dir="rtl">
-      <div style={{ background:'#fff', borderRadius:18, width:'100%', maxWidth:860, boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+    <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:100, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'24px 16px', overflowY:'auto' }} dir="rtl">
+      <div className="modal-card" style={{ background:'#fff', borderRadius:18, width:'100%', maxWidth:860, boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
         {/* Header */}
-        <div style={{ background:'linear-gradient(135deg, var(--purple), #6A47A8)', borderRadius:'20px 20px 0 0', padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap', color:'#fff' }}>
+        <div className="modal-head" style={{ background:'linear-gradient(135deg, var(--purple), #6A47A8)', borderRadius:'20px 20px 0 0', padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap', color:'#fff' }}>
           <div>
             <h2 style={{ fontWeight:800, fontSize:23, marginBottom:2 }}>דוח ממ"מ והעדרויות</h2>
             <p style={{ fontSize:14.9, opacity:.85 }}>{school.name} — {monthLabel}</p>
@@ -2172,7 +2175,7 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
         </div>
 
         {/* Table */}
-        <div style={{ padding:'0 24px 24px', overflowX:'auto' }}>
+        <div className="table-scroll" style={{ padding:'0 24px 24px', overflowX:'auto' }}>
           {withAbsence.length === 0 ? (
             <div style={{ textAlign:'center', padding:'32px', color:'#aaa', fontSize:16.1 }}>אין העדרויות או ממ"מ לחודש זה</div>
           ) : (
@@ -2555,7 +2558,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
             </div>
           </div>
 
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+          <div className="toolbar-stack" style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
             <div style={{ position:'relative', flex:'1 1 190px', maxWidth:250 }}>
               <Search size={15} strokeWidth={2.2}
                 style={{ position:'absolute', insetInlineStart:12, top:'50%', transform:'translateY(-50%)', color:'var(--text3)', pointerEvents:'none' }} />
@@ -3262,8 +3265,8 @@ function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute
       <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text2)', marginBottom:8 }}>
         פירוט המשרות — {school.name} · {ts.length} עובדי הוראה
       </p>
-      <div className="sheet-wrap">
-        <table className="apple-table" style={{ fontSize:14.4 }}>
+      <div className="sheet-wrap table-scroll">
+        <table className="apple-table sticky-first" style={{ fontSize:14.4 }}>
           <thead>
             <tr>
               <th>שם</th>
@@ -3624,8 +3627,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         <div style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'1px solid var(--danger-line)', borderRadius:10,
           padding:'9px 14px', fontSize:14.9, fontWeight:600, marginBottom:12 }}>{err}</div>
       )}
-      <div className="apple-card" style={{ padding:0, overflowX:'auto' }}>
-        <table style={{ width:'100%', borderCollapse:'collapse' }}>
+      <div className="apple-card table-scroll" style={{ padding:0, overflowX:'auto' }}>
+        <table className="sticky-first" style={{ width:'100%', borderCollapse:'collapse' }}>
           <thead>
             <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
               <TH>בית ספר</TH>
@@ -3889,8 +3892,8 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
             <p style={{ fontSize:17.2, fontWeight:800, marginBottom:8 }}>
               {sc.name} · {live.length} תלושים{!paysSupp ? ' · תשלום ישיר (בלי תוספת)' : ''}
             </p>
-            <div style={{ overflowX:'auto' }}>
-              <table className="apple-table" style={{ fontSize:14.9, minWidth:760 }}>
+            <div className="table-scroll">
+              <table className="apple-table sticky-first" style={{ fontSize:14.9, minWidth:760 }}>
                 <thead><tr>
                   <th>שם</th>
                   <th style={{ textAlign:'center' }}>דרגה</th>
@@ -3968,9 +3971,9 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
         const { t, r } = openSlip;
         const sl = lines[t.id];
         return (
-          <div onClick={() => setOpenSlip(null)} className="print-sheet"
+          <div onClick={() => setOpenSlip(null)} className="print-sheet modal-overlay"
             style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.5)', zIndex:70, overflowY:'auto' }} dir="rtl">
-            <div onClick={e => e.stopPropagation()}
+            <div onClick={e => e.stopPropagation()} className="modal-card"
               style={{ maxWidth:560, margin:'26px auto', background:'#fff', borderRadius:14, padding:'22px 26px' }}>
               <div className="no-print" style={{ display:'flex', justifyContent:'space-between', marginBottom:10 }}>
                 <button className="apple-btn apple-btn-blue" onClick={() => window.print()} style={{ fontSize:14.4 }}>
@@ -4134,7 +4137,7 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
       <div>
         <div className="sheet-wrap">
           <div className="sheet-scroll" style={{ maxHeight:'none' }}>
-          <table className="apple-table">
+          <table className="apple-table sticky-first">
             <thead>
               <tr>
                 <th>בית ספר</th>
@@ -4507,8 +4510,8 @@ function PrincipalLinkModal({ school, onClose }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,11,53,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, backdropFilter: 'blur(6px)' }} dir="rtl" onClick={onClose}>
-      <div className="apple-card" style={{ width: '100%', maxWidth: 420, padding: 24 }} onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(26,11,53,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, backdropFilter: 'blur(6px)', overflowY: 'auto' }} dir="rtl" onClick={onClose}>
+      <div className="apple-card modal-card" style={{ width: '100%', maxWidth: 420, padding: 24 }} onClick={e => e.stopPropagation()}>
         <h2 style={{ fontSize: 19.5, fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>קישור אישי — {school.name}</h2>
         {st.error && <p style={{ fontSize: 14.9, color: 'var(--danger)', lineHeight: 1.6 }}>{st.error}</p>}
         {pr && (
@@ -5202,8 +5205,8 @@ function BackupModal({ schools, months, onClose }) {
   };
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(6px)', overflowY:'auto' }} dir="rtl">
-      <div className="apple-card spring-enter" style={{ width:'100%', maxWidth:440, padding:24, margin:'auto' }}>
+    <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(6px)', overflowY:'auto' }} dir="rtl">
+      <div className="apple-card spring-enter modal-card" style={{ width:'100%', maxWidth:440, padding:24, margin:'auto' }}>
 
         <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, marginBottom:18 }}>
           <div>
@@ -5525,9 +5528,9 @@ function Form101Print({ row, onClose }) {
   ];
 
   return (
-    <div className="print-sheet" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:60, overflowY:'auto' }} dir="rtl">
-      <div style={{ maxWidth:820, margin:'20px auto', background:'#fff', padding:'26px 30px', borderRadius:8 }}>
-        <div className="no-print" style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
+    <div className="print-sheet modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:60, overflowY:'auto' }} dir="rtl">
+      <div className="modal-card" style={{ maxWidth:820, margin:'20px auto', background:'#fff', padding:'26px 30px', borderRadius:8 }}>
+        <div className="no-print modal-head" style={{ display:'flex', justifyContent:'space-between', marginBottom:16, gap:8, flexWrap:'wrap', background:'#fff' }}>
           <button className="apple-btn apple-btn-blue" onClick={() => window.print()}>
             <Printer size={15} strokeWidth={2.2} />הדפסה / שמירה כ-PDF
           </button>
@@ -6173,9 +6176,9 @@ function OnboardingAdmin({ activeMonth, onClose }) {
   const complete = (rows || []).filter(r => doneOf(r) >= 5).length;
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:70, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:16, overflowY:'auto', backdropFilter:'blur(6px)' }} onClick={onClose}>
-      <div className="apple-card" onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:860, padding:22, marginTop:20 }} dir="rtl">
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:4 }}>
+    <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:70, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:16, overflowY:'auto', backdropFilter:'blur(6px)' }} onClick={onClose}>
+      <div className="apple-card modal-card" onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:860, padding:22, marginTop:20 }} dir="rtl">
+        <div className="modal-head" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:4 }}>
           <div>
             <p style={{ fontWeight:800, fontSize:20.7 }}>קליטת עובדות — טופס 101, מסמכים וחוזה</p>
             <p style={{ fontSize:14.4, color:'var(--text3)' }}>דדליין: {OB_DEADLINE} · הושלמו {complete} / {total}</p>
@@ -6203,8 +6206,8 @@ function OnboardingAdmin({ activeMonth, onClose }) {
         ) : Object.entries(bySchool).map(([sn, list]) => (
           <div key={sn} style={{ marginTop:14 }}>
             <p style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:6 }}>{sn} · {list.filter(r => doneOf(r) >= 7).length}/{list.length} הושלמו</p>
-            <div style={{ overflowX:'auto' }}>
-              <table className="apple-table" style={{ fontSize:13.8 }}>
+            <div className="table-scroll">
+              <table className="apple-table sticky-first" style={{ fontSize:13.8 }}>
                 <thead><tr>
                   <th>עובדת</th><th style={{ textAlign:'center' }}>101</th><th style={{ textAlign:'center' }}>ת.ז.</th>
                   <th style={{ textAlign:'center' }}>נתוני שכר</th><th style={{ textAlign:'center' }}>תיק משה"ח</th>
@@ -6418,6 +6421,13 @@ export default function App() {
   const [showApproval,  setShowApproval]  = useState(false);
   const [showBackup,    setShowBackup]    = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // הניווט העליון גולל אופקית במובייל — הלשונית הפעילה נגררת אל תוך
+  // שדה הראייה, אחרת מעבר מסך משאיר את הסימון מחוץ למסך בלי עדות.
+  useEffect(() => {
+    const el = document.querySelector('.app-header .nav-btn.active');
+    if (el) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [view]);
 
   // כל שינוי נשמר בשרת ואז נטען מחדש. פשוט, ותמיד מסונכרן עם מה שבאמת נשמר.
   const refresh = useCallback(async () => {

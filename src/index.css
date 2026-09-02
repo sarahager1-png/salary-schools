@@ -367,10 +367,13 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 
 @media (max-width: 767px) {
   .sheet-scroll { max-height: none; }
-  .sheet-scroll .sticky-head th:first-child,
-  .sheet-scroll .sticky-head td:first-child,
+  /* במובייל עמודת השם נשארת נעוצה — עוגן קריאה בגלילה הרוחבית.
+     הרקע מפורש ולא inherit: inherit נפתר לשקוף בשורה רגילה והטקסטים
+     נערמים זה על זה. עמודת הסה"כ משתחררת — שתי עמודות נעוצות על 390px
+     משאירות פס תוכן צר מדי. */
   .sheet-scroll .sticky-head th:nth-last-child(2),
   .sheet-scroll .sticky-head td:nth-last-child(2) { position: static; box-shadow: none; }
+  .sheet-scroll .sticky-head td:first-child { background: var(--surface); }
 }
 .sheet-table { width: 100%; border-collapse: collapse; font-size: 14.9px; font-variant-numeric: tabular-nums; }
 .sheet-table th {
@@ -639,8 +642,18 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   /* !important בכוונה: השדות בתאים נושאים fontSize ידני (13.8–14.9)
      שגובר על stylesheet, ו-iOS עושה זום-קפיצה על כל שדה מתחת ל-16px.
      כלל הנגישות כאן חזק מהעיצוב הנקודתי. */
-  .apple-table input, .apple-table select { min-height: 38px; font-size: 16px !important; }
-  .apple-table button[title] { min-width: 40px; min-height: 38px; }
+  .apple-table input, .apple-table select { min-height: 44px; font-size: 16px !important; }
+  .apple-table button[title] { min-width: 44px; min-height: 44px; }
+
+  /* יעדי מגע במסכי הניהול: 44px ומעלה לכל כפתור ושדה (דוח 3.9).
+     min-height ולא height — כפתור עם טקסט שנשבר לשתי שורות גדל, לא נחתך.
+     !important בכוונה: לכפתורים רבים minHeight קטן ב-inline (32 ,28)
+     שנכון לדסקטופ בלבד — במובייל כלל המגע גובר. */
+  .apple-btn   { min-height: 44px !important; }
+  .sheet-btn   { min-height: 44px !important; }
+  .apple-input, .apple-select { min-height: 44px; font-size: 16px; }
+  .apple-seg-item { min-height: 40px; }
+  .nav-btn { height: 42px; }
 }
 
 /* מחוץ למדיה — הריפוד הידני (40px) על ה-main גובר על הכלל, ולכן
@@ -669,4 +682,72 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
     overflow: visible !important;
     text-overflow: clip !important;
   }
+}
+
+/* ═══ התאמת מובייל מלאה למסכי הניהול ("לא מותאם מובייל לחלוטין", שרה 3.9) ═══ */
+
+/* ── רמז גלילה לטבלאות רחבות ──
+   צל בקצה המיכל שמופיע רק כשיש עוד תוכן באותו כיוון ונעלם בקצה הגלילה
+   (background-attachment: local מזיז את שכבת הכיסוי עם התוכן). עובד
+   בשני הכיוונים, ולכן נכון גם ב-RTL. הצל סגול-רשת, לא אפור זר. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+.sheet-scroll, .table-scroll {
+  background:
+    linear-gradient(to right, var(--surface) 40%, rgba(255,255,255,0)) 0 0,
+    linear-gradient(to left,  var(--surface) 40%, rgba(255,255,255,0)) 100% 0,
+    radial-gradient(farthest-side at 0 50%,   rgba(75,46,131,.24), transparent) 0 0,
+    radial-gradient(farthest-side at 100% 50%, rgba(75,46,131,.24), transparent) 100% 0;
+  background-repeat: no-repeat;
+  background-size: 36px 100%, 36px 100%, 12px 100%, 12px 100%;
+  background-attachment: local, local, scroll, scroll;
+  background-color: var(--surface);
+}
+
+/* ── עמודת שם נעוצה בטבלאות שאינן הגיליון (דוח רשת, תלושים, עלות
+   הוראה, קליטה) — במובייל בלבד; בדסקטופ הטבלאות האלה נכנסות במסך. ── */
+@media (max-width: 767px) {
+  .sticky-first th:first-child, .sticky-first td:first-child {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 2;
+    background: var(--surface);
+    box-shadow: -1px 0 0 var(--line-soft);
+  }
+  .sticky-first thead th:first-child { background: var(--surface); z-index: 3; }
+  .apple-table.sticky-first thead th:first-child { background: var(--bg); }
+  .sticky-first tfoot td:first-child { background: var(--fill); }
+  .sticky-first tbody tr:hover td:first-child { background: var(--fill); }
+}
+
+/* ── דיאלוגים צפים במובייל: כל המסך, גלילה פנימית, כותרת דביקה ──
+   העטיפות ממוקמות inline (position:fixed + ריפוד), ולכן !important —
+   הכלל כאן גובר בכוונה על ריפוד וריכוז שנכונים רק לדסקטופ. */
+@media (max-width: 640px) {
+  .modal-overlay { padding: 0 !important; display: block !important; }
+  .modal-overlay .modal-card {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    min-height: 100dvh;
+    box-shadow: none !important;
+    padding-bottom: calc(28px + env(safe-area-inset-bottom)) !important;
+  }
+  /* שורת הכותרת של הדיאלוג נשארת למעלה בגלילה — כפתור הסגירה תמיד ביד */
+  .modal-card .modal-head {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: inherit;
+  }
+}
+
+/* ── סרגל הכלים של מסך בית הספר: רשת מסודרת במקום כפתורים נדחסים ── */
+@media (max-width: 640px) {
+  .toolbar-stack { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; }
+  .toolbar-stack > * { width: 100%; max-width: none !important; }
+  .toolbar-stack > :first-child { grid-column: 1 / -1; }   /* החיפוש על כל הרוחב */
+  .toolbar-stack > .apple-btn-blue { grid-column: 1 / -1; } /* הפעולה הראשית בולטת */
+  .toolbar-stack > span[aria-hidden] { display: none; }     /* מפריד אנכי מיותר בפריסת רשת */
+  .page-actions .apple-btn { flex: 1 1 auto; }
 }
