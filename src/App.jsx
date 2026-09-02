@@ -5698,7 +5698,7 @@ function ContractDoc({ me, form, sigUrl }) {
           const d = deriveHours({ reform: 'ofek', level: me.level, frontalHours: me.frontal_hours, scopePct: me.scope_pct, scope: me.scope_pct });
           const ind = d?.individual ?? 0;
           const pres = d?.presence ?? 0;
-          return <b>{me.frontal_hours} שעות פרונטליות + {ind} שעות פרטניות + {pres} שעות שהייה = {Number(me.frontal_hours) + ind + pres} שעות (אופק חדש)</b>;
+          return <b>{me.frontal_hours} שעות פרונטליות + {ind} שעות פרטניות + {pres} שעות שהייה = {Number(me.frontal_hours) + ind + pres} שעות</b>;
         }
         return <b>{hours} שעות פרונטליות</b>;
       })()}</Sec>
