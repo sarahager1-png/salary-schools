@@ -61,8 +61,22 @@ export default async function handler(req, res) {
 
     const out = (schools || []).map(s => {
       const ts = (rows || []).filter(r => r.school_id === s.id).map(toTeacher);
-      const monthly = ts.reduce((sum, t) => sum + emp.calcEmployer(t).total, 0);
-      return { name: s.name, monthly: Math.round(monthly), annual: Math.round(monthly * 12), teachers: ts.length };
+      /*
+        המנהלת מופרדת: סימולציית ההוראה במערכות התקציב היא שעות הוראה
+        בלבד, והשוואה שכוללת את המנהלת מייצרת "פער לא מוסבר" (מזכרת
+        בתיה, 3.9) — 312 אלף ₪ של מנהלת שנראו כחריגת הוראה.
+      */
+      let teaching = 0, principal = 0;
+      for (const t of ts) {
+        const c = emp.calcEmployer(t).total;
+        if (emp.isPrincipalRow(t)) principal += c; else teaching += c;
+      }
+      const monthly = teaching + principal;
+      return { name: s.name,
+        monthly: Math.round(monthly), annual: Math.round(monthly * 12),
+        teachingMonthly: Math.round(teaching), teachingAnnual: Math.round(teaching * 12),
+        principalMonthly: Math.round(principal),
+        teachers: ts.length };
     });
     res.setHeader('access-control-allow-origin', '*');
     return res.status(200).json({ month, schools: out, fetchedAt: new Date().toISOString() });
