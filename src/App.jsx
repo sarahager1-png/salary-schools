@@ -5922,7 +5922,8 @@ function OnboardingView({ code }) {
           <div style={{ flex:1, height:8, background:'var(--fill)', borderRadius:99 }}>
             <div style={{ width:(totalSteps ? Math.round(doneCount / totalSteps * 100) : 0) + '%', height:'100%', background:'var(--teal)', borderRadius:99, transition:'width .3s' }} />
           </div>
-          <span style={{ fontSize:14.4, fontWeight:700, color:'var(--text2)' }}>{doneCount} / {totalSteps}</span>
+          {/* dir=ltr — בלעדיו "0 / 5" מתהפך ל"5 / 0" בהקשר העברי (ממצא QA) */}
+          <span dir="ltr" style={{ fontSize:14.4, fontWeight:700, color:'var(--text2)' }}>{doneCount} / {totalSteps}</span>
         </div>
 
         {/* ── שלב 1: טופס 101 ── */}
