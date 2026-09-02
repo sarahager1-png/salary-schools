@@ -3510,7 +3510,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     */
     // שני הצדדים כוללים מנהלת (הוראת שרה, 3.9) — השוואה מלאה מול מלאה
     const simGap = f.teachingSim != null && monthly > 0 ? f.teachingSim - annual : null;
-    return { sc, f, monthly, annual, left, simGap };
+    return { sc, f, monthly, annual, mmAnnual, left, simGap };
   });
   const tot = rows.reduce((a, r) => ({
     budget: a.budget + (r.f.ministryBudget || 0),
@@ -3594,7 +3594,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           <tbody>
             {fin === null ? (
               <tr><td colSpan={7} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
+            ) : rows.map(({ sc, f, monthly, annual, mmAnnual, left, simGap }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
