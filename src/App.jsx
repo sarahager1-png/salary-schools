@@ -3433,6 +3433,17 @@ function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute
    ההסתרה אינה רק בקוד: הטבלה school_finance מאחורי RLS של
    coordinator, כך שגם מי שיפתח את ה-API יקבל ריק.
 ═══════════════════════════════════════════════════════════════ */
+/* שורת תווית-ערך בכרטיס מובייל — משותפת לעלות הוראה ולדוח רשת.
+   הכרטיסים מחליפים את הטבלאות הרחבות ב-640px ומטה (CSS בלבד). */
+function CardRow({ label, strong, color, children }) {
+  return (
+    <div className={'mcard-row' + (strong ? ' mcard-row-strong' : '')}>
+      <span className="mcard-label">{label}</span>
+      <span className="mcard-value num" style={color ? { color } : undefined}>{children}</span>
+    </div>
+  );
+}
+
 function TeachingCostView({ schools, teachers, monthKey }) {
   const [fin, setFin]     = useState(null);   // null: עוד נטען
   const [err, setErr]     = useState('');
@@ -3627,7 +3638,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         <div style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'1px solid var(--danger-line)', borderRadius:10,
           padding:'9px 14px', fontSize:14.9, fontWeight:600, marginBottom:12 }}>{err}</div>
       )}
-      <div className="apple-card table-scroll" style={{ padding:0, overflowX:'auto' }}>
+      <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
         <table className="sticky-first" style={{ width:'100%', borderCollapse:'collapse' }}>
           <thead>
             <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
@@ -3683,6 +3694,67 @@ function TeachingCostView({ schools, teachers, monthKey }) {
             </tfoot>
           )}
         </table>
+      </div>
+
+      {/* מובייל: כרטיס אנכי לכל בית ספר במקום הטבלה הרחבה — אותם נתונים,
+          אותם משתנים (rows, tot, per, moneyInput), רק פריסה אחרת.
+          moneyInput מרונדר גם כאן וגם בטבלה — שניהם כותבים לאותו state,
+          וה-key לפי הערך גורם לשניהם להתרענן יחד אחרי שמירה. */}
+      <div className="only-mobile">
+        {fin === null ? (
+          <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
+        ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
+          <div key={'m-' + sc.id} className="apple-card mcard">
+            <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
+            <CardRow label="הכנסות משרד החינוך + מענק">
+              {period === 'year'
+                ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
+                : money(per(f.ministryBudget))}
+            </CardRow>
+            <CardRow label="עלות שכר">{money(period === 'month' ? monthly : annual)}</CardRow>
+            <CardRow label="מילוי מקום · 5%" color="var(--text2)">{money(per(annual * MM_PCT))}</CardRow>
+            {showSim && (
+              <CardRow label="עלות הוראה מהתקציב" color="var(--text2)">
+                {f.teachingSim == null ? '—' : money(per(f.teachingSim))}
+              </CardRow>
+            )}
+            {showSim && (
+              <CardRow label="הפרש מול השכר בפועל"
+                color={simGap == null ? 'var(--text3)' : simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
+                {simGap == null ? '—' : money(per(simGap))}
+              </CardRow>
+            )}
+            <CardRow label="השתתפות הרשת">
+              {period === 'year'
+                ? moneyInput(sc.id, 'networkSupport', f.networkSupport)
+                : money(per(f.networkSupport))}
+            </CardRow>
+            <CardRow label="יתרה לאחר שכר" strong
+              color={left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
+              {left == null ? '—' : money(per(left))}
+            </CardRow>
+          </div>
+        ))}
+        {fin !== null && rows.length > 1 && (
+          <div className="apple-card mcard" style={{ background:'var(--fill)' }}>
+            <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ הרשת</p>
+            <CardRow label="הכנסות משרד החינוך + מענק">{money(per(tot.budget))}</CardRow>
+            <CardRow label="עלות שכר">{money(period === 'month' ? tot.monthly : tot.annual)}</CardRow>
+            <CardRow label="מילוי מקום · 5%" color="var(--text2)">{money(per(tot.annual * MM_PCT))}</CardRow>
+            {showSim && <CardRow label="עלות הוראה מהתקציב" color="var(--text2)">{money(per(tot.sim))}</CardRow>}
+            {showSim && (
+              <CardRow label="הפרש מול השכר בפועל"
+                color={tot.simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
+                {money(per(tot.simGap))}
+              </CardRow>
+            )}
+            <CardRow label="השתתפות הרשת">{money(per(tot.support))}</CardRow>
+            <CardRow label="יתרה לאחר שכר" strong
+              color={tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
+              {money(per(tot.left))}
+            </CardRow>
+          </div>
+        )}
       </div>
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
         תקציב הכנסות משרד החינוך פחות עלות השכר ומילוי מקום (5% מעלות השכר), בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
@@ -4135,7 +4207,7 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
 
       {/* Table */}
       <div>
-        <div className="sheet-wrap">
+        <div className="sheet-wrap only-desktop">
           <div className="sheet-scroll" style={{ maxHeight:'none' }}>
           <table className="apple-table sticky-first">
             <thead>
@@ -4210,6 +4282,66 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
               </tr>
             </tfoot>
           </table>
+          </div>
+        </div>
+
+        {/* מובייל: כרטיס לכל בית ספר במקום הטבלה הרחבה — אותם נתונים
+            (rows), לחיצה פותחת את פירוט המשרות כמו בשורת הטבלה. */}
+        <div className="only-mobile">
+          {rows.map(r => (
+            <div key={'m-' + r.id} className="apple-card mcard"
+              onClick={() => r.count > 0 && setOpenSchool(openSchool === r.id ? null : r.id)}
+              style={{ cursor: r.count > 0 ? 'pointer' : 'default' }}>
+              <div className="mcard-head">
+                <div style={{ minWidth:0 }}>
+                  <p className="mcard-name">
+                    {r.count > 0 && (
+                      <ChevronLeft size={14} strokeWidth={2.6} color="var(--purple)"
+                        style={{ display:'inline', verticalAlign:'-2px', marginInlineEnd:5,
+                                 transform: openSchool === r.id ? 'rotate(-90deg)' : 'none', transition:'transform .15s' }} />
+                    )}
+                    {r.name}
+                  </p>
+                  {r.city && <p style={{ fontSize:13.8, color:'var(--text3)' }}>{r.city}</p>}
+                </div>
+                {r.pending > 0
+                  ? <span className="apple-badge badge-orange"><Bell size={12} strokeWidth={2.3} />{r.pending}</span>
+                  : <span className="apple-badge badge-green"><Check size={12} strokeWidth={2.8} />מעודכן</span>}
+              </div>
+              <CardRow label="עובדי הוראה">
+                {r.count}
+                {r.count > 0 && r.officialCount < r.count && (
+                  <span style={{ fontSize:13.2, color:'var(--warn)', fontWeight:600, marginInlineStart:5 }}>
+                    ({r.officialCount} רשמי)
+                  </span>
+                )}
+              </CardRow>
+              <CardRow label="שעות / מכסה"
+                color={r.quota && r.usedHours > r.quota ? 'var(--danger)'
+                     : r.quota && r.usedHours / r.quota >= 0.9 ? 'var(--warn)' : 'var(--text2)'}>
+                {r.quota ? `${r.usedHours} / ${r.quota}` : (r.usedHours || '—')}
+              </CardRow>
+              <CardRow label="ברוטו / חודש">{r.gross > 0 ? r.gross.toLocaleString('he-IL') + ' ₪' : '—'}</CardRow>
+              <CardRow label="ברוטו למעסיק">{r.empTot > 0 ? r.empTot.toLocaleString('he-IL') + ' ₪' : '—'}</CardRow>
+              <CardRow label="עלות שנתית" strong color="var(--purple)">
+                {r.annual > 0 ? r.annual.toLocaleString('he-IL') + ' ₪' : '—'}
+              </CardRow>
+              {openSchool === r.id && (
+                <div onClick={e => e.stopPropagation()}
+                  style={{ margin:'8px -16px -10px', background:'var(--bg)', borderTop:'1px solid var(--line)', cursor:'default' }}>
+                  <SchoolPositions onSaveTeacher={onSaveTeacher} onApprove={onApprove} simState={simState} onCompute={onCompute} onDelete={onDelete} school={r} />
+                </div>
+              )}
+            </div>
+          ))}
+          <div className="apple-card mcard" style={{ background:'var(--fill)' }}>
+            <p className="mcard-name" style={{ marginBottom:4 }}>סה״כ רשת</p>
+            <CardRow label="עובדי הוראה">{totCount}</CardRow>
+            <CardRow label="שעות / מכסה">{totUsedHours}{totQuota ? ` / ${totQuota}` : ''}</CardRow>
+            <CardRow label="ברוטו / חודש">{totGross.toLocaleString('he-IL')} ₪</CardRow>
+            <CardRow label="ברוטו למעסיק">{totEmp.toLocaleString('he-IL')} ₪</CardRow>
+            <CardRow label="עלות שנתית" strong color="var(--purple)">{totAnnual.toLocaleString('he-IL')} ₪</CardRow>
+            {totPending > 0 && <CardRow label="ממתינים לאישור" color="var(--warn)">{totPending}</CardRow>}
           </div>
         </div>
         <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:10, padding:'0 4px', lineHeight:1.7 }}>

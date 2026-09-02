@@ -719,6 +719,39 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   .sticky-first tbody tr:hover td:first-child { background: var(--fill); }
 }
 
+/* ── כרטיסים במקום טבלאות רחבות במובייל ──
+   "עלות ההוראה ודוח רשת לא קריא כשצריכים לגלול כל כך הרבה" (שרה, 3.9):
+   שתי התצוגות מרונדרות תמיד, וה-CSS מחליף — טבלה בדסקטופ, כרטיסים
+   אנכיים ב-640px ומטה. אין תלות ברוחב חלון ב-JS. */
+.only-mobile { display: none; }
+@media (max-width: 640px) {
+  .only-desktop { display: none !important; }
+  .only-mobile  { display: block; }
+}
+.mcard { padding: 14px 16px 10px; margin-bottom: 10px; }
+.mcard-name { font-size: 16.7px; font-weight: 800; color: var(--text); line-height: 1.3; }
+.mcard-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 10px; margin-bottom: 4px;
+}
+.mcard-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--line-soft);
+  font-size: 15.5px;
+}
+.mcard-row:last-child { border-bottom: none; }
+.mcard-label { color: var(--text3); font-weight: 600; font-size: 13.8px; flex-shrink: 0; }
+.mcard-value { font-weight: 600; text-align: left; }
+/* השורה המסכמת של הכרטיס — מופרדת בקו מלא, כמו tfoot בטבלה */
+.mcard-row-strong {
+  border-top: 1.5px solid var(--line);
+  border-bottom: none;
+  margin-top: 2px; padding-top: 10px;
+  font-size: 16.1px;
+}
+.mcard-row-strong .mcard-value { font-weight: 800; font-size: 16.7px; }
+
 /* ── דיאלוגים צפים במובייל: כל המסך, גלילה פנימית, כותרת דביקה ──
    העטיפות ממוקמות inline (position:fixed + ריפוד), ולכן !important —
    הכלל כאן גובר בכוונה על ריפוד וריכוז שנכונים רק לדסקטופ. */
