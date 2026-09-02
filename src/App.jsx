@@ -470,7 +470,7 @@ function LoginScreen({ onSignedIn, initialError = '' }) {
           <img src="/logo-chabad.png" alt="רשת חינוך חב״ד"
             style={{ height:56, width:'auto', objectFit:'contain', margin:'0 auto 16px', display:'block' }} />
           <h1 style={{ fontSize:31, fontWeight:800, letterSpacing:'-0.03em', color:'var(--text)', marginBottom:5 }}>מערכת שכר מורים</h1>
-          <p style={{ fontSize:16.1, color:'var(--text3)' }}>ניהול תקציב שכר — רשת בתי הספר</p>
+          <p style={{ fontSize:16.1, color:'var(--text3)' }}>גני חב"ד — ניהול שכר עובדי ההוראה</p>
         </div>
 
         <div className="apple-card" style={{ padding:'24px 22px' }}>
@@ -5691,7 +5691,16 @@ function ContractDoc({ me, form, sigUrl }) {
           <tr><td style={cell}>ביגוד חודשית (לעובדי הוראה ומינהל בלבד)</td><td style={cell}>9 לחודש</td></tr>
         </tbody>
       </table>
-      <Sec n="7">אורכו של שבוע העבודה הרגיל של העובד/ת: <b>{hours} שעות{isPrincipal ? '' : ' פרונטליות'}</b></Sec>
+      <Sec n="7">אורכו של שבוע העבודה הרגיל של העובד/ת: {(() => {
+        if (isPrincipal) return <b>40 שעות</b>;
+        if (me.reform === 'ofek' && Number(me.frontal_hours) > 0) {
+          // "באופק חדש להוסיף כמה פרטני וכמה פרונטלי וסה"כ" (שרה, 3.9)
+          const d = deriveHours({ reform: 'ofek', level: me.level, frontalHours: me.frontal_hours, scopePct: me.scope_pct, scope: me.scope_pct });
+          const ind = d?.individual ?? 0;
+          return <b>{me.frontal_hours} שעות פרונטליות + {ind} שעות פרטניות = {Number(me.frontal_hours) + ind} שעות (אופק חדש)</b>;
+        }
+        return <b>{hours} שעות פרונטליות</b>;
+      })()}</Sec>
       <Sec n="8">תשלומים בעבור תנאים סוציאליים שהעובד/ת זכאי/ת להם:</Sec>
       <table style={{ width:'100%', borderCollapse:'collapse', margin:'8px 0' }}>
         <thead>
@@ -5743,12 +5752,31 @@ function OnboardingView({ code }) {
   }, [code]);
   useEffect(() => { Promise.resolve().then(load); }, [load]);
 
+  /*
+    "תוכל למלא שלב שלב וכל אחד יישמר?" (שרה, 3.9) — כן: טיוטת ה-101
+    נשמרת מעצמה שנייה וחצי אחרי כל שינוי. סגרה באמצע — ממשיכה מאותה
+    נקודה. שאר השלבים (קבצים, בנק, הסכם) ממילא נשמרים מיד.
+  */
+  const draftTimer = useRef(null);
+  useEffect(() => {
+    if (state !== 'ok' || me?.form101_signed || !Object.keys(form).length) return undefined;
+    clearTimeout(draftTimer.current);
+    draftTimer.current = setTimeout(() => {
+      store.obSave(code, { form101: form }).catch(() => { /* רשת רגעית — הניסיון הבא ישמור */ });
+    }, 1500);
+    return () => clearTimeout(draftTimer.current);
+  }, [form, state, me?.form101_signed, code]);
+
   if (state === 'loading') return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center' }} dir="rtl"><p style={{ color:'var(--text3)' }}>טוען…</p></div>;
   if (state === 'bad') return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:24, textAlign:'center' }} dir="rtl"><p style={{ fontWeight:700 }}>הקישור אינו תקף. פני לשרה הגר.</p></div>;
 
   const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  // אסמכתת התיק ירדה: "אם יש נתוני שכר אז יש תיק במשרד" (שרה, 3.9).
+  // אישור משטרה — חובה לגברים בלבד (חוק למניעת העסקה של עברייני מין).
+  const isMale = me.gender === 'm';
   const steps = [
-    me.form101_signed, me.has_id_doc, me.has_salary_form, me.has_ministry_file,
+    me.form101_signed, me.has_id_doc, me.has_salary_form,
+    isMale ? me.has_police_doc : null,
     me.bank_saved,                                       // פרטי בנק — בלעדיהם אין לאן להעביר
     me.contract_available ? me.contract_signed : null,   // null = עוד לא זמין
   ];
@@ -5976,7 +6004,14 @@ function OnboardingView({ code }) {
         {/* ── שלבים 2–4: העלאות ── */}
         <ObUpload label="2 · צילום תעודת זהות" hint="צלמי או העלי קובץ" done={me.has_id_doc} onFile={upload('id_doc')} />
         <ObUpload label="3 · טופס נתוני שכר — משרד החינוך" hint="הטופס מהפורטל של משרד החינוך" done={me.has_salary_form} onFile={upload('salary_form')} />
-        <ObUpload label="4 · אסמכתת תיק במשרד החינוך (חובה)" hint="אישור קיום תיק עובד הוראה" done={me.has_ministry_file} onFile={upload('ministry_file')} />
+        {me.gender === 'm' && (
+          <ObUpload label="4 · אישור משטרה — היעדר עבירות מין (חובה לגברים)"
+            hint="לפי החוק למניעת העסקה של עברייני מין במוסדות חינוך"
+            done={me.has_police_doc} onFile={upload('police_doc')} />
+        )}
+        <ObUpload label="טופס 101 חתום מוכן (רשות)"
+          hint="רק אם כבר מילאת 101 בנייר — אפשר להעלות במקום למלא כאן"
+          done={me.has_form101_file} onFile={upload('form101_file')} />
 
         {/* ── שלב 5: פרטי בנק ── */}
         <div className="apple-card" style={{ padding:18 }}>
@@ -6073,7 +6108,7 @@ function OnboardingAdmin({ activeMonth, onClose }) {
 
   const bySchool = {};
   for (const r of rows || []) (bySchool[r.schools?.name || '—'] ??= []).push(r);
-  const doneOf = r => [r.form101_signed_at, r.id_doc_path, r.salary_form_path, r.ministry_file_path, r.bank_saved_at, r.bank_doc_path, r.contract_signed_at].filter(Boolean).length;
+  const doneOf = r => [r.form101_signed_at, r.id_doc_path, r.salary_form_path, r.bank_saved_at, r.bank_doc_path, r.contract_signed_at].filter(Boolean).length;
   const total = (rows || []).length;
   const complete = (rows || []).filter(r => doneOf(r) >= 5).length;
 
