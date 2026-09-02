@@ -712,6 +712,74 @@ function UpdateBanner() {
   );
 }
 
+
+/* ═══════════════════════════════════════════════════════════════
+   התקנה כאפליקציה — "תן אופציה להורדה כאפלקציה" (שרה, 2.9.2026)
+
+   התשתית (manifest, service worker, אייקונים) קיימת ופועלת; מה
+   שחסר היה כפתור גלוי. באנדרואיד/כרום הדפדפן מוסר אירוע
+   beforeinstallprompt (נתפס ב-index.html לפני שריאקט עולה) —
+   לחיצה פותחת את חלון ההתקנה של המערכת. באייפון אין אירוע כזה
+   בכלל, ולכן שם הכפתור פותח הסבר קצר: שיתוף ← הוסף למסך הבית.
+   בתוך אפליקציה שכבר הותקנה — הכפתור לא מוצג.
+═══════════════════════════════════════════════════════════════ */
+function InstallAppButton() {
+  const [ready, setReady] = useState(() => Boolean(window.__installPrompt));
+  const [showIos, setShowIos] = useState(false);
+
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches
+    || window.navigator.standalone === true;
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  useEffect(() => {
+    const on = () => setReady(true);
+    window.addEventListener('install-ready', on);
+    return () => window.removeEventListener('install-ready', on);
+  }, []);
+
+  if (standalone) return null;
+  if (!ready && !isIos) return null;
+
+  const install = async () => {
+    if (isIos && !window.__installPrompt) { setShowIos(true); return; }
+    const ev = window.__installPrompt;
+    if (!ev) return;
+    ev.prompt();
+    try { await ev.userChoice; } catch { /* ביטלה — לא מציקים */ }
+    window.__installPrompt = null;
+    setReady(false);
+  };
+
+  return (
+    <>
+      <button type="button" onClick={install}
+        className="apple-btn apple-btn-ghost"
+        style={{ width:'100%', minHeight:46, fontSize:16.1, fontWeight:600, gap:8, marginTop:10 }}>
+        <Download size={16} strokeWidth={2.3} />
+        התקנת האפליקציה על המכשיר
+      </button>
+      {showIos && (
+        <div onClick={() => setShowIos(false)}
+          style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.5)', zIndex:80,
+            display:'flex', alignItems:'flex-end', justifyContent:'center' }} dir="rtl">
+          <div onClick={e => e.stopPropagation()}
+            style={{ background:'#fff', borderRadius:'18px 18px 0 0', padding:'22px 22px 30px',
+              maxWidth:420, width:'100%', boxShadow:'0 -8px 40px rgba(0,0,0,.18)' }}>
+            <p style={{ fontSize:17.8, fontWeight:800, marginBottom:10 }}>התקנה באייפון</p>
+            <ol style={{ fontSize:16.1, lineHeight:2, paddingInlineStart:20, color:'var(--text2)' }}>
+              <li>לוחצים על כפתור השיתוף <span style={{ fontWeight:700 }}>⎋</span> בסרגל של ספארי</li>
+              <li>גוללים ובוחרים <b>"הוסף למסך הבית"</b></li>
+              <li>מאשרים — והאייקון יופיע כמו כל אפליקציה</li>
+            </ol>
+            <button className="apple-btn apple-btn-blue" onClick={() => setShowIos(false)}
+              style={{ width:'100%', minHeight:44, marginTop:14 }}>הבנתי</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function LoginScreen({ onSignedIn, initialError = '' }) {
   const [email, setEmail]   = useState('');
   const [password, setPass] = useState('');
@@ -814,6 +882,8 @@ function LoginScreen({ onSignedIn, initialError = '' }) {
             <Send size={16} strokeWidth={2.3} />
             שלחו לי קישור כניסה למייל
           </button>
+
+          <InstallAppButton />
 
           {hasGoogle && (
             <>
@@ -6007,6 +6077,8 @@ function LinkView({ code }) {
               {rows.map(t => <LinkCard key={t.id} teacher={t} locked={locked} onSave={onSave} />)}
               {!locked && <LinkNewCard schoolReform={me?.schoolReform} onAdd={onAdd} male={male} />}
             </div>
+            {/* המנהלות עובדות מהטלפון — ההתקנה מוצעת גם כאן, לא רק בכניסה */}
+            <div style={{ maxWidth:420, margin:'18px auto 0' }}><InstallAppButton /></div>
           </>
         )}
       </main>

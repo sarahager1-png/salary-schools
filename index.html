@@ -28,6 +28,13 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
       }
+      // האירוע נורה פעם אחת, לרוב לפני שהאפליקציה עלתה — נתפס כאן
+      // ונשמר לכפתור "התקנת האפליקציה".
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.__installPrompt = e;
+        window.dispatchEvent(new Event('install-ready'));
+      });
     </script>
   </body>
 </html>
