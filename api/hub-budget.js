@@ -52,6 +52,8 @@ export default async function handler(req, res) {
         // "לאשקלון אין ייעול" (שרה, 2.9): אפס אינו ייעול — רק סכום
         // חיובי שנבחר בפועל נחשב; אחרת התא נשאר ריק.
         yieul: s.efficiency?.saved === true && (s.efficiency?.total || 0) > 0 ? s.efficiency.total : null,
+        // הסימולציה של שרה במערכת התקציב: עלות ההוראה המתוכננת, שנתית
+        teachingSim: s.expenses?.teaching > 0 ? s.expenses.teaching : null,
       };
     });
     /*
@@ -66,6 +68,7 @@ export default async function handler(req, res) {
       if (!cur) { byBase.set(base, { ...s, name: base }); continue; }
       cur.ministry += s.ministry;
       cur.incomeTotal += s.incomeTotal;
+      cur.teachingSim = (cur.teachingSim == null && s.teachingSim == null) ? null : (cur.teachingSim || 0) + (s.teachingSim || 0);
       cur.yieul = (cur.yieul == null && s.yieul == null) ? null : (cur.yieul || 0) + (s.yieul || 0);
     }
     return res.status(200).json({ schools: [...byBase.values()], fetchedAt: new Date().toISOString() });
