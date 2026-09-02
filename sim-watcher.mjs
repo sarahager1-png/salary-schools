@@ -33,10 +33,17 @@ const stamp = () => new Date().toLocaleTimeString('he-IL');
 
 while (true) {
   try {
+    // שחרור בקשות שנתקעו ב-running (ווצ'ר שמת באמצע) — חוזרות לתור
+    await sb.from('sim_requests').update({ status: 'pending' })
+      .eq('status', 'running')
+      .lt('created_at', new Date(Date.now() - 15 * 60e3).toISOString());
     const { data: reqs } = await sb.from('sim_requests')
       .select('id, teacher_month_id').eq('status', 'pending').order('created_at').limit(10);
     for (const req of reqs || []) {
-      await sb.from('sim_requests').update({ status: 'running' }).eq('id', req.id);
+      // תפיסה אטומית: רק ווצ'ר אחד יצליח להעביר pending→running
+      const { data: claimed } = await sb.from('sim_requests')
+        .update({ status: 'running' }).eq('id', req.id).eq('status', 'pending').select('id');
+      if (!claimed?.length) continue;
       const { data: t } = await sb.from('teacher_months')
         .select('id, month_key, name, reform, degree, grade, seniority, scope_pct, scope_set_at, gamul_role, leave_type, frontal_hours, children_under_18, official_gross')
         .eq('id', req.teacher_month_id).single();

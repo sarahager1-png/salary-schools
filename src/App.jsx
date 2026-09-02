@@ -3451,6 +3451,11 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           if (src[k] === 'manual') continue;
           if (want[k] != null && want[k] !== cur[k]) { patch[k] = want[k]; src[k] = 'hub'; }
         }
+        // הפירוט לשורות — עד היום לא נשמר במשיכה, והכרטיסים הציגו רק סכומים
+        const wantDetail = (h.detail || h.teach) ? { ...(h.detail || {}), teach: h.teach || null } : null;
+        if (wantDetail && JSON.stringify(wantDetail) !== JSON.stringify(cur.detail)) {
+          patch.detail = wantDetail;
+        }
         if (Object.keys(patch).length) { await save(sc.id, { ...patch, src }); filled++; }
       }
       // "נשמר" רק כשבאמת נשמר משהו — כשל שקט שמוצג כהצלחה גרוע מכשל
@@ -3473,12 +3478,6 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     return () => { alive = false; };
   }, []);
 
-  // "בעלות הוראה תוספת מילוי מקום" (שרה, 3.9): הפרשת מ"מ — שעת מ"מ
-  // חודשית על כל שעה שבועית, 100 ₪ — נספרת בתוך עלות השכר.
-  const mmProvision = (sid) => teachers
-    .filter(t => t.schoolId === sid && !isPrincipalRow(t)
-      && (t.leaveType ?? 'none') === 'none' && Number(t.frontalHours) > 0)
-    .reduce((a, t) => a + Number(t.frontalHours), 0) * 100;
   const monthlyCost = (sid) => teachers
     .filter(t => t.schoolId === sid)
     .reduce((sum, t) => sum + calcEmployer(t).total, 0);
@@ -3497,11 +3496,10 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const f = fin?.[sc.id] || {};
     const monthly = monthlyCost(sc.id);
     const annual  = monthly * 12;
-    const mmAnnual = mmProvision(sc.id) * 12;
     // "תוסיף השתתפות רשת מרינה" (שרה, 3.9) — מצטרפת ליתרה בחיוב,
     // כמו בנוסחת דף הפגישה: משרד − ייעול − שכר + השתתפות
     const left = (f.ministryBudget != null || f.yieul != null)
-      ? (f.ministryBudget || 0) - (f.yieul || 0) - annual - mmAnnual + (f.networkSupport || 0)
+      ? (f.ministryBudget || 0) - (f.yieul || 0) - annual + (f.networkSupport || 0)
       : null;
     /*
       "עשיתי סימולציית שכר לפני הסימולציה האמיתית — חשוב לי לדעת מה
@@ -3510,7 +3508,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     */
     // שני הצדדים כוללים מנהלת (הוראת שרה, 3.9) — השוואה מלאה מול מלאה
     const simGap = f.teachingSim != null && monthly > 0 ? f.teachingSim - annual : null;
-    return { sc, f, monthly, annual, mmAnnual, left, simGap };
+    return { sc, f, monthly, annual, left, simGap };
   });
   const tot = rows.reduce((a, r) => ({
     budget: a.budget + (r.f.ministryBudget || 0),
@@ -3521,8 +3519,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     sim: a.sim + (r.f.teachingSim || 0),
     simGap: a.simGap + (r.simGap || 0),
     support: a.support + (r.f.networkSupport || 0),
-    mm: a.mm + (r.mmAnnual || 0),
-  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, left: 0, sim: 0, simGap: 0, support: 0, mm: 0 });
+  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, left: 0, sim: 0, simGap: 0, support: 0 });
 
   const TH = ({ children }) => (
     <th style={{ padding:'10px 8px', fontSize:13.8, fontWeight:700, color:'var(--text2)',
@@ -3586,15 +3583,14 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <TH>הכנסות משרד החינוך + מענק</TH>
               <TH>ייעול</TH>
               <TH>עלות שכר</TH>
-              <TH>הפרשת מילוי מקום</TH>
               <TH>השתתפות הרשת</TH>
               <TH>יתרה לאחר שכר</TH>
             </tr>
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={7} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : rows.map(({ sc, f, monthly, annual, mmAnnual, left, simGap }) => (
+              <tr><td colSpan={6} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+            ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
@@ -3604,7 +3600,6 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   ? moneyInput(sc.id, 'yieul', f.yieul)
                   : <span style={{ fontSize:16.1 }}>{money(per(f.yieul))}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(period === 'month' ? monthly : annual)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1 }}>{money(per(mmAnnual))}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
                   ? moneyInput(sc.id, 'networkSupport', f.networkSupport)
                   : <span style={{ fontSize:16.1 }}>{money(per(f.networkSupport))}</span>}</td>
@@ -3622,7 +3617,6 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.budget))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.yieul))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(period === 'month' ? tot.monthly : tot.annual)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.mm))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.support))}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(per(tot.left))}</td>
@@ -3632,8 +3626,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         </table>
       </div>
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10 }}>
-        חל"ת אינו נספר בעלות. הפרשת מילוי מקום — עמודה נפרדת: שעת מ"מ חודשית לכל
-        שעה שבועית, 100 ₪ לשעה; נכללת ביתרה. שינוי נשמר ביציאה מהשדה.
+        חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
       </p>
 
       {/* "לכל בית ספר תעשה הכנסות מול הוצאות ללא עלות הוראה" (שרה, 3.9) —
@@ -3641,16 +3634,12 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           שאינן שכר הוראה וייעוץ. */}
       {/* "תכין כרטיס לכל בית ספר... הפרשי עלות הוראה והפרשי הוצאות עם
           כרטיס מתרחב ומפורט" (שרה, 3.9). שני ההפרשים בכותרת; בפתיחה —
-          הפירוט המלא של שני הצדדים. הפרשת מ"מ: שעת מ"מ חודשית על כל
-          שעה שבועית, 100 ₪ לשעה. */}
+          הפירוט המלא של שני הצדדים. בלי מילוי מקום — "תוריד את כל
+          המילויי מקום" (שרה, 3.9). */}
       <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>כרטיסי בתי הספר · הפרשי עלות הוראה והוצאות</h2>
       {fin !== null && rows.map(({ sc, f, monthly, annual }) => {
-        const ts = teachers.filter(t => t.schoolId === sc.id && !isPrincipalRow(t)
-          && (t.leaveType ?? 'none') === 'none' && Number(t.frontalHours) > 0);
-        const hours = ts.reduce((a, t) => a + Number(t.frontalHours), 0);
-        const mmAnnualCard = hours * 100 * 12;
         const teachIncome = (f.ministryBudget || 0) - (f.yieul || 0) + (f.networkSupport || 0);
-        const teachCost = annual + mmAnnualCard;
+        const teachCost = annual;
         const teachDiff = (f.ministryBudget != null) ? teachIncome - teachCost : null;
         // צד התפעול
         const incLines = f.detail?.income || [];
@@ -3685,18 +3674,36 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:20, marginTop:12 }}>
                 <div>
                   <p style={{ fontSize:14.4, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>עלות הוראה · שנתי</p>
-                  {dline('הכנסות משרד החינוך + מענק', per(f.ministryBudget || 0))}
+                  {/* "הכנסות משרד החינוך 2 שורות" (שרה, 3.9) — משרד ומענק בנפרד */}
+                  {f.detail?.teach?.income?.length
+                    ? f.detail.teach.income.map((x, i) => <div key={'ti' + i}>{dline(x.name, per(x.amount))}</div>)
+                    : dline('הכנסות משרד החינוך + מענק', per(f.ministryBudget || 0))}
                   {f.yieul ? dline('ייעול', per(f.yieul), false, true) : null}
                   {f.networkSupport ? dline('השתתפות הרשת', per(f.networkSupport)) : null}
                   {dline('סה"כ הכנסות הוראה', per(teachIncome), true)}
                   <div style={{ height:8 }} />
                   {dline(`שכר הוראה (מורות, מנהלת, תוספות)`, per(annual))}
-                  {dline(`הפרשת מילוי מקום — ${hours} שעות × 100 ₪${period === 'year' ? ' × 12' : ''}`, per(mmAnnualCard))}
                   {dline('סה"כ הוצאות הוראה', per(teachCost), true)}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
                     borderTop:'2px solid var(--line)', color: gapColor(teachDiff) }}>
                     <span>הפרש עלות הוראה</span><span>{teachDiff == null ? '—' : money(per(teachDiff))}</span>
                   </div>
+                  {/* "תוסיף את עלות ההוראה שחישבתי בתקציב... הוצאות שעות
+                      הוראה, ייעוץ" (שרה, 3.9) — התכנון שלה מהתקציב, מול הבפועל */}
+                  {f.detail?.teach?.expenses?.length > 0 && (() => {
+                    const simSum = f.detail.teach.expenses.reduce((a, x) => a + x.amount, 0);
+                    return (
+                      <div style={{ marginTop:12, padding:'10px 12px', background:'var(--apple-fill, #f5f3fa)', borderRadius:10 }}>
+                        <p style={{ fontSize:13.8, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>עלות ההוראה שחושבה בתקציב</p>
+                        {f.detail.teach.expenses.map((x, i) => <div key={'te' + i}>{dline(x.name, per(x.amount))}</div>)}
+                        {dline('סה"כ מהתקציב', per(simSum), true)}
+                        <div style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', fontSize:14.4, fontWeight:800,
+                          color: gapColor(simSum - annual) }}>
+                          <span>הפרש מול השכר בפועל</span><span>{money(per(simSum - annual))}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <p style={{ fontSize:14.4, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>הכנסות והוצאות אחרות · שנתי</p>

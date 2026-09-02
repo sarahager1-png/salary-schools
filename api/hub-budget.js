@@ -43,12 +43,26 @@ export default async function handler(req, res) {
 
     const mapped = (data.schools || []).filter(s => !s.empty && !s.error).map(s => {
       const inc = s.income || {};
-      // "בהכנסות עלות הוראה רק הכנסות משרד החינוך" (שרה, 2.9):
-      // שורת המשרד בלבד — בלי מענק, בלי פר-תלמיד, בלי תל"ן ובלי שכ"ל.
-      const ministry = inc.ministry || 0;
+      // "מענק לתלמיד זה הכנסות עלות הוראה" (שרה, 3.9): משרד + מענק,
+      // ובפירוט — "הכנסות משרד החינוך 2 שורות".
+      const ministry = (inc.ministry || 0) + (inc.grant || 0);
+      const teachingBudget = (s.expenses?.teaching || 0) + (s.principalMonthly || 0) * 12;
+      const counseling = s.expenses?.counselingCost || 0;
       return {
         name: s.name,
         ministry,
+        // עלות ההוראה שחישבה שרה בתקציב, בפירוט שביקשה (3.9):
+        // הכנסות 2 שורות; הוצאות — שעות הוראה, ייעוץ.
+        teach: {
+          income: [
+            { name: 'תקציב משרד החינוך', amount: inc.ministry || 0 },
+            { name: 'מענק לתלמיד', amount: inc.grant || 0 },
+          ].filter(x => x.amount > 0),
+          expenses: [
+            { name: 'שעות הוראה (כולל מנהלת)', amount: teachingBudget },
+            { name: 'ייעוץ', amount: counseling },
+          ].filter(x => x.amount > 0),
+        },
         incomeTotal: inc.total || 0,
         // "לאשקלון אין ייעול" (שרה, 2.9): אפס אינו ייעול — רק סכום
         // חיובי שנבחר בפועל נחשב; אחרת התא נשאר ריק.
@@ -59,11 +73,10 @@ export default async function handler(req, res) {
           נוספים). "הוצאות עלות הוראה זה שכר מורים מנהלת ויועצת" —
           ולכן ההוצאות בלי הוראה ובלי ייעוץ.
         */
-        incomeOther: Math.max(0, (inc.total || 0) - (inc.ministry || 0)),
-        // הפירוט לשורות ("יהיו מפורטים"): הכנסות בלי משרד, הוצאות בלי שכר הוראה
+        incomeOther: Math.max(0, (inc.total || 0) - ministry),
+        // הפירוט לשורות ("יהיו מפורטים"): הכנסות בלי משרד ומענק, הוצאות בלי שכר הוראה
         detail: {
           income: [
-            { name: 'מענק לתלמיד', amount: inc.grant || 0 },
             { name: 'שכר לימוד ותל"ן (גבייה 80%)', amount: (inc.perStudent || 0) + (inc.talan || 0) },
             ...(inc.sources || []).map(x => ({ name: x.name, amount: Number(x.amount || 0) })),
           ].filter(x => x.amount > 0),
@@ -78,9 +91,9 @@ export default async function handler(req, res) {
         // הסימולציה של שרה במערכת התקציב: עלות ההוראה המתוכננת, שנתית.
         // "עלות הוראה חייב לכלול מנהלת" (שרה, 3.9) — שכר המנהלת מהתקציב
         // מצורף, כך שההשוואה מול הבפועל (שגם הוא כולל מנהלת) היא אחד-לאחד.
-        teachingSim: s.expenses?.teaching > 0
-          ? s.expenses.teaching + (s.principalMonthly || 0) * 12
-          : null,
+        // "הוצאות שעות הוראה, ייעוץ" (שרה, 3.9) — הסימולציה שלה מהתקציב
+        // היא סכום שתי השורות, כדי שהסה"כ יתאים לפירוט.
+        teachingSim: s.expenses?.teaching > 0 ? teachingBudget + counseling : null,
       };
     });
     /*
@@ -102,6 +115,18 @@ export default async function handler(req, res) {
         income: [...(cur.detail?.income || []), ...s.detail.income],
         expenses: [...(cur.detail?.expenses || []), ...s.detail.expenses],
       };
+      // פיצול בנים/בנות: שורות עלות ההוראה מאוחדות לפי שם השורה
+      if (s.teach) {
+        const mergeLines = (a = [], b = []) => {
+          const m = new Map(a.map(x => [x.name, { ...x }]));
+          for (const x of b) m.set(x.name, { name: x.name, amount: (m.get(x.name)?.amount || 0) + x.amount });
+          return [...m.values()].filter(x => x.amount > 0);
+        };
+        cur.teach = {
+          income: mergeLines(cur.teach?.income, s.teach.income),
+          expenses: mergeLines(cur.teach?.expenses, s.teach.expenses),
+        };
+      }
       cur.yieul = (cur.yieul == null && s.yieul == null) ? null : (cur.yieul || 0) + (s.yieul || 0);
     }
     return res.status(200).json({ schools: [...byBase.values()], fetchedAt: new Date().toISOString() });
