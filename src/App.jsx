@@ -3441,7 +3441,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         const src = { ...(cur.src || {}) };
         const patch = {};
         const want = { ministryBudget: h.ministry > 0 ? h.ministry : null, yieul: h.yieul, teachingSim: h.teachingSim,
-          incomeTotal: h.incomeTotal > 0 ? h.incomeTotal : null, expensesOther: h.expensesOther > 0 ? h.expensesOther : null };
+          incomeTotal: h.incomeOther > 0 ? h.incomeOther : null, expensesOther: h.expensesOther > 0 ? h.expensesOther : null };
         for (const k of ['ministryBudget', 'yieul', 'teachingSim', 'incomeTotal', 'expensesOther']) {
           if (src[k] === 'manual') continue;
           if (want[k] != null && want[k] !== cur[k]) { patch[k] = want[k]; src[k] = 'hub'; }
@@ -3610,14 +3610,14 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       {/* "לכל בית ספר תעשה הכנסות מול הוצאות ללא עלות הוראה" (שרה, 3.9) —
           התמונה התפעולית מהתקציב במבט-רשת: כל ההכנסות מול כל ההוצאות
           שאינן שכר הוראה וייעוץ. */}
-      <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>הכנסות מול הוצאות · ללא עלות הוראה</h2>
+      <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>הכנסות מול הוצאות · ללא עלות הוראה ומשרד החינוך</h2>
       <div className="apple-card" style={{ padding:0, overflowX:'auto' }}>
         <table style={{ width:'100%', borderCollapse:'collapse' }}>
           <thead>
             <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
               <TH>בית ספר</TH>
-              <TH>סה"כ הכנסות · שנתי</TH>
-              <TH>הוצאות ללא הוראה · שנתי</TH>
+              <TH>הכנסות ללא משרד החינוך · שנתי</TH>
+              <TH>הוצאות ללא שכר הוראה · שנתי</TH>
               <TH>הפרש</TH>
             </tr>
           </thead>
@@ -3656,7 +3656,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         </table>
       </div>
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:8 }}>
-        מהתקציב במבט-רשת: כל מקורות ההכנסה מול כל ההוצאות מלבד שכר הוראה וייעוץ. מתרענן במשיכה.
+        מהתקציב במבט-רשת: מענק, שכ"ל/תל"ן ומקורות נוספים — מול כל ההוצאות מלבד שכר הוראה,
+        מנהלת וייעוץ (משרד החינוך ושכר ההוראה חיים בטבלה העליונה). מתרענן במשיכה.
       </p>
     </div>
   );

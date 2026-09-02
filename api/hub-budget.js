@@ -53,7 +53,13 @@ export default async function handler(req, res) {
         // "לאשקלון אין ייעול" (שרה, 2.9): אפס אינו ייעול — רק סכום
         // חיובי שנבחר בפועל נחשב; אחרת התא נשאר ריק.
         yieul: s.efficiency?.saved === true && (s.efficiency?.total || 0) > 0 ? s.efficiency.total : null,
-        // הכנסות מלאות והוצאות ללא הוראה — לטבלת הכנסות/הוצאות (3.9)
+        /*
+          לטבלת הכנסות/הוצאות (שרה, 3.9): "משרד החינוך זה הכנסות עלות
+          הוראה" — ולכן כאן ההכנסות בלי המשרד (מענק, שכ"ל/תל"ן, מקורות
+          נוספים). "הוצאות עלות הוראה זה שכר מורים מנהלת ויועצת" —
+          ולכן ההוצאות בלי הוראה ובלי ייעוץ.
+        */
+        incomeOther: Math.max(0, (inc.total || 0) - (inc.ministry || 0)),
         expensesOther: Math.max(0, (s.expenses?.total || 0) - (s.expenses?.teaching || 0) - (s.expenses?.counselingCost || 0)),
         // הסימולציה של שרה במערכת התקציב: עלות ההוראה המתוכננת, שנתית.
         // "עלות הוראה חייב לכלול מנהלת" (שרה, 3.9) — שכר המנהלת מהתקציב
@@ -77,6 +83,7 @@ export default async function handler(req, res) {
       cur.incomeTotal += s.incomeTotal;
       cur.teachingSim = (cur.teachingSim == null && s.teachingSim == null) ? null : (cur.teachingSim || 0) + (s.teachingSim || 0);
       cur.expensesOther = (cur.expensesOther || 0) + (s.expensesOther || 0);
+      cur.incomeOther = (cur.incomeOther || 0) + (s.incomeOther || 0);
       cur.yieul = (cur.yieul == null && s.yieul == null) ? null : (cur.yieul || 0) + (s.yieul || 0);
     }
     return res.status(200).json({ schools: [...byBase.values()], fetchedAt: new Date().toISOString() });
