@@ -53,8 +53,12 @@ export default async function handler(req, res) {
         // "לאשקלון אין ייעול" (שרה, 2.9): אפס אינו ייעול — רק סכום
         // חיובי שנבחר בפועל נחשב; אחרת התא נשאר ריק.
         yieul: s.efficiency?.saved === true && (s.efficiency?.total || 0) > 0 ? s.efficiency.total : null,
-        // הסימולציה של שרה במערכת התקציב: עלות ההוראה המתוכננת, שנתית
-        teachingSim: s.expenses?.teaching > 0 ? s.expenses.teaching : null,
+        // הסימולציה של שרה במערכת התקציב: עלות ההוראה המתוכננת, שנתית.
+        // "עלות הוראה חייב לכלול מנהלת" (שרה, 3.9) — שכר המנהלת מהתקציב
+        // מצורף, כך שההשוואה מול הבפועל (שגם הוא כולל מנהלת) היא אחד-לאחד.
+        teachingSim: s.expenses?.teaching > 0
+          ? s.expenses.teaching + (s.principalMonthly || 0) * 12
+          : null,
       };
     });
     /*

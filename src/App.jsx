@@ -3426,10 +3426,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   const monthlyCost = (sid) => teachers
     .filter(t => t.schoolId === sid)
     .reduce((sum, t) => sum + calcEmployer(t).total, 0);
-  // הסימולציה במערכות התקציב היא הוראה בלי מנהלת — הפער מושווה בלעדיה
-  const principalCost = (sid) => teachers
-    .filter(t => t.schoolId === sid && isPrincipalRow(t))
-    .reduce((sum, t) => sum + calcEmployer(t).total, 0);
+
 
   const save = async (sid, patch) => {
     const cur = { ...(fin?.[sid] || {}), ...patch };
@@ -3452,9 +3449,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       הפער" (שרה, 2.9). הסימולציה שלה ממערכות התקציב מול העלות בפועל:
       חיובי = בפועל זול מהמתוכנן; שלילי = חריגה מהסימולציה.
     */
-    const simGap = f.teachingSim != null && monthly > 0
-      ? f.teachingSim - (annual - principalCost(sc.id) * 12)
-      : null;
+    // שני הצדדים כוללים מנהלת (הוראת שרה, 3.9) — השוואה מלאה מול מלאה
+    const simGap = f.teachingSim != null && monthly > 0 ? f.teachingSim - annual : null;
     return { sc, f, monthly, annual, left, simGap };
   });
   const tot = rows.reduce((a, r) => ({
@@ -3522,7 +3518,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <TH>עלות שכר · חודש</TH>
               <TH>עלות שכר · שנה</TH>
               <TH>הסימולציה שלך · שנתי</TH>
-              <TH>פער סימולציה מול בפועל · ללא מנהלת</TH>
+              <TH>פער סימולציה מול בפועל</TH>
               <TH>יתרה לאחר שכר</TH>
             </tr>
           </thead>
