@@ -43,8 +43,9 @@ export default async function handler(req, res) {
 
     const mapped = (data.schools || []).filter(s => !s.empty && !s.error).map(s => {
       const inc = s.income || {};
-      // הכסף שמקורו במשרד: תקן + מענק + לתלמיד + תל"ן. שכר לימוד ותרומות לא.
-      const ministry = (inc.ministry || 0) + (inc.grant || 0) + (inc.perStudent || 0) + (inc.talan || 0);
+      // "בהכנסות עלות הוראה רק הכנסות משרד החינוך" (שרה, 2.9):
+      // שורת המשרד בלבד — בלי מענק, בלי פר-תלמיד, בלי תל"ן ובלי שכ"ל.
+      const ministry = inc.ministry || 0;
       return {
         name: s.name,
         ministry,
