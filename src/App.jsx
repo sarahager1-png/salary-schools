@@ -1699,7 +1699,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
         <div style={{ padding:'20px 24px', display:'flex', flexDirection:'column', gap:16 }}>
 
           {/* שם + ת.ז */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)', gap:10 }}>
             <div>
               <p className="apple-label">שם עובד/ת ההוראה</p>
               <input value={t.name} onChange={e => set('name', e.target.value)} placeholder="שם מלא" className="apple-input" />
@@ -1745,7 +1745,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 {t.isTemp && <p style={{ fontSize:13.8, color:'var(--apple-orange)' }}>תאריך סיום — חובה</p>}
               </div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)', gap:10 }}>
               <div>
                 <p className="apple-label">תאריך התחלה</p>
                 <input type="date" value={t.startDate} onChange={e => set('startDate', e.target.value)} dir="ltr" className="apple-input" />
@@ -1771,7 +1771,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
 
           {/* אופק חדש */}
           {t.reform === 'ofek' && (<>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)', gap:10 }}>
               <div>
                 <p className="apple-label">דרגה</p>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:4 }}>
@@ -3417,7 +3417,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         עמודות, סימולציית עולם ישן וסימולציית אופק, והפער
                         ביניהן היה תוספת בית חב"ד. הסימולציות ירדו. */}
                     <td style={{ textAlign:'center' }}>
-                      <input type="number" min="0" dir="ltr"
+                      <input type="number" min="0" dir="ltr" inputMode="decimal"
                         key={`gross-${t.id}`}
                         defaultValue={t._officialGross || ''}
                         placeholder="₪"
@@ -3628,7 +3628,7 @@ function SchoolPositions({ school, onSaveTeacher }) {
                     {onSaveTeacher ? (
                       <select className="apple-select" value={t.role || 'none'}
                         onChange={e => onSaveTeacher({ ...t, role: e.target.value })}
-                        style={{ fontSize:13.8, padding:'3px 7px', maxWidth:150 }}>
+                        style={{ fontSize:13.8, padding:'3px 7px', maxWidth:150, minWidth:86 }}>
                         {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
                       </select>
                     ) : (t.role && t.role !== 'none' ? (ROLES.find(x => x.id === t.role)?.label.split('(')[0].trim() || '—') : '—')}
@@ -3658,7 +3658,7 @@ function SchoolPositions({ school, onSaveTeacher }) {
                     {onSaveTeacher ? (
                       <span style={{ display:'inline-flex', alignItems:'center', gap:2 }}>
                         <input type="number" min="0" max="200" dir="ltr" className="apple-input"
-                          key={`pos-pct-${t.id}-${t.scopePct ?? ''}`}
+                          inputMode="decimal" key={`pos-pct-${t.id}-${t.scopePct ?? ''}`}
                           defaultValue={scope}
                           title={scopeConfirmed(t) ? 'אחוז משרה' : 'עדיין ברירת המחדל — הקלדה כאן קובעת אותו'}
                           onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
@@ -3683,7 +3683,7 @@ function SchoolPositions({ school, onSaveTeacher }) {
                   <td style={{ textAlign:'center', color: done ? 'var(--text)' : 'var(--text3)' }}>
                     {onSaveTeacher && !isPrincipalRow(t) ? (
                       <input type="number" min="0" dir="ltr" className="apple-input"
-                        key={`pos-gross-${t.id}-${t._officialGross ?? ''}`}
+                        inputMode="decimal" key={`pos-gross-${t.id}-${t._officialGross ?? ''}`}
                         defaultValue={t._officialGross || ''}
                         placeholder="₪"
                         onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
@@ -3764,8 +3764,11 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         if (cur.yieul == null && h.yieul != null) patch.yieul = h.yieul;
         if (Object.keys(patch).length) { await save(sc.id, patch); filled++; }
       }
-      setErr(misses.length ? `לא נמצאו במבט-רשת: ${misses.join(', ')}` : '');
-      setFlash(Date.now());
+      // "נשמר" רק כשבאמת נשמר משהו — כשל שקט שמוצג כהצלחה גרוע מכשל
+      setErr(misses.length
+        ? `לא נמצאו במבט-רשת: ${misses.join(', ')}`
+        : (filled === 0 ? 'לא היה מה למלא — כל התאים כבר מלאים' : ''));
+      if (filled > 0) setFlash(Date.now());
     } catch (e) { setErr(e.message); }
     finally { setPulling(false); }
   };
@@ -3817,7 +3820,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   );
   const moneyInput = (sid, field, val) => (
     <input type="number" min="0" dir="ltr" className="apple-input"
-      key={`fin-${sid}-${field}-${val ?? ''}`}
+      inputMode="decimal" key={`fin-${sid}-${field}-${val ?? ''}`}
       defaultValue={val ?? ''}
       placeholder="—"
       onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
@@ -3829,9 +3832,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   );
 
   return (
-    <div style={{ maxWidth:1120, margin:'0 auto' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:6 }}>
-        <h1 style={{ fontSize:24.2, fontWeight:800 }}>עלות הוראה מול תקציב</h1>
+    <div style={{ maxWidth:1120, margin:'0 auto', padding:'0 16px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:6, flexWrap:'wrap' }}>
+        <h1 style={{ fontSize:24.2, fontWeight:800, whiteSpace:'nowrap' }}>עלות הוראה מול תקציב</h1>
         <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700,
           color:'var(--apple-blue)', background:'rgba(90,110,255,.07)',
           border:'1px solid rgba(90,110,255,.2)', borderRadius:999, padding:'3px 11px' }}>
@@ -4150,7 +4153,7 @@ function FillProgress({ schools, month, onOpenSchool }) {
   useEffect(() => { let alive = true; (async () => { if (alive) await load(); })(); return () => { alive = false; }; }, [load]);
 
   if (err)   return <p style={{ fontSize:14.4, color:'var(--danger)' }}>{err}</p>;
-  if (!rows) return null;
+  if (!rows) return <p style={{ padding:20, fontSize:15.5, color:'var(--text3)' }}>טוען…</p>;
 
   const name = id => schools.find(s => s.id === id)?.name || '';
 
@@ -4733,7 +4736,7 @@ function NotificationsView() {
   useEffect(() => { let alive = true; (async () => { if (alive) await load(); })(); return () => { alive = false; }; }, [load]);
 
   if (err)   return <p style={{ padding:20, color:'var(--danger)', fontSize:14.9 }}>{err}</p>;
-  if (!rows) return null;
+  if (!rows) return <p style={{ padding:20, fontSize:15.5, color:'var(--text3)' }}>טוען…</p>;
 
   const mine = rows.filter(n => n.channel === 'inapp');
   const sent = rows.filter(n => n.channel !== 'inapp');
@@ -5101,12 +5104,12 @@ function BackupModal({ schools, months, onClose }) {
    הקוד חי בכתובת בלבד ואינו נשמר בדפדפן: מי שסוגר את הלשונית צריך
    את הקישור מחדש. זה מכוון — הקישור הוא כל ההגנה.
 ═════════════════════════════════════════════════════════════ */
-function LinkField({ label, value, onChange, type = 'number', hint }) {
+function LinkField({ label, value, onChange, type = 'number', hint, inputMode }) {
   return (
     <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 96px', minWidth:96 }}>
       <span style={{ fontSize:12.6, fontWeight:600, color:'var(--text3)' }}>{label}</span>
       <input
-        type={type} inputMode={type === 'number' ? 'numeric' : undefined}
+        type={type} inputMode={inputMode ?? (type === 'number' ? 'numeric' : undefined)}
         className="apple-input" dir={type === 'text' ? 'rtl' : 'ltr'}
         value={type === 'date' ? String(value ?? '').slice(0, 10) : (value ?? '')} placeholder={hint}
         onChange={e => onChange(type === 'number'
@@ -5139,9 +5142,9 @@ function LinkTeacherFields({ draft, apply }) {
     <>
       <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginBottom:9 }}>
         <LinkField label="שם עובד/ת ההוראה" type="text" value={draft.name} onChange={v => apply({ name: v })} hint="שם מלא" />
-        <LinkField label="ת.ז." type="text" value={draft.tzId} onChange={v => apply({ tzId: v })} hint="9 ספרות" />
-        <LinkField label="טלפון *" type="text" value={draft.phone} onChange={v => apply({ phone: v })} hint="05x-xxxxxxx" />
-        <LinkField label="מייל *" type="text" value={draft.email} onChange={v => apply({ email: v })} hint="name@example.com" />
+        <LinkField label="ת.ז." type="text" inputMode="numeric" value={draft.tzId} onChange={v => apply({ tzId: v })} hint="9 ספרות" />
+        <LinkField label="טלפון *" type="tel" value={draft.phone} onChange={v => apply({ phone: v })} hint="05x-xxxxxxx" />
+        <LinkField label="מייל *" type="email" value={draft.email} onChange={v => apply({ email: v })} hint="name@example.com" />
       </div>
       <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginBottom:9 }}>
         <LinkSelect label="מסלול" value={draft.reform} onChange={v => apply({ reform: v })}
@@ -5480,9 +5483,16 @@ function SignaturePad({ onChange }) {
   const drawing = useRef(false);
   const dirty = useRef(false);
   const pos = e => {
+    /*
+      הבאפר 400×140 אבל ה-CSS במובייל צר יותר — בלי תרגום קנה מידה
+      הקו נרשם מוסט מהאצבע (נמדד: יחס 1.25 באייפון). מתרגמים תמיד.
+    */
     const r = ref.current.getBoundingClientRect();
     const p2 = e.touches ? e.touches[0] : e;
-    return { x: p2.clientX - r.left, y: p2.clientY - r.top };
+    return {
+      x: (p2.clientX - r.left) * (ref.current.width / r.width),
+      y: (p2.clientY - r.top) * (ref.current.height / r.height),
+    };
   };
   const start = e => { drawing.current = true; const c = ref.current.getContext('2d'); const { x, y } = pos(e); c.beginPath(); c.moveTo(x, y); e.preventDefault(); };
   const move  = e => { if (!drawing.current) return; const c = ref.current.getContext('2d');
@@ -6048,7 +6058,7 @@ function LinkView({ code }) {
         </div>
       </header>
 
-      <main style={{ maxWidth:760, margin:'0 auto', padding:'16px 16px 40px' }}>
+      <main className="pb-safe-bottom" style={{ maxWidth:760, margin:'0 auto', padding:'16px 16px 40px' }}>
         {locked && (
           <div style={{ background:'var(--warn-bg)', border:'1px solid var(--warn)', borderRadius:12, padding:'11px 14px', marginBottom:14 }}>
             <p style={{ fontSize:14.9, fontWeight:600, color:'var(--warn)' }}>החודש נעול — אי אפשר לשנות נתונים.</p>
@@ -6351,7 +6361,7 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ display:'flex', gap:5, alignItems:'center', flexWrap:'nowrap', overflowX:'auto', maxWidth:'100%', paddingBottom:2 }}>
+          <div className="nav-scroll" style={{ display:'flex', gap:5, alignItems:'center', flexWrap:'nowrap', overflowX:'auto', maxWidth:'100%', paddingBottom:2 }}>
             {isCoord && view !== 'schools' && (
               <button className="nav-btn" onClick={() => setView('schools')}>
                 <ArrowRight size={15} strokeWidth={2.4} />

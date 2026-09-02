@@ -721,6 +721,10 @@ export async function fetchHubBudget() {
   const token = data?.session?.access_token;
   if (!token) throw new Error('פג תוקף ההתחברות — התחברי מחדש');
   const r = await fetch('/api/hub-budget', { headers: { authorization: `Bearer ${token}` } });
+  // תשובת HTML (סביבת פיתוח בלי ה-API, או rewrite שגוי) אינה "אפס
+  // בתי ספר" — היא כשל, ונאמרת ככזה במקום להתחפש להצלחה ריקה.
+  const ct = r.headers.get('content-type') || '';
+  if (!ct.includes('json')) throw new Error('שירות מבט-רשת אינו זמין כאן (התקבל דף במקום נתונים)');
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `מבט-רשת: שגיאה ${r.status}`);
   return j.schools || [];

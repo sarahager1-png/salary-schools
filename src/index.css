@@ -563,3 +563,20 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* בית ספר בלי תוספת בית חב"ד (מזכרת בתיה): עמודות הבסיס והתוספת
    מוסתרות — התשלום ישיר ואין להן משמעות שם. */
 .no-supp th:nth-child(23), .no-supp td:nth-child(23) { display:none; }
+
+/* ── מובייל: רמז שסרגל הניווט ממשיך, ומטרות מגע נדיבות ──
+   הדוח של 2.9: הכפתורים שמעבר לקצה נעלמים בלי סימן, והשדות בתאים
+   נמוכים מ-40px מגע. הדהייה בקצה אומרת "יש עוד", וההגדלה חלה רק
+   מתחת ל-640px כדי שהדסקטופ לא יזוז. */
+.nav-scroll {
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 26px);
+  mask-image: linear-gradient(to left, transparent 0, #000 26px);
+  scrollbar-width: none;
+}
+.nav-scroll::-webkit-scrollbar { display: none; }
+
+@media (max-width: 640px) {
+  .apple-table input, .apple-table select { min-height: 38px; font-size: 16px; }
+  .apple-table button[title] { min-width: 40px; min-height: 38px; }
+  .pb-safe-bottom { padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
+}
