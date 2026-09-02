@@ -3470,9 +3470,15 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     return () => { alive = false; };
   }, []);
 
+  // "בעלות הוראה תוספת מילוי מקום" (שרה, 3.9): הפרשת מ"מ — שעת מ"מ
+  // חודשית על כל שעה שבועית, 100 ₪ — נספרת בתוך עלות השכר.
+  const mmProvision = (sid) => teachers
+    .filter(t => t.schoolId === sid && !isPrincipalRow(t)
+      && (t.leaveType ?? 'none') === 'none' && Number(t.frontalHours) > 0)
+    .reduce((a, t) => a + Number(t.frontalHours), 0) * 100;
   const monthlyCost = (sid) => teachers
     .filter(t => t.schoolId === sid)
-    .reduce((sum, t) => sum + calcEmployer(t).total, 0);
+    .reduce((sum, t) => sum + calcEmployer(t).total, 0) + mmProvision(sid);
 
 
   const save = async (sid, patch) => {
@@ -3606,12 +3612,91 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         </table>
       </div>
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10 }}>
-        חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
+        חל"ת אינו נספר בעלות. עלות השכר כוללת הפרשת מילוי מקום — שעת מ"מ חודשית לכל
+        שעה שבועית, 100 ₪ לשעה. שינוי נשמר ביציאה מהשדה.
       </p>
 
       {/* "לכל בית ספר תעשה הכנסות מול הוצאות ללא עלות הוראה" (שרה, 3.9) —
           התמונה התפעולית מהתקציב במבט-רשת: כל ההכנסות מול כל ההוצאות
           שאינן שכר הוראה וייעוץ. */}
+      {/* "תכין כרטיס לכל בית ספר... הפרשי עלות הוראה והפרשי הוצאות עם
+          כרטיס מתרחב ומפורט" (שרה, 3.9). שני ההפרשים בכותרת; בפתיחה —
+          הפירוט המלא של שני הצדדים. הפרשת מ"מ: שעת מ"מ חודשית על כל
+          שעה שבועית, 100 ₪ לשעה. */}
+      <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>כרטיסי בתי הספר · הפרשי עלות הוראה והוצאות</h2>
+      {fin !== null && rows.map(({ sc, f, monthly, annual }) => {
+        const ts = teachers.filter(t => t.schoolId === sc.id && !isPrincipalRow(t)
+          && (t.leaveType ?? 'none') === 'none' && Number(t.frontalHours) > 0);
+        const hours = ts.reduce((a, t) => a + Number(t.frontalHours), 0);
+        const mmAnnual = hours * 100 * 12;
+        // annual כבר כולל את ההפרשה (monthlyCost) — הכרטיס רק מפרק אותה
+        const teachIncome = (f.ministryBudget || 0) - (f.yieul || 0) + (f.networkSupport || 0);
+        const teachCost = annual;
+        const teachDiff = (f.ministryBudget != null) ? teachIncome - teachCost : null;
+        // צד התפעול
+        const incLines = f.detail?.income || [];
+        const expLines = f.detail?.expenses || [];
+        const incSum = incLines.reduce((a, x) => a + x.amount, 0) || (f.incomeTotal || 0);
+        const expSum = expLines.reduce((a, x) => a + x.amount, 0) || (f.expensesOther || 0);
+        const opDiff = (f.incomeTotal != null || expLines.length) ? incSum - expSum : null;
+        if (teachDiff == null && opDiff == null) return null;
+        const isOpen = !!openInc['card-' + sc.id];
+        const dline = (label, val, bold, neg) => (
+          <div style={{ display:'flex', justifyContent:'space-between', gap:10, padding:'4px 0',
+            borderBottom: bold ? 'none' : '1px dashed var(--line)', fontSize: bold ? 15.5 : 14.9, fontWeight: bold ? 800 : 400 }}>
+            <span>{label}</span><b style={{ whiteSpace:'nowrap', color: neg ? 'var(--danger)' : undefined }}>{neg ? '−' : ''}{money(Math.abs(val))}</b>
+          </div>
+        );
+        const gap = v => v == null ? '—' : money(v);
+        const gapColor = v => v == null ? 'var(--text3)' : v < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)';
+        return (
+          <div key={'card-' + sc.id} className="apple-card" style={{ padding:'12px 18px', marginBottom:10 }}>
+            <div onClick={() => setOpenInc(m => ({ ...m, ['card-' + sc.id]: !m['card-' + sc.id] }))}
+              style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap', cursor:'pointer' }}>
+              <ChevronLeft size={16} strokeWidth={2.4} style={{ color:'var(--text3)', transform: isOpen ? 'rotate(-90deg)' : 'none' }} />
+              <p style={{ fontSize:16.7, fontWeight:800 }}>{sc.name}</p>
+              <span style={{ fontSize:14.4, fontWeight:700, color: gapColor(teachDiff) }}>
+                הפרש עלות הוראה: {gap(teachDiff)}
+              </span>
+              <span style={{ fontSize:14.4, fontWeight:700, marginInlineStart:'auto', color: gapColor(opDiff) }}>
+                הפרש הוצאות: {gap(opDiff)}
+              </span>
+            </div>
+            {isOpen && (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:20, marginTop:12 }}>
+                <div>
+                  <p style={{ fontSize:14.4, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>עלות הוראה · שנתי</p>
+                  {dline('הכנסות משרד החינוך + מענק', f.ministryBudget || 0)}
+                  {f.yieul ? dline('ייעול', f.yieul, false, true) : null}
+                  {f.networkSupport ? dline('השתתפות הרשת', f.networkSupport) : null}
+                  {dline('סה"כ הכנסות הוראה', teachIncome, true)}
+                  <div style={{ height:8 }} />
+                  {dline(`שכר הוראה (מורות, מנהלת, תוספות)`, annual - mmAnnual)}
+                  {dline(`הפרשת מילוי מקום — ${hours} שעות × 100 ₪ × 12`, mmAnnual)}
+                  {dline('סה"כ הוצאות הוראה', teachCost, true)}
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
+                    borderTop:'2px solid var(--line)', color: gapColor(teachDiff) }}>
+                    <span>הפרש עלות הוראה</span><span>{gap(teachDiff)}</span>
+                  </div>
+                </div>
+                <div>
+                  <p style={{ fontSize:14.4, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>הכנסות והוצאות אחרות · שנתי</p>
+                  {incLines.map((x, i) => <div key={'i' + i}>{dline(x.name, x.amount)}</div>)}
+                  {dline('סה"כ הכנסות', incSum, true)}
+                  <div style={{ height:8 }} />
+                  {expLines.map((x, i) => <div key={'e' + i}>{dline(x.name, x.amount)}</div>)}
+                  {dline('סה"כ הוצאות', expSum, true)}
+                  <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
+                    borderTop:'2px solid var(--line)', color: gapColor(opDiff) }}>
+                    <span>הפרש הוצאות</span><span>{gap(opDiff)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
       <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>הכנסות מול הוצאות · ללא עלות הוראה ומשרד החינוך</h2>
       {fin !== null && rows.map(({ sc, f }) => {
         const d = f.detail;
