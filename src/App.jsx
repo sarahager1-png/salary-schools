@@ -3440,6 +3440,16 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   const [period, setPeriod] = useState('year');
   // עלות מילוי מקום: 5% מעלות השכר בפועל (הכרעת שרה, 3.9)
   const MM_PCT = 0.05;
+  // מדד בכותרת כרטיס: תווית קטנה מעל מספר, רוחב קבוע — הכרטיסים מיושרים
+  const Metric = ({ label, val, big }) => (
+    <div style={{ minWidth:150, flexShrink:0 }}>
+      <p style={{ fontSize:12.6, color:'var(--text3)', fontWeight:600, marginBottom:1 }}>{label}</p>
+      <p className="num" style={{ fontSize: big ? 17.8 : 15.5, fontWeight:800,
+        color: val == null ? 'var(--text3)' : val < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
+        {val == null ? '—' : money(per(val))}
+      </p>
+    </div>
+  );
   // שורות באותו שם (למשל שני מקורות "גיוס קהילתי", או פיצול בנים/בנות)
   // מאוחדות לשורה אחת — "לתקן" (שרה, 3.9)
   const mergeLines = (lines) => {
@@ -3710,18 +3720,12 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         return (
           <div key={'card-' + sc.id} className="apple-card" style={{ padding:'12px 18px', marginBottom:10, cursor:'pointer' }}
             onClick={() => setOpenInc(m => ({ ...m, ['card-' + sc.id]: !m['card-' + sc.id] }))}>
-            <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
-              <ChevronLeft size={16} strokeWidth={2.4} style={{ color:'var(--text3)', transform: isOpen ? 'rotate(-90deg)' : 'none' }} />
-              <p style={{ fontSize:16.7, fontWeight:800 }}>{sc.name}</p>
-              <span style={{ fontSize:14.4, fontWeight:700, color: gapColor(teachDiff) }}>
-                הפרש עלות הוראה: {teachDiff == null ? '—' : money(per(teachDiff))}
-              </span>
-              <span style={{ fontSize:14.4, fontWeight:700, color: gapColor(opDiff) }}>
-                הפרש תקציב נוסף: {opDiff == null ? '—' : money(per(opDiff))}
-              </span>
-              <span style={{ fontSize:15.5, fontWeight:800, marginInlineStart:'auto', color: gapColor((teachDiff || 0) + (opDiff || 0)) }}>
-                סך הכל: {money(per((teachDiff || 0) + (opDiff || 0)))}
-              </span>
+            <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+              <ChevronLeft size={16} strokeWidth={2.4} style={{ color:'var(--text3)', flexShrink:0, transform: isOpen ? 'rotate(-90deg)' : 'none' }} />
+              <p style={{ fontSize:16.7, fontWeight:800, flex:'1 1 160px', minWidth:120 }}>{sc.name}</p>
+              <Metric label="הפרש עלות הוראה" val={teachDiff} />
+              <Metric label="הפרש תקציב נוסף" val={opDiff} />
+              <Metric label="סך הכל" val={(teachDiff || 0) + (opDiff || 0)} big />
             </div>
             {isOpen && (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:20, marginTop:12 }}>
@@ -3792,11 +3796,11 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         const gc = v => v < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)';
         return (
           <div className="apple-card" style={{ padding:'14px 18px', marginBottom:10, background:'var(--apple-fill, #f5f3fa)' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
-              <p style={{ fontSize:16.7, fontWeight:800 }}>סה"כ הרשת</p>
-              <span style={{ fontSize:14.4, fontWeight:700, color: gc(sumTeach) }}>הפרש עלות הוראה: {money(per(sumTeach))}</span>
-              <span style={{ fontSize:14.4, fontWeight:700, color: gc(sumOp) }}>הפרש תקציב נוסף: {money(per(sumOp))}</span>
-              <span style={{ fontSize:15.5, fontWeight:800, marginInlineStart:'auto', color: gc(sumTeach + sumOp) }}>סך הכל: {money(per(sumTeach + sumOp))}</span>
+            <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+              <p style={{ fontSize:16.7, fontWeight:800, flex:'1 1 160px', minWidth:120, paddingInlineStart:32 }}>סה"כ הרשת</p>
+              <Metric label="הפרש עלות הוראה" val={sumTeach} />
+              <Metric label="הפרש תקציב נוסף" val={sumOp} />
+              <Metric label="סך הכל" val={sumTeach + sumOp} big />
             </div>
           </div>
         );
