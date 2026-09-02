@@ -685,7 +685,7 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
             ))}
           </div>
 
-          <p style={{ fontSize:12.1, color:'var(--text3)', marginTop:22, lineHeight:1.7, textAlign:'center' }}>
+          <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:22, lineHeight:1.7, textAlign:'center' }}>
             מסמך פנימי של רשת חינוך חב״ד. אינו מחליף טופס 101.
           </p>
         </div>
@@ -764,7 +764,7 @@ function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
             {bySchool.map(({ school, ts }) => (
               <div key={school.id}>
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                  <span style={{ background:'var(--apple-blue)', color:'#fff', fontSize:12.6, fontWeight:700, padding:'2px 8px', borderRadius:10 }}>{ts.length}</span>
+                  <span style={{ background:'var(--apple-blue)', color:'#fff', fontSize:13.2, fontWeight:700, padding:'2px 8px', borderRadius:10 }}>{ts.length}</span>
                   <span style={{ fontWeight:600, fontSize:16.1, color:'var(--apple-text)' }}>{school.name}{school.city ? ` — ${school.city}` : ''}</span>
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -779,9 +779,9 @@ function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
                             {t._changedAt && <p style={{ fontSize:13.8, color:'var(--apple-blue)', marginTop:2 }}>שונה: {new Date(t._changedAt).toLocaleDateString('he-IL')}</p>}
                           </div>
                           <div style={{ textAlign:'left' }}>
-                            <p style={{ fontSize:12.6, color:'var(--apple-green)', fontWeight:600, marginBottom:2 }}>שכר רשמי</p>
+                            <p style={{ fontSize:13.2, color:'var(--apple-green)', fontWeight:600, marginBottom:2 }}>שכר רשמי</p>
                             <p style={{ fontWeight:700, fontSize:18.4, color:'var(--apple-text)' }}>{emp.gross.toLocaleString()} ₪</p>
-                            <p style={{ fontSize:12.6, color:'var(--apple-text3)' }}>למעסיק: {emp.total.toLocaleString()} ₪</p>
+                            <p style={{ fontSize:13.2, color:'var(--apple-text3)' }}>למעסיק: {emp.total.toLocaleString()} ₪</p>
                           </div>
                         </div>
                         <div style={{ marginBottom:12 }}><TeacherDiff t={t} /></div>
@@ -1211,15 +1211,15 @@ function ImportModal({ schoolId, schoolName, onImport, onClose }) {
                   {preview.map((t,i) => (
                     <tr key={i}>
                       <td style={{ fontWeight:600 }}>{t.name}</td>
-                      <td style={{ fontFamily:'monospace', fontSize:12.6 }}>{t.tzId||'—'}</td>
-                      <td style={{ fontSize:12.6, color:'var(--apple-text2)' }}>{t.email||'—'}</td>
+                      <td style={{ fontFamily:'monospace', fontSize:13.2 }}>{t.tzId||'—'}</td>
+                      <td style={{ fontSize:13.2, color:'var(--apple-text2)' }}>{t.email||'—'}</td>
                       <td>{reformLabel(t.reform)}</td>
                       <td>{t.grade==='intern'?'מתמחה':t.grade}</td>
                       <td>{t.seniority}</td>
                       <td>{t.scopePct}%</td>
-                      <td style={{ fontSize:12.6 }}>{ROLES.find(r=>r.id===t.role)?.label.split('(')[0].trim()||'—'}</td>
+                      <td style={{ fontSize:13.2 }}>{ROLES.find(r=>r.id===t.role)?.label.split('(')[0].trim()||'—'}</td>
                       <td style={{ textAlign:'center' }}>{t.isTemp?'כן':'—'}</td>
-                      <td style={{ fontSize:12.6 }}>{t.startDate||'—'}</td>
+                      <td style={{ fontSize:13.2 }}>{t.startDate||'—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1292,7 +1292,7 @@ function FileAttachSection({ files, onChange }) {
               </span>
               <div style={{ flex:1, minWidth:0 }}>
                 <p style={{ fontSize:14.9, fontWeight:600, color:'var(--apple-text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{f.name}</p>
-                <p style={{ fontSize:12.6, color:'var(--apple-text3)' }}>{new Date(f.uploadedAt).toLocaleDateString('he-IL')}</p>
+                <p style={{ fontSize:13.2, color:'var(--apple-text3)' }}>{new Date(f.uploadedAt).toLocaleDateString('he-IL')}</p>
               </div>
               <button onClick={() => download(f)} style={{ fontSize:13.8, color:'var(--apple-blue)', background:'none', border:'none', cursor:'pointer', fontWeight:600, padding:'4px 8px' }}>הורד</button>
               <button onClick={() => onChange(files.filter(x => x.id !== f.id))} style={{ fontSize:14.9, color:'var(--apple-red)', background:'none', border:'none', cursor:'pointer', padding:'4px 6px' }}><X size={15} strokeWidth={2.4} /></button>
@@ -1480,7 +1480,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 <div style={{ display:'flex', gap:4, marginTop:8, flexWrap:'wrap' }}>
                   {[50,67,75,100,112,125,140].map(v => (
                     <button key={v} onClick={() => syncFromScope(v)} style={{
-                      flex:1, minWidth:0, padding:'5px 2px', borderRadius:8, border:'none', fontSize:12.6, fontWeight:600, cursor:'pointer',
+                      flex:1, minWidth:0, padding:'5px 2px', borderRadius:8, border:'none', fontSize:13.2, fontWeight:600, cursor:'pointer',
                       background: t.scopePct===v ? 'var(--apple-blue)' : '#fff',
                       color: t.scopePct===v ? '#fff' : 'var(--apple-text2)',
                     }}>{v}%</button>
@@ -1503,7 +1503,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                     { label: 'שהייה',   val: derived.presence },
                   ].map(c => (
                     <div key={c.label} style={{ background:'#fff', borderRadius:10, padding:'8px 4px' }}>
-                      <p style={{ fontSize:12.6, color:'var(--apple-text3)', marginBottom:2 }}>{c.label}</p>
+                      <p style={{ fontSize:13.2, color:'var(--apple-text3)', marginBottom:2 }}>{c.label}</p>
                       <p style={{ fontWeight:700, color:'var(--apple-blue)', fontSize:16.1 }}>{c.val}</p>
                     </div>
                   ))}
@@ -1581,12 +1581,12 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
               {onLeave(t) && (
                 <>
                   <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 120px' }}>
-                    <span style={{ fontSize:12.6, color:'var(--text3)' }}>מתאריך</span>
+                    <span style={{ fontSize:13.2, color:'var(--text3)' }}>מתאריך</span>
                     <input type="date" className="apple-input" dir="ltr" value={String(t.leaveFrom ?? '').slice(0,10)}
                       onChange={e => set('leaveFrom', e.target.value || null)} />
                   </label>
                   <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 120px' }}>
-                    <span style={{ fontSize:12.6, color:'var(--text3)' }}>עד תאריך (אם ידוע)</span>
+                    <span style={{ fontSize:13.2, color:'var(--text3)' }}>עד תאריך (אם ידוע)</span>
                     <input type="date" className="apple-input" dir="ltr" value={String(t.leaveTo ?? '').slice(0,10)}
                       onChange={e => set('leaveTo', e.target.value || null)} />
                   </label>
@@ -1718,7 +1718,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                   {t._actualEmployerCost && <button onClick={() => set('_actualEmployerCost', null)}
                     style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer' }}><X size={15} strokeWidth={2.4} /></button>}
                 </div>
-                <p style={{ fontSize:12.6, color:'var(--text3)', marginTop:6, lineHeight:1.6 }}>
+                <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:6, lineHeight:1.6 }}>
                   בחודש הראשון העלות היא אומדן לפי רכיבי החוק — פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד — עד שהנהלת החשבונות מזינה את הסכום בפועל.
                   משהוזן כאן סכום, הוא גובר עליו בכל הדוחות.
                 </p>
@@ -1740,7 +1740,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                       value={t._agreedGross || ''}
                       onChange={e => set('_agreedGross', e.target.value ? Number(e.target.value) : '')}
                       placeholder="ברוטו מוסכם" style={{ fontSize:16.1 }} />
-                    <p style={{ fontSize:12.6, color:'var(--text3)', marginTop:6, lineHeight:1.6 }}>
+                    <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:6, lineHeight:1.6 }}>
                       מחליף את הברוטו ואת הסימולציה. השורה לא תמתין לחשבת השכר.
                     </p>
                   </>
@@ -1751,7 +1751,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             {/* אופק חדש — שני שדות. למנהלת סימולציית ניהול אחת. */}
             {isPrincipalRow(t) ? (
               <div>
-                <p style={{ fontSize:12.6, fontWeight:700, color:'var(--purple)', marginBottom:4 }}>סימולציית אופק — ניהול</p>
+                <p style={{ fontSize:13.2, fontWeight:700, color:'var(--purple)', marginBottom:4 }}>סימולציית אופק — ניהול</p>
                 <div style={{ display:'flex', gap:4, alignItems:'center' }}>
                   <input type="number" className="apple-input" dir="ltr" style={{ fontSize:14.9 }}
                     value={t._officialGross || ''}
@@ -1759,14 +1759,14 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                     placeholder="שכר ניהול..." disabled={!!t._agreedGross} />
                   {t._officialGross && <button onClick={() => set('_officialGross', null)} style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer' }}><X size={15} strokeWidth={2.4} /></button>}
                 </div>
-                <p style={{ fontSize:12.6, color:'var(--text3)', marginTop:5 }}>
+                <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:5 }}>
                   הסכום הזה הוא הבסיס במלואו — אין למנהלת רכיב תוספת בית חב"ד.
                 </p>
               </div>
             ) : t.reform === 'ofek' ? (<>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
                 <div>
-                  <p style={{ fontSize:12.6, fontWeight:700, color:'#1a7a38', marginBottom:4 }}>סימולציית אופק חדש</p>
+                  <p style={{ fontSize:13.2, fontWeight:700, color:'#1a7a38', marginBottom:4 }}>סימולציית אופק חדש</p>
                   <div style={{ display:'flex', gap:4, alignItems:'center' }}>
                     <input type="number" className="apple-input" dir="ltr" style={{ fontSize:14.9 }}
                       value={t._officialGross || ''}
@@ -1776,7 +1776,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                   </div>
                 </div>
                 <div>
-                  <p style={{ fontSize:12.6, fontWeight:700, color:'var(--purple)', marginBottom:4 }}>סימולציית עולם ישן</p>
+                  <p style={{ fontSize:13.2, fontWeight:700, color:'var(--purple)', marginBottom:4 }}>סימולציית עולם ישן</p>
                   <div style={{ display:'flex', gap:4, alignItems:'center' }}>
                     <input type="number" className="apple-input" dir="ltr" style={{ fontSize:14.9 }}
                       value={t._officialGrossPre || ''}
@@ -1807,7 +1807,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
           {/* פירוק התשלום — נתון רשמי בלבד */}
           {simComplete(t) ? (
             <div className="apple-section" style={{ background:'var(--ok-bg)', border:'1px solid var(--ok-line)' }}>
-              <p style={{ fontSize:12.6, fontWeight:700, color:'var(--ok)', textAlign:'center', marginBottom:12, letterSpacing:'0.04em' }}>
+              <p style={{ fontSize:13.2, fontWeight:700, color:'var(--ok)', textAlign:'center', marginBottom:12, letterSpacing:'0.04em' }}>
                 פירוק התשלום — לפי הסימולציה הרשמית
               </p>
               {[
@@ -1820,7 +1820,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 <div key={label} style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10, padding:'5px 0' }}>
                   <span style={{ fontSize:14.4, color:'var(--text2)' }}>
                     {label}
-                    {note && <span style={{ fontSize:12.6, color:'var(--text3)', marginInlineStart:6 }}>{note}</span>}
+                    {note && <span style={{ fontSize:13.2, color:'var(--text3)', marginInlineStart:6 }}>{note}</span>}
                   </span>
                   <span className="num" style={{ fontSize:16.1, fontWeight:700, color:'var(--text)' }}>{val.toLocaleString('he-IL')} ₪</span>
                 </div>
@@ -1840,7 +1840,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                     </div>
                   ))}
                   {emp.supplement > 0 && (
-                    <p style={{ fontSize:12.1, color:'var(--text3)', marginTop:4, opacity:.8 }}>
+                    <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:4, opacity:.8 }}>
                       מזה {emp.employerSupp.toLocaleString('he-IL')} ₪ על תוספת בית חב"ד — היא נושאת מס שכר וביטוח לאומי בלבד
                     </p>
                   )}
@@ -1851,7 +1851,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 <span style={{ fontSize:14.9, fontWeight:700, color:'var(--text)' }}>סה״כ למעסיק</span>
                 <span className="num" style={{ fontSize:20.7, fontWeight:800, color:'var(--purple)' }}>{emp.total.toLocaleString('he-IL')} ₪</span>
               </div>
-              <p style={{ fontSize:12.6, color:'var(--text3)', textAlign:'center', marginTop:8 }}>
+              <p style={{ fontSize:13.2, color:'var(--text3)', textAlign:'center', marginTop:8 }}>
                 נטו משוער {calcNet(emp.gross).toLocaleString('he-IL')} ₪
               </p>
             </div>
@@ -2043,7 +2043,7 @@ function SchoolReport({ school, teachers, onClose }) {
               return (
                 <tr key={t.id} style={pending ? { background:'rgba(255,159,10,0.08)' } : {}}>
                   <td style={{ fontWeight:600, color:'var(--text)' }}>{pending && <Bell size={12} strokeWidth={2.4} color="var(--warn)" style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:5 }} />}{t.name}</td>
-                  <td style={{ fontFamily:'monospace', fontSize:12.6 }}>{t.tzId||'—'}</td>
+                  <td style={{ fontFamily:'monospace', fontSize:13.2 }}>{t.tzId||'—'}</td>
                   <td style={{ textAlign:'center' }}>{reformLabel(t.reform)}</td>
                   <td style={{ textAlign:'center', fontWeight:700 }}>{grade}</td>
                   <td style={{ textAlign:'center' }}>{t.seniority}</td>
@@ -2051,7 +2051,7 @@ function SchoolReport({ school, teachers, onClose }) {
                   <td style={{ textAlign:'center' }}>{derived ? derived.frontal : (t.frontalHours ?? '—')}</td>
                   <td style={{ textAlign:'center' }}>{derived ? derived.individual : '—'}</td>
                   <td style={{ textAlign:'center' }}>{derived ? derived.presence : '—'}</td>
-                  <td style={{ fontSize:12.6 }}>{t.role!=='none' ? ROLES.find(r=>r.id===t.role)?.label.split('(')[0].trim() : '—'}</td>
+                  <td style={{ fontSize:13.2 }}>{t.role!=='none' ? ROLES.find(r=>r.id===t.role)?.label.split('(')[0].trim() : '—'}</td>
                   <td style={{ textAlign:'center' }}>{fmt(t.startDate)}</td>
                   <td style={{ textAlign:'center' }}>{fmt(t.endDate)}</td>
                   <td style={{ fontWeight: t._officialGross ? 700 : 400, color: t._officialGross ? 'var(--apple-green)' : '#bbb' }}>
@@ -2165,7 +2165,7 @@ function AbsenceReport({ school, teachers, monthLabel, onClose }) {
             { label:'סה"כ תוספות',      val: totExtras.toLocaleString()+' ₪', color:'#27ae60' },
           ].map(c => (
             <div key={c.label} style={{ background:'#f9f9f9', borderRadius:12, padding:'12px 16px', textAlign:'center' }}>
-              <div style={{ fontSize:12.6, color:'#888', fontWeight:600, marginBottom:4 }}>{c.label}</div>
+              <div style={{ fontSize:13.2, color:'#888', fontWeight:600, marginBottom:4 }}>{c.label}</div>
               <div style={{ fontSize:25.3, fontWeight:800, color: c.color }}>{c.val}</div>
             </div>
           ))}
@@ -2271,10 +2271,10 @@ function ReportMonth({ school, teachers, monthKey, due, onReport }) {
           הדיווח על {fmtMonth(monthKey)}
         </p>
         {reported
-          ? <span className="apple-badge badge-green" style={{ fontSize:12.1, padding:'2px 8px' }}>נמסר</span>
+          ? <span className="apple-badge badge-green" style={{ fontSize:13.2, padding:'2px 8px' }}>נמסר</span>
           : past
-            ? <span className="apple-badge badge-orange" style={{ fontSize:12.1, padding:'2px 8px' }}>אחרי המועד</span>
-            : daysLeft != null && <span className="apple-badge badge-purple" style={{ fontSize:12.1, padding:'2px 8px' }}>
+            ? <span className="apple-badge badge-orange" style={{ fontSize:13.2, padding:'2px 8px' }}>אחרי המועד</span>
+            : daysLeft != null && <span className="apple-badge badge-purple" style={{ fontSize:13.2, padding:'2px 8px' }}>
                 {daysLeft === 0 ? 'היום המועד האחרון' : `נותרו ${daysLeft} ימים`}
               </span>}
       </div>
@@ -2732,7 +2732,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         setEditData(p => ({ ...p, scopePct: pct, scope: pct }));
                       }}
                       style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:58, textAlign:'center', fontWeight:700 }} />
-                    <span style={{ display:'block', fontSize:12.1, color:'var(--text3)' }}>% משרה</span>
+                    <span style={{ display:'block', fontSize:13.2, color:'var(--text3)' }}>% משרה</span>
                   </td>
                   <td>
                     <select value={editData.degree||'BA'} onChange={e=>setF('degree',e.target.value)} className="apple-select" style={{ fontSize:13.8, padding:'4px 8px' }}>
@@ -2834,7 +2834,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           setEditData(p => ({ ...p, scopePct: pct, scope: pct }));
                         }}
                         style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:58, textAlign:'center', fontWeight:700 }} />
-                      <span style={{ display:'block', fontSize:12.1, color:'var(--text3)' }}>% משרה</span>
+                      <span style={{ display:'block', fontSize:13.2, color:'var(--text3)' }}>% משרה</span>
                     </td>
                     <td>
                       <select value={d.degree||'BA'} onChange={e=>setF('degree',e.target.value)} className="apple-select" style={{ fontSize:13.8, padding:'4px 8px' }}>
@@ -2911,14 +2911,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         {isAppr && <ClipboardCheck size={13} strokeWidth={2.4} color="var(--teal-700)" aria-label="ממתין לאישור" />}
                         <span style={{ color: t.name === PRINCIPAL_PLACEHOLDER ? 'var(--text3)' : undefined }}>{t.name}</span>
                         {!hasContact(t) && (
-                          <span className="apple-badge badge-orange" style={{ fontSize:12.1, padding:'2px 8px' }}
+                          <span className="apple-badge badge-orange" style={{ fontSize:13.2, padding:'2px 8px' }}
                             title="בלי טלפון ומייל אי אפשר לשלוח את נתוני ההעסקה לחתימה">
                             חסרים פרטי קשר
                           </span>
                         )}
                         {onLeave(t) && (
                           <span className={`apple-badge ${t.leaveType === 'maternity' && hasSubstitute(t) ? 'badge-teal' : 'badge-orange'}`}
-                            style={{ fontSize:12.1, padding:'2px 8px' }} title={leaveText(t)}>
+                            style={{ fontSize:13.2, padding:'2px 8px' }} title={leaveText(t)}>
                             {leaveLabel(t.leaveType)}{t.leaveFrom ? ` ${fmtDay(t.leaveFrom)}` : ''}
                             {t.leaveType === 'maternity'
                               ? (hasSubstitute(t) ? ' · שובצה מחליפה — הפרשות בלבד' : ' · השכר נשמר עד שיבוץ')
@@ -2926,14 +2926,14 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           </span>
                         )}
                         {isPrincipalRow(t) && (
-                          <span className="apple-badge badge-purple" style={{ fontSize:12.1, padding:'2px 8px', cursor:'help' }}
+                          <span className="apple-badge badge-purple" style={{ fontSize:13.2, padding:'2px 8px', cursor:'help' }}
                             title="נוצרה אוטומטית עם פתיחת בית הספר, עם 26 שעות כברירת מחדל — השעות נספרות במכסה. עדכני את שעותיה ואת פרטיה.">
                             מנהלת
                           </span>
                         )}
-                        {t._agreedGross && <span className="apple-badge badge-teal" style={{ fontSize:12.1, padding:'2px 8px' }} title="ברוטו מוסכם — לא מסימולציה">שכר מוסכם</span>}
+                        {t._agreedGross && <span className="apple-badge badge-teal" style={{ fontSize:13.2, padding:'2px 8px' }} title="ברוטו מוסכם — לא מסימולציה">שכר מוסכם</span>}
                         {fullyApproved(t) && (
-                          <span className="apple-badge badge-green" style={{ fontSize:12.1, padding:'2px 8px' }}
+                          <span className="apple-badge badge-green" style={{ fontSize:13.2, padding:'2px 8px' }}
                             title="מאושר סופית — אפשר להפיק לה נתוני העסקה לחתימה">
                             <Check size={10} strokeWidth={3} />
                             מאושר
@@ -2974,17 +2974,17 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         <button
                           title="לפי הנוסחה: שעות (ועוד 3 למחנכת בעולם ישן) חלקי 30, או 26 באופק. לחיצה מיישרת, ותוספת האם מעל."
                           onClick={e => { e.stopPropagation(); const v = suggestedScope(t); saveRow({ ...t, scopePct: v, scope: v, scopeSetAt: new Date().toISOString() }); }}
-                          style={{ display:'block', margin:'3px auto 0', fontSize:12.1, color:'#fff',
+                          style={{ display:'block', margin:'3px auto 0', fontSize:13.2, color:'#fff',
                             background:'var(--teal)', border:'none', cursor:'pointer', fontFamily:'inherit',
                             fontWeight:700, padding:'2px 8px', borderRadius:999, whiteSpace:'nowrap' }}>
                           {`תקני ל-${suggestedScope(t)}`}
                         </button>
                       ) : momBonus ? (
-                        <span style={{ display:'block', fontSize:11.5, color:'var(--purple)', fontWeight:700, marginTop:2 }}>
+                        <span style={{ display:'block', fontSize:13.2, color:'var(--purple)', fontWeight:700, marginTop:2 }}>
                           {`כולל +${MOM_SCOPE_BONUS} אם`}
                         </span>
                       ) : momUnderThreshold(t) ? (
-                        <span style={{ display:'block', fontSize:11.5, color:'var(--text3)', marginTop:2 }}
+                        <span style={{ display:'block', fontSize:13.2, color:'var(--text3)', marginTop:2 }}
                           title={`תוספת אם ניתנת ממשרה של ${MOM_MIN_SCOPE}% ומעלה`}>
                           {`אם · מתחת ל-${MOM_MIN_SCOPE}%`}
                         </span>
@@ -3033,7 +3033,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           border:'1px solid var(--line)', borderRadius:7, padding:'3px 4px',
                           background: momBonus ? 'var(--purple-100)' : 'var(--surface)',
                           color:'var(--text)', fontFamily:'inherit' }} />
-                      {momBonus && <span style={{ display:'block', fontSize:10.9, color:'var(--purple)', fontWeight:700 }}>אם</span>}
+                      {momBonus && <span style={{ display:'block', fontSize:13.2, color:'var(--purple)', fontWeight:700 }}>אם</span>}
                     </td>
                     <td style={{ textAlign:'center', color: (t.absenceDays||0)>0 ? 'var(--danger)' : 'var(--text3)', fontWeight: (t.absenceDays||0)>0 ? 700 : 400 }}>
                       {(t.absenceDays||0) > 0 ? t.absenceDays : '—'}
@@ -3399,7 +3399,7 @@ function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute
                 <td style={{ textAlign:'center', fontWeight:700 }}>{tot.hours || '—'}</td>
                 <td style={{ textAlign:'center', fontWeight:700 }}>{nis(tot.gross)}</td>
                 <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>{nis(tot.total)}</td>
-                <td style={{ textAlign:'center', fontSize:12.6, color:'var(--text3)' }}>
+                <td style={{ textAlign:'center', fontSize:13.2, color:'var(--text3)' }}>
                   {school.officialCount < school.count ? `${school.count - school.officialCount} ללא סימולציה` : 'הכול רשמי'}
                 </td>
               </tr>
@@ -3407,7 +3407,7 @@ function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute
           )}
         </table>
       </div>
-      <p style={{ fontSize:12.6, color:'var(--text3)', marginTop:8, lineHeight:1.7 }}>
+      <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:8, lineHeight:1.7 }}>
         הסכומים נספרים רק עבור משרות שהסימולציה שלהן הושלמה — לכן סה״כ בית הספר כאן זהה לשורה שבדוח.
       </p>
     </div>
@@ -3443,7 +3443,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   // מדד בכותרת כרטיס: תווית קטנה מעל מספר, רוחב קבוע — הכרטיסים מיושרים
   const Metric = ({ label, val, big }) => (
     <div style={{ minWidth:150, flexShrink:0 }}>
-      <p style={{ fontSize:12.6, color:'var(--text3)', fontWeight:600, marginBottom:1 }}>{label}</p>
+      <p style={{ fontSize:13.2, color:'var(--text3)', fontWeight:600, marginBottom:1 }}>{label}</p>
       <p className="num" style={{ fontSize: big ? 17.8 : 15.5, fontWeight:800,
         color: val == null ? 'var(--text3)' : val < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
         {val == null ? '—' : money(per(val))}
@@ -3998,7 +3998,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                 </>)}
               </div>
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:14.4 }}>
-                <thead><tr style={{ borderBottom:'1px solid var(--line)', color:'var(--text3)', fontSize:12.6 }}>
+                <thead><tr style={{ borderBottom:'1px solid var(--line)', color:'var(--text3)', fontSize:13.2 }}>
                   <th style={{ textAlign:'right', padding:'3px 4px' }}>סמל</th>
                   <th style={{ textAlign:'right', padding:'3px 4px' }}>רכיב</th>
                   <th style={{ textAlign:'left', padding:'3px 4px' }}>סכום</th>
@@ -4006,14 +4006,14 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                 <tbody>
                   {r.principal && (
                     <tr style={{ borderBottom:'1px solid var(--line)' }}>
-                      <td style={{ padding:'4px', color:'var(--text3)', fontSize:12.6 }}></td>
+                      <td style={{ padding:'4px', color:'var(--text3)', fontSize:13.2 }}></td>
                       <td style={{ padding:'4px' }}>שכר מנהל/ת בית ספר</td>
                       <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(r.base).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   )}
                   {(sl?.lines || []).map((ln, i) => (
                     <tr key={i} style={{ borderBottom:'1px solid var(--line)' }}>
-                      <td style={{ padding:'4px', color:'var(--text3)', fontSize:12.6 }}>{ln.code}</td>
+                      <td style={{ padding:'4px', color:'var(--text3)', fontSize:13.2 }}>{ln.code}</td>
                       <td style={{ padding:'4px' }}>{ln.label}</td>
                       <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(ln.amount).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                     </tr>
@@ -4028,7 +4028,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                   {r.paysSupp && (
                     <tr style={{ borderBottom:'1px solid var(--line)' }}>
                       <td style={{ padding:'4px' }}></td>
-                      <td style={{ padding:'4px' }}>תוספת בית חב"ד <span style={{ fontSize:11.5, color:'var(--text3)' }}>(שורה קבועה — ללא נלוות)</span></td>
+                      <td style={{ padding:'4px' }}>תוספת בית חב"ד <span style={{ fontSize:13.2, color:'var(--text3)' }}>(שורה קבועה — ללא נלוות)</span></td>
                       <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{(r.principal ? r.supp : Math.max(0, r.gross - (sl?.gross || 0))).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   )}
@@ -4039,7 +4039,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                   </tr>
                 </tbody>
               </table>
-              <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:10 }}>
+              <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:10 }}>
                 הרכיבים כפי שמפיק מחשבון משרד החינוך לנתוני התלוש · הופק ממערכת השכר, רשת חינוך חב"ד
               </p>
             </div>
@@ -4166,7 +4166,7 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
                   <td style={{ textAlign:'center', fontWeight:600 }}>
                     {r.count}
                     {r.count > 0 && r.officialCount < r.count && (
-                      <span title="מספר עובדי ההוראה שכבר עברו סימולציה" style={{ fontSize:12.6, color:'var(--warn)', fontWeight:600, marginInlineStart:5 }}>
+                      <span title="מספר עובדי ההוראה שכבר עברו סימולציה" style={{ fontSize:13.2, color:'var(--warn)', fontWeight:600, marginInlineStart:5 }}>
                         ({r.officialCount} רשמי)
                       </span>
                     )}
@@ -4209,7 +4209,7 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
           </table>
           </div>
         </div>
-        <p style={{ fontSize:12.6, color:'var(--text3)', marginTop:10, padding:'0 4px', lineHeight:1.7 }}>
+        <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:10, padding:'0 4px', lineHeight:1.7 }}>
           התשלומים רצים במערכת של עולם ישן. הפער עד שכר האופק משולם כתוספת בית חב"ד.<br/>
           ברוטו למעסיק = ברוטו לעובדת + פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד
         </p>
@@ -4228,13 +4228,13 @@ function SimStep({ n, label, calcLabel, active, onFocus, value, onChange, onEnte
     <div style={{ marginBottom:8 }}>
       <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4 }}>
         <span style={{
-          width:18, height:18, borderRadius:'50%', flexShrink:0, fontSize:12.6, fontWeight:800,
+          width:18, height:18, borderRadius:'50%', flexShrink:0, fontSize:13.2, fontWeight:800,
           display:'flex', alignItems:'center', justifyContent:'center',
           background: value ? 'var(--ok)' : active ? 'var(--purple)' : 'var(--fill2)',
           color: (value || active) ? '#fff' : 'var(--text3)',
         }}>{value ? '✓' : n}</span>
         <span style={{ fontSize:13.8, fontWeight:700, color:'var(--text2)' }}>{label}</span>
-        {active && <span style={{ fontSize:12.1, color:'var(--purple)' }}>← {calcLabel}</span>}
+        {active && <span style={{ fontSize:13.2, color:'var(--purple)' }}>← {calcLabel}</span>}
       </div>
       <input type="number" className="apple-input" dir="ltr" autoFocus={autoFocus} ref={inputRef}
         placeholder={`שכר משולב מ${calcLabel}`}
@@ -4334,7 +4334,7 @@ function FillProgress({ schools, month, onOpenSchool }) {
           <button key={r.schoolId} onClick={() => onOpenSchool?.(r.schoolId)} className="fill-row"
             style={{ display:'flex', alignItems:'center', gap:9, padding:'7px 10px', background:'var(--fill)',
               border:'none', borderRadius:10, cursor:'pointer', textAlign:'right', fontFamily:'inherit', width:'100%' }}>
-            <span className={`apple-badge badge-${r.st.tone}`} style={{ fontSize:12.1, padding:'2px 8px', flexShrink:0, minWidth:96, justifyContent:'center' }}>
+            <span className={`apple-badge badge-${r.st.tone}`} style={{ fontSize:13.2, padding:'2px 8px', flexShrink:0, minWidth:96, justifyContent:'center' }}>
               {r.st.label}
             </span>
             <span className="fill-name" style={{ flex:1, minWidth:0, fontSize:14.9, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
@@ -4402,7 +4402,7 @@ function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, use
         <p style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--text)' }}>
           {title || `מסמכים מהנהלת החשבונות — ${fmtMonth(monthKey)}`}
         </p>
-        {(docs?.length ?? 0) > 0 && <span className="apple-badge badge-purple" style={{ fontSize: 12.1, padding: '2px 8px' }}>{docs.length}</span>}
+        {(docs?.length ?? 0) > 0 && <span className="apple-badge badge-purple" style={{ fontSize: 13.2, padding: '2px 8px' }}>{docs.length}</span>}
       </div>
       <p style={{ fontSize: 13.2, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.6 }}>
         דוח השכר, סיכום עלות מעביד או כל קובץ שיצא ממערכת השכר. גלוי לרשת, לחשבת השכר ולמאשרות — לא למנהלות.
@@ -4440,7 +4440,7 @@ function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, use
               <button onClick={() => open(d)} title="פתיחה"
                 style={{ flex: 1, minWidth: 0, textAlign: 'right', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
                 <p style={{ fontSize: 14.9, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fileName}</p>
-                <p style={{ fontSize: 12.6, color: 'var(--text3)' }}>
+                <p style={{ fontSize: 13.2, color: 'var(--text3)' }}>
                   {[d.schoolId ? schoolName(d.schoolId) : 'כל בתי הספר', fmtSize(d.size), fmtWhen(d.uploadedAt), d.note].filter(Boolean).join(' · ')}
                 </p>
               </button>
@@ -4792,7 +4792,7 @@ function ScopePanel({ teachers, schools, onSave }) {
                           {o.l}
                         </button>
                       ))}
-                      {flash[`${t.id}|gender`] && <span style={{ fontSize:12.6, color:'var(--ok)', fontWeight:700 }}>✓</span>}
+                      {flash[`${t.id}|gender`] && <span style={{ fontSize:13.2, color:'var(--ok)', fontWeight:700 }}>✓</span>}
                     </div>
                   )}
                   {fields.map(f => {
@@ -4804,9 +4804,9 @@ function ScopePanel({ teachers, schools, onSave }) {
                           <p style={{ fontSize:13.8, fontWeight:600, color: f.done ? 'var(--text2)' : 'var(--warn)' }}>
                             {f.label}
                             {f.done && <span style={{ color:'var(--ok)', fontWeight:700 }}>{` · ${f.now}%`}</span>}
-                            {flash[key] && <span style={{ marginInlineStart:6, fontSize:12.6, color:'var(--ok)', fontWeight:700 }}>✓ נקבע</span>}
+                            {flash[key] && <span style={{ marginInlineStart:6, fontSize:13.2, color:'var(--ok)', fontWeight:700 }}>✓ נקבע</span>}
                           </p>
-                          <p style={{ fontSize:12.6, color:'var(--text3)' }}>{f.hint}</p>
+                          <p style={{ fontSize:13.2, color:'var(--text3)' }}>{f.hint}</p>
                         </div>
                         <input type="number" inputMode="numeric" className="apple-input" dir="ltr" placeholder="%"
                           value={cur}
@@ -4944,11 +4944,11 @@ function NotificationsView() {
               </span>
               {tab === 'sent' && (
                 <span className={`apple-badge badge-${n.status === 'sent' ? 'green' : n.status === 'failed' ? 'orange' : 'purple'}`}
-                  style={{ fontSize:12.1, padding:'2px 8px' }}>
+                  style={{ fontSize:13.2, padding:'2px 8px' }}>
                   {n.status === 'sent' ? 'נשלח' : n.status === 'failed' ? 'נכשל' : 'ממתין'} · {n.toName || ''}
                 </span>
               )}
-              <span style={{ fontSize:12.6, color:'var(--text3)', marginInlineStart:'auto' }}>{when(n.createdAt)}</span>
+              <span style={{ fontSize:13.2, color:'var(--text3)', marginInlineStart:'auto' }}>{when(n.createdAt)}</span>
             </div>
             <p style={{ fontSize:14.4, color:'var(--text2)', whiteSpace:'pre-wrap', lineHeight:1.6 }}>{n.body}</p>
           </div>
@@ -5263,7 +5263,7 @@ function BackupModal({ schools, months, onClose }) {
 function LinkField({ label, value, onChange, type = 'number', hint, inputMode }) {
   return (
     <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 96px', minWidth:96 }}>
-      <span style={{ fontSize:12.6, fontWeight:600, color:'var(--text3)' }}>{label}</span>
+      <span style={{ fontSize:13.2, fontWeight:600, color:'var(--text3)' }}>{label}</span>
       <input
         type={type} inputMode={inputMode ?? (type === 'number' ? 'numeric' : undefined)}
         className="apple-input" dir={type === 'text' ? 'rtl' : 'ltr'}
@@ -5279,7 +5279,7 @@ function LinkField({ label, value, onChange, type = 'number', hint, inputMode })
 function LinkSelect({ label, value, onChange, options }) {
   return (
     <label style={{ display:'flex', flexDirection:'column', gap:3, flex:'1 1 120px', minWidth:120 }}>
-      <span style={{ fontSize:12.6, fontWeight:600, color:'var(--text3)' }}>{label}</span>
+      <span style={{ fontSize:13.2, fontWeight:600, color:'var(--text3)' }}>{label}</span>
       <select className="apple-select" value={value ?? ''} onChange={e => onChange(e.target.value)}
         style={{ fontSize:17.2, minHeight:42 }}>
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -5440,7 +5440,7 @@ function LinkCard({ teacher, locked, onSave }) {
         <span style={{ fontSize:13.2, color:'var(--text3)' }}>
           {reformLabel(draft.reform)}{draft.scopePct ? ` · ${draft.scopePct}% משרה` : ''}
           {onLeave(teacher) && (
-            <span className="apple-badge badge-orange" style={{ fontSize:12.1, padding:'2px 8px', marginInlineStart:6 }}>
+            <span className="apple-badge badge-orange" style={{ fontSize:13.2, padding:'2px 8px', marginInlineStart:6 }}>
               {leaveText(teacher)}
             </span>
           )}
@@ -5776,13 +5776,13 @@ function ContractDoc({ me, form, sigUrl }) {
       </Twrap>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginTop:16, gap:20 }}>
         <div>
-          <p style={{ fontSize:12.6, color:'var(--text3)' }}>תאריך</p>
+          <p style={{ fontSize:13.2, color:'var(--text3)' }}>תאריך</p>
           <p style={{ fontSize:14.9, fontWeight:600, borderBottom:'1px solid #999', paddingBottom:2 }}>
             {new Date().toLocaleDateString('he-IL')}
           </p>
         </div>
         <div style={{ flex:'0 0 190px' }}>
-          <p style={{ fontSize:12.6, color:'var(--text3)' }}>חתימת העובד/ת</p>
+          <p style={{ fontSize:13.2, color:'var(--text3)' }}>חתימת העובד/ת</p>
           {sigUrl
             ? <img src={sigUrl} alt="חתימה" style={{ height:52, borderBottom:'1px solid #999', display:'block' }} />
             : <div style={{ height:52, borderBottom:'1px solid #999' }} />}
@@ -6736,7 +6736,7 @@ export default function App() {
                 סימולציה
                 {needsSimCount > 0 && (
                   <span style={{ background:'var(--warn-bg)', color:'var(--warn)', border:'1px solid var(--warn-line)',
-                    fontSize:12.6, fontWeight:700, borderRadius:999, minWidth:19, height:19, padding:'0 5px',
+                    fontSize:13.2, fontWeight:700, borderRadius:999, minWidth:19, height:19, padding:'0 5px',
                     display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
                     {needsSimCount}
                   </span>
@@ -7006,17 +7006,17 @@ export default function App() {
                       </div>
                       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
                         <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-                          <p style={{ fontSize:12.6, color:'var(--text2)', marginBottom:2 }}>עובדי הוראה</p>
+                          <p style={{ fontSize:13.2, color:'var(--text2)', marginBottom:2 }}>עובדי הוראה</p>
                           <p className="num" style={{ fontWeight:800, fontSize:25.3, color:'var(--text)', letterSpacing:'-0.02em' }}>{ts.length}</p>
                         </div>
                         <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-                          <p style={{ fontSize:12.6, color:'var(--text2)', marginBottom:2 }}>שעות</p>
+                          <p style={{ fontSize:13.2, color:'var(--text2)', marginBottom:2 }}>שעות</p>
                           <p className="num" style={{ fontWeight:700, fontSize:16.1, color: overQuota ? 'var(--danger)' : 'var(--text)' }}>
                             {quota ? `${used} / ${quota}` : used || '—'}
                           </p>
                         </div>
                         <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-                          <p style={{ fontSize:12.6, color:'var(--text2)', marginBottom:2 }}>למעסיק/חודש</p>
+                          <p style={{ fontSize:13.2, color:'var(--text2)', marginBottom:2 }}>למעסיק/חודש</p>
                           <p className="num" style={{ fontWeight:700, fontSize:16.1, color:'var(--text)', letterSpacing:'-0.01em' }}>{empTot > 0 ? empTot.toLocaleString('he-IL')+' ₪' : '—'}</p>
                         </div>
                       </div>

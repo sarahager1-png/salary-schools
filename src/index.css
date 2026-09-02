@@ -272,7 +272,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* ── Table ── */
 .apple-table { width: 100%; border-collapse: collapse; }
 .apple-table th {
-  font-size: 12.6px;
+  font-size: 13.2px;
   font-weight: 700;
   letter-spacing: .04em;
   color: var(--text3);
@@ -376,7 +376,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .sheet-table th {
   background: var(--bg);
   color: var(--text3);
-  font-size: 12.6px; font-weight: 700; letter-spacing: .03em;
+  font-size: 13.2px; font-weight: 700; letter-spacing: .03em;
   padding: 10px;
   text-align: right;
   border: none;
