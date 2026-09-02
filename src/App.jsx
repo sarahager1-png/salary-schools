@@ -716,7 +716,7 @@ function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
         {waitingSim.length > 0 && (
           <div className="apple-card" style={{ padding:16, marginBottom:16, borderRight:'3px solid var(--apple-orange)' }}>
             <p style={{ fontWeight:600, fontSize:16.1, color:'var(--apple-text)', marginBottom:4 }}>
-              {waitingSim.length} מורים ממתינים לסימולציה
+              {waitingSim.length} עובדי הוראה ממתינים לסימולציה
             </p>
             <p style={{ fontSize:13.8, color:'var(--apple-text2)', marginBottom:10 }}>אחרי שחשבת השכר תזין שכר רשמי, הם יופיעו כאן</p>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
@@ -880,7 +880,7 @@ function buildEmailBody(school, teachers, monthLabel) {
 
   let body = `דוח שכר חודשי — ${school.name}\nתאריך: ${now}\n\n`;
   body += `סה"כ עובדי הוראה: ${ts.length}\nברוטו: ${totGross.toLocaleString()} ₪\nברוטו למעסיק: ${totEmp.toLocaleString()} ₪\n`;
-  body += `\n— רשימת מורים —\n`;
+  body += `\n— רשימת עובדי הוראה —\n`;
   ts.forEach(t => {
     const emp   = calcEmployer(t);
     const grade = t.reform === 'ofek' ? (t.grade === 'intern' ? 'מתמחה' : `ד${t.grade}`) : (t.degree === 'intern' ? 'מתמחה' : t.degree);
@@ -1104,7 +1104,7 @@ function downloadTemplate(schoolName) {
   const ex2 = 'רחל לוי,987654321,rachel@school.edu,אופק,מתמחה,1,100,ללא תפקיד,לא,01/09/2024,';
   const ex3 = 'מרים דוד,111222333,miriam@school.edu,טרום,תואר-שני,18,75,ללא תפקיד,כן,01/09/2024,31/01/2025';
   const csv = BOM + [note1, note2, note3, header, ex1, ex2, ex3].join('\r\n');
-  downloadBlob(csv, `מורים_${schoolName || 'בית_ספר'}.csv`, 'text/csv;charset=utf-8;');
+  downloadBlob(csv, `עובדי_הוראה_${schoolName || 'בית_ספר'}.csv`, 'text/csv;charset=utf-8;');
 }
 
 function ImportModal({ schoolId, schoolName, onImport, onClose }) {
@@ -1132,7 +1132,7 @@ function ImportModal({ schoolId, schoolName, onImport, onClose }) {
     <div style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', padding:16, overflowY:'auto' }}>
       <div className="apple-card" style={{ width:'100%', maxWidth:640, padding:24, margin:'16px auto' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <h2 style={{ fontWeight:700, fontSize:19.5, color:'var(--apple-text)', letterSpacing:'-0.01em' }}>ייבוא מורים — {schoolName}</h2>
+          <h2 style={{ fontWeight:700, fontSize:19.5, color:'var(--apple-text)', letterSpacing:'-0.01em' }}>ייבוא עובדי הוראה — {schoolName}</h2>
           <button onClick={onClose} style={{ background:'var(--apple-fill)', border:'none', borderRadius:8, width:28, height:28, cursor:'pointer', fontSize:16.1, color:'var(--apple-text2)', display:'flex', alignItems:'center', justifyContent:'center' }}><X size={15} strokeWidth={2.4} /></button>
         </div>
 
@@ -1174,7 +1174,7 @@ function ImportModal({ schoolId, schoolName, onImport, onClose }) {
 
         {preview ? (
           <div>
-            <p style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-text)', marginBottom:10 }}>שלב 3 — אישור: נמצאו {preview.length} מורים</p>
+            <p style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-text)', marginBottom:10 }}>שלב 3 — אישור: נמצאו {preview.length} עובדי הוראה</p>
             <div style={{ background:'rgba(255,159,10,0.08)', border:'1px solid rgba(255,159,10,0.2)', borderRadius:10, padding:'8px 12px', marginBottom:12, fontSize:13.8, color:'var(--warn)' }}>
               <Lightbulb size={13} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-2px', marginInlineEnd:4 }} />
             לאחר הייבוא — כנסי לסימולטור והזיני את השכר הרשמי לכל מורה
@@ -1208,7 +1208,7 @@ function ImportModal({ schoolId, schoolName, onImport, onClose }) {
             </div>
             <div style={{ display:'flex', gap:8, marginTop:16 }}>
               <button className="apple-btn apple-btn-ghost" onClick={() => setPrev(null)} style={{ flex:1, fontSize:16.1 }}><ArrowRight size={15} strokeWidth={2.4} />חזרה</button>
-              <button className="apple-btn apple-btn-green" onClick={() => onImport(preview)} style={{ flex:1, fontSize:16.1 }}>ייבא {preview.length} מורים<Check size={15} strokeWidth={2.6} /></button>
+              <button className="apple-btn apple-btn-green" onClick={() => onImport(preview)} style={{ flex:1, fontSize:16.1 }}>ייבא {preview.length} עובדי הוראה<Check size={15} strokeWidth={2.6} /></button>
             </div>
           </div>
         ) : (
@@ -1890,7 +1890,7 @@ function SchoolModal({ school, onSave, onClose }) {
               ))}
             </div>
             <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:6, lineHeight:1.5 }}>
-              קובע את ברירת המחדל למורות חדשות ואת המחשבון הרשמי שייפתח. אפשר לשנות מסלול למורה בודדת.
+              קובע את ברירת המחדל לעובדי הוראה חדשים ואת המחשבון הרשמי שייפתח. אפשר לשנות מסלול לעובד/ת הוראה בודד/ת.
             </p>
           </div>
           <div>
@@ -2402,7 +2402,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
       };
     });
     const footer = {
-      name: `סה"כ (${tsOfficial.length} מורות עם סימולציה מלאה)`,
+      name: `סה"כ (${tsOfficial.length} עובדי הוראה עם סימולציה מלאה)`,
       monthlyExtras: totMonthly,
       base: totBase,
       chabad: totChabad,
@@ -3153,8 +3153,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     התא, ותא מתפרש אחד אינו יכול להיעלם עם העמודה שלו. */}
                 <tr>
                   <td style={{ fontWeight:700, whiteSpace:'nowrap' }}
-                      title={`${tsOfficial.length} מורות עם סימולציה מלאה`}>
-                    סה״כ · {tsOfficial.length} מורות
+                      title={`${tsOfficial.length} עובדי הוראה עם סימולציה מלאה`}>
+                    סה״כ · {tsOfficial.length} עובדי הוראה
                   </td>
                   {/* 26 עמודות: 1 שם, 19 ריקות, ואז תוספות · ברוטו ·
                       תוספת בית חב"ד · הוצאות מעביד · סה״כ · כפתורים */}
@@ -3419,6 +3419,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   const [openInc, setOpenInc] = useState({});
   // "אני צריכה חתכים שונים — חודשי/שנתי" (3.9): מתג אחד לכל הדף
   const [period, setPeriod] = useState('year');
+  // "עלות ההוראה מהתקציב חייב להיות מוסתר כולל הפרש" (שרה, 3.9):
+  // התחשיב שלה נחשף רק בלחיצה מפורשת — לא מוצג לכל מי שנכנס לדף.
+  const [showSim, setShowSim] = useState(false);
   const per = v => (v == null ? null : (period === 'month' ? v / 12 : v));
   const [pulling, setPulling] = useState(false);
 
@@ -3548,6 +3551,12 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           border:'1px solid rgba(90,110,255,.2)', borderRadius:999, padding:'3px 11px' }}>
         <ShieldCheck size={14} strokeWidth={2.4} />לעינייך בלבד
         </span>
+        <button onClick={() => setShowSim(v => !v)} className="apple-btn"
+          style={{ padding:'5px 14px', fontSize:13.8, fontWeight:700, borderRadius:8, cursor:'pointer',
+            border:'1px solid var(--line)', background: showSim ? 'var(--purple)' : 'transparent',
+            color: showSim ? '#fff' : 'var(--text3)' }}>
+          {showSim ? 'הסתרת התחשיב מהתקציב' : 'הצגת התחשיב מהתקציב'}
+        </button>
         <div style={{ display:'flex', gap:4, background:'var(--apple-fill)', borderRadius:10, padding:3 }}>
           {[['month', 'חודשי'], ['year', 'שנתי']].map(([v, l]) => (
             <button key={v} onClick={() => setPeriod(v)} className="apple-btn"
@@ -3583,14 +3592,14 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <TH>הכנסות משרד החינוך + מענק</TH>
               <TH>ייעול</TH>
               <TH>עלות שכר</TH>
-              <TH>עלות הוראה מהתקציב</TH>
+              {showSim && <TH>עלות הוראה מהתקציב</TH>}
               <TH>השתתפות הרשת</TH>
               <TH>יתרה לאחר שכר</TH>
             </tr>
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={7} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+              <tr><td colSpan={showSim ? 7 : 6} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
             ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
@@ -3601,7 +3610,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   ? moneyInput(sc.id, 'yieul', f.yieul)
                   : <span style={{ fontSize:16.1 }}>{money(per(f.yieul))}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(period === 'month' ? monthly : annual)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}>{f.teachingSim == null ? '—' : money(per(f.teachingSim))}</td>
+                {showSim && <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}>{f.teachingSim == null ? '—' : money(per(f.teachingSim))}</td>}
                 <td style={{ textAlign:'center' }}>{period === 'year'
                   ? moneyInput(sc.id, 'networkSupport', f.networkSupport)
                   : <span style={{ fontSize:16.1 }}>{money(per(f.networkSupport))}</span>}</td>
@@ -3619,7 +3628,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.budget))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.yieul))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(period === 'month' ? tot.monthly : tot.annual)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.sim))}</td>
+                {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.sim))}</td>}
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.support))}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(per(tot.left))}</td>
@@ -3685,7 +3694,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   {f.networkSupport ? dline('השתתפות הרשת', per(f.networkSupport)) : null}
                   {dline('סה"כ הכנסות הוראה', per(teachIncome), true)}
                   <div style={{ height:8 }} />
-                  {dline(`שכר הוראה (עובדי/ות הוראה, מנהלת, תוספות)`, per(annual))}
+                  {dline(`שכר הוראה (עובדי הוראה, מנהלת, תוספות)`, per(annual))}
                   {dline('סה"כ הוצאות הוראה', per(teachCost), true)}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
                     borderTop:'2px solid var(--line)', color: gapColor(teachDiff) }}>
@@ -3693,7 +3702,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   </div>
                   {/* "תוסיף את עלות ההוראה שחישבתי בתקציב... הוצאות שעות
                       הוראה, ייעוץ" (שרה, 3.9) — התכנון שלה מהתקציב, מול הבפועל */}
-                  {f.detail?.teach?.expenses?.length > 0 && (() => {
+                  {showSim && f.detail?.teach?.expenses?.length > 0 && (() => {
                     const simSum = f.detail.teach.expenses.reduce((a, x) => a + x.amount, 0);
                     return (
                       <div style={{ marginTop:12, padding:'10px 12px', background:'var(--apple-fill, #f5f3fa)', borderRadius:10 }}>
@@ -4084,7 +4093,7 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
             <span className="title-bar" />
             <h1 style={{ fontSize:26.4, fontWeight:800, color:'var(--text)', letterSpacing:'-0.025em' }}>דוח רשת — סימולציית שכר תשפ״ו</h1>
           </div>
-          <p style={{ fontSize:14.9, color:'var(--text3)', marginTop:2, marginInlineStart:13 }}>{rows.filter(r=>r.count>0).length} בתי ספר · {totCount} מורות</p>
+          <p style={{ fontSize:14.9, color:'var(--text3)', marginTop:2, marginInlineStart:13 }}>{rows.filter(r=>r.count>0).length} בתי ספר · {totCount} עובדי הוראה</p>
         </div>
         {totPending > 0 && <span className="apple-badge badge-orange"><Bell size={12} strokeWidth={2.3} />{totPending} ממתינים לאישור</span>}
         <button className="apple-btn apple-btn-ghost" onClick={exportCSV} disabled={rows.length === 0} style={{ fontSize:14.9 }}>
@@ -4118,7 +4127,7 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
               <tr>
                 <th>בית ספר</th>
                 <th>עיר</th>
-                <th style={{ textAlign:'center' }}>מורות</th>
+                <th style={{ textAlign:'center' }}>עובדי הוראה</th>
                 <th style={{ textAlign:'center' }}>שעות / מכסה</th>
                 <th style={{ textAlign:'center' }}>ברוטו / חודש</th>
                 <th style={{ textAlign:'center' }}>ברוטו למעסיק</th>
@@ -4474,7 +4483,7 @@ function PrincipalLinkModal({ school, onClose }) {
       const code = await store.issueLink(pr.id);
       const link = `${window.location.origin}/?k=${code}`;
       const first = (pr.fullName || '').split(' ')[0];
-      const msg = `שלום ${first}, זה הקישור האישי שלך למערכת שכר המורים — ${school.name}:\n${link}\n\nהקישור אישי; לא להעביר הלאה.`;
+      const msg = `שלום ${first}, זה הקישור האישי שלך למערכת השכר של עובדי ההוראה — ${school.name}:\n${link}\n\nהקישור אישי; לא להעביר הלאה.`;
       const wa  = pr.phone ? `https://wa.me/${pr.phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}` : null;
       setSt({ link, wa });
     } catch (e) { setSt({ error: e.message }); }
@@ -4932,7 +4941,7 @@ function NotificationsView() {
   );
 }
 
-/* ── בקשת טפסים מהמורות ────────────────────────────────────────
+/* ── בקשת טפסים מעובדי ההוראה ────────────────────────────────────────
    "לאחר אישור שלי תשלח לכל המורות הודעה על מילוי טפסים — 101, נתוני
    העסקה, הסכם. רק מי שתשלח תקבל שכר בחודש הבא" (שרה, 1.9), ובלחיצה
    ולא באוטומציה. לכן הכפתור כאן, ליד האישורים, ולא ב-cron.
@@ -4957,15 +4966,15 @@ function FormsRequest({ teachers, monthKey }) {
       <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
         <Send size={15} strokeWidth={2.3} color="var(--purple)" />
         <div style={{ flex:'1 1 220px', minWidth:0 }}>
-          <p style={{ fontSize:14.4, fontWeight:700, color:'var(--text)' }}>בקשת טפסים מהמורות</p>
+          <p style={{ fontSize:14.4, fontWeight:700, color:'var(--text)' }}>בקשת טפסים מעובדי ההוראה</p>
           <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.6 }}>
             טופס 101, נתוני העסקה והסכם — קישור אישי לכל אחת.
-            {` ${approved.length} מורות מאושרות החודש.`} רק מי שתשלים תקבל שכר בחודש הבא.
+            {` ${approved.length} עובדי הוראה שאושרו החודש.`} רק מי שתשלים תקבל שכר בחודש הבא.
           </p>
         </div>
         <button className="apple-btn apple-btn-blue" onClick={send} disabled={busy}
           style={{ minHeight:38, padding:'0 16px', fontSize:14.4 }}>
-          {busy ? 'שולח…' : 'שליחה למורות'}
+          {busy ? 'שולח…' : 'שליחה לעובדי ההוראה'}
         </button>
       </div>
       {err && <p style={{ fontSize:13.2, color:'var(--danger)', marginTop:8 }}>{err}</p>}
@@ -6957,7 +6966,7 @@ export default function App() {
                       </div>
                       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
                         <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-                          <p style={{ fontSize:12.6, color:'var(--text2)', marginBottom:2 }}>מורים</p>
+                          <p style={{ fontSize:12.6, color:'var(--text2)', marginBottom:2 }}>עובדי הוראה</p>
                           <p className="num" style={{ fontWeight:800, fontSize:25.3, color:'var(--text)', letterSpacing:'-0.02em' }}>{ts.length}</p>
                         </div>
                         <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
