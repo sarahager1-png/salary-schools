@@ -3686,8 +3686,11 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <span style={{ fontSize:14.4, fontWeight:700, color: gapColor(teachDiff) }}>
                 הפרש עלות הוראה: {teachDiff == null ? '—' : money(per(teachDiff))}
               </span>
-              <span style={{ fontSize:14.4, fontWeight:700, marginInlineStart:'auto', color: gapColor(opDiff) }}>
-                הפרש הוצאות: {opDiff == null ? '—' : money(per(opDiff))}
+              <span style={{ fontSize:14.4, fontWeight:700, color: gapColor(opDiff) }}>
+                הפרש תקציב נוסף: {opDiff == null ? '—' : money(per(opDiff))}
+              </span>
+              <span style={{ fontSize:15.5, fontWeight:800, marginInlineStart:'auto', color: gapColor((teachDiff || 0) + (opDiff || 0)) }}>
+                סך הכל: {money(per((teachDiff || 0) + (opDiff || 0)))}
               </span>
             </div>
             {isOpen && (
@@ -3725,7 +3728,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   })()}
                 </div>
                 <div>
-                  <p style={{ fontSize:14.4, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>הכנסות והוצאות אחרות · {period === 'month' ? 'חודשי' : 'שנתי'}</p>
+                  <p style={{ fontSize:14.4, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>תקציב נוסף · {period === 'month' ? 'חודשי' : 'שנתי'}</p>
                   {incLines.map((x, i) => <div key={'i' + i}>{dline(x.name, per(x.amount))}</div>)}
                   {dline('סה"כ הכנסות', per(incSum), true)}
                   <div style={{ height:8 }} />
@@ -3733,7 +3736,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   {dline('סה"כ הוצאות', per(expSum), true)}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
                     borderTop:'2px solid var(--line)', color: gapColor(opDiff) }}>
-                    <span>הפרש הוצאות</span><span>{opDiff == null ? '—' : money(per(opDiff))}</span>
+                    <span>הפרש תקציב נוסף</span><span>{opDiff == null ? '—' : money(per(opDiff))}</span>
                   </div>
                 </div>
               </div>
@@ -3742,7 +3745,32 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         );
       })}
 
-      <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>הכנסות מול הוצאות · ללא עלות הוראה ומשרד החינוך</h2>
+      {fin !== null && (() => {
+        // סיכום רשתי — אותם חישובים בדיוק כמו בכרטיסים הבודדים
+        let sumTeach = 0, sumOp = 0, any = false;
+        for (const { f, annual } of rows) {
+          const ti = (f.ministryBudget || 0) + (f.networkSupport || 0);
+          const td = f.ministryBudget != null ? ti - annual : null;
+          const il = mergeLines(f.detail?.income), el = mergeLines(f.detail?.expenses);
+          const is_ = il.reduce((a, x) => a + x.amount, 0) || (f.incomeTotal || 0);
+          const es = el.reduce((a, x) => a + x.amount, 0) || (f.expensesOther || 0);
+          const od = (f.incomeTotal != null || el.length) ? is_ - es : null;
+          if (td != null || od != null) { any = true; sumTeach += td || 0; sumOp += od || 0; }
+        }
+        if (!any) return null;
+        const gc = v => v < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)';
+        return (
+          <div className="apple-card" style={{ padding:'14px 18px', marginBottom:10, background:'var(--apple-fill, #f5f3fa)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
+              <p style={{ fontSize:16.7, fontWeight:800 }}>סה"כ הרשת</p>
+              <span style={{ fontSize:14.4, fontWeight:700, color: gc(sumTeach) }}>הפרש עלות הוראה: {money(per(sumTeach))}</span>
+              <span style={{ fontSize:14.4, fontWeight:700, color: gc(sumOp) }}>הפרש תקציב נוסף: {money(per(sumOp))}</span>
+              <span style={{ fontSize:15.5, fontWeight:800, marginInlineStart:'auto', color: gc(sumTeach + sumOp) }}>סך הכל: {money(per(sumTeach + sumOp))}</span>
+            </div>
+          </div>
+        );
+      })()}
+      <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>תקציב נוסף · הכנסות מול הוצאות ללא עלות הוראה ומשרד החינוך</h2>
       {fin !== null && rows.map(({ sc, f }) => {
         const d = f.detail;
         if (!d && f.incomeTotal == null) return null;
