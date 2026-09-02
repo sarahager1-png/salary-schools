@@ -3713,7 +3713,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                     return (
                       <div style={{ marginTop:12, padding:'10px 12px', background:'var(--apple-fill, #f5f3fa)', borderRadius:10 }}>
                         <p style={{ fontSize:13.8, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>עלות ההוראה שחושבה בתקציב</p>
-                        {f.detail.teach.expenses.map((x, i) => <div key={'te' + i}>{dline(x.name, per(x.amount))}</div>)}
+                        {f.detail.teach.expenses.map((x, i) => <div key={'te' + i}>{dline(x.name, per(x.amount), false, x.amount < 0)}</div>)}
                         {dline('סה"כ מהתקציב', per(simSum), true)}
                         <div style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', fontSize:14.4, fontWeight:800,
                           color: gapColor(simSum - annual) }}>

@@ -48,6 +48,17 @@ export default async function handler(req, res) {
       const ministry = (inc.ministry || 0) + (inc.grant || 0);
       const teachingBudget = (s.expenses?.teaching || 0) + (s.principalMonthly || 0) * 12;
       const counseling = s.expenses?.counselingCost || 0;
+      /*
+        "ייעול בשעות צריך להכנס לתחשיב שלי" (שרה, 3.9): הצעות ייעול
+        שנבחרו בפועל (saved) ומצמצמות שעות הוראה — הורדת שעות מכיתות,
+        קבלת שבת משותפת, פרטניות כפרונטלית, שעות הוראה של המנהלת —
+        מקטינות את עלות ההוראה המתוכננת. ייעול כספי (קיצוץ הוצאות,
+        גבייה) נשאר בעמודת הייעול הכללית בלבד.
+      */
+      const HOURS_YIEUL = /^(הורדת \d+ שעות הוראה|קבלת שבת|שעות פרטניות|שעות הוראה של המנהלת)/;
+      const hoursYieul = (s.efficiency?.saved === true ? (s.efficiency?.rows || []) : [])
+        .filter(r => HOURS_YIEUL.test(r.label || ''))
+        .reduce((a, r) => a + (Number(r.saving) || 0), 0);
       return {
         name: s.name,
         ministry,
@@ -61,7 +72,8 @@ export default async function handler(req, res) {
           expenses: [
             { name: 'שעות הוראה (כולל מנהלת)', amount: teachingBudget },
             { name: 'ייעוץ', amount: counseling },
-          ].filter(x => x.amount > 0),
+            { name: 'ייעול בשעות', amount: -hoursYieul },
+          ].filter(x => x.amount !== 0),
         },
         incomeTotal: inc.total || 0,
         // "לאשקלון אין ייעול" (שרה, 2.9): אפס אינו ייעול — רק סכום
@@ -93,7 +105,7 @@ export default async function handler(req, res) {
         // מצורף, כך שההשוואה מול הבפועל (שגם הוא כולל מנהלת) היא אחד-לאחד.
         // "הוצאות שעות הוראה, ייעוץ" (שרה, 3.9) — הסימולציה שלה מהתקציב
         // היא סכום שתי השורות, כדי שהסה"כ יתאים לפירוט.
-        teachingSim: s.expenses?.teaching > 0 ? teachingBudget + counseling : null,
+        teachingSim: s.expenses?.teaching > 0 ? teachingBudget + counseling - hoursYieul : null,
       };
     });
     /*
@@ -120,7 +132,7 @@ export default async function handler(req, res) {
         const mergeLines = (a = [], b = []) => {
           const m = new Map(a.map(x => [x.name, { ...x }]));
           for (const x of b) m.set(x.name, { name: x.name, amount: (m.get(x.name)?.amount || 0) + x.amount });
-          return [...m.values()].filter(x => x.amount > 0);
+          return [...m.values()].filter(x => x.amount !== 0);
         };
         cur.teach = {
           income: mergeLines(cur.teach?.income, s.teach.income),
