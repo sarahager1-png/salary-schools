@@ -3750,8 +3750,14 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn }) {
               <div style={{ textAlign:'center', borderBottom:'2px solid var(--text)', paddingBottom:8, marginBottom:10 }}>
                 <p style={{ fontSize:18.4, fontWeight:800 }}>תלוש שכר · {fmtMonthFn ? fmtMonthFn(monthKey) : monthKey}</p>
                 <p style={{ fontSize:15.5, fontWeight:600 }}>{t.name}</p>
+                <p style={{ fontSize:13.8, color:'var(--text2)', fontWeight:600 }}>
+                  {t.frontalHours} שעות פרונטליות{r.kita ? ' + 3 שעות חינוך (מחנכת)' : ''} = {r.hours} שעות
+                </p>
+                <p style={{ fontSize:13.8, color:'var(--text2)', fontWeight:600 }}>
+                  אחוז משרה עולם ישן: {r.hours}/30 = {r.pct}%
+                </p>
                 <p style={{ fontSize:13.2, color:'var(--text3)' }}>
-                  דרגה {r.darga} · ותק {r.vetek} · {r.pct}% משרה{r.kita ? ' · גמול חינוך' : ''}
+                  דרגה {r.darga} · ותק {r.vetek}{r.kita ? ' · גמול חינוך' : ''}
                 </p>
               </div>
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:14.4 }}>
