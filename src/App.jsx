@@ -3824,7 +3824,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   }), { budget: 0, yieul: 0, monthly: 0, annual: 0, left: 0, sim: 0, simGap: 0 });
 
   const TH = ({ children }) => (
-    <th style={{ padding:'10px 12px', fontSize:14.5, fontWeight:700, color:'var(--text2)',
+    <th style={{ padding:'10px 8px', fontSize:13.8, fontWeight:700, color:'var(--text2)',
       textAlign:'center', whiteSpace:'nowrap' }}>{children}</th>
   );
   const moneyInput = (sid, field, val) => (
@@ -3837,11 +3837,11 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         const v = e.target.value === '' ? null : Number(e.target.value);
         if (v !== (val ?? null)) save(sid, { [field]: v });
       }}
-      style={{ width:130, textAlign:'center', fontSize:16.1, fontWeight:600, padding:'7px 9px' }} />
+      style={{ width:112, textAlign:'center', fontSize:15.5, fontWeight:600, padding:'6px 7px' }} />
   );
 
   return (
-    <div style={{ maxWidth:1120, margin:'0 auto', padding:'0 16px' }}>
+    <div style={{ maxWidth:1380, margin:'0 auto', padding:'0 16px' }}>
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:6, flexWrap:'wrap' }}>
         <h1 style={{ fontSize:24.2, fontWeight:800, whiteSpace:'nowrap' }}>עלות הוראה מול תקציב</h1>
         <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700,
@@ -3886,7 +3886,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <tr><td colSpan={8} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
             ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                <td style={{ padding:'10px 12px', fontSize:16.1, fontWeight:700 }}>{sc.name}</td>
+                <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
                 <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'ministryBudget', f.ministryBudget)}</td>
                 <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'yieul', f.yieul)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1 }}>{money(monthly)}</td>
