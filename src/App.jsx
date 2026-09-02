@@ -3561,7 +3561,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           <thead>
             <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
               <TH>בית ספר</TH>
-              <TH>תקציב הכנסות משרד החינוך · שנתי</TH>
+              <TH>הכנסות משרד החינוך + מענק · שנתי</TH>
               <TH>ייעול · שנתי</TH>
               <TH>עלות שכר · חודש</TH>
               <TH>עלות שכר · שנה</TH>
@@ -6113,9 +6113,10 @@ export default function App() {
     MM_REPLACED.clear();
     MATERNITY_LEAVES.clear();
     for (const [mk, rows2] of Object.entries(data.months || {}))
-      for (const r2 of rows2 || [])
+      for (const r2 of rows2 || []) {
         if (String(r2.mmFor || '').trim()) MM_REPLACED.add(mmKey(mk, r2.schoolId, r2.mmFor));
         if (r2.leaveType === 'maternity') MATERNITY_LEAVES.add(mmKey(mk, r2.schoolId, r2.name));
+      }
     setActiveMonth(prev => {
       const keys = Object.keys(data.months).sort();
       if (keys.includes(prev)) return prev;
