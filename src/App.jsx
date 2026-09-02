@@ -3685,7 +3685,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   {f.networkSupport ? dline('השתתפות הרשת', per(f.networkSupport)) : null}
                   {dline('סה"כ הכנסות הוראה', per(teachIncome), true)}
                   <div style={{ height:8 }} />
-                  {dline(`שכר הוראה (מורות, מנהלת, תוספות)`, per(annual))}
+                  {dline(`שכר הוראה (עובדי/ות הוראה, מנהלת, תוספות)`, per(annual))}
                   {dline('סה"כ הוצאות הוראה', per(teachCost), true)}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
                     borderTop:'2px solid var(--line)', color: gapColor(teachDiff) }}>
