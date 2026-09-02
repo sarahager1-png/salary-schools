@@ -3661,9 +3661,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         const gap = v => v == null ? '—' : money(v);
         const gapColor = v => v == null ? 'var(--text3)' : v < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)';
         return (
-          <div key={'card-' + sc.id} className="apple-card" style={{ padding:'12px 18px', marginBottom:10 }}>
-            <div onClick={() => setOpenInc(m => ({ ...m, ['card-' + sc.id]: !m['card-' + sc.id] }))}
-              style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap', cursor:'pointer' }}>
+          <div key={'card-' + sc.id} className="apple-card" style={{ padding:'12px 18px', marginBottom:10, cursor:'pointer' }}
+            onClick={() => setOpenInc(m => ({ ...m, ['card-' + sc.id]: !m['card-' + sc.id] }))}>
+            <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
               <ChevronLeft size={16} strokeWidth={2.4} style={{ color:'var(--text3)', transform: isOpen ? 'rotate(-90deg)' : 'none' }} />
               <p style={{ fontSize:16.7, fontWeight:800 }}>{sc.name}</p>
               <span style={{ fontSize:14.4, fontWeight:700, color: gapColor(teachDiff) }}>
@@ -3743,9 +3743,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         );
         const isOpen = !!openInc[sc.id];
         return (
-          <div key={sc.id} className="apple-card" style={{ padding:'12px 18px', marginBottom:10 }}>
-            <div onClick={() => setOpenInc(m => ({ ...m, [sc.id]: !m[sc.id] }))}
-              style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', cursor:'pointer' }}>
+          <div key={sc.id} className="apple-card" style={{ padding:'12px 18px', marginBottom:10, cursor:'pointer' }}
+            onClick={() => setOpenInc(m => ({ ...m, [sc.id]: !m[sc.id] }))}>
+            <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
               {isOpen ? <ChevronLeft size={16} strokeWidth={2.4} style={{ transform:'rotate(-90deg)', color:'var(--text3)' }} />
                       : <ChevronLeft size={16} strokeWidth={2.4} style={{ color:'var(--text3)' }} />}
               <p style={{ fontSize:16.7, fontWeight:800 }}>{sc.name}</p>
