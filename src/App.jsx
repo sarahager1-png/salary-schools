@@ -3600,6 +3600,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <TH>בית ספר</TH>
               <TH>הכנסות משרד החינוך + מענק</TH>
               <TH>עלות שכר</TH>
+              <TH>מילוי מקום · 5%</TH>
               {showSim && <TH>עלות הוראה מהתקציב</TH>}
               {showSim && <TH>הפרש מול השכר בפועל</TH>}
               <TH>השתתפות הרשת</TH>
@@ -3608,7 +3609,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={showSim ? 7 : 5} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+              <tr><td colSpan={showSim ? 8 : 6} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
             ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
@@ -3616,6 +3617,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
                   : <span style={{ fontSize:16.1 }}>{money(per(f.ministryBudget))}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(period === 'month' ? monthly : annual)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}>{money(per(annual * MM_PCT))}</td>
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}>{f.teachingSim == null ? '—' : money(per(f.teachingSim))}</td>}
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
                   color: simGap == null ? 'var(--text3)' : simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
@@ -3636,6 +3638,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 <td style={{ padding:'11px 12px', fontSize:16.1, fontWeight:800 }}>סה"כ הרשת</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.budget))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(period === 'month' ? tot.monthly : tot.annual)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.annual * MM_PCT))}</td>
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.sim))}</td>}
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
                   color: tot.simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(per(tot.simGap))}</td>}
