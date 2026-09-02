@@ -4384,13 +4384,13 @@ function FillProgress({ schools, month, onOpenSchool }) {
 
       <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
         {list.map(r => (
-          <button key={r.schoolId} onClick={() => onOpenSchool?.(r.schoolId)}
+          <button key={r.schoolId} onClick={() => onOpenSchool?.(r.schoolId)} className="fill-row"
             style={{ display:'flex', alignItems:'center', gap:9, padding:'7px 10px', background:'var(--fill)',
               border:'none', borderRadius:10, cursor:'pointer', textAlign:'right', fontFamily:'inherit', width:'100%' }}>
             <span className={`apple-badge badge-${r.st.tone}`} style={{ fontSize:12.1, padding:'2px 8px', flexShrink:0, minWidth:96, justifyContent:'center' }}>
               {r.st.label}
             </span>
-            <span style={{ flex:1, minWidth:0, fontSize:14.9, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+            <span className="fill-name" style={{ flex:1, minWidth:0, fontSize:14.9, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
               {name(r.schoolId)}
               {r.principal && <span style={{ fontWeight:400, color:'var(--text3)' }}> · {r.principal}</span>}
             </span>

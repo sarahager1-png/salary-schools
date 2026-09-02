@@ -657,3 +657,16 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   .ob-page .apple-card { padding: 14px !important; }
   .ob-page button { min-height: 46px; }
 }
+
+/* מעקב מילוי במובייל: שם בית הספר בשורה מלאה משלו, במקום להיחתך
+   ("שלהבו…") בין התג לנתוני הזמן (ממצא QA, 3.9) */
+@media (max-width: 640px) {
+  .fill-row { flex-wrap: wrap; row-gap: 3px; }
+  .fill-row .fill-name {
+    flex-basis: 100%;
+    order: -1;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
