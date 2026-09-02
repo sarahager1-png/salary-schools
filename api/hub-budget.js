@@ -49,7 +49,9 @@ export default async function handler(req, res) {
         name: s.name,
         ministry,
         incomeTotal: inc.total || 0,
-        yieul: s.efficiency?.saved === true ? (s.efficiency?.total || 0) : null,
+        // "לאשקלון אין ייעול" (שרה, 2.9): אפס אינו ייעול — רק סכום
+        // חיובי שנבחר בפועל נחשב; אחרת התא נשאר ריק.
+        yieul: s.efficiency?.saved === true && (s.efficiency?.total || 0) > 0 ? s.efficiency.total : null,
       };
     });
     /*
