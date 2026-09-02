@@ -665,8 +665,8 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   .fill-row .fill-name {
     flex-basis: 100%;
     order: -1;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
   }
 }
