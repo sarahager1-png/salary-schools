@@ -3809,7 +3809,15 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
   })).filter(x => x.ts.length);
 
   const rowFor = (t, paysSupp) => {
-    if (isPrincipalRow(t)) return { skip: 'מנהלת — תלוש נפרד' };
+    if (isPrincipalRow(t)) {
+      // "למה אין תלוש למנהלים" (שרה, 3.9): יש. שכר קבוע — בסיס +
+      // תוספת בית חב"ד (4,700 מתוך השכר), 40 שעות שבועיות.
+      const bd = payBreakdown(t);
+      if (!bd.gross) return { skip: 'אין עדיין שכר מנהלת' };
+      return { darga: '—', vetek: t.seniority ?? '—', pct: 100, hours: 40,
+        kita: false, base: bd.base, supp: bd.supplement, gross: bd.gross,
+        paysSupp: bd.supplement > 0, principal: true };
+    }
     if (t.leaveType === 'maternity') return { skip: 'חל"ד — הפרשות בלבד, אין תלוש' };
     if (t.leaveType === 'unpaid') return { skip: 'חל"ת — אין תלוש' };
     if (!Number(t.frontalHours)) return { skip: '0 שעות — ממתינה לעדכון המנהלת' };
@@ -3872,10 +3880,10 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                       <td colSpan={10} style={{ fontSize:13.8 }}>{r.skip}</td>
                     </tr>
                   ) : (
-                    <tr key={t.id} onClick={() => lines[t.id] && setOpenSlip({ t, r })}
-                      style={{ cursor: lines[t.id] ? 'pointer' : 'default' }}
-                      title={lines[t.id] ? 'לחיצה פותחת את התלוש המלא' : 'התלוש המפורט בהכנה — יופיע בסיום החישוב'}>
-                      <td style={{ fontWeight:600 }}>{t.name}{lines[t.id] && <FileText size={12} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-1px', marginInlineStart:5, color:'var(--purple)' }} />}</td>
+                    <tr key={t.id} onClick={() => (lines[t.id] || r.principal) && setOpenSlip({ t, r })}
+                      style={{ cursor: (lines[t.id] || r.principal) ? 'pointer' : 'default' }}
+                      title={(lines[t.id] || r.principal) ? 'לחיצה פותחת את התלוש המלא' : 'התלוש המפורט בהכנה — יופיע בסיום החישוב'}>
+                      <td style={{ fontWeight:600 }}>{r.principal && <Briefcase size={12} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}{t.name}{(lines[t.id] || r.principal) && <FileText size={12} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-1px', marginInlineStart:5, color:'var(--purple)' }} />}</td>
                       <td style={{ textAlign:'center' }}>{r.darga || '—'}</td>
                       <td style={{ textAlign:'center' }}>{r.vetek}</td>
                       <td style={{ textAlign:'center' }} onClick={e => e.stopPropagation()}>
@@ -3942,6 +3950,11 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
               <div style={{ textAlign:'center', borderBottom:'2px solid var(--text)', paddingBottom:8, marginBottom:10 }}>
                 <p style={{ fontSize:18.4, fontWeight:800 }}>תלוש שכר · {fmtMonthFn ? fmtMonthFn(monthKey) : monthKey}</p>
                 <p style={{ fontSize:15.5, fontWeight:600 }}>{t.name}</p>
+                {r.principal ? (
+                  <p style={{ fontSize:13.8, color:'var(--text2)', fontWeight:600 }}>
+                    מנהל/ת בית ספר · 40 שעות שבועיות · משרה מלאה
+                  </p>
+                ) : (<>
                 <p style={{ fontSize:13.8, color:'var(--text2)', fontWeight:600 }}>
                   {t.frontalHours} שעות פרונטליות{r.kita ? ' + 3 שעות חינוך (מחנכת)' : ''} = {r.hours} שעות
                 </p>
@@ -3951,6 +3964,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                 <p style={{ fontSize:13.2, color:'var(--text3)' }}>
                   דרגה {r.darga} · ותק {r.vetek}{r.kita ? ' · גמול חינוך' : ''}
                 </p>
+                </>)}
               </div>
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:14.4 }}>
                 <thead><tr style={{ borderBottom:'1px solid var(--line)', color:'var(--text3)', fontSize:12.6 }}>
@@ -3959,6 +3973,13 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                   <th style={{ textAlign:'left', padding:'3px 4px' }}>סכום</th>
                 </tr></thead>
                 <tbody>
+                  {r.principal && (
+                    <tr style={{ borderBottom:'1px solid var(--line)' }}>
+                      <td style={{ padding:'4px', color:'var(--text3)', fontSize:12.6 }}></td>
+                      <td style={{ padding:'4px' }}>שכר מנהל/ת בית ספר</td>
+                      <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(r.base).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  )}
                   {(sl?.lines || []).map((ln, i) => (
                     <tr key={i} style={{ borderBottom:'1px solid var(--line)' }}>
                       <td style={{ padding:'4px', color:'var(--text3)', fontSize:12.6 }}>{ln.code}</td>
@@ -3966,16 +3987,18 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                       <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(ln.amount).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
+                  {!r.principal && (
                   <tr style={{ borderBottom:'1px solid var(--line)', fontWeight:700 }}>
                     <td style={{ padding:'4px' }}></td>
                     <td style={{ padding:'4px' }}>סה"כ עולם ישן</td>
                     <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(sl?.gross || 0).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                   </tr>
+                  )}
                   {r.paysSupp && (
                     <tr style={{ borderBottom:'1px solid var(--line)' }}>
                       <td style={{ padding:'4px' }}></td>
                       <td style={{ padding:'4px' }}>תוספת בית חב"ד <span style={{ fontSize:11.5, color:'var(--text3)' }}>(שורה קבועה — ללא נלוות)</span></td>
-                      <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Math.max(0, r.gross - (sl?.gross || 0)).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{(r.principal ? r.supp : Math.max(0, r.gross - (sl?.gross || 0))).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   )}
                   <tr style={{ fontWeight:800, fontSize:15.5, background:'var(--apple-fill)' }}>
