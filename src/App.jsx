@@ -3753,22 +3753,28 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     try {
       const hub = await store.fetchHubBudget();
       const byName = new Map(hub.map(h => [norm(h.name), h]));
-      let filled = 0, skippedManual = 0; const misses = [];
+      /*
+        "לא מתעדכן מבט הרשת" (שרה, 2.9): כל ערך שמקורו במשיכה מתרענן
+        במשיכה הבאה; רק ערך שהוקלד ידנית (src manual) מוגן מדריסה.
+      */
+      let filled = 0; const misses = [];
       for (const sc of schools) {
         const h = byName.get(norm(sc.name));
         if (!h) { misses.push(sc.name); continue; }
         const cur = fin?.[sc.id] || {};
+        const src = { ...(cur.src || {}) };
         const patch = {};
-        if (cur.ministryBudget == null && h.ministry > 0) patch.ministryBudget = h.ministry;
-        else if (cur.ministryBudget != null) skippedManual++;
-        if (cur.yieul == null && h.yieul != null) patch.yieul = h.yieul;
-        if (cur.teachingSim == null && h.teachingSim != null) patch.teachingSim = h.teachingSim;
-        if (Object.keys(patch).length) { await save(sc.id, patch); filled++; }
+        const want = { ministryBudget: h.ministry > 0 ? h.ministry : null, yieul: h.yieul, teachingSim: h.teachingSim };
+        for (const k of ['ministryBudget', 'yieul', 'teachingSim']) {
+          if (src[k] === 'manual') continue;
+          if (want[k] != null && want[k] !== cur[k]) { patch[k] = want[k]; src[k] = 'hub'; }
+        }
+        if (Object.keys(patch).length) { await save(sc.id, { ...patch, src }); filled++; }
       }
       // "נשמר" רק כשבאמת נשמר משהו — כשל שקט שמוצג כהצלחה גרוע מכשל
       setErr(misses.length
         ? `לא נמצאו במבט-רשת: ${misses.join(', ')}`
-        : (filled === 0 ? 'לא היה מה למלא — כל התאים כבר מלאים' : ''));
+        : (filled === 0 ? 'אין שינויים חדשים במבט-רשת' : ''));
       if (filled > 0) setFlash(Date.now());
     } catch (e) { setErr(e.message); }
     finally { setPulling(false); }
@@ -3835,7 +3841,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
       onBlur={e => {
         const v = e.target.value === '' ? null : Number(e.target.value);
-        if (v !== (val ?? null)) save(sid, { [field]: v });
+        // הקלדה ידנית מסמנת בעלות: המשיכה לא תדרוס אותה יותר
+        if (v !== (val ?? null)) save(sid, { [field]: v, src: { ...((fin?.[sid] || {}).src || {}), [field]: 'manual' } });
       }}
       style={{ width:112, textAlign:'center', fontSize:15.5, fontWeight:600, padding:'6px 7px' }} />
   );
