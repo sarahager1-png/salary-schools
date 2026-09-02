@@ -3419,6 +3419,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   const [openInc, setOpenInc] = useState({});
   // "אני צריכה חתכים שונים — חודשי/שנתי" (3.9): מתג אחד לכל הדף
   const [period, setPeriod] = useState('year');
+  // עלות מילוי מקום: 5% מעלות השכר בפועל (הכרעת שרה, 3.9)
+  const MM_PCT = 0.05;
   // שורות באותו שם (למשל שני מקורות "גיוס קהילתי", או פיצול בנים/בנות)
   // מאוחדות לשורה אחת — "לתקן" (שרה, 3.9)
   const mergeLines = (lines) => {
@@ -3507,9 +3509,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const monthly = monthlyCost(sc.id);
     const annual  = monthly * 12;
     // "תוסיף השתתפות רשת מרינה" (שרה, 3.9) — מצטרפת ליתרה בחיוב,
-    // "אין צורך" בייעול (שרה, 3.9): משרד − שכר + השתתפות
+    // "אין צורך" בייעול (שרה, 3.9): משרד − (שכר + מ"מ 5%) + השתתפות
     const left = (f.ministryBudget != null)
-      ? (f.ministryBudget || 0) - annual + (f.networkSupport || 0)
+      ? (f.ministryBudget || 0) - annual * (1 + MM_PCT) + (f.networkSupport || 0)
       : null;
     /*
       "עשיתי סימולציית שכר לפני הסימולציה האמיתית — חשוב לי לדעת מה
@@ -3584,7 +3586,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         </button>
       </div>
       <p style={{ fontSize:15.5, color:'var(--text2)', marginBottom:16, lineHeight:1.55 }}>
-        תקציב הכנסות משרד החינוך פחות עלות השכר, בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
+        תקציב הכנסות משרד החינוך פחות עלות השכר ומילוי מקום (5% מעלות השכר), בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
         עלות השכר נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
       </p>
       {err && (
@@ -3659,7 +3661,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>כרטיסי בתי הספר · הפרשי עלות הוראה והוצאות</h2>
       {fin !== null && rows.map(({ sc, f, monthly, annual }) => {
         const teachIncome = (f.ministryBudget || 0) + (f.networkSupport || 0);
-        const teachCost = annual;
+        const mmCost = annual * MM_PCT;
+        const teachCost = annual + mmCost;
         const teachDiff = (f.ministryBudget != null) ? teachIncome - teachCost : null;
         // צד התפעול
         const incLines = mergeLines(f.detail?.income);
@@ -3705,6 +3708,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   {dline('סה"כ הכנסות הוראה', per(teachIncome), true)}
                   <div style={{ height:8 }} />
                   {dline(`שכר הוראה (עובדי הוראה, מנהלת, תוספות)`, per(annual))}
+                  {dline('מילוי מקום — 5% מעלות השכר', per(mmCost))}
                   {dline('סה"כ הוצאות הוראה', per(teachCost), true)}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
                     borderTop:'2px solid var(--line)', color: gapColor(teachDiff) }}>
@@ -3750,7 +3754,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         let sumTeach = 0, sumOp = 0, any = false;
         for (const { f, annual } of rows) {
           const ti = (f.ministryBudget || 0) + (f.networkSupport || 0);
-          const td = f.ministryBudget != null ? ti - annual : null;
+          const td = f.ministryBudget != null ? ti - annual * (1 + MM_PCT) : null;
           const il = mergeLines(f.detail?.income), el = mergeLines(f.detail?.expenses);
           const is_ = il.reduce((a, x) => a + x.amount, 0) || (f.incomeTotal || 0);
           const es = el.reduce((a, x) => a + x.amount, 0) || (f.expensesOther || 0);
