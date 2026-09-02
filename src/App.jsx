@@ -5642,6 +5642,87 @@ function ObUpload({ label, hint, done, onFile }) {
   );
 }
 
+
+/* ═══════════════════════════════════════════════════════════════
+   הסכם ההעסקה — מרונדר ומלא, לחתימה דיגיטלית (שרה, 3.9.2026)
+
+   "הודעה בדבר פירוט תנאי עבודה / עובדי הוראה" של רשת גני חב"ד
+   בארה"ק, במבנה המסמך שמסרה שרה: תקופת החוזה 1.9.26–30.8.27,
+   הפרטים והשעות נמשכים מהשורה; למנהלים — 40 שעות. הכול מוצג
+   למורה לפני החתימה, והחתימה נטבעת על אותו מסמך.
+═══════════════════════════════════════════════════════════════ */
+const CONTRACT_FROM = '01.09.2026';
+const CONTRACT_TO   = '30.08.2027';
+function ContractDoc({ me, form, sigUrl }) {
+  const isPrincipal = me.gamul_role === 'principal';
+  const hours = isPrincipal ? 40 : (Number(me.frontal_hours) || '____');
+  const roleLabel = isPrincipal ? 'מנהל/ת בית ספר' : 'עובד/ת הוראה';
+  const Sec = ({ n, children }) => (
+    <p style={{ fontSize:14.9, margin:'7px 0', lineHeight:1.65 }}><b>{n}.</b> {children}</p>
+  );
+  const cell = { border:'1px solid #cbc3e3', padding:'5px 9px', textAlign:'center', fontSize:13.8 };
+  const head = { ...cell, background:'#EDE8F8', fontWeight:700 };
+  return (
+    <div style={{ background:'#fff', border:'1px solid var(--line)', borderRadius:12, padding:'20px 22px', margin:'10px 0' }}>
+      <p style={{ textAlign:'center', fontSize:17.2, fontWeight:800, textDecoration:'underline', marginBottom:12 }}>
+        הודעה בדבר פירוט תנאי עבודה / עובדי הוראה
+      </p>
+      <Sec n="1">שם המעביד: <b>רשת גני חב"ד בארה"ק</b> · אישיות משפטית: ע.ר. 58-0141-026 ·
+        מען: ת.ד 271 כפר חב"ד (להלן — "המעסיק")<br/>
+        שם העובד/ת: <b>{me.name}</b> · מס' זהות: <b dir="ltr">{me.tz_id || form.tz || '____'}</b> ·
+        כתובת: <b>{[form.address, form.city].filter(Boolean).join(', ') || '____'}</b></Sec>
+      <Sec n="2">תאריך תחילת העבודה: <b>{CONTRACT_FROM}</b> ·
+        תקופת החוזה מיום <b>{CONTRACT_FROM}</b> עד יום <b>{CONTRACT_TO}</b><br/>
+        סיבת קציבת תקופת העבודה: חוסר יציבות כלכלית</Sec>
+      <Sec n="3">תפקידו/ה העיקרי של העובד/ת: <b>{roleLabel}</b> · {me.school_name}</Sec>
+      <Sec n="4">הממונה הישיר/ה של העובד/ת: {isPrincipal ? 'הנהלת הרשת' : 'מנהל/ת בית הספר'}</Sec>
+      <Sec n="5">הבסיס שלפיו משולם השכר: משכורת חודשית</Sec>
+      <Sec n="6">שכר עבודתו/ה של העובד/ת נקבע על פי דירוג, בהתאם לטופס נתוני ההעסקה
+        <b> מפורטל עובדי הוראה של משרד החינוך</b>.</Sec>
+      <table style={{ width:'100%', borderCollapse:'collapse', margin:'8px 0' }}>
+        <thead>
+          <tr><th style={head} colSpan={2}>תשלומים קבועים</th></tr>
+          <tr><th style={head}>סוג התשלום</th><th style={head}>מועד התשלום</th></tr>
+        </thead>
+        <tbody>
+          <tr><td style={cell}>שכר בסיס ותוספות על פי התקנות</td><td style={cell}>9 לחודש</td></tr>
+          <tr><td style={cell}>נסיעות</td><td style={cell}>9 לחודש</td></tr>
+          <tr><td style={cell}>הבראה חודשית</td><td style={cell}>9 לחודש</td></tr>
+          <tr><td style={cell}>ביגוד חודשית (לעובדי הוראה ומינהל בלבד)</td><td style={cell}>9 לחודש</td></tr>
+        </tbody>
+      </table>
+      <Sec n="7">אורכו של שבוע העבודה הרגיל של העובד/ת: <b>{hours} שעות{isPrincipal ? '' : ' פרונטליות'}</b></Sec>
+      <Sec n="8">תשלומים בעבור תנאים סוציאליים שהעובד/ת זכאי/ת להם:</Sec>
+      <table style={{ width:'100%', borderCollapse:'collapse', margin:'8px 0' }}>
+        <thead>
+          <tr>
+            <th style={head}>סוג התשלום</th><th style={head}>הגוף המקבל ושם התוכנית</th>
+            <th style={head}>הפרשת העובד</th><th style={head}>הפרשת המעביד</th><th style={head}>תחילת התשלום</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style={cell}>פנסיה</td><td style={cell}>קרן פנסיה ברירת מחדל</td><td style={cell}>6%</td><td style={cell}>7%</td><td style={cell}>תחילת העסקה</td></tr>
+          <tr><td style={cell}>קרן השתלמות</td><td style={cell}>קרן השתלמות של עובדי הוראה</td><td style={cell}>4.2%</td><td style={cell}>8.4%</td><td style={cell}>תחילת העסקה</td></tr>
+        </tbody>
+      </table>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginTop:16, gap:20 }}>
+        <div>
+          <p style={{ fontSize:12.6, color:'var(--text3)' }}>תאריך</p>
+          <p style={{ fontSize:14.9, fontWeight:600, borderBottom:'1px solid #999', paddingBottom:2 }}>
+            {new Date().toLocaleDateString('he-IL')}
+          </p>
+        </div>
+        <div style={{ flex:'0 0 190px' }}>
+          <p style={{ fontSize:12.6, color:'var(--text3)' }}>חתימת העובד/ת</p>
+          {sigUrl
+            ? <img src={sigUrl} alt="חתימה" style={{ height:52, borderBottom:'1px solid #999', display:'block' }} />
+            : <div style={{ height:52, borderBottom:'1px solid #999' }} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OnboardingView({ code }) {
   const [me, setMe] = useState(null);
   const [state, setState] = useState('loading');
@@ -5657,7 +5738,7 @@ function OnboardingView({ code }) {
       const d = await store.obWhoami(code);
       if (!d) { setState('bad'); return; }
       setMe(d); setForm(f => ({ ...(d.form101 || {}), ...f })); setState('ok');
-      if (d.contract_available) store.obDownload('contract/contract.pdf').then(setContractUrl).catch(() => {});
+      // ההסכם מרונדר באפליקציה — אין PDF להוריד
     } catch { setState('bad'); }
   }, [code]);
   useEffect(() => { Promise.resolve().then(load); }, [load]);
@@ -5944,10 +6025,12 @@ function OnboardingView({ code }) {
           {!me.contract_available ? (
             <p style={{ fontSize:14.9, color:'var(--text3)', marginTop:6 }}>החוזה יעלה בקרוב — תקבלי הודעה כשיהיה מוכן לחתימה.</p>
           ) : me.contract_signed ? (
-            <p style={{ color:'var(--ok)', fontWeight:700, fontSize:15.5, marginTop:6 }}>✓ נחתם. תודה!</p>
+            <div>
+              <p style={{ color:'var(--ok)', fontWeight:700, fontSize:15.5, marginTop:6 }}>✓ נחתם. תודה!</p>
+              <ContractDoc me={me} form={form} sigUrl={contractUrl} />
+            </div>
           ) : (<>
-            {contractUrl && <a href={contractUrl} target="_blank" rel="noreferrer" className="apple-btn apple-btn-ghost" style={{ margin:'10px 0', textDecoration:'none' }}>
-              <ExternalLink size={14} /> פתיחת החוזה לקריאה</a>}
+            <ContractDoc me={me} form={form} sigUrl={null} />
             <p className="apple-label">חתימה על החוזה</p>
             <SignaturePad onChange={setContractSig} />
             <button className="apple-btn apple-btn-blue" onClick={() => signContract().catch(e => setMsg(e.message))} style={{ marginTop:10, width:'100%', minHeight:44 }}>
