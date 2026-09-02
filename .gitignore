@@ -30,3 +30,5 @@ verify-sim-diffs.json
 recomputed.json
 sim-watcher.log
 sim-watcher.err
+slip-data.json
+תלושים-*.csv
