@@ -3415,6 +3415,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   const [fin, setFin]     = useState(null);   // null: עוד נטען
   const [err, setErr]     = useState('');
   const [flash, setFlash] = useState(0);
+  // "הכנסות מול הוצאות שיהיה מתרחב" (שרה, 3.9) — סגור כברירת מחדל
+  const [openInc, setOpenInc] = useState({});
   const [pulling, setPulling] = useState(false);
 
   /*
@@ -3625,16 +3627,24 @@ function TeachingCostView({ schools, teachers, monthKey }) {
             <span>{x.name}</span><b style={{ whiteSpace:'nowrap' }}>{money(x.amount)}</b>
           </div>
         );
+        const isOpen = !!openInc[sc.id];
         return (
-          <div key={sc.id} className="apple-card" style={{ padding:'14px 18px', marginBottom:14 }}>
-            <div style={{ display:'flex', alignItems:'baseline', gap:12, marginBottom:8, flexWrap:'wrap' }}>
+          <div key={sc.id} className="apple-card" style={{ padding:'12px 18px', marginBottom:10 }}>
+            <div onClick={() => setOpenInc(m => ({ ...m, [sc.id]: !m[sc.id] }))}
+              style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', cursor:'pointer' }}>
+              {isOpen ? <ChevronLeft size={16} strokeWidth={2.4} style={{ transform:'rotate(-90deg)', color:'var(--text3)' }} />
+                      : <ChevronLeft size={16} strokeWidth={2.4} style={{ color:'var(--text3)' }} />}
               <p style={{ fontSize:16.7, fontWeight:800 }}>{sc.name}</p>
+              <span style={{ fontSize:13.8, color:'var(--text3)' }}>
+                הכנסות {money(incSum)} · הוצאות {money(expSum)}
+              </span>
               <span style={{ fontSize:15.5, fontWeight:800, marginInlineStart:'auto',
                 color: diff < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
                 הפרש: {money(diff)}
               </span>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:18 }}>
+            {isOpen && (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:18, marginTop:10 }}>
               <div>
                 <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text2)', marginBottom:4 }}>הכנסות (ללא משרד החינוך)</p>
                 {incLines.map(line)}
@@ -3650,6 +3660,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 </div>
               </div>
             </div>
+            )}
           </div>
         );
       })}
