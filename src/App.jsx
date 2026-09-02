@@ -3417,6 +3417,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   const [flash, setFlash] = useState(0);
   // "הכנסות מול הוצאות שיהיה מתרחב" (שרה, 3.9) — סגור כברירת מחדל
   const [openInc, setOpenInc] = useState({});
+  // "אני צריכה חתכים שונים — חודשי/שנתי" (3.9): מתג אחד לכל הדף
+  const [period, setPeriod] = useState('year');
+  const per = v => (v == null ? null : (period === 'month' ? v / 12 : v));
   const [pulling, setPulling] = useState(false);
 
   /*
@@ -3548,6 +3551,15 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           border:'1px solid rgba(90,110,255,.2)', borderRadius:999, padding:'3px 11px' }}>
         <ShieldCheck size={14} strokeWidth={2.4} />לעינייך בלבד
         </span>
+        <div style={{ display:'flex', gap:4, background:'var(--apple-fill)', borderRadius:10, padding:3 }}>
+          {[['month', 'חודשי'], ['year', 'שנתי']].map(([v, l]) => (
+            <button key={v} onClick={() => setPeriod(v)} className="apple-btn"
+              style={{ padding:'5px 16px', fontSize:14.4, fontWeight:700, borderRadius:8, border:'none', cursor:'pointer',
+                background: period === v ? '#fff' : 'transparent',
+                boxShadow: period === v ? '0 1px 4px rgba(0,0,0,.12)' : 'none',
+                color: period === v ? 'var(--purple)' : 'var(--text3)' }}>{l}</button>
+          ))}
+        </div>
         {flash > 0 && Date.now() - flash < 4000 && (
           <span style={{ fontSize:13.8, color:'var(--ok, #2e7d32)', fontWeight:700 }}>נשמר ✓</span>
         )}
@@ -3571,30 +3583,34 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           <thead>
             <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
               <TH>בית ספר</TH>
-              <TH>הכנסות משרד החינוך + מענק · שנתי</TH>
-              <TH>ייעול · שנתי</TH>
-              <TH>עלות שכר · חודש</TH>
-              <TH>עלות שכר · שנה</TH>
-              <TH>הפרשת מילוי מקום · שנתי</TH>
+              <TH>הכנסות משרד החינוך + מענק</TH>
+              <TH>ייעול</TH>
+              <TH>עלות שכר</TH>
+              <TH>הפרשת מילוי מקום</TH>
               <TH>השתתפות הרשת</TH>
               <TH>יתרה לאחר שכר</TH>
             </tr>
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={8} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+              <tr><td colSpan={7} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
             ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
-                <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'ministryBudget', f.ministryBudget)}</td>
-                <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'yieul', f.yieul)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1 }}>{money(monthly)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(annual)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1 }}>{money(mmAnnual)}</td>
-                <td style={{ textAlign:'center' }}>{moneyInput(sc.id, 'networkSupport', f.networkSupport)}</td>
+                <td style={{ textAlign:'center' }}>{period === 'year'
+                  ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
+                  : <span style={{ fontSize:16.1 }}>{money(per(f.ministryBudget))}</span>}</td>
+                <td style={{ textAlign:'center' }}>{period === 'year'
+                  ? moneyInput(sc.id, 'yieul', f.yieul)
+                  : <span style={{ fontSize:16.1 }}>{money(per(f.yieul))}</span>}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(period === 'month' ? monthly : annual)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1 }}>{money(per(mmAnnual))}</td>
+                <td style={{ textAlign:'center' }}>{period === 'year'
+                  ? moneyInput(sc.id, 'networkSupport', f.networkSupport)
+                  : <span style={{ fontSize:16.1 }}>{money(per(f.networkSupport))}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
-                  {left == null ? '—' : money(left)}
+                  {left == null ? '—' : money(per(left))}
                 </td>
               </tr>
             ))}
@@ -3603,14 +3619,13 @@ function TeachingCostView({ schools, teachers, monthKey }) {
             <tfoot>
               <tr style={{ borderTop:'2px solid var(--line)', background:'var(--apple-fill)' }}>
                 <td style={{ padding:'11px 12px', fontSize:16.1, fontWeight:800 }}>סה"כ הרשת</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.budget)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.yieul)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.monthly)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.annual)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.mm)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(tot.support)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.budget))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.yieul))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(period === 'month' ? tot.monthly : tot.annual)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.mm))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.support))}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
-                  color: tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(tot.left)}</td>
+                  color: tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(per(tot.left))}</td>
               </tr>
             </tfoot>
           )}
@@ -3660,27 +3675,27 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <ChevronLeft size={16} strokeWidth={2.4} style={{ color:'var(--text3)', transform: isOpen ? 'rotate(-90deg)' : 'none' }} />
               <p style={{ fontSize:16.7, fontWeight:800 }}>{sc.name}</p>
               <span style={{ fontSize:14.4, fontWeight:700, color: gapColor(teachDiff) }}>
-                הפרש עלות הוראה: {gap(teachDiff)}
+                הפרש עלות הוראה: {teachDiff == null ? '—' : money(per(teachDiff))}
               </span>
               <span style={{ fontSize:14.4, fontWeight:700, marginInlineStart:'auto', color: gapColor(opDiff) }}>
-                הפרש הוצאות: {gap(opDiff)}
+                הפרש הוצאות: {opDiff == null ? '—' : money(per(opDiff))}
               </span>
             </div>
             {isOpen && (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:20, marginTop:12 }}>
                 <div>
                   <p style={{ fontSize:14.4, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>עלות הוראה · שנתי</p>
-                  {dline('הכנסות משרד החינוך + מענק', f.ministryBudget || 0)}
-                  {f.yieul ? dline('ייעול', f.yieul, false, true) : null}
-                  {f.networkSupport ? dline('השתתפות הרשת', f.networkSupport) : null}
-                  {dline('סה"כ הכנסות הוראה', teachIncome, true)}
+                  {dline('הכנסות משרד החינוך + מענק', per(f.ministryBudget || 0))}
+                  {f.yieul ? dline('ייעול', per(f.yieul), false, true) : null}
+                  {f.networkSupport ? dline('השתתפות הרשת', per(f.networkSupport)) : null}
+                  {dline('סה"כ הכנסות הוראה', per(teachIncome), true)}
                   <div style={{ height:8 }} />
-                  {dline(`שכר הוראה (מורות, מנהלת, תוספות)`, annual)}
-                  {dline(`הפרשת מילוי מקום — ${hours} שעות × 100 ₪ × 12`, mmAnnualCard)}
-                  {dline('סה"כ הוצאות הוראה', teachCost, true)}
+                  {dline(`שכר הוראה (מורות, מנהלת, תוספות)`, per(annual))}
+                  {dline(`הפרשת מילוי מקום — ${hours} שעות × 100 ₪${period === 'year' ? ' × 12' : ''}`, per(mmAnnualCard))}
+                  {dline('סה"כ הוצאות הוראה', per(teachCost), true)}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
                     borderTop:'2px solid var(--line)', color: gapColor(teachDiff) }}>
-                    <span>הפרש עלות הוראה</span><span>{gap(teachDiff)}</span>
+                    <span>הפרש עלות הוראה</span><span>{teachDiff == null ? '—' : money(per(teachDiff))}</span>
                   </div>
                 </div>
                 <div>
@@ -3692,7 +3707,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   {dline('סה"כ הוצאות', expSum, true)}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
                     borderTop:'2px solid var(--line)', color: gapColor(opDiff) }}>
-                    <span>הפרש הוצאות</span><span>{gap(opDiff)}</span>
+                    <span>הפרש הוצאות</span><span>{opDiff == null ? '—' : money(per(opDiff))}</span>
                   </div>
                 </div>
               </div>

@@ -30,8 +30,11 @@ export const dargaFor = (t) =>
 */
 export const kitaFor = (t) => {
   const r = t.gamul_role || '';
-  if (r === 'homeroom1') return '1';
-  return /^homeroom/.test(r) ? '2' : null;
+  if (r === 'homeroom1') return '1';   // כיתה א' — 11.5%
+  // "היו בתי ספר שנתנו חינוך חטיבה שזה 11.5 — צריך לשנות" (שרה, 3.9):
+  // מחנכת חטיבה נשלחה ככיתה ב' (10%) וקיבלה גמול חסר. כיתה ז' = 11.5%.
+  if (r === 'homeroom2') return '7';   // חטיבה — 11.5%
+  return /^homeroom/.test(r) ? '2' : null;   // ב'-ו' — 10%
 };
 
 /*
