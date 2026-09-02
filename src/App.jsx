@@ -3565,7 +3565,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <TH>עלות שכר · שנה</TH>
               <TH>הסימולציה שלך · שנתי</TH>
               <TH>פער סימולציה מול בפועל</TH>
-              <TH>השתתפות רשת · רינה</TH>
+              <TH>השתתפות הרשת</TH>
               <TH>יתרה לאחר שכר</TH>
             </tr>
           </thead>
