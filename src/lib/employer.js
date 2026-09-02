@@ -25,6 +25,8 @@ const CHABAD_SUPP = new Map();
 // מי שכבר שובצה לה ממ"מ: מפתחות "חודש|בית ספר|שם" של הנשות שמופיעות
 // בשדה "במקום מי" של שורה אחרת. מתעדכן בכל טעינת נתונים.
 const MM_REPLACED = new Set();
+// מי בחל"ד החודש — מ"מ שממלאת אותה היא המשרה עצמה, לא שעות בתשלום
+const MATERNITY_LEAVES = new Set();
 const mmKey = (mk, sid, name) => `${mk}|${sid}|${String(name || '').trim()}`;
 const hasSubstitute = t => MM_REPLACED.has(mmKey(t.monthKey, t.schoolId, t.name));
 const schoolPaysSupp = id => CHABAD_SUPP.get(id) !== false;
@@ -439,7 +441,11 @@ function calcEmployer(t) {
     התשלום למ"מ אינו נכנס לתלוש — הוא מתווסף לעלות ההוראה בלבד,
     על השורה של הממלאת. הנעדרת אינה מנוכה.
   */
-  const mmPay = (Number(t.mmHours) || 0) * MM_HOUR_RATE;
+  // "זה לא נכון כי זה מ"מ לחופשת לידה" (שרה, 3.9): מחליפת חל"ד
+  // מקבלת את שכרה הרגיל — היא המשרה. 100 ₪ לשעה רק למילוי שוטף.
+  const coversMaternity = t.mmFor &&
+    MATERNITY_LEAVES.has(mmKey(t.monthKey, t.schoolId, String(t.mmFor).trim()));
+  const mmPay = coversMaternity ? 0 : (Number(t.mmHours) || 0) * MM_HOUR_RATE;
   if (mmPay > 0) parts.push({ key: 'mm',
     label: `מילוי מקום (${t.mmHours} שעות × ${MM_HOUR_RATE} ₪)`,
     rate: null, on: null, amount: mmPay });
@@ -457,6 +463,7 @@ function calcEmployer(t) {
 
 export {
   MM_HOUR_RATE,
+  MATERNITY_LEAVES,
   LEVELS,
   AGE_RED,
   CHABAD_SUPP,

@@ -21,6 +21,7 @@ const BUILD = 31;
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
 import {
+  MATERNITY_LEAVES,
   LEVELS,
   AGE_RED,
   CHABAD_SUPP,
@@ -6058,9 +6059,11 @@ export default function App() {
     setMonths(data.months);
     setDue(data.due || {});
     MM_REPLACED.clear();
+    MATERNITY_LEAVES.clear();
     for (const [mk, rows2] of Object.entries(data.months || {}))
       for (const r2 of rows2 || [])
         if (String(r2.mmFor || '').trim()) MM_REPLACED.add(mmKey(mk, r2.schoolId, r2.mmFor));
+        if (r2.leaveType === 'maternity') MATERNITY_LEAVES.add(mmKey(mk, r2.schoolId, r2.name));
     setActiveMonth(prev => {
       const keys = Object.keys(data.months).sort();
       if (keys.includes(prev)) return prev;

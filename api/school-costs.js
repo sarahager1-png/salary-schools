@@ -53,9 +53,13 @@ export default async function handler(req, res) {
     emp.CHABAD_SUPP.clear();
     for (const s of schools || []) emp.CHABAD_SUPP.set(s.id, s.chabad_supp !== false);
     emp.MM_REPLACED.clear();
+    emp.MATERNITY_LEAVES.clear();
     for (const r of rows || []) {
       if (String(r.mm_for || '').trim()) {
         emp.MM_REPLACED.add(`${r.month_key}|${r.school_id}|${String(r.mm_for).trim()}`);
+      }
+      if (r.leave_type === 'maternity') {
+        emp.MATERNITY_LEAVES.add(`${r.month_key}|${r.school_id}|${String(r.name).trim()}`);
       }
     }
 
