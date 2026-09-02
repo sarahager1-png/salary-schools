@@ -3419,6 +3419,13 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   const [openInc, setOpenInc] = useState({});
   // "אני צריכה חתכים שונים — חודשי/שנתי" (3.9): מתג אחד לכל הדף
   const [period, setPeriod] = useState('year');
+  // שורות באותו שם (למשל שני מקורות "גיוס קהילתי", או פיצול בנים/בנות)
+  // מאוחדות לשורה אחת — "לתקן" (שרה, 3.9)
+  const mergeLines = (lines) => {
+    const m = new Map();
+    for (const x of lines || []) m.set(x.name, (m.get(x.name) || 0) + Number(x.amount || 0));
+    return [...m.entries()].map(([name, amount]) => ({ name, amount }));
+  };
   // "עלות ההוראה מהתקציב חייב להיות מוסתר כולל הפרש" (שרה, 3.9):
   // התחשיב שלה נחשף רק בלחיצה מפורשת — לא מוצג לכל מי שנכנס לדף.
   const [showSim, setShowSim] = useState(false);
@@ -3500,9 +3507,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const monthly = monthlyCost(sc.id);
     const annual  = monthly * 12;
     // "תוסיף השתתפות רשת מרינה" (שרה, 3.9) — מצטרפת ליתרה בחיוב,
-    // כמו בנוסחת דף הפגישה: משרד − ייעול − שכר + השתתפות
-    const left = (f.ministryBudget != null || f.yieul != null)
-      ? (f.ministryBudget || 0) - (f.yieul || 0) - annual + (f.networkSupport || 0)
+    // "אין צורך" בייעול (שרה, 3.9): משרד − שכר + השתתפות
+    const left = (f.ministryBudget != null)
+      ? (f.ministryBudget || 0) - annual + (f.networkSupport || 0)
       : null;
     /*
       "עשיתי סימולציית שכר לפני הסימולציה האמיתית — חשוב לי לדעת מה
@@ -3577,7 +3584,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         </button>
       </div>
       <p style={{ fontSize:15.5, color:'var(--text2)', marginBottom:16, lineHeight:1.55 }}>
-        תקציב הכנסות משרד החינוך פחות ייעול פחות עלות השכר. התקציב והייעול שנתיים ומוקלדים כאן;
+        תקציב הכנסות משרד החינוך פחות עלות השכר, בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
         עלות השכר נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
       </p>
       {err && (
@@ -3590,7 +3597,6 @@ function TeachingCostView({ schools, teachers, monthKey }) {
             <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
               <TH>בית ספר</TH>
               <TH>הכנסות משרד החינוך + מענק</TH>
-              <TH>ייעול</TH>
               <TH>עלות שכר</TH>
               {showSim && <TH>עלות הוראה מהתקציב</TH>}
               {showSim && <TH>הפרש מול השכר בפועל</TH>}
@@ -3600,16 +3606,13 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={showSim ? 8 : 6} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+              <tr><td colSpan={showSim ? 7 : 5} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
             ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
                   ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
                   : <span style={{ fontSize:16.1 }}>{money(per(f.ministryBudget))}</span>}</td>
-                <td style={{ textAlign:'center' }}>{period === 'year'
-                  ? moneyInput(sc.id, 'yieul', f.yieul)
-                  : <span style={{ fontSize:16.1 }}>{money(per(f.yieul))}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(period === 'month' ? monthly : annual)}</td>
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}>{f.teachingSim == null ? '—' : money(per(f.teachingSim))}</td>}
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
@@ -3630,7 +3633,6 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <tr style={{ borderTop:'2px solid var(--line)', background:'var(--apple-fill)' }}>
                 <td style={{ padding:'11px 12px', fontSize:16.1, fontWeight:800 }}>סה"כ הרשת</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.budget))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.yieul))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(period === 'month' ? tot.monthly : tot.annual)}</td>
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.sim))}</td>}
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
@@ -3656,12 +3658,12 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           המילויי מקום" (שרה, 3.9). */}
       <h2 style={{ fontSize:19.5, fontWeight:800, margin:'26px 0 10px' }}>כרטיסי בתי הספר · הפרשי עלות הוראה והוצאות</h2>
       {fin !== null && rows.map(({ sc, f, monthly, annual }) => {
-        const teachIncome = (f.ministryBudget || 0) - (f.yieul || 0) + (f.networkSupport || 0);
+        const teachIncome = (f.ministryBudget || 0) + (f.networkSupport || 0);
         const teachCost = annual;
         const teachDiff = (f.ministryBudget != null) ? teachIncome - teachCost : null;
         // צד התפעול
-        const incLines = f.detail?.income || [];
-        const expLines = f.detail?.expenses || [];
+        const incLines = mergeLines(f.detail?.income);
+        const expLines = mergeLines(f.detail?.expenses);
         const incSum = incLines.reduce((a, x) => a + x.amount, 0) || (f.incomeTotal || 0);
         const expSum = expLines.reduce((a, x) => a + x.amount, 0) || (f.expensesOther || 0);
         const opDiff = (f.incomeTotal != null || expLines.length) ? incSum - expSum : null;
@@ -3691,12 +3693,11 @@ function TeachingCostView({ schools, teachers, monthKey }) {
             {isOpen && (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:20, marginTop:12 }}>
                 <div>
-                  <p style={{ fontSize:14.4, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>עלות הוראה · שנתי</p>
+                  <p style={{ fontSize:14.4, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>עלות הוראה · {period === 'month' ? 'חודשי' : 'שנתי'}</p>
                   {/* "הכנסות משרד החינוך 2 שורות" (שרה, 3.9) — משרד ומענק בנפרד */}
                   {f.detail?.teach?.income?.length
                     ? f.detail.teach.income.map((x, i) => <div key={'ti' + i}>{dline(x.name, per(x.amount))}</div>)
                     : dline('הכנסות משרד החינוך + מענק', per(f.ministryBudget || 0))}
-                  {f.yieul ? dline('ייעול', per(f.yieul), false, true) : null}
                   {f.networkSupport ? dline('השתתפות הרשת', per(f.networkSupport)) : null}
                   {dline('סה"כ הכנסות הוראה', per(teachIncome), true)}
                   <div style={{ height:8 }} />
@@ -3724,12 +3725,12 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   })()}
                 </div>
                 <div>
-                  <p style={{ fontSize:14.4, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>הכנסות והוצאות אחרות · שנתי</p>
-                  {incLines.map((x, i) => <div key={'i' + i}>{dline(x.name, x.amount)}</div>)}
-                  {dline('סה"כ הכנסות', incSum, true)}
+                  <p style={{ fontSize:14.4, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>הכנסות והוצאות אחרות · {period === 'month' ? 'חודשי' : 'שנתי'}</p>
+                  {incLines.map((x, i) => <div key={'i' + i}>{dline(x.name, per(x.amount))}</div>)}
+                  {dline('סה"כ הכנסות', per(incSum), true)}
                   <div style={{ height:8 }} />
-                  {expLines.map((x, i) => <div key={'e' + i}>{dline(x.name, x.amount)}</div>)}
-                  {dline('סה"כ הוצאות', expSum, true)}
+                  {expLines.map((x, i) => <div key={'e' + i}>{dline(x.name, per(x.amount))}</div>)}
+                  {dline('סה"כ הוצאות', per(expSum), true)}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
                     borderTop:'2px solid var(--line)', color: gapColor(opDiff) }}>
                     <span>הפרש הוצאות</span><span>{opDiff == null ? '—' : money(per(opDiff))}</span>
@@ -3745,15 +3746,15 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       {fin !== null && rows.map(({ sc, f }) => {
         const d = f.detail;
         if (!d && f.incomeTotal == null) return null;
-        const incLines = d?.income || [];
-        const expLines = d?.expenses || [];
+        const incLines = mergeLines(d?.income);
+        const expLines = mergeLines(d?.expenses);
         const incSum = incLines.reduce((a, x) => a + x.amount, 0) || (f.incomeTotal || 0);
         const expSum = expLines.reduce((a, x) => a + x.amount, 0) || (f.expensesOther || 0);
         const diff = incSum - expSum;
         const line = (x, k) => (
           <div key={k} style={{ display:'flex', justifyContent:'space-between', gap:10,
             padding:'4px 0', borderBottom:'1px dashed var(--line)', fontSize:14.9 }}>
-            <span>{x.name}</span><b style={{ whiteSpace:'nowrap' }}>{money(x.amount)}</b>
+            <span>{x.name}</span><b style={{ whiteSpace:'nowrap' }}>{money(per(x.amount))}</b>
           </div>
         );
         const isOpen = !!openInc[sc.id];
@@ -3765,11 +3766,11 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                       : <ChevronLeft size={16} strokeWidth={2.4} style={{ color:'var(--text3)' }} />}
               <p style={{ fontSize:16.7, fontWeight:800 }}>{sc.name}</p>
               <span style={{ fontSize:13.8, color:'var(--text3)' }}>
-                הכנסות {money(incSum)} · הוצאות {money(expSum)}
+                הכנסות {money(per(incSum))} · הוצאות {money(per(expSum))}
               </span>
               <span style={{ fontSize:15.5, fontWeight:800, marginInlineStart:'auto',
                 color: diff < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
-                הפרש: {money(diff)}
+                הפרש: {money(per(diff))}
               </span>
             </div>
             {isOpen && (
@@ -3778,14 +3779,14 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text2)', marginBottom:4 }}>הכנסות (ללא משרד החינוך)</p>
                 {incLines.map(line)}
                 <div style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', fontSize:14.9, fontWeight:800 }}>
-                  <span>סה"כ הכנסות</span><span>{money(incSum)}</span>
+                  <span>סה"כ הכנסות</span><span>{money(per(incSum))}</span>
                 </div>
               </div>
               <div>
                 <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text2)', marginBottom:4 }}>הוצאות (ללא שכר הוראה)</p>
                 {expLines.map(line)}
                 <div style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', fontSize:14.9, fontWeight:800 }}>
-                  <span>סה"כ הוצאות</span><span>{money(expSum)}</span>
+                  <span>סה"כ הוצאות</span><span>{money(per(expSum))}</span>
                 </div>
               </div>
             </div>
