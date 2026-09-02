@@ -3619,6 +3619,23 @@ function TeachingCostView({ schools, teachers, monthKey }) {
 ═══════════════════════════════════════════════════════════════ */
 function SlipsView({ schools, teachers, monthKey, fmtMonthFn }) {
   const money = v => (v == null ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
+  /*
+    "לא רואים את התלוש רק עלויות" (שרה, 3.9): שורות הרכיבים המלאות —
+    כפי שמחשבון המשרד מפיק אותן — נטענות מ-slip_lines, ולחיצה על מורה
+    פותחת את התלוש עצמו: שכר משולב, התוספות, ת.שקלית... ועד הברוטו.
+  */
+  const [lines, setLines] = useState({});
+  const [openSlip, setOpenSlip] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const m = await store.listSlipLines(teachers.map(t => t.id));
+        if (alive) setLines(m);
+      } catch { /* אין הרשאה/רשת — הטבלה עדיין עובדת */ }
+    })();
+    return () => { alive = false; };
+  }, [teachers]);
   const bySchool = schools.map(sc => ({
     sc,
     ts: teachers.filter(t => t.schoolId === sc.id),
@@ -3686,8 +3703,10 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn }) {
                       <td colSpan={8} style={{ fontSize:13.8 }}>{r.skip}</td>
                     </tr>
                   ) : (
-                    <tr key={t.id}>
-                      <td style={{ fontWeight:600 }}>{t.name}</td>
+                    <tr key={t.id} onClick={() => lines[t.id] && setOpenSlip({ t, r })}
+                      style={{ cursor: lines[t.id] ? 'pointer' : 'default' }}
+                      title={lines[t.id] ? 'לחיצה פותחת את התלוש המלא' : 'התלוש המפורט בהכנה — יופיע בסיום החישוב'}>
+                      <td style={{ fontWeight:600 }}>{t.name}{lines[t.id] && <FileText size={12} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-1px', marginInlineStart:5, color:'var(--purple)' }} />}</td>
                       <td style={{ textAlign:'center' }}>{r.darga || '—'}</td>
                       <td style={{ textAlign:'center' }}>{r.vetek}</td>
                       <td style={{ textAlign:'center' }}>{r.hours}</td>
@@ -3712,7 +3731,69 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn }) {
       })}
       <p className="no-print" style={{ fontSize:13.8, color:'var(--text3)' }}>
         ההפרשות: פנסיה וקרן השתלמות על הבסיס בלבד; על התוספת מס שכר וביטוח לאומי בלבד.
+        לחיצה על שם עם סמל 📄 פותחת את התלוש המלא.
       </p>
+      {openSlip && (() => {
+        const { t, r } = openSlip;
+        const sl = lines[t.id];
+        return (
+          <div onClick={() => setOpenSlip(null)} className="print-sheet"
+            style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.5)', zIndex:70, overflowY:'auto' }} dir="rtl">
+            <div onClick={e => e.stopPropagation()}
+              style={{ maxWidth:560, margin:'26px auto', background:'#fff', borderRadius:14, padding:'22px 26px' }}>
+              <div className="no-print" style={{ display:'flex', justifyContent:'space-between', marginBottom:10 }}>
+                <button className="apple-btn apple-btn-blue" onClick={() => window.print()} style={{ fontSize:14.4 }}>
+                  <Printer size={14} strokeWidth={2.2} />הדפסה
+                </button>
+                <button className="apple-btn apple-btn-ghost" onClick={() => setOpenSlip(null)}>סגירה</button>
+              </div>
+              <div style={{ textAlign:'center', borderBottom:'2px solid var(--text)', paddingBottom:8, marginBottom:10 }}>
+                <p style={{ fontSize:18.4, fontWeight:800 }}>תלוש שכר · {fmtMonthFn ? fmtMonthFn(monthKey) : monthKey}</p>
+                <p style={{ fontSize:15.5, fontWeight:600 }}>{t.name}</p>
+                <p style={{ fontSize:13.2, color:'var(--text3)' }}>
+                  דרגה {r.darga} · ותק {r.vetek} · {r.pct}% משרה{r.kita ? ' · גמול חינוך' : ''}
+                </p>
+              </div>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:14.4 }}>
+                <thead><tr style={{ borderBottom:'1px solid var(--line)', color:'var(--text3)', fontSize:12.6 }}>
+                  <th style={{ textAlign:'right', padding:'3px 4px' }}>סמל</th>
+                  <th style={{ textAlign:'right', padding:'3px 4px' }}>רכיב</th>
+                  <th style={{ textAlign:'left', padding:'3px 4px' }}>סכום</th>
+                </tr></thead>
+                <tbody>
+                  {(sl?.lines || []).map((ln, i) => (
+                    <tr key={i} style={{ borderBottom:'1px solid var(--line)' }}>
+                      <td style={{ padding:'4px', color:'var(--text3)', fontSize:12.6 }}>{ln.code}</td>
+                      <td style={{ padding:'4px' }}>{ln.label}</td>
+                      <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(ln.amount).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ borderBottom:'1px solid var(--line)', fontWeight:700 }}>
+                    <td style={{ padding:'4px' }}></td>
+                    <td style={{ padding:'4px' }}>סה"כ עולם ישן</td>
+                    <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(sl?.gross || 0).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                  {r.paysSupp && (
+                    <tr style={{ borderBottom:'1px solid var(--line)' }}>
+                      <td style={{ padding:'4px' }}></td>
+                      <td style={{ padding:'4px' }}>תוספת בית חב"ד <span style={{ fontSize:11.5, color:'var(--text3)' }}>(שורה קבועה — ללא נלוות)</span></td>
+                      <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Math.max(0, r.gross - (sl?.gross || 0)).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  )}
+                  <tr style={{ fontWeight:800, fontSize:15.5, background:'var(--apple-fill)' }}>
+                    <td style={{ padding:'6px 4px' }}></td>
+                    <td style={{ padding:'6px 4px' }}>ברוטו לתשלום</td>
+                    <td style={{ padding:'6px 4px', textAlign:'left', direction:'ltr' }}>{Number(r.paysSupp ? r.gross : (sl?.gross || r.gross)).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p style={{ fontSize:11.5, color:'var(--text3)', marginTop:10 }}>
+                הרכיבים כפי שמפיק מחשבון משרד החינוך לנתוני התלוש · הופק ממערכת השכר, רשת חינוך חב"ד
+              </p>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

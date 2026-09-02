@@ -14,7 +14,8 @@
 import fs from 'node:fs';
 import { chromium } from 'file:///C:/tmp/node_modules/playwright/index.mjs';
 import { createClient } from '@supabase/supabase-js';
-import { formFields, openForm, runOne, pickEnv } from './sim-form.mjs';
+import { formFields, openForm, runOne, readResultRows, dargaFor, kitaFor, pickEnv } from './sim-form.mjs';
+import { computedBaseScope, momScopeBonus } from './src/lib/employer.js';
 
 const { env } = pickEnv(fs, true);
 const sb = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
@@ -53,6 +54,29 @@ while (true) {
         if (!gross) throw new Error('לא נקרא ברוטו מהטופס');
         console.log(`[${stamp()}] ${t.name} · ${f.pct}%${f.kita ? ' · מחנכת' : ''} → ${gross.toLocaleString('he-IL')} ₪`);
         await sb.from('sim_requests').update({ status: 'done', result_gross: gross, done_at: new Date().toISOString() }).eq('id', req.id);
+        /*
+          שורות התלוש מתרעננות עם החישוב: התלוש בעולם ישן לפי השעות
+          (+3 למחנכת, +10 לאם) — הרצה שנייה, והרכיבים נשמרים כפי שהם.
+        */
+        try {
+          let slipPct = t.scope_pct;
+          if (t.reform === 'ofek') {
+            const pseudo = { reform: 'pre', frontalHours: t.frontal_hours, role: t.gamul_role,
+              gender: t.gender, childrenUnder18: t.children_under_18 };
+            slipPct = Math.min(100, computedBaseScope(pseudo) + momScopeBonus(pseudo));
+          }
+          const slipPlan = { calc: 'old', darga: dargaFor(t),
+            vetek: String(Math.max(1, Math.min(40, Number(t.seniority) || 1))),
+            pct: String(slipPct), kita: kitaFor(t) };
+          if (slipPlan.darga) {
+            const slipGross = await runOne(p, slipPlan, t.month_key);
+            if (slipGross) {
+              const lines = await readResultRows(p);
+              await sb.from('slip_lines').upsert({ teacher_month_id: t.id, lines, gross: slipGross, computed_at: new Date().toISOString() });
+              console.log(`[${stamp()}]   ↳ תלוש: ${lines.length} שורות · ${slipGross.toLocaleString('he-IL')} ₪`);
+            }
+          }
+        } catch (e2) { console.log(`[${stamp()}]   ↳ תלוש נכשל: ${e2.message?.slice(0, 60)}`); }
       } catch (e) {
         console.log(`[${stamp()}] ${t.name} — נכשל: ${e.message?.slice(0, 100)}`);
         await sb.from('sim_requests').update({ status: 'failed', error: String(e.message || e).slice(0, 300), done_at: new Date().toISOString() }).eq('id', req.id);

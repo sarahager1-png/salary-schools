@@ -762,3 +762,13 @@ export async function deleteSimRequest(id) {
   const { error } = await supabase.from('sim_requests').delete().eq('id', id);
   raise(error, 'מחיקת בקשת החישוב נכשלה');
 }
+
+/* שורות התלוש המלאות — רכיבי המחשבון שנלכדו לכל מורה. */
+export async function listSlipLines(teacherIds) {
+  if (!teacherIds.length) return {};
+  const { data, error } = await supabase.from('slip_lines')
+    .select('teacher_month_id, lines, gross, computed_at')
+    .in('teacher_month_id', teacherIds);
+  raise(error, 'טעינת שורות התלוש נכשלה');
+  return Object.fromEntries((data || []).map(r => [r.teacher_month_id, r]));
+}

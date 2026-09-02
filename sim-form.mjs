@@ -221,6 +221,22 @@ export const setMonth = async (p, monthKey) => {
   בלי הרכיבים שמאחוריו אינו תוצאה; כל ריצה קוראת עכשיו גם את הפירוט,
   ומי שביקשה גמול חינוך ולא קיבלה אותו ברכיבים — נזרקת, לא נרשמת.
 */
+/*
+  שורות התלוש כמבנה: [{code, label, amount, qty}] מטבלת התוצאות של
+  המחשבון — לא פרשנות שלנו, השורות עצמן. משמש את מסך התלושים.
+*/
+export const readResultRows = async (p) => {
+  const h = await p.evaluateHandle(() =>
+    [...document.querySelectorAll('table')].find(t => t.innerText.includes('סך הכל ברוטו כללי')) || null);
+  const el = h.asElement();
+  if (!el) return [];
+  return el.evaluate(t => [...t.querySelectorAll('tr')]
+    .map(tr => [...tr.children].map(td => td.innerText.trim()))
+    .filter(c => c.length >= 3 && c[1] && c[2] && !/תיאור/.test(c[1]))
+    .map(c => ({ code: c[0] || '', label: c[1], amount: Number(String(c[2]).replace(/,/g, '')) || 0, qty: c[3] || '' }))
+    .filter(r => !/סך הכל ברוטו/.test(r.label)));
+};
+
 const readResults = async (p) => {
   const h = await p.evaluateHandle(() =>
     [...document.querySelectorAll('table')].find(t => t.innerText.includes('סך הכל ברוטו כללי')) || null);
