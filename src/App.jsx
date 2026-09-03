@@ -5577,6 +5577,68 @@ function FormsRequest({ teachers, monthKey }) {
   );
 }
 
+/*
+  מסירת התלושים — "כשחשבת שכר מסיימת לכתוב תלושים תהיה לה אפשרות
+  להודיע לי, וכשאסיים לעבור אכתוב לה שאושר" (שרה, 4.9).
+  שתי חותמות על החודש; ההודעות יוצאות בוואטסאפ דרך תור המערכת.
+*/
+function SlipsHandoff({ monthKey, role }) {
+  const [st, setSt]   = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const load = useCallback(() => store.monthHandoff(monthKey).then(setSt).catch(e => setErr(e.message)), [monthKey]);
+  useEffect(() => { load(); }, [load]);
+  if (!st) return null;
+  const act = async a => {
+    setBusy(true); setErr('');
+    try { await store.slipsHandoff(monthKey, a); await load(); }
+    catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
+  const fmt = iso => new Date(iso).toLocaleString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const card = (bg, line, children) => (
+    <div className="apple-card" style={{ padding: '12px 14px', marginBottom: 14, background: bg, borderColor: line }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>{children}</div>
+      {err && <p style={{ fontSize: 13.2, color: 'var(--danger)', marginTop: 6 }}>{err}</p>}
+    </div>
+  );
+  if (role === 'clerk') {
+    if (st.approvedAt) return card('#E8F5E9', '#A5D6A7', <>
+      <Check size={15} strokeWidth={2.6} color="#2e7d32" />
+      <p style={{ fontSize: 14.4, fontWeight: 700, color: '#2e7d32' }}>שרה עברה על התלושים ואישרה ✓ ({fmt(st.approvedAt)})</p>
+    </>);
+    if (st.doneAt) return card('var(--fill)', 'var(--line)', <>
+      <p style={{ fontSize: 14.4, color: 'var(--text2)' }}>הודעת לשרה שהתלושים מוכנים ({fmt(st.doneAt)}) — ממתין לאישורה.</p>
+      <button className="apple-btn apple-btn-ghost" disabled={busy} onClick={() => act('done')}
+        style={{ minHeight: 34, padding: '0 12px', fontSize: 13.8 }}>שליחת תזכורת</button>
+    </>);
+    return card('var(--purple-100, #F3EFFB)', 'var(--line)', <>
+      <Send size={15} strokeWidth={2.3} color="var(--purple)" />
+      <p style={{ flex: '1 1 220px', fontSize: 14.4, fontWeight: 600 }}>סיימת להזין את התלושים לחודש הזה?</p>
+      <button className="apple-btn apple-btn-blue" disabled={busy} onClick={() => act('done')}
+        style={{ minHeight: 40, padding: '0 16px', fontSize: 14.4 }}>
+        {busy ? 'שולח…' : 'סיימתי — הודעה לשרה'}
+      </button>
+    </>);
+  }
+  // שרה: מוצג רק כשהחשבת סימנה סיום
+  if (!st.doneAt) return null;
+  if (st.approvedAt) return card('#E8F5E9', '#A5D6A7', <>
+    <Check size={15} strokeWidth={2.6} color="#2e7d32" />
+    <p style={{ fontSize: 14.4, fontWeight: 700, color: '#2e7d32' }}>תלושי החודש אושרו ({fmt(st.approvedAt)}) — נשלחה הודעה לחשבת.</p>
+  </>);
+  return card('var(--warn-bg)', '#FFB74D', <>
+    <Bell size={15} strokeWidth={2.3} color="#E65100" />
+    <p style={{ flex: '1 1 240px', fontSize: 14.4, fontWeight: 700, color: '#E65100' }}>
+      חשבת השכר סיימה להזין את התלושים ({fmt(st.doneAt)}) — לעבור ולאשר.
+    </p>
+    <button className="apple-btn apple-btn-green" disabled={busy} onClick={() => act('approve')}
+      style={{ minHeight: 40, padding: '0 16px', fontSize: 14.4 }}>
+      {busy ? 'שולח…' : 'עברתי — אושר, הודעה לחשבת'}
+    </button>
+  </>);
+}
+
 function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveScope,
                        activeMonth, userRole, userId }) {
   const isClerk = userRole === 'clerk';
@@ -5596,6 +5658,7 @@ function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveSco
           ? 'הזנת ברוטו ותוספת בית חב"ד, עלות מעביד בפועל, ותלושי החודש.'
           : 'אחוזי משרה, הזנת שכר, עלות מעביד בפועל, ומסמכי החודש.'}
       />
+      <SlipsHandoff monthKey={activeMonth} role={userRole} />
       <div className="apple-seg" style={{ marginBottom:14, flexWrap:'wrap' }}>
         {canSetScope && (
           <button onClick={() => setTab('scope')} className={['apple-seg-item', tab === 'scope' ? 'active' : ''].join(' ')}
@@ -7701,10 +7764,11 @@ export default function App() {
               }
             />
             {/* מעקב מילוי — ראשון, כי זו השאלה הראשונה של השליח בבוקר */}
-            {schools.length > 0 && (
+            {schools.length > 0 && (<>
+              <SlipsHandoff monthKey={activeMonth} role="coordinator" />
               <FillProgress schools={schools} month={activeMonth}
                 onOpenSchool={id => { const sc = schools.find(x => x.id === id); if (sc) { setActiveSchool(sc); setView('school'); } }} />
-            )}
+            </>)}
 
             {schools.length === 0 ? (
               <div className="apple-card" style={{ textAlign:'center', padding:'80px 20px' }}>

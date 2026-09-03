@@ -712,6 +712,18 @@ export async function requestTeacherForms(monthKey) {
   return { queued: queue.length, done, noPhone, approved: approved.length };
 }
 
+/* ── מסירת התלושים: חשבת ↔ שרה (שרה, 4.9) ──────────────────── */
+export async function monthHandoff(key) {
+  const { data, error } = await supabase.from('months')
+    .select('slips_done_at, slips_approved_at').eq('key', key).single();
+  raise(error, 'טעינת מצב התלושים נכשלה');
+  return { doneAt: data.slips_done_at, approvedAt: data.slips_approved_at };
+}
+export async function slipsHandoff(key, action) {
+  const { error } = await supabase.rpc('slips_handoff', { p_month: key, p_action: action });
+  raise(error, 'הפעולה נכשלה');
+}
+
 /* ── עלות הוראה מול תקציב — לעיני שרה בלבד ───────────────────
    RLS מגביל את הטבלה ל-coordinator; לכל תפקיד אחר היא פשוט ריקה,
    והמסך כלל אינו מוצג לו. תקציב וייעול שנתיים, בהקלדה ידנית. */
