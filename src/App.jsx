@@ -4581,6 +4581,13 @@ function SimStep({ n, label, calcLabel, active, onFocus, value, onChange, onEnte
 function FillProgress({ schools, month, onOpenSchool }) {
   const [rows, setRows] = useState(null);
   const [err,  setErr]  = useState('');
+  /*
+    "נעלם לי עמוד חשוב — כל בתי הספר" (שרה, 4.9): שמונה שורות המעקב
+    דחפו את כרטיסי בתי הספר אל מתחת לקצה המסך. המעקב מקופל לשורת
+    סיכום; נפתח בלחיצה — או לבד כשיש ממתינים. ה-hook כאן למעלה,
+    לפני ה-return המוקדם — אחרת React מפיל את הדף (שגיאה #310).
+  */
+  const [openList, setOpenList] = useState(false);
 
   // ה-effect רק מפעיל; כל setState קורה בתוך הפונקציה האסינכרונית,
   // אחרי await, ולא בגוף ה-effect עצמו.
@@ -4626,12 +4633,6 @@ function FillProgress({ schools, month, onOpenSchool }) {
   const waiting = list.filter(r => r.st.k <= 3).length;
   const totalT  = list.reduce((n, r) => n + r.teachers, 0);
 
-  /*
-    "נעלם לי עמוד חשוב — כל בתי הספר" (שרה, 4.9): שמונה שורות המעקב
-    דחפו את כרטיסי בתי הספר אל מתחת לקצה המסך, במיוחד במובייל. המעקב
-    מקופל לשורת סיכום; נפתח בלחיצה — או לבד כשיש בתי ספר שממתינים לה.
-  */
-  const [openList, setOpenList] = useState(false);
   const showList = openList || waiting > 0;
 
   return (
