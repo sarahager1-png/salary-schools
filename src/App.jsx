@@ -6317,10 +6317,13 @@ function OnboardingView({ code }) {
 
   return (
     <div className="ob-page pb-safe-bottom" style={{ minHeight:'100vh', background:'var(--bg)', paddingBottom:60 }} dir="rtl">
-      <header className="app-header"><div style={{ maxWidth:640, margin:'0 auto', padding:'12px 16px', display:'flex', alignItems:'center', gap:11 }}>
-        <img src="/logo-chabad.png" alt="לוגו" style={{ height:34 }} />
-        <div><p style={{ fontWeight:700, fontSize:16.7 }}>קליטת עובד/ת הוראה</p>
-        <p style={{ fontSize:13.2, color:'var(--text3)' }}>{me.name} · {me.school_name}</p></div>
+      {/* "תוריד את הלוגו של הרשת, תכתוב בגדול רשת גני חב"ד" (שרה, 3.9) */}
+      <header className="app-header"><div style={{ maxWidth:640, margin:'0 auto', padding:'12px 16px', display:'flex', alignItems:'center', gap:14 }}>
+        <div>
+          <p style={{ fontWeight:800, fontSize:21.8, letterSpacing:'-0.02em', color:'var(--purple)' }}>רשת גני חב"ד</p>
+          <p style={{ fontWeight:700, fontSize:14.9 }}>קליטת עובד/ת הוראה
+            <span style={{ fontWeight:400, color:'var(--text3)' }}> · {me.name} · {me.school_name}</span></p>
+        </div>
       </div></header>
 
       <div style={{ maxWidth:640, margin:'0 auto', padding:'14px 16px', display:'flex', flexDirection:'column', gap:14 }}>
