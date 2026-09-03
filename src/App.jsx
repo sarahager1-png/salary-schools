@@ -6537,7 +6537,7 @@ function OnboardingView({ code }) {
           </>)}
         </div>
 
-        <p style={{ fontSize:13.2, color:'var(--text3)', textAlign:'center' }}>שאלות? שרה הגר · רשת חינוך חב"ד</p>
+        <p style={{ fontSize:13.2, color:'var(--text3)', textAlign:'center' }}>שאלות? שרה הגר · רשת גני חב"ד</p>
       </div>
     </div>
   );
