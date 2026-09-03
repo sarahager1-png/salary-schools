@@ -173,6 +173,21 @@ const needsSim      = t => Boolean(!unpaidThisMonth(t) && t._changedAt && !t._ap
 const needsApproval = t => Boolean(t._changedAt && !t._approved && simComplete(t));
 const isPending     = t => Boolean(t._changedAt && !t._approved); // = needsSim || needsApproval
 
+// "אסתר צריכה לראות מי ממלאת מקום ובאיזה תקופה ואת מי מחליפה" (שרה, 3.9):
+// שורת מילוי המקום — שיבוץ זמני עם התקופה, במקום מי, ושעות ממ"מ שדווחו.
+// ריק כשאין — רוב השורות רגילות והמידע מופיע רק כשהוא קיים.
+const subInfo = (t) => {
+  const bits = [];
+  if (t.isTemp) {
+    const d = v => (v ? new Date(v).toLocaleDateString('he-IL') : '');
+    const from = d(t.startDate), to = d(t.endDate);
+    bits.push(`מילוי מקום${from || to ? ` ${from}${from && to ? ' – ' : ''}${to}` : ''}`);
+  }
+  if (t.mmFor) bits.push(`במקום ${t.mmFor}`);
+  if ((t.mmHours || 0) > 0) bits.push(`${t.mmHours} שעות ממ"מ`);
+  return bits.join(' · ');
+};
+
 // אחוז המשרה נקבע ביד, אחרי שהמנהלת מילאה שם ושעות. במסד הוא NOT NULL
 // DEFAULT 100, ולכן שורה שאיש לא נגע בה נראית בדיוק כמו משרה מלאה —
 // וזה מה שנכנס לסימולציה ולהבראה ולביגוד. scopeSetAt הוא החותמת שנרשמת
@@ -673,7 +688,7 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
 
           <p style={{ fontSize:14.4, color:'var(--text2)', lineHeight:1.8, marginBottom:20 }}>
             אני החתומה מטה מאשרת שנתוני ההעסקה המפורטים לעיל נכונים, ושהם משקפים את
-            תנאי העסקתי ברשת חינוך חב״ד.
+            תנאי העסקתי ברשת גני חב״ד.
           </p>
 
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
@@ -686,7 +701,7 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
           </div>
 
           <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:22, lineHeight:1.7, textAlign:'center' }}>
-            מסמך פנימי של רשת חינוך חב״ד. אינו מחליף טופס 101.
+            מסמך פנימי של רשת גני חב״ד. אינו מחליף טופס 101.
           </p>
         </div>
       </div>
@@ -3892,7 +3907,106 @@ function TeachingCostView({ schools, teachers, monthKey }) {
    התלוש הנגזרים מהשעות, והסה"כ — שהוא בדיוק השכר המאומת. הכול חי
    מהנתונים; שינוי במערכת משתקף כאן מיד. כפתור הדפסה בכל בית ספר.
 ═══════════════════════════════════════════════════════════════ */
-function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
+/* ═══ היעדרויות וממ"מ — המבט של שרה ואסתר ═══
+   "גם אני וגם אסתר יראו" (שרה, 3.9): מה שהמנהלות מדווחות בדשבורד
+   החודשי שבקישור מופיע כאן, לכל הרשת, לקריאה בלבד — התיקון נעשה
+   אצל המנהלת, לא כאן. */
+function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
+  const [onlyReported, setOnlyReported] = useState(true);
+  const has = t => (t.absenceDays || 0) > 0 || (t.mmHours || 0) > 0 || t.mmFor
+    || onLeave(t) || t.isTemp;
+  const shown = teachers.filter(t => !onlyReported || has(t));
+  const bySchool = schools
+    .map(sc => ({ sc, list: shown.filter(t => t.schoolId === sc.id) }))
+    .filter(g => g.list.length);
+  const totAbs = shown.reduce((s, t) => s + (t.absenceDays || 0), 0);
+  const totMM  = shown.reduce((s, t) => s + (t.mmHours || 0), 0);
+
+  const exportCSV = () => {
+    const headers = [
+      { key:'school', label:'בית ספר' }, { key:'name', label:'שם' },
+      { key:'absence', label:'ימי היעדרות' }, { key:'status', label:'סטטוס' },
+      { key:'mmHours', label:'שעות ממ"מ' }, { key:'mmFor', label:'במקום מי' },
+      { key:'period', label:'מילוי מקום' },
+    ];
+    const body = bySchool.flatMap(({ sc, list }) => list.map(t => ({
+      school: sc.name, name: t.name, absence: t.absenceDays || 0,
+      status: onLeave(t) ? leaveText(t) : '', mmHours: t.mmHours || 0,
+      mmFor: t.mmFor || '', period: t.isTemp ? subInfo(t) : '',
+    })));
+    downloadCSV(headers, body, `היעדרויות_וממ"מ_${monthKey}.csv`,
+      { school:'סה"כ', absence: totAbs, mmHours: totMM });
+  };
+
+  return (
+    <div className="page-wrap" style={{ maxWidth:1100 }}>
+      <PageHead
+        title={`היעדרויות וממ"מ · ${fmtMonthFn ? fmtMonthFn(monthKey) : monthKey}`}
+        subtitle={`מה שהמנהלות דיווחו החודש: ${totAbs} ימי היעדרות · ${totMM} שעות ממ"מ. התיקון נעשה אצל המנהלת בקישור שלה.`}
+        actions={
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <div className="apple-seg">
+              <button onClick={() => setOnlyReported(true)} className={['apple-seg-item', onlyReported ? 'active' : ''].join(' ')}
+                style={{ padding:'5px 11px', fontSize:13.8 }}>עם דיווח</button>
+              <button onClick={() => setOnlyReported(false)} className={['apple-seg-item', !onlyReported ? 'active' : ''].join(' ')}
+                style={{ padding:'5px 11px', fontSize:13.8 }}>כל העובדות</button>
+            </div>
+            <button className="apple-btn apple-btn-ghost" onClick={exportCSV} style={{ fontSize:14.4 }}>
+              <FileSpreadsheet size={15} strokeWidth={2.2} />
+              ייצוא
+            </button>
+          </div>
+        }
+      />
+      {!bySchool.length ? (
+        <div className="apple-card" style={{ textAlign:'center', padding:'56px 20px' }}>
+          <p style={{ fontSize:17.2, fontWeight:700, color:'var(--text)' }}>אין דיווחי היעדרות או ממ"מ החודש</p>
+          <p style={{ fontSize:14.4, color:'var(--text3)', marginTop:4 }}>מה שהמנהלות ימלאו בדשבורד החודשי יופיע כאן.</p>
+        </div>
+      ) : bySchool.map(({ sc, list }) => (
+        <div key={sc.id} className="apple-card" style={{ padding:'14px 16px', marginBottom:16 }}>
+          <p style={{ fontSize:16.7, fontWeight:800, marginBottom:8 }}>{sc.name} · {list.length}</p>
+          <div className="table-scroll">
+            <table className="apple-table sticky-first" style={{ fontSize:14.9, minWidth:680 }}>
+              <thead><tr>
+                <th>שם</th>
+                <th style={{ textAlign:'center' }}>ימי היעדרות</th>
+                <th style={{ textAlign:'center' }}>סטטוס</th>
+                <th style={{ textAlign:'center' }}>שעות ממ"מ</th>
+                <th>במקום מי</th>
+                <th>מילוי מקום</th>
+              </tr></thead>
+              <tbody>
+                {list.map(t => (
+                  <tr key={t.id}>
+                    <td style={{ fontWeight:600 }}>{t.name}</td>
+                    <td style={{ textAlign:'center', fontWeight:(t.absenceDays||0)>0 ? 700 : 400,
+                      color:(t.absenceDays||0)>0 ? 'var(--danger)' : 'var(--text3)' }}>
+                      {(t.absenceDays||0) > 0 ? t.absenceDays : '—'}
+                    </td>
+                    <td style={{ textAlign:'center' }}>
+                      {onLeave(t)
+                        ? <span className="apple-badge badge-orange">{leaveText(t)}</span>
+                        : <span style={{ color:'var(--text3)' }}>—</span>}
+                    </td>
+                    <td style={{ textAlign:'center', fontWeight:(t.mmHours||0)>0 ? 700 : 400,
+                      color:(t.mmHours||0)>0 ? 'var(--purple)' : 'var(--text3)' }}>
+                      {(t.mmHours||0) > 0 ? t.mmHours : '—'}
+                    </td>
+                    <td>{t.mmFor || '—'}</td>
+                    <td style={{ fontSize:13.8, color:'var(--apple-orange)' }}>{t.isTemp ? subInfo(t) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onMarkSlip, onSaveSlipGross }) {
   const money = v => (v == null ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
   /*
     "לא רואים את התלוש רק עלויות" (שרה, 3.9): שורות הרכיבים המלאות —
@@ -3972,10 +4086,11 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
               {sc.name} · {live.length} תלושים{!paysSupp ? ' · תשלום ישיר (בלי תוספת)' : ''}
             </p>
             <div className="table-scroll">
-              <table className="apple-table sticky-first" style={{ fontSize:14.9, minWidth:760 }}>
+              <table className="apple-table sticky-first" style={{ fontSize:14.9, minWidth:960 }}>
                 <thead><tr>
                   <th>שם</th>
                   <th style={{ textAlign:'center' }}>דרגה</th>
+                  <th style={{ textAlign:'center' }}>תואר</th>
                   <th style={{ textAlign:'center' }}>ותק</th>
                   <th style={{ textAlign:'center' }} title="קובע את תוספת האם: 24 שעות לאם = 90%">מין</th>
                   <th style={{ textAlign:'center' }}>ילדים עד 18</th>
@@ -3985,19 +4100,30 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                   <th style={{ textAlign:'center' }}>בסיס עולם ישן</th>
                   <th style={{ textAlign:'center' }}>תוספת בית חב"ד</th>
                   <th style={{ textAlign:'center' }}>ברוטו לתשלום</th>
+                  <th style={{ textAlign:'center' }} title="הברוטו שיצא בתלוש בפועל — נרשם לצד המספר של המערכת, לא במקומו">יצא בתלוש</th>
+                  <th style={{ textAlign:'center' }} title="וי — התלוש לחודש הזה כבר הוצא">תלוש הוצא</th>
                 </tr></thead>
                 <tbody>
                   {rows.map(({ t, r }) => r.skip ? (
                     <tr key={t.id} style={{ color:'var(--text3)' }}>
-                      <td style={{ fontWeight:600 }}>{t.name}</td>
-                      <td colSpan={10} style={{ fontSize:13.8 }}>{r.skip}</td>
+                      <td style={{ fontWeight:600 }}>
+                        {t.name}
+                        {subInfo(t) && <p style={{ fontSize:12.6, fontWeight:600, color:'var(--apple-orange)' }}>{subInfo(t)}</p>}
+                      </td>
+                      <td colSpan={13} style={{ fontSize:13.8 }}>{r.skip}</td>
                     </tr>
                   ) : (
                     <tr key={t.id} onClick={() => (lines[t.id] || r.principal) && setOpenSlip({ t, r })}
                       style={{ cursor: (lines[t.id] || r.principal) ? 'pointer' : 'default' }}
                       title={(lines[t.id] || r.principal) ? 'לחיצה פותחת את התלוש המלא' : 'התלוש המפורט בהכנה — יופיע בסיום החישוב'}>
-                      <td style={{ fontWeight:600 }}>{r.principal && <Briefcase size={12} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}{t.name}{(lines[t.id] || r.principal) && <FileText size={12} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-1px', marginInlineStart:5, color:'var(--purple)' }} />}</td>
+                      <td style={{ fontWeight:600 }}>
+                        {r.principal && <Briefcase size={12} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}
+                        {t.name}
+                        {(lines[t.id] || r.principal) && <FileText size={12} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-1px', marginInlineStart:5, color:'var(--purple)' }} />}
+                        {subInfo(t) && <p style={{ fontSize:12.6, fontWeight:600, color:'var(--apple-orange)' }}>{subInfo(t)}</p>}
+                      </td>
                       <td style={{ textAlign:'center' }}>{r.darga || '—'}</td>
+                      <td style={{ textAlign:'center' }}>{DEGREE_LABELS[t.degree] || t.degree || '—'}</td>
                       <td style={{ textAlign:'center' }}>{r.vetek}</td>
                       <td style={{ textAlign:'center' }} onClick={e => e.stopPropagation()}>
                         {onSaveTeacher ? (
@@ -4028,14 +4154,47 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                       <td style={{ textAlign:'center' }}>{money(r.base)}</td>
                       <td style={{ textAlign:'center' }}>{r.paysSupp ? money(r.supp) : '—'}</td>
                       <td style={{ textAlign:'center', fontWeight:800 }}>{money(r.gross)}</td>
+                      <td style={{ textAlign:'center' }} onClick={e => e.stopPropagation()}>
+                        {onSaveSlipGross ? (
+                          <input type="number" min="0" dir="ltr" className="apple-input" inputMode="numeric"
+                            key={`slip-gross-${t.id}-${t._slipGross ?? ''}`}
+                            defaultValue={t._slipGross ?? ''}
+                            placeholder="—"
+                            title="מה שיצא בתלוש בפועל — לא נוגע בברוטו של המערכת"
+                            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                            onBlur={e => {
+                              const v = e.target.value === '' ? null : Math.round(Number(e.target.value));
+                              if (v !== (t._slipGross ?? null)) onSaveSlipGross(t.id, v);
+                            }}
+                            style={{ width:86, textAlign:'center', fontSize:14.4, padding:'3px 5px', fontWeight:700,
+                              background: t._slipGross && Math.abs(t._slipGross - r.gross) > 1 ? 'var(--warn-bg)' : undefined }} />
+                        ) : (t._slipGross ? money(t._slipGross) : '—')}
+                      </td>
+                      <td style={{ textAlign:'center' }} onClick={e => e.stopPropagation()}>
+                        {onMarkSlip ? (
+                          <button className="apple-btn apple-btn-ghost"
+                            title={t._slipIssuedAt
+                              ? `הוצא ${new Date(t._slipIssuedAt).toLocaleDateString('he-IL')} — לחיצה מבטלת`
+                              : 'סימון שהתלוש הוצא'}
+                            onClick={() => onMarkSlip(t.id, !t._slipIssuedAt)}
+                            style={{ minHeight:30, padding:'0 10px', fontWeight:800,
+                              color: t._slipIssuedAt ? 'var(--ok)' : 'var(--text3)' }}>
+                            {t._slipIssuedAt ? '✓' : '◻'}
+                          </button>
+                        ) : (t._slipIssuedAt ? '✓' : '')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot><tr style={{ background:'var(--apple-fill)', fontWeight:800 }}>
-                  <td colSpan={8}>סה"כ {sc.name}</td>
+                  <td colSpan={9}>סה"כ {sc.name}</td>
                   <td style={{ textAlign:'center' }}>{money(tot.base)}</td>
                   <td style={{ textAlign:'center' }}>{money(tot.supp)}</td>
                   <td style={{ textAlign:'center' }}>{money(tot.gross)}</td>
+                  <td style={{ textAlign:'center' }}>
+                    {(() => { const s = live.reduce((a, x) => a + (Number(x.t._slipGross) || 0), 0); return s ? money(s) : '—'; })()}
+                  </td>
+                  <td style={{ textAlign:'center' }}>{live.filter(x => x.t._slipIssuedAt).length}/{live.length}</td>
                 </tr></tfoot>
               </table>
             </div>
@@ -4122,7 +4281,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher }) {
                 </tbody>
               </table>
               <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:10 }}>
-                הרכיבים כפי שמפיק מחשבון משרד החינוך לנתוני התלוש · הופק ממערכת השכר, רשת חינוך חב"ד
+                הרכיבים כפי שמפיק מחשבון משרד החינוך לנתוני התלוש · הופק ממערכת השכר, רשת גני חב"ד
               </p>
             </div>
           </div>
@@ -4751,7 +4910,12 @@ function ActualCostPanel({ teachers, schools, onSave }) {
               return (
                 <div key={t.id} className="apple-card" style={{ padding:'10px 12px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
                   <div style={{ flex:'1 1 150px', minWidth:0 }}>
-                    <p style={{ fontSize:15.5, fontWeight:600, color:'var(--text)' }}>{t.name}</p>
+                    <p style={{ fontSize:15.5, fontWeight:600, color:'var(--text)' }}>
+                      {t.name}
+                      {subInfo(t) && (
+                        <span style={{ fontWeight:600, fontSize:12.6, color:'var(--apple-orange)' }}>{` · ${subInfo(t)}`}</span>
+                      )}
+                    </p>
                     <p style={{ fontSize:13.2, color:'var(--text3)' }}>
                       אומדן {emp.estimate.toLocaleString('he-IL')} ₪ ({emp.pct}%)
                       {diff !== null && <span style={{ marginInlineStart:6, color: Math.abs(diff) > 10 ? 'var(--warn)' : 'var(--text3)' }}>· בפועל {diff > 0 ? '+' : ''}{diff}%</span>}
@@ -5286,6 +5450,9 @@ function PayrollEntry({ teachers, schools, onSave }) {
                       {` · ותק ${t.seniority ?? 1} · ${effectiveScope(t)}% משרה`}
                       {t.role && t.role !== 'none' ? ` · ${ROLE_SHORT[t.role] || t.role}` : ''}
                     </span>
+                    {subInfo(t) && (
+                      <span style={{ fontWeight:600, fontSize:13.2, color:'var(--apple-orange)' }}>{` · ${subInfo(t)}`}</span>
+                    )}
                     {flash[t.id] && <span style={{ marginInlineStart:6, fontSize:13.2, color:'var(--ok)', fontWeight:700 }}>✓ נשמר</span>}
                   </p>
                   <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:6 }}>
@@ -5615,6 +5782,99 @@ function LinkCard({ teacher, locked, onSave }) {
   );
 }
 
+/* ═══ דיווח חודשי — היעדרויות ומילויי מקום ═══
+   "רוצה להכין דשבורד למנהלות למילוי העדרויות ומילויי מקום חודשיים"
+   (שרה, 3.9). מסך ממוקד בתוך הקישור האישי: המנהלת רואה סיכום על כל
+   מורה ומזינה רק את נתוני החודש — היעדרויות, ממ"מ וסטטוס. נתוני
+   ההעסקה נשארים בטאב שלהם. שרה ואסתר רואות את אותם דיווחים במסך
+   "היעדרויות וממ"מ" שבמערכת. */
+function LinkMonthlyReport({ rows, locked, onSave }) {
+  const [drafts, setDrafts] = useState({});   // teacherId → שינויים שטרם נשמרו
+  const [state,  setState]  = useState({});   // teacherId → '' | saving | saved | שגיאה
+  const cur   = (t) => ({ ...t, ...(drafts[t.id] || {}) });
+  const set   = (t, patch) => setDrafts(m => ({ ...m, [t.id]: { ...(m[t.id] || {}), ...patch } }));
+  const dirty = (t) => Boolean(drafts[t.id] && Object.keys(drafts[t.id]).length);
+
+  const save = async (t) => {
+    setState(s => ({ ...s, [t.id]: 'saving' }));
+    try {
+      await onSave({ ...cur(t), _snapshot: t._snapshot || snapT(t) });
+      setDrafts(m => { const x = { ...m }; delete x[t.id]; return x; });
+      setState(s => ({ ...s, [t.id]: 'saved' }));
+      setTimeout(() => setState(s => (s[t.id] === 'saved' ? { ...s, [t.id]: '' } : s)), 2000);
+    } catch (e) { setState(s => ({ ...s, [t.id]: e.message })); }
+  };
+
+  const totAbs  = rows.reduce((s, t) => s + (Number(cur(t).absenceDays) || 0), 0);
+  const totMM   = rows.reduce((s, t) => s + (Number(cur(t).mmHours) || 0), 0);
+  const nLeave  = rows.filter(t => onLeave(cur(t))).length;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:11 }}>
+      {/* הסיכום למעלה — מה שכבר דווח החודש, במבט אחד */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8 }}>
+        {[
+          { label:'ימי היעדרות', val: totAbs,  color:'var(--danger)' },
+          { label:'שעות ממ"מ',   val: totMM,   color:'var(--purple)' },
+          { label:'בחופשה',      val: nLeave,  color:'var(--warn)'   },
+        ].map(x => (
+          <div key={x.label} className="apple-card" style={{ padding:'10px 8px', textAlign:'center' }}>
+            <p className="num" style={{ fontWeight:800, fontSize:23, color: x.val ? x.color : 'var(--text3)' }}>{x.val}</p>
+            <p style={{ fontSize:13.2, color:'var(--text2)' }}>{x.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {rows.map(t => {
+        const d = cur(t);
+        const st = state[t.id] || '';
+        const reported = (t.absenceDays || 0) > 0 || (t.mmHours || 0) > 0 || t.mmFor || onLeave(t);
+        return (
+          <div key={t.id} className="apple-card" style={{ padding:'12px 14px',
+            borderRight: reported ? '3px solid var(--purple)' : '3px solid transparent' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, flexWrap:'wrap' }}>
+              <p style={{ fontSize:16.1, fontWeight:700, color:'var(--text)' }}>{t.name}</p>
+              {/* הסיכום על המורה — מה רשום עליה כרגע, לפני כל הקלדה */}
+              <span style={{ fontSize:13.2, color:'var(--text3)' }}>
+                {reported
+                  ? [
+                      (t.absenceDays || 0) > 0 ? `${t.absenceDays} ימי היעדרות` : '',
+                      (t.mmHours || 0) > 0 ? `${t.mmHours} שעות ממ"מ` : '',
+                      t.mmFor ? `במקום ${t.mmFor}` : '',
+                      onLeave(t) ? leaveText(t) : '',
+                    ].filter(Boolean).join(' · ')
+                  : 'לא דווח דבר החודש'}
+              </span>
+            </div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginTop:9 }}>
+              <LinkField label="ימי היעדרות" value={d.absenceDays} onChange={v => set(t, { absenceDays: v })} />
+              <LinkField label={'שעות ממ' + '"' + 'מ'} value={d.mmHours} onChange={v => set(t, { mmHours: v })} />
+              <LinkField label="במקום מי" type="text" value={d.mmFor} onChange={v => set(t, { mmFor: v })} hint="שם עובד/ת ההוראה" />
+              <LinkSelect label="סטטוס" value={d.leaveType || 'none'}
+                onChange={v => set(t, { leaveType: v, ...(v === 'none' ? { leaveFrom: null, leaveTo: null } : {}) })}
+                options={LEAVE_TYPES.map(x => [x.id, x.label])} />
+              {onLeave(d) && (
+                <>
+                  <LinkField label="מתאריך" type="date" value={d.leaveFrom} onChange={v => set(t, { leaveFrom: v || null })} />
+                  <LinkField label="עד תאריך" type="date" value={d.leaveTo} onChange={v => set(t, { leaveTo: v || null })} hint="אם ידוע" />
+                </>
+              )}
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:10 }}>
+              <button className="apple-btn apple-btn-blue" disabled={!dirty(t) || locked || st === 'saving'}
+                onClick={() => save(t)} style={{ minHeight:38, paddingInline:18, opacity: (!dirty(t) || locked) ? .45 : 1 }}>
+                {st === 'saving' ? 'שומר…' : 'שמירה'}
+              </button>
+              {st === 'saved' && <span style={{ fontSize:14.4, color:'var(--ok)', fontWeight:600 }}>✓ נשמר</span>}
+              {st && st !== 'saving' && st !== 'saved' && <span style={{ fontSize:13.8, color:'var(--danger)' }}>{st}</span>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ═══ קליטת עובדת הוראה — קישור אישי ═══ */
 // שנת המס של הטופס. הטופס הרשמי נושא שנה, ומי שממלאת אותו בינואר
 // ממלאת על השנה החדשה — לכן הוא נגזר ולא מוקלד.
@@ -5683,7 +5943,7 @@ function Form101Print({ row, onClose }) {
 
         <p style={{ fontSize:11, fontWeight:800, background:'#eee', padding:'3px 6px', margin:'10px 0 6px' }}>א · פרטי המעסיק</p>
         <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
-          <F101Field label="שם המעסיק" value='רשת חינוך חב"ד' w="1 1 220px" />
+          <F101Field label="שם המעסיק" value='רשת גני חב"ד' w="1 1 220px" />
           <F101Field label="מספר תיק ניכויים" value="" />
         </div>
 
@@ -5768,7 +6028,7 @@ function Form101Print({ row, onClose }) {
         </div>
 
         <p style={{ fontSize:9, color:'#666', marginTop:14, borderTop:'1px solid #ccc', paddingTop:6 }}>
-          הופק ממערכת השכר של רשת חינוך חב"ד. הנתונים נמסרו וניחתמו דיגיטלית בידי העובד/ת
+          הופק ממערכת השכר של רשת גני חב"ד. הנתונים נמסרו וניחתמו דיגיטלית בידי העובד/ת
           {row.form101_signed_at ? ` בתאריך ${day(String(row.form101_signed_at).slice(0, 10))}` : ''}.
         </p>
       </div>
@@ -6072,7 +6332,7 @@ function OnboardingView({ code }) {
             <p style={{ color:'var(--ok)', fontWeight:700, fontSize:15.5, marginTop:6 }}>✓ מולא ונחתם. תודה!</p>
           ) : (<>
             <p style={{ fontSize:14.4, color:'var(--text3)', marginBottom:12 }}>
-              שנת המס {TAX_YEAR} · המעסיקה: רשת חינוך חב"ד
+              שנת המס {TAX_YEAR} · המעסיקה: רשת גני חב"ד
             </p>
 
             {/* ── ב. פרטי העובדת ── */}
@@ -6408,6 +6668,8 @@ function LinkView({ code }) {
   const [rows,    setRows]    = useState([]);
   const [loading, setLoading] = useState(true);
   const [fatal,   setFatal]   = useState('');
+  // הדשבורד החודשי הוא העבודה השוטפת — הוא נפתח ראשון; נתוני העסקה בטאב
+  const [tab,     setTab]     = useState('report');
 
   useEffect(() => {
     let alive = true;
@@ -6515,13 +6777,29 @@ function LinkView({ code }) {
           </>
         ) : (
           <>
-            <p style={{ fontSize:14.4, color:'var(--text3)', marginBottom:11 }}>
-              {rows.length} עובדי הוראה · שינוי בוותק, בדרגה, בתואר או בשעות מחזיר לחישוב שכר מחדש
-            </p>
-            <div style={{ display:'flex', flexDirection:'column', gap:11 }}>
-              {rows.map(t => <LinkCard key={t.id} teacher={t} locked={locked} onSave={onSave} />)}
-              {!locked && <LinkNewCard schoolReform={me?.schoolReform} onAdd={onAdd} male={male} />}
+            <div className="apple-seg" style={{ marginBottom:12 }}>
+              <button onClick={() => setTab('report')} className={['apple-seg-item', tab === 'report' ? 'active' : ''].join(' ')}
+                style={{ padding:'7px 14px', fontSize:14.9 }}>
+                דיווח חודשי — היעדרויות וממ"מ
+              </button>
+              <button onClick={() => setTab('cards')} className={['apple-seg-item', tab === 'cards' ? 'active' : ''].join(' ')}
+                style={{ padding:'7px 14px', fontSize:14.9 }}>
+                נתוני העסקה
+              </button>
             </div>
+            {tab === 'report' ? (
+              <LinkMonthlyReport rows={rows} locked={locked} onSave={onSave} />
+            ) : (
+              <>
+                <p style={{ fontSize:14.4, color:'var(--text3)', marginBottom:11 }}>
+                  {rows.length} עובדי הוראה · שינוי בוותק, בדרגה, בתואר או בשעות מחזיר לחישוב שכר מחדש
+                </p>
+                <div style={{ display:'flex', flexDirection:'column', gap:11 }}>
+                  {rows.map(t => <LinkCard key={t.id} teacher={t} locked={locked} onSave={onSave} />)}
+                  {!locked && <LinkNewCard schoolReform={me?.schoolReform} onAdd={onAdd} male={male} />}
+                </div>
+              </>
+            )}
             {/* המנהלות עובדות מהטלפון — ההתקנה מוצעת גם כאן, לא רק בכניסה */}
             <div style={{ maxWidth:420, margin:'18px auto 0' }}><InstallAppButton /></div>
           </>
@@ -6534,7 +6812,25 @@ function LinkView({ code }) {
 export default function App() {
   // ?k=<קוד> — מנהלת שנכנסה מהקישור שנשלח אליה בוואטסאפ. נקרא פעם אחת,
   // לפני כל אתחול אחר: המסלול הזה אינו עובר דרך התחברות כלל.
-  const [linkCode] = useState(() => new URLSearchParams(window.location.search).get('k') || '');
+  /*
+    "אפשר שהקישור שלהם ירד כאפליקציה?" (שרה, 3.9). אפליקציה מותקנת
+    נפתחת ב-start_url — "/" בלי ?k — והמנהלת הייתה נוחתת על מסך
+    ההתחברות במקום על הדשבורד שלה. לכן הקוד נשמר במכשיר בפתיחת
+    קישור, ובהפעלה כאפליקציה (standalone בלבד — בדפדפן רגיל "/"
+    נשאר מסך הכניסה של שרה ואסתר) הוא נטען משם.
+  */
+  const [linkCode] = useState(() => {
+    const k = new URLSearchParams(window.location.search).get('k') || '';
+    try {
+      if (k) { localStorage.setItem('linkCode', k); return k; }
+      const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches
+        || window.navigator.standalone === true;
+      // מי שמחוברת (שרה/אסתר) גוברת על קוד שמור — אחרת התקנה במכשיר
+      // שפעם נפתח בו קישור של מנהלת הייתה דורסת את מסך הכניסה שלהן
+      const signedIn = Object.keys(localStorage).some(x => x.startsWith('sb-') && x.includes('auth-token'));
+      return standalone && !signedIn ? (localStorage.getItem('linkCode') || '') : '';
+    } catch { return k; }
+  });
   const [obCode2] = useState(() => new URLSearchParams(window.location.search).get('f') || '');
   const [user,    setUser]    = useState(null);   // הפרופיל: תפקיד, שם, בית ספר
   const [schools, setSchools] = useState([]);
@@ -6893,7 +7189,9 @@ export default function App() {
                 )}
               </button>
             )}
-            {isCoord && (
+            {/* "תשתף את אסתר גם באישורים של המורים" (שרה, 3.9) — האישורים
+                ועלות ההוראה נפתחו גם לחשבת השכר */}
+            {(isCoord || isClerk) && (
               <button
                 className={`nav-btn ${needsApprovalCount > 0 ? 'active' : ''}`}
                 onClick={() => setShowApproval(true)}
@@ -6910,6 +7208,12 @@ export default function App() {
                 תלושים
               </button>
             )}
+            {(isCoord || isClerk) && (
+              <button className={`nav-btn ${view==='mm' ? 'active' : ''}`} onClick={() => setView('mm')}>
+                <CalendarClock size={15} strokeWidth={2.2} />
+                היעדרויות
+              </button>
+            )}
             {(isCoord || isClerk) && <span className="nav-sep" />}
 
             {/* ── ניתוח ── */}
@@ -6919,7 +7223,7 @@ export default function App() {
                 דוח רשת
               </button>
             )}
-            {isCoord && (
+            {(isCoord || isClerk) && (
               <button className={`nav-btn ${view==='finance' ? 'active' : ''}`} onClick={() => setView('finance')}>
                 <Wallet size={15} strokeWidth={2.2} />
                 עלות הוראה
@@ -7012,7 +7316,7 @@ export default function App() {
       <div className="flex-1">
         {/* לחשבת יש כפתורי תלושים/התראות בניווט, אבל הענף הזה רונדר תמיד
             לפניהם — הכפתורים היו מתים (ממצא QA, 3.9). עכשיו הם עוברים. */}
-        {isClerk && view !== 'slips' && view !== 'alerts' ? (
+        {isClerk && view !== 'slips' && view !== 'alerts' && view !== 'finance' && view !== 'mm' ? (
           <PayrollDesk
             teachers={teachers}
             schools={schools}
@@ -7059,10 +7363,17 @@ export default function App() {
           <NotificationsView />
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} onApprove={onApproveTeacher} simState={simState} onCompute={onCompute} onDelete={onDeleteTeacher} />
-        ) : view === 'finance' && user.role === 'coordinator' ? (
+        ) : view === 'finance' && (user.role === 'coordinator' || user.role === 'clerk') ? (
           <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} />
+        ) : view === 'mm' && (user.role === 'coordinator' || user.role === 'clerk') ? (
+          <AbsencesView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} />
         ) : view === 'slips' ? (
-          <SlipsView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} onSaveTeacher={user.role === 'coordinator' ? onSaveTeacher : null} />
+          <SlipsView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth}
+            onSaveTeacher={user.role === 'coordinator' ? onSaveTeacher : null}
+            onMarkSlip={(user.role === 'coordinator' || user.role === 'clerk')
+              ? (id, issued) => run(() => store.markSlipIssued(id, issued)) : null}
+            onSaveSlipGross={(user.role === 'coordinator' || user.role === 'clerk')
+              ? (id, amount) => run(() => store.saveSlipGross(id, amount)) : null} />
         ) : view === 'school' && activeSchool ? (
           <SchoolView userId={user.id}
             school={activeSchool}

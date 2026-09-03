@@ -55,6 +55,8 @@ const TEACHER_FIELDS = [
   ['reported_at',          '_reportedAt'],
   ['late_report',          '_lateReport'],
   ['payroll_ready',        '_payrollReady'],
+  ['slip_issued_at',       '_slipIssuedAt'],
+  ['slip_gross',           '_slipGross'],
   ['changed_at',           '_changedAt'],
   ['snapshot',             '_snapshot'],
   ['approved',             '_approved'],
@@ -365,6 +367,25 @@ export async function savePayroll(id, { gross, chabadSupp, actualCost } = {}) {
 // עלות המעביד בפועל בלבד. null מחזיר את השורה לאומדן.
 export async function saveActualCost(id, amount) {
   return savePayroll(id, { actualCost: amount ?? null });
+}
+
+// הווי של חשבת השכר — למי כבר הוצא תלוש החודש. התאריך הוא הסימון.
+export async function markSlipIssued(id, issued) {
+  const { data, error } = await supabase.from('teacher_months')
+    .update({ slip_issued_at: issued ? new Date().toISOString() : null })
+    .eq('id', id).select().single();
+  raise(error, 'סימון התלוש נכשל');
+  return rowToTeacher(data);
+}
+
+// הברוטו שיצא בתלוש בפועל — עמודה של החשבת, לצד המספר של המערכת.
+// לא נוגעת ב-official_gross: "אסור שאסתר תדרוס נתונים" (שרה, 3.9).
+export async function saveSlipGross(id, amount) {
+  const { data, error } = await supabase.from('teacher_months')
+    .update({ slip_gross: amount ?? null })
+    .eq('id', id).select().single();
+  raise(error, 'שמירת הברוטו מהתלוש נכשלה');
+  return rowToTeacher(data);
 }
 
 export async function approve(ids) {
