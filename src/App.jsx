@@ -6003,6 +6003,8 @@ function Form101Print({ row, onClose }) {
           <F101Field label="זו הכנסתי היחידה" value={f.otherIncome === 'no' ? 'כן' : f.otherIncome === 'yes' ? 'לא' : ''} />
           <F101Field label="מעסיק נוסף" value={f.otherEmployer} w="1 1 200px" />
           <F101Field label="סוג ההכנסה הנוספת" value={f.otherKind} />
+          <F101Field label='עבד/ה בעבר ברשת גני חב"ד' value={f.workedBefore === 'yes' ? 'כן' : f.workedBefore === 'no' ? 'לא' : ''} />
+          <F101Field label="קרן פנסיה" value={f.pensionFund} w="1 1 180px" />
         </div>
 
         <p style={{ fontSize:11, fontWeight:800, background:'#eee', padding:'3px 6px', margin:'10px 0 6px' }}>ו · בקשה לנקודות זיכוי</p>
@@ -6425,7 +6427,22 @@ function OnboardingView({ code }) {
                     <option value="">בחרי</option><option>משכורת</option><option>קצבה</option>
                     <option>מלגה</option><option>עסק</option><option>אחר</option>
                   </select></div>
+                <p style={{ flex:'1 1 100%', fontSize:13.2, color:'#E65100', fontWeight:600 }}>
+                  שימי לב: בהמשך העמוד יש להעלות אישור תיאום מס.
+                </p>
               </>)}
+            </div>
+
+            {/* ── עבודה קודמת ברשת וקרן פנסיה (שרה, 3.9) ── */}
+            <p style={{ fontWeight:700, fontSize:15.5, color:'var(--purple)', margin:'14px 0 8px' }}>קרן פנסיה</p>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+              <div style={{ flex:'1 1 100%' }}><p className="apple-label">האם עבדת בעבר ברשת גני חב"ד?</p>
+                <select value={form.workedBefore || ''} onChange={e => setF('workedBefore', e.target.value)} className="apple-select" style={{ width:'100%' }}>
+                  <option value="">בחרי</option>
+                  <option value="yes">כן — עבדתי בעבר ברשת גני חב"ד</option>
+                  <option value="no">לא — זו העסקתי הראשונה ברשת</option>
+                </select></div>
+              {form.workedBefore === 'no' && field('pensionFund', 'שם קרן הפנסיה שלך')}
             </div>
 
             {/* ── ו. נקודות זיכוי ── */}
@@ -6471,6 +6488,11 @@ function OnboardingView({ code }) {
           <ObUpload label="4 · אישור משטרה — היעדר עבירות מין (חובה לגברים)"
             hint="לפי החוק למניעת העסקה של עברייני מין במוסדות חינוך"
             done={me.has_police_doc} onFile={upload('police_doc')} />
+        )}
+        {form.otherIncome === 'yes' && (
+          <ObUpload label="אישור תיאום מס (חובה למי שיש עבודה נוספת)"
+            hint="את האישור מפיקים באתר רשות המסים או אצל רואה החשבון"
+            done={me.has_tax_coord} onFile={upload('tax_coord')} />
         )}
         <ObUpload label="טופס 101 חתום מוכן (רשות)"
           hint="רק אם כבר מילאת 101 בנייר — אפשר להעלות במקום למלא כאן"
