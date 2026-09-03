@@ -14,8 +14,8 @@
 import fs from 'node:fs';
 import { chromium } from 'file:///C:/tmp/node_modules/playwright/index.mjs';
 import { createClient } from '@supabase/supabase-js';
-import { formFields, openForm, runOne, readResultRows, dargaFor, kitaFor, pickEnv } from './sim-form.mjs';
-import { computedBaseScope, momScopeBonus } from './src/lib/employer.js';
+import { formFields, openForm, runOne, readResultRows, dargaFor, kitaFor, pickEnv, resetForm } from './sim-form.mjs';
+import { scopeWithMom } from './src/lib/employer.js';
 
 const { env } = pickEnv(fs, true);
 const sb = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
@@ -26,6 +26,7 @@ const getPage = async () => {
   if (page && !page.isClosed()) return page;
   browser = await chromium.launch();
   page = await (await browser.newContext({ locale: 'he-IL', viewport: { width: 1300, height: 1600 } })).newPage();
+  resetForm();
   return page;
 };
 
@@ -55,10 +56,27 @@ while (true) {
         continue;
       }
       try {
-        const p = await getPage();
-        await openForm(p, f.calc || 'old');
-        const gross = await runOne(p, f, t.month_key);
+        /*
+          האתר של המשרד נתקע לסירוגין (קליק תלוי, ניווט באמצע evaluate) —
+          וריצה חוזרת כמעט תמיד מצליחה. לכן כישלון ראשון אינו "נכשל":
+          הדפדפן נזרק, נפתח חדש, ורק כישלון שני עולה לבקשה.
+        */
+        let gross = null, p = null;
+        for (let att = 1; ; att++) {
+          try {
+            p = await getPage();
+            await openForm(p, f.calc || 'old');
+            gross = await runOne(p, f, t.month_key);
+            break;
+          } catch (e) {
+            try { await browser?.close(); } catch { /* הדפדפן ממילא מת */ }
+            page = null;
+            if (att >= 2) throw e;
+            console.log(`[${stamp()}] ${t.name} — ניסיון ${att} נפל (${e.message?.slice(0, 60)}), מנסה שוב`);
+          }
+        }
         if (!gross) throw new Error('לא נקרא ברוטו מהטופס');
+        p = await getPage();
         console.log(`[${stamp()}] ${t.name} · ${f.pct}%${f.kita ? ' · מחנכת' : ''} → ${gross.toLocaleString('he-IL')} ₪`);
         await sb.from('sim_requests').update({ status: 'done', result_gross: gross, done_at: new Date().toISOString() }).eq('id', req.id);
         /*
@@ -70,7 +88,7 @@ while (true) {
           if (t.reform === 'ofek') {
             const pseudo = { reform: 'pre', frontalHours: t.frontal_hours, role: t.gamul_role,
               gender: t.gender, childrenUnder18: t.children_under_18 };
-            slipPct = Math.min(100, computedBaseScope(pseudo) + momScopeBonus(pseudo));
+            slipPct = scopeWithMom(pseudo); // אם: בסיס חתוך + 10 (הכלל של שרה, 4.9)
           }
           const slipPlan = { calc: 'old', darga: dargaFor(t),
             vetek: String(Math.max(1, Math.min(40, Number(t.seniority) || 1))),

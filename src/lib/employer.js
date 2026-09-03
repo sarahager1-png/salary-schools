@@ -193,21 +193,31 @@ const MOM_SCOPE_BONUS = 10;
 // (יסודי). מחנכת בעולם ישן מקבלת 3 שעות מעל מה שהיא מלמדת. תוספת
 // האם אינה כאן — היא מעל הבסיס, ב-effectiveScope.
 // אומת מול ההקלדות הידניות של שרה, 27.8: שבע מתוך תשע עד עיגול.
-function computedBaseScope(t) {
+function rawBaseScope(t) {
   // מנהלת: תמיד 100% — 40 שעות ניהול, לא נוסחת הוראה
   if (isPrincipalRow(t)) return 100;
   const hr = t.reform === 'pre' && /^homeroom/.test(t.role || t.gamulRole || '') ? HOMEROOM_HOURS_PRE : 0;
   const full = t.reform === 'pre' ? PRE_FRONTAL : (LEVELS[t.level]?.frontal || 26);
   const h = Number(t.frontalHours) || 0;
-  return full ? Math.round((h + hr) / full * 100) : 100;
+  return full ? (h + hr) / full * 100 : 100;
 }
+function computedBaseScope(t) { return Math.round(rawBaseScope(t)); }
 const momScopeBonus = t => (momBonusEligible(t) ? MOM_SCOPE_BONUS : 0);
+/*
+  "שים לב היא 96 אחוז — תלמד את הנתונים" (שרה, 4.9): כשנוספת תוספת
+  האם, הבסיס נחתך כלפי מטה לפני ה-10+ — לא מעוגל. נלמד מההקלדות שלה:
+  איטה 23+3 ⇒ 86.67 ⇒ 86+10=96 (לא 97); חני אלבוים 20+3 ⇒ 76.67 ⇒
+  76+10=86 (כפי שרשום). בלי התוספת — עיגול רגיל (חיים שטראקס 87).
+*/
+const scopeWithMom = t => (momBonusEligible(t)
+  ? Math.min(100, Math.floor(rawBaseScope(t)) + MOM_SCOPE_BONUS)
+  : computedBaseScope(t));
 /*
   ההצעה שמוצגת ככפתור — מה שבאמת מוקלד למחשבון: הבסיס מהשעות, ועוד
   תוספת האם כשהיא מגיעה. האחוז שנשמר הוא הסופי, ולכן ההצעה חייבת
   להיות סופית גם היא. אין כאן מילוי אוטומטי; ההצעה מחכה ללחיצה.
 */
-const suggestedScope = t => ofekMomScope(t) ?? (computedBaseScope(t) + momScopeBonus(t));
+const suggestedScope = t => ofekMomScope(t) ?? scopeWithMom(t);
 function calcNet(gross) { return Math.round(gross * 0.735); }
 // אחוז המשרה והשעות הפרונטליות קשורים זה בזה דרך השלב והפחתת הגיל.
 // אפשר להזין כל אחד מהם, והשני נגזר — לפעמים השעות ידועות, ולפעמים
@@ -527,6 +537,7 @@ export {
   supplementCost,
   payBreakdown,
   calcEmployer,
+  scopeWithMom,
 };
 
 /* ── גזירת נתוני התלוש (שרה, 3.9) ──────────────────────────────

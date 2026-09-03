@@ -1878,7 +1878,8 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
           )}
         </div>
 
-        <div style={{ padding:'16px 24px', borderTop:'1px solid var(--apple-fill2)', display:'flex', gap:8 }}>
+        {/* במובייל השורה דביקה לתחתית המסך — הטופס ארוך והאגודל קצר */}
+        <div className="modal-foot" style={{ padding:'16px 24px', borderTop:'1px solid var(--apple-fill2)', display:'flex', gap:8 }}>
           <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ flex:1 }}>ביטול</button>
           <button className="apple-btn apple-btn-blue" onClick={() => {
             if (!t.name.trim()) return alert('יש למלא שם');
@@ -1952,7 +1953,7 @@ function SchoolModal({ school, onSave, onClose }) {
           <input value={s.principalEmail || ''} onChange={e => setS(p => ({...p, principalEmail: e.target.value}))} placeholder="מייל מנהלת" dir="ltr" className="apple-input" />
           <input value={s.coordinatorEmail || ''} onChange={e => setS(p => ({...p, coordinatorEmail: e.target.value}))} placeholder="מייל שליח (עותק)" dir="ltr" className="apple-input" />
         </div>
-        <div style={{ display:'flex', gap:8 }}>
+        <div className="modal-foot modal-foot-bleed" style={{ display:'flex', gap:8 }}>
           <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ flex:1 }}>ביטול</button>
           <button className="apple-btn apple-btn-blue" disabled={saving}
             onClick={async () => {
@@ -2474,7 +2475,16 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   const startEdit = t => { setEditingId(t.id); setEditData({ ...t }); };
   // בלי id. store.saveTeacher בוחר INSERT או UPDATE לפי קיומו, ומזהה
   // מקומי היה שולח אותה למסלול העדכון — על שורה שעוד לא קיימת.
-  const startNew  = () => { setEditingId('new'); setEditData({ ...EMPTY_TEACHER, schoolId: school.id, reform: school.reform || 'ofek' }); };
+  const startNew  = () => {
+    // במובייל הגיליון מוסתר וההזנה בכרטיסים — שורת-עריכה בטבלה נסתרת
+    // הייתה נפתחת אל שום מקום. ההוספה עוברת בדיאלוג המלא, דרך אותו
+    // onSaveTeacher ואותה בדיקת מכסה.
+    if (window.matchMedia('(max-width: 640px)').matches) {
+      setFullEdit({ ...EMPTY_TEACHER, schoolId: school.id, reform: school.reform || 'ofek' });
+      return;
+    }
+    setEditingId('new'); setEditData({ ...EMPTY_TEACHER, schoolId: school.id, reform: school.reform || 'ofek' });
+  };
   const cancelEdit = () => { setEditingId(null); setEditData(null); };
   const saveEdit = () => {
     if (!editData.name.trim()) return alert('יש למלא שם');
@@ -2700,12 +2710,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
             }}>
             שמירה
           </button>
-          <button className="apple-btn apple-btn-ghost" onClick={() => setAllCols(v => !v)}
+          <button className="apple-btn apple-btn-ghost only-desktop" onClick={() => setAllCols(v => !v)}
             style={{ minHeight:32, padding:'0 12px', fontSize:14.4 }}>
             {allCols ? 'תצוגה מצומצמת' : `כל העמודות (${26})`}
           </button>
         </div>
-        <div className="sheet-wrap">
+        <div className="sheet-wrap only-desktop">
           <div className="sheet-scroll">
             <table className={`apple-table sticky-head${allCols ? '' : ' compact-cols'}${school.chabadSupp === false ? ' no-supp' : ''}`} style={{ fontSize:14.9, minWidth: allCols ? 1330 : 0 }}>
             <thead>
@@ -3217,6 +3227,141 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
             )}
             </table>
           </div>
+        </div>
+
+        {/* ── מובייל: כרטיס לעובדת במקום גיליון 26 העמודות ("עדיין לא
+            נח", שרה 4.9). המספרים שפותחים בשבילם את המסך — שעות, אחוז,
+            ברוטו וסה"כ למעסיק — על הכרטיס; הברוטו והתוספת נערכים בו
+            ישירות באותו מסלול שמירה של הגיליון (saveRow), וכל שאר
+            השדות בדיאלוג העריכה המלא. אף פעולה לא ירדה: עריכה, חישוב,
+            אישור, נתוני העסקה ומחיקה — בשורת הפעולות. ── */}
+        <div className="only-mobile">
+          {filtered.length === 0 ? (
+            <div className="apple-card" style={{ textAlign:'center', padding:'36px 16px', color:'var(--text3)', fontSize:15.5 }}>
+              {ts.length === 0 ? 'אין עדיין עובדי הוראה' : 'לא נמצאו תוצאות'}
+            </div>
+          ) : filtered.map(t => {
+            const emp     = calcEmployer(t);
+            const derived = deriveHours(t);
+            const scope   = t.reform === 'ofek' ? (derived?.scopePct || t.scopePct || 100) : (t.scope || 100);
+            const isSim   = needsSim(t);
+            const isAppr  = needsApproval(t);
+            const done    = simComplete(t);
+            const supplies = !isPrincipalRow(t) && schoolPaysSupp(t.schoolId);
+            return (
+              <div key={'m-' + t.id} className="apple-card mcard" style={{
+                borderInlineStart: isSim ? '3px solid var(--warn)' : isAppr ? '3px solid var(--teal)' : '3px solid transparent' }}>
+                <div className="mcard-head">
+                  <div style={{ minWidth:0 }}>
+                    <p className="mcard-name" style={{ color: t.name === PRINCIPAL_PLACEHOLDER ? 'var(--text3)' : undefined }}>{t.name}</p>
+                    <div className="mcard-badges">
+                      <span className={`apple-badge ${t.reform==='ofek' ? 'badge-blue' : 'badge-gray'}`} style={{ fontSize:12.6, padding:'1px 8px' }}>
+                        {reformLabel(t.reform)}
+                      </span>
+                      {isPrincipalRow(t) && <span className="apple-badge badge-purple" style={{ fontSize:12.6, padding:'1px 8px' }}>מנהלת</span>}
+                      {onLeave(t) && (
+                        <span className={`apple-badge ${t.leaveType === 'maternity' && hasSubstitute(t) ? 'badge-teal' : 'badge-orange'}`}
+                          style={{ fontSize:12.6, padding:'1px 8px' }} title={leaveText(t)}>
+                          {leaveLabel(t.leaveType)}
+                        </span>
+                      )}
+                      {!hasContact(t) && (
+                        <span className="apple-badge badge-orange" style={{ fontSize:12.6, padding:'1px 8px' }}
+                          title="בלי טלפון ומייל אי אפשר לשלוח את נתוני ההעסקה לחתימה">חסרים פרטי קשר</span>
+                      )}
+                      {t._agreedGross && <span className="apple-badge badge-teal" style={{ fontSize:12.6, padding:'1px 8px' }}>שכר מוסכם</span>}
+                    </div>
+                  </div>
+                  {isSim ? <span className="apple-badge badge-orange" style={{ flexShrink:0 }}>חסר ברוטו</span>
+                    : isAppr ? <span className="apple-badge badge-teal" style={{ flexShrink:0 }}><ClipboardCheck size={12} strokeWidth={2.4} />לאישור</span>
+                    : fullyApproved(t) ? <span className="apple-badge badge-green" style={{ flexShrink:0 }}><Check size={11} strokeWidth={3} />מאושר</span>
+                    : null}
+                </div>
+                <CardRow label="שעות פרונטליות">{derived ? derived.frontal : (t.frontalHours ?? '—')}</CardRow>
+                <CardRow label="אחוז משרה">{scope}%</CardRow>
+                <div className="mcard-row">
+                  <span className="mcard-label">ברוטו (₪)</span>
+                  <input type="number" min="0" dir="ltr" inputMode="decimal" className="apple-input"
+                    key={`mgross-${t.id}`}
+                    defaultValue={t._officialGross || ''}
+                    placeholder="—"
+                    title="הברוטו לעובדת — נשמר ביציאה מהשדה"
+                    onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                    onBlur={e => {
+                      const v2 = e.target.value === '' ? null : Number(e.target.value);
+                      if ((v2 ?? null) === (t._officialGross ?? null)) return;
+                      saveRow({ ...t, _officialGross: v2 });
+                    }}
+                    style={{ width:132, textAlign:'center', fontWeight:700 }} />
+                </div>
+                {!isPrincipal && supplies && (
+                  <div className="mcard-row">
+                    <span className="mcard-label">תוספת בית חב"ד (₪)</span>
+                    <input type="number" min="0" dir="ltr" inputMode="decimal" className="apple-input"
+                      key={`msupp-${t.id}`}
+                      defaultValue={t._chabadSupp || ''}
+                      placeholder="—"
+                      title='תוספת בית חב"ד — לא פנסיונית, נושאת מס שכר וביטוח לאומי'
+                      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                      onBlur={e => {
+                        const v2 = e.target.value === '' ? null : Number(e.target.value);
+                        if ((v2 ?? null) === (t._chabadSupp ?? null)) return;
+                        saveRow({ ...t, _chabadSupp: v2 });
+                      }}
+                      style={{ width:132, textAlign:'center', fontWeight:700, background:'var(--purple-100)' }} />
+                  </div>
+                )}
+                {!isPrincipal && (
+                  <CardRow label="סה״כ למעסיק" strong color={done ? 'var(--purple)' : 'var(--text3)'}>
+                    {done ? emp.total.toLocaleString('he-IL') + ' ₪' : '—'}
+                  </CardRow>
+                )}
+                <div className="mcard-actions">
+                  <button className="apple-btn apple-btn-ghost" onClick={() => setFullEdit(t)}>
+                    <Pencil size={14} strokeWidth={2.2} />
+                    כל הפרטים
+                  </button>
+                  {isCoord && isAppr && onApproveTeacher && (
+                    <button className="apple-btn apple-btn-green" onClick={() => onApproveTeacher(t.id)}>
+                      <Check size={15} strokeWidth={2.8} />
+                      אישור
+                    </button>
+                  )}
+                  {isCoord && onCompute && !isPrincipalRow(t) && (
+                    simState?.[t.id] === 'pending' || simState?.[t.id] === 'running'
+                      ? <span className="apple-badge badge-purple" style={{ alignSelf:'center' }}>מחשב…</span>
+                      : <button className="apple-btn apple-btn-ghost" title="חישוב במחשבון משרד החינוך — התוצאה תיכנס לברוטו"
+                          onClick={() => onCompute(t)}>
+                          <Calculator size={14} strokeWidth={2.2} />
+                          חישוב
+                        </button>
+                  )}
+                  {fullyApproved(t) && hasContact(t) && (
+                    <button className="apple-btn apple-btn-ghost" onClick={() => setDetails(t)}>
+                      <FileText size={14} strokeWidth={2.2} />
+                      נתוני העסקה
+                    </button>
+                  )}
+                  {isCoord && onDeleteTeacher && (
+                    <button className="apple-btn apple-btn-ghost" title="מחיקה"
+                      onClick={() => { if (window.confirm('למחוק?')) onDeleteTeacher(t.id); }}
+                      style={{ color:'var(--danger)', flex:'0 0 auto', minWidth:48 }}>
+                      <Trash2 size={14} strokeWidth={2.2} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {tsOfficial.length > 0 && !isPrincipal && (
+            <div className="apple-card mcard" style={{ background:'var(--fill)' }}>
+              <p className="mcard-name" style={{ marginBottom:4 }}>סה״כ · {tsOfficial.length} עובדי הוראה</p>
+              <CardRow label="ברוטו">{totGross.toLocaleString('he-IL')} ₪</CardRow>
+              <CardRow label='תוספת בית חב"ד'>{totChabad.toLocaleString('he-IL')} ₪</CardRow>
+              <CardRow label="הוצאות מעביד">{totExtras.toLocaleString('he-IL')} ₪</CardRow>
+              <CardRow label="סה״כ למעסיק" strong color="var(--purple)">{totEmp.toLocaleString('he-IL')} ₪</CardRow>
+            </div>
+          )}
         </div>
         {isCoord && (
           <MonthDocuments monthKey={activeMonth} schools={[school]} schoolId={school.id}
@@ -4095,7 +4240,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
             <p style={{ fontSize:17.2, fontWeight:800, marginBottom:8 }}>
               {sc.name} · {live.length} תלושים{!paysSupp ? ' · תשלום ישיר (בלי תוספת)' : ''}
             </p>
-            <div className="table-scroll">
+            <div className="table-scroll only-desktop">
               <table className="apple-table sticky-first" style={{ fontSize:14.9, minWidth:960 }}>
                 <thead><tr>
                   <th>שם</th>
@@ -4207,6 +4352,103 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                   <td style={{ textAlign:'center' }}>{live.filter(x => x.t._slipIssuedAt).length}/{live.length}</td>
                 </tr></tfoot>
               </table>
+            </div>
+
+            {/* ── מובייל: בלוק לתלוש במקום טבלת 14 העמודות. אותם נתונים
+                ואותן פעולות — סימון "הוצא", "יצא בתלוש", מין וילדים —
+                והתלוש המלא נפתח בכפתור מפורש במקום בלחיצה על השם. ── */}
+            <div className="only-mobile">
+              {rows.map(({ t, r }) => r.skip ? (
+                <div key={'m-' + t.id} className="slipm">
+                  <p style={{ fontWeight:700, fontSize:15.5, color:'var(--text2)' }}>{t.name}</p>
+                  {subInfo(t) && <p style={{ fontSize:12.6, fontWeight:600, color:'var(--apple-orange)' }}>{subInfo(t)}</p>}
+                  <p style={{ fontSize:13.8, color:'var(--text3)' }}>{r.skip}</p>
+                </div>
+              ) : (
+                <div key={'m-' + t.id} className="slipm">
+                  <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10 }}>
+                    <div style={{ minWidth:0 }}>
+                      <p style={{ fontWeight:800, fontSize:16.1, color:'var(--text)' }}>
+                        {r.principal && <Briefcase size={13} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}
+                        {t.name}
+                      </p>
+                      <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:1 }}>
+                        {r.darga && r.darga !== '—' ? `דרגה ${r.darga} · ` : ''}
+                        ותק {r.vetek} · {r.hours} שעות · {r.pct}%{r.kita ? ' · גמול חינוך' : ''}
+                      </p>
+                      {subInfo(t) && <p style={{ fontSize:12.6, fontWeight:600, color:'var(--apple-orange)' }}>{subInfo(t)}</p>}
+                    </div>
+                    {onMarkSlip ? (
+                      <button className="apple-btn apple-btn-ghost"
+                        title={t._slipIssuedAt
+                          ? `הוצא ${new Date(t._slipIssuedAt).toLocaleDateString('he-IL')} — לחיצה מבטלת`
+                          : 'סימון שהתלוש הוצא'}
+                        onClick={() => onMarkSlip(t.id, !t._slipIssuedAt)}
+                        style={{ flexShrink:0, fontSize:13.8, fontWeight:700,
+                          color: t._slipIssuedAt ? 'var(--ok)' : 'var(--text3)' }}>
+                        {t._slipIssuedAt ? '✓ הוצא' : 'סימון הוצא'}
+                      </button>
+                    ) : (t._slipIssuedAt ? <span style={{ color:'var(--ok)', fontWeight:800 }}>✓</span> : null)}
+                  </div>
+                  <CardRow label="בסיס עולם ישן">{money(r.base)}</CardRow>
+                  {paysSupp && <CardRow label='תוספת בית חב"ד'>{r.paysSupp ? money(r.supp) : '—'}</CardRow>}
+                  <CardRow label="ברוטו לתשלום" strong>{money(r.gross)}</CardRow>
+                  <div className="mcard-row">
+                    <span className="mcard-label" title="הברוטו שיצא בתלוש בפועל — נרשם לצד המספר של המערכת, לא במקומו">יצא בתלוש (₪)</span>
+                    {onSaveSlipGross ? (
+                      <input type="number" min="0" dir="ltr" className="apple-input" inputMode="numeric"
+                        key={`m-slip-gross-${t.id}-${t._slipGross ?? ''}`}
+                        defaultValue={t._slipGross ?? ''}
+                        placeholder="—"
+                        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                        onBlur={e => {
+                          const v = e.target.value === '' ? null : Math.round(Number(e.target.value));
+                          if (v !== (t._slipGross ?? null)) onSaveSlipGross(t.id, v);
+                        }}
+                        style={{ width:132, textAlign:'center', fontWeight:700,
+                          background: t._slipGross && Math.abs(t._slipGross - r.gross) > 1 ? 'var(--warn-bg)' : undefined }} />
+                    ) : <span className="mcard-value num">{t._slipGross ? money(t._slipGross) : '—'}</span>}
+                  </div>
+                  {onSaveTeacher && (
+                    <div style={{ display:'flex', gap:10, padding:'8px 0', borderTop:'1px dashed var(--line-soft)' }}>
+                      <label style={{ flex:1 }}>
+                        <span className="mcard-label" style={{ display:'block', marginBottom:3 }} title="קובע את תוספת האם: 24 שעות לאם = 90%">מין</span>
+                        <select className="apple-select" value={t.gender || ''}
+                          onChange={e => onSaveTeacher({ ...t, gender: e.target.value || null })}
+                          style={{ fontSize:14.4, background: t.gender ? undefined : 'var(--warn-bg, #FFF6E5)' }}>
+                          <option value="">—</option>
+                          <option value="f">נקבה</option>
+                          <option value="m">זכר</option>
+                        </select>
+                      </label>
+                      <label style={{ flex:1 }}>
+                        <span className="mcard-label" style={{ display:'block', marginBottom:3 }}>ילדים עד 18</span>
+                        <input type="number" min="0" dir="ltr" className="apple-input" inputMode="numeric"
+                          key={`m-slip-kids-${t.id}-${t.childrenUnder18 ?? ''}`}
+                          defaultValue={t.childrenUnder18 ?? ''}
+                          placeholder="—"
+                          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                          onBlur={e => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (t.childrenUnder18 ?? null)) onSaveTeacher({ ...t, childrenUnder18: v }); }}
+                          style={{ textAlign:'center', fontSize:14.4 }} />
+                      </label>
+                    </div>
+                  )}
+                  {(lines[t.id] || r.principal) && (
+                    <button className="apple-btn apple-btn-ghost" onClick={() => setOpenSlip({ t, r })}
+                      style={{ width:'100%', marginTop:6, fontSize:14.4 }}>
+                      <FileText size={14} strokeWidth={2.2} />
+                      התלוש המלא
+                    </button>
+                  )}
+                </div>
+              ))}
+              <div className="slipm" style={{ background:'var(--fill)', borderRadius:12, padding:'10px 12px', marginTop:10, borderTop:'none' }}>
+                <p style={{ fontWeight:800, fontSize:15.5, marginBottom:2 }}>סה"כ {sc.name}</p>
+                <CardRow label="בסיס עולם ישן">{money(tot.base)}</CardRow>
+                {paysSupp && <CardRow label='תוספת בית חב"ד'>{money(tot.supp)}</CardRow>}
+                <CardRow label="ברוטו לתשלום" strong>{money(tot.gross)}</CardRow>
+                <CardRow label="תלושים הוצאו">{live.filter(x => x.t._slipIssuedAt).length}/{live.length}</CardRow>
+              </div>
             </div>
           </div>
         );
@@ -7521,7 +7763,7 @@ export default function App() {
                           <button className="apple-btn apple-btn-ghost" title="מחיקה" onClick={() => { if(window.confirm(`למחוק את ${s.name}?`)) onDeleteSchool(s.id); }} style={{ padding:'0 10px', minHeight:32, color:'var(--danger)' }}><Trash2 size={14} strokeWidth={2.2} /></button>
                         </div>
                       </div>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
+                      <div className="sc-stats" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
                         <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
                           <p style={{ fontSize:13.2, color:'var(--text2)', marginBottom:2 }}>עובדי הוראה</p>
                           <p className="num" style={{ fontWeight:800, fontSize:25.3, color:'var(--text)', letterSpacing:'-0.02em' }}>{ts.length}</p>
@@ -7532,7 +7774,7 @@ export default function App() {
                             {quota ? `${used} / ${quota}` : used || '—'}
                           </p>
                         </div>
-                        <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
+                        <div className="sc-money" style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
                           <p style={{ fontSize:13.2, color:'var(--text2)', marginBottom:2 }}>למעסיק/חודש</p>
                           <p className="num" style={{ fontWeight:700, fontSize:16.1, color:'var(--text)', letterSpacing:'-0.01em' }}>{empTot > 0 ? empTot.toLocaleString('he-IL')+' ₪' : '—'}</p>
                         </div>
@@ -7541,6 +7783,15 @@ export default function App() {
                         style={{ width:'100%', fontSize:14.9, borderRadius:10, border:'1.5px dashed var(--apple-fill2)' }}>
                         + הוספת עובד/ת הוראה
                       </button>
+                      {/* במובייל כל הכרטיס לחיץ אבל שום דבר לא אומר זאת —
+                          כפתור כניסה מפורש. בדסקטופ יש hover, והוא מוסתר. */}
+                      <div className="only-mobile" style={{ marginTop:8 }}>
+                        <button className="apple-btn apple-btn-blue" style={{ width:'100%' }}
+                          onClick={e => { e.stopPropagation(); setActiveSchool(s); setView('school'); }}>
+                          כניסה לבית הספר
+                          <ChevronLeft size={15} strokeWidth={2.4} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}

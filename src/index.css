@@ -775,6 +775,63 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   }
 }
 
+/* ═══ סבב נוחות מובייל שני ("עדיין לא נח", שרה 4.9) ═══
+   הסבב הקודם פתר שבירות; זה עוסק בנוחות: פחות רעש בניווט, כרטיסי
+   עובדים במקום גיליון 26 העמודות גם במסך בית הספר ובתלושים, ואוויר. */
+
+/* — ניווט: אותם יעדים, פחות נפח. הגובה נשאר 42px מגע — */
+@media (max-width: 640px) {
+  .app-header > div { padding-inline: 12px; }
+  .nav-btn { font-size: 14.4px; padding: 0 10px; gap: 5px; }
+  .nav-sep { margin: 0 1px; }
+}
+
+/* — כרטיס בית ספר במסך הראשי: הסכום למעסיק הוא המספר שבשבילו
+     פותחים את הכרטיס — במובייל הוא מקבל שורה מלאה וגדל — */
+@media (max-width: 640px) {
+  .sc-stats { grid-template-columns: 1fr 1fr !important; }
+  .sc-money { grid-column: 1 / -1; }
+  .sc-money .num { font-size: 21.8px !important; }
+}
+
+/* — כרטיס עובדת (מסך בית ספר במובייל): תגי מצב ושורת פעולות — */
+.mcard-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+.mcard-actions {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  border-top: 1px solid var(--line-soft);
+  margin-top: 4px; padding: 10px 0 4px;
+}
+.mcard-actions .apple-btn { flex: 1 1 auto; font-size: 14.4px; padding: 0 12px; }
+
+/* — תלושים במובייל: בלוק לעובדת בתוך כרטיס בית הספר — */
+.slipm { padding: 12px 0 8px; border-top: 1px solid var(--line-soft); }
+.slipm:first-child { border-top: none; padding-top: 4px; }
+
+/* — אוויר: המרווחים נושמים, בלי לגעת בדסקטופ — */
+@media (max-width: 640px) {
+  .page-wrap { padding: 18px 14px 44px; }
+  .page-head { margin-bottom: 16px; }
+  .mcard { padding: 15px 16px 11px; margin-bottom: 12px; }
+}
+
+/* — דיאלוגים במסך מלא: כפתורי הפעולה דביקים לתחתית, בהישג אגודל — */
+@media (max-width: 640px) {
+  .modal-card .modal-foot {
+    position: sticky; bottom: -1px; z-index: 6;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 20px rgba(75, 46, 131, .07);
+    padding-top: 12px !important;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+  }
+  /* בכרטיסים עם padding פנימי (24px) — הפוטר נמתח עד קצות הכרטיס,
+     אחרת התוכן הנגלל מציץ ברצועות שמצידיו */
+  .modal-card .modal-foot-bleed {
+    margin: 0 -24px calc(-28px - env(safe-area-inset-bottom));
+    padding-inline: 24px !important;
+  }
+}
+
 /* ── סרגל הכלים של מסך בית הספר: רשת מסודרת במקום כפתורים נדחסים ── */
 @media (max-width: 640px) {
   .toolbar-stack { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; }
