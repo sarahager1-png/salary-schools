@@ -43,7 +43,5 @@ $$;
 revoke all on function public.ob_whoami(text) from public;
 grant execute on function public.ob_whoami(text) to anon, authenticated;
 
--- הסמלים הידועים מדשבורד שלהבות (3.9); השאר יושלמו בהגדרות בית הספר
-update public.schools set semel = '661967' where name = 'שלהבות גני תקוה' and semel is null;
-update public.schools set semel = '674549' where name = 'שלהבות ירושלים' and semel is null;
-update public.schools set semel = '770770' where name = 'שלהבות רמת ישי' and semel is null;
+-- הסמלים אינם מיובאים ממערכות אחרות — "אל תשתמש בסמלי המוסד, הם ימלאו"
+-- (שרה, 4.9): העמודה מתמלאת ידנית בהגדרות בית הספר.
