@@ -5292,7 +5292,7 @@ function FormsRequest({ teachers, monthKey }) {
           <p style={{ fontSize:14.4, fontWeight:700, color:'var(--text)' }}>בקשת טפסים מעובדי ההוראה</p>
           <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.6 }}>
             טופס 101, נתוני העסקה והסכם — קישור אישי לכל אחת.
-            {` ${approved.length} עובדי הוראה שאושרו החודש.`} רק מי שתשלים תקבל שכר בחודש הבא.
+            {` ${approved.length} עובדי הוראה שאושרו החודש.`} רק מי שישלים/תשלים — השכר בחודש הבא ישולם.
           </p>
         </div>
         <button className="apple-btn apple-btn-blue" onClick={send} disabled={busy}
@@ -6307,7 +6307,7 @@ function OnboardingView({ code }) {
     <div className="ob-page pb-safe-bottom" style={{ minHeight:'100vh', background:'var(--bg)', paddingBottom:60 }} dir="rtl">
       <header className="app-header"><div style={{ maxWidth:640, margin:'0 auto', padding:'12px 16px', display:'flex', alignItems:'center', gap:11 }}>
         <img src="/logo-chabad.png" alt="לוגו" style={{ height:34 }} />
-        <div><p style={{ fontWeight:700, fontSize:16.7 }}>קליטת עובדת הוראה</p>
+        <div><p style={{ fontWeight:700, fontSize:16.7 }}>קליטת עובד/ת הוראה</p>
         <p style={{ fontSize:13.2, color:'var(--text3)' }}>{me.name} · {me.school_name}</p></div>
       </div></header>
 
@@ -6315,7 +6315,7 @@ function OnboardingView({ code }) {
         {/* דדליין */}
         <div style={{ background:'var(--warn-bg)', border:'1px solid #FFB74D', borderRadius:12, padding:'10px 14px' }}>
           <p style={{ fontSize:14.9, fontWeight:700, color:'#E65100' }}>להשלמה עד {OB_DEADLINE}</p>
-          <p style={{ fontSize:13.8, color:'#E65100' }}>רק מי שתשלים את כל השלבים עד למועד תקבל משכורת על חודש ספטמבר.</p>
+          <p style={{ fontSize:13.8, color:'#E65100' }}>רק מי שישלים/תשלים את כל השלבים עד למועד יקבל/תקבל משכורת על חודש ספטמבר.</p>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ flex:1, height:8, background:'var(--fill)', borderRadius:99 }}>
@@ -6532,7 +6532,7 @@ function OnboardingView({ code }) {
             <p className="apple-label">חתימה על החוזה</p>
             <SignaturePad onChange={setContractSig} />
             <button className="apple-btn apple-btn-blue" onClick={() => signContract().catch(e => setMsg(e.message))} style={{ marginTop:10, width:'100%', minHeight:44 }}>
-              קראתי ואני חותמת על החוזה
+              {isMale ? 'קראתי ואני חותם על החוזה' : 'קראתי ואני חותמת על החוזה'}
             </button>
           </>)}
         </div>
