@@ -10,7 +10,7 @@
     { "path": "/api/cron/report-due",      "schedule": "0 15 5 * *" },
     { "path": "/api/cron/payroll-cutoff",  "schedule": "0 15 6 * *" },
     { "path": "/api/cron/maternity-watch", "schedule": "0 * * * *" },
-    { "path": "/api/cron/queue-drain",     "schedule": "*/10 * * * *" }
+    { "path": "/api/cron/queue-drain",     "schedule": "* * * * *" }
   ],
   "headers": [
     {

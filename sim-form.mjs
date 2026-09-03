@@ -144,6 +144,10 @@ const CALC = {
 };
 let onCalc = null;
 
+// דפדפן חדש מתחיל מדף ריק — בלי האיפוס openForm חושב שהמחשבון כבר
+// טעון ומדלג על הטעינה המלאה (הנתיב שנכשל אחרי קריסה, נמדד 3.9).
+export const resetForm = () => { onCalc = null; };
+
 export const openForm = async (p, calc = 'old', { fresh = false } = {}) => {
   if (onCalc === calc && !fresh) return;
   if (onCalc === null) {
@@ -185,17 +189,27 @@ const pickGmul = async (p, label, { expectOff = false } = {}) => {
     1,000 ₪ פחות, בלי שום שגיאה. הצ'יפ שמופיע בבורר הוא העדות היחידה
     שהבחירה באמת נקלטה, ולכן הוא נבדק — ובלעדיו מנסים שוב.
   */
+  /*
+    קליק של Playwright מול האתר הזה נתקע לפעמים 30 שניות ומפיל את כל
+    הבקשה (נמדד 3.9: elementHandle.click Timeout). הצ'יפ בסוף הלולאה
+    הוא ממילא האמת היחידה, ולכן קליק שנתקע נחתך אחרי 5 שניות ונורה
+    שוב ב-JS — והצ'יפ יגיד אם נקלט.
+  */
+  const clickOrJs = async (target) => {
+    try { await target.click({ timeout: 5000 }); }
+    catch { await target.evaluate(e => e.click()).catch(() => {}); }
+  };
   for (let attempt = 1; attempt <= 3; attempt++) {
     const head = p.locator('.panel-heading', { hasText: 'גמולים' }).first().locator('span.collapse-oral').first();
     if ((await head.getAttribute('aria-expanded')) !== 'true') {
       await head.scrollIntoViewIfNeeded();
-      await head.click();
+      await clickOrJs(head);
       await p.waitForTimeout(1200);
     }
     // ה-k-input הראשון הוא שדה החודש; השני הוא בורר הגמולים
     const picker = p.locator('input.k-input').nth(1);
     await picker.scrollIntoViewIfNeeded();
-    await picker.click();
+    await clickOrJs(picker);
     await p.waitForTimeout(1200);
     const h = await p.evaluateHandle((want) => {
       const cs = [...document.querySelectorAll('.k-animation-container')];
@@ -205,7 +219,7 @@ const pickGmul = async (p, label, { expectOff = false } = {}) => {
     }, label);
     const el = h.asElement();
     if (!el) throw new Error(`לא נמצא הגמול "${label}" ברשימה`);
-    await el.click();
+    await clickOrJs(el);
     await p.waitForTimeout(1500);
     await p.keyboard.press('Escape');
     await p.waitForTimeout(700);
