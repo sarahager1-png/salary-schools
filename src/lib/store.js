@@ -87,6 +87,7 @@ const teacherToRow = (t, monthKey) => {
 const schoolToRow = (s) => ({
   name: s.name,
   city: s.city ?? null,
+  semel: s.semel ?? null,
   reform: s.reform || 'ofek',
   hours_quota: s.hoursQuota ?? null,
   murkavut: s.murkavut ?? 1,
@@ -101,6 +102,7 @@ const rowToSchool = (r) => ({
   id: r.id,
   name: r.name,
   city: r.city,
+  semel: r.semel,
   reform: r.reform,
   hoursQuota: r.hours_quota,
   murkavut: r.murkavut ?? 1,

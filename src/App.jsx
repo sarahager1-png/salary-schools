@@ -1928,6 +1928,16 @@ function SchoolModal({ school, onSave, onClose }) {
             </p>
           </div>
           <div>
+            <p className="apple-label">סמל מוסד</p>
+            <input type="text" dir="ltr" className="apple-input"
+              value={s.semel ?? ''}
+              onChange={e => setS(p => ({ ...p, semel: e.target.value || null }))}
+              placeholder="למשל 661967" style={{ textAlign:'center' }} />
+            <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:6, lineHeight:1.5 }}>
+              מוצג לעובד/ת הוראה חדש/ה בהנחיה לפתיחת תיק מקוון במשרד החינוך.
+            </p>
+          </div>
+          <div>
             <p className="apple-label">מכסת שעות עובדי הוראה</p>
             <input type="number" min="0" dir="ltr" className="apple-input"
               value={s.hoursQuota ?? ''}
@@ -6484,6 +6494,14 @@ function OnboardingView({ code }) {
         {/* ── שלבים 2–4: העלאות ── */}
         <ObUpload label="2 · צילום תעודת זהות" hint="צלמי או העלי קובץ" done={me.has_id_doc} onFile={upload('id_doc')} />
         <ObUpload label="3 · טופס נתוני שכר — משרד החינוך" hint="הטופס מהפורטל של משרד החינוך" done={me.has_salary_form} onFile={upload('salary_form')} />
+        {/* "אם אין פרטים במשרד החינוך יש לפתוח תיק מקוון על שם סמל המוסד" (שרה, 3.9) */}
+        {!me.has_salary_form && (
+          <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.7, margin:'-6px 4px 0' }}>
+            אין לך עדיין פרטים בפורטל עובדי הוראה של משרד החינוך? יש לפתוח <b>תיק מקוון</b> בפורטל
+            על שם סמל המוסד{me.school_semel ? <> — <b dir="ltr">{me.school_semel}</b> ({me.school_name})</> : ' (את הסמל מקבלים ממנהלת בית הספר)'},
+            ולאחר הפתיחה להוריד משם את טופס נתוני השכר ולהעלות כאן.
+          </p>
+        )}
         {me.gender === 'm' && (
           <ObUpload label="4 · אישור משטרה — היעדר עבירות מין (חובה לגברים)"
             hint="לפי החוק למניעת העסקה של עברייני מין במוסדות חינוך"
