@@ -4626,21 +4626,32 @@ function FillProgress({ schools, month, onOpenSchool }) {
   const waiting = list.filter(r => r.st.k <= 3).length;
   const totalT  = list.reduce((n, r) => n + r.teachers, 0);
 
+  /*
+    "נעלם לי עמוד חשוב — כל בתי הספר" (שרה, 4.9): שמונה שורות המעקב
+    דחפו את כרטיסי בתי הספר אל מתחת לקצה המסך, במיוחד במובייל. המעקב
+    מקופל לשורת סיכום; נפתח בלחיצה — או לבד כשיש בתי ספר שממתינים לה.
+  */
+  const [openList, setOpenList] = useState(false);
+  const showList = openList || waiting > 0;
+
   return (
     <div className="apple-card" style={{ padding:'14px 16px', marginBottom:14 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:3, flexWrap:'wrap' }}>
+      <div onClick={() => setOpenList(v => !v)}
+        style={{ display:'flex', alignItems:'center', gap:9, flexWrap:'wrap', cursor:'pointer' }}>
+        <ChevronLeft size={15} strokeWidth={2.4} style={{ color:'var(--text3)', transform: showList ? 'rotate(-90deg)' : 'none', transition:'transform .15s' }} />
         <ClipboardCheck size={15} strokeWidth={2.3} color="var(--purple)" />
         <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)' }}>מעקב מילוי — {fmtMonth(month)}</p>
-        <button onClick={load} title="רענון" style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text3)', fontSize:13.2, padding:0 }}>
+        <span style={{ fontSize:13.2, color: waiting ? '#E65100' : 'var(--text3)', fontWeight: waiting ? 700 : 400 }}>
+          {waiting ? `${waiting} ממתינים לך` : 'כל בתי הספר סיימו'} · {totalT} הוזנו
+        </span>
+        <button onClick={e => { e.stopPropagation(); load(); }} title="רענון"
+          style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text3)', fontSize:13.2, padding:0, marginInlineStart:'auto' }}>
           רענון
         </button>
       </div>
-      <p style={{ fontSize:13.2, color:'var(--text3)', marginBottom:11 }}>
-        {waiting ? `${waiting} בתי ספר ממתינים לך · ` : 'כל בתי הספר סיימו · '}
-        {totalT} עובדי הוראה הוזנו
-      </p>
 
-      <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+      {showList && (
+      <div style={{ display:'flex', flexDirection:'column', gap:5, marginTop:11 }}>
         {list.map(r => (
           <button key={r.schoolId} onClick={() => onOpenSchool?.(r.schoolId)} className="fill-row"
             style={{ display:'flex', alignItems:'center', gap:9, padding:'7px 10px', background:'var(--fill)',
@@ -4659,6 +4670,7 @@ function FillProgress({ schools, month, onOpenSchool }) {
           </button>
         ))}
       </div>
+      )}
     </div>
   );
 }
