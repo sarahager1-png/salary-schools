@@ -175,7 +175,17 @@ const isMother = t => t.gender === 'f' && (t.childrenUnder18 || 0) > 0;
   ואחוז משרה שגוי מזיז את כל השכר — זה בדיוק מה שקרה כשהייתה כאן נוסחה
   שהוסרה ב-27.8.
 */
-const OFEK_MOM_SCOPE = { 20: 76, 21: 86, 22: 91, 23: 94 };
+/*
+  "תראה שיש טבלאות לאם" (שרה, 4.9): שתי טבלאות המרה באופק — לאם
+  ולרגילה — שחולצו מהנתונים שהיא ייבאה ואושרו על ידה. שעה שאינה
+  בטבלה נופלת לנוסחה הליניארית (שעות/26).
+*/
+const OFEK_MOM_SCOPE = { 10: 38, 12: 46, 13: 50, 15: 58, 16: 64, 17: 65,
+                         18: 69, 19: 74, 20: 76, 21: 86, 22: 91, 23: 94 };
+const OFEK_SCOPE     = { 9: 36, 10: 38, 12: 46, 13: 50, 14: 54, 15: 58,
+                         16: 62, 17: 73, 18: 75, 19: 77, 21: 86, 26: 100 };
+const ofekTableScope = t =>
+  t.reform === 'ofek' && !isMother(t) ? (OFEK_SCOPE[Number(t.frontalHours)] ?? null) : null;
 const ofekMomScope = t =>
   t.reform === 'ofek' && isMother(t) ? (OFEK_MOM_SCOPE[Number(t.frontalHours)] ?? null) : null;
 
@@ -217,7 +227,7 @@ const scopeWithMom = t => (momBonusEligible(t)
   תוספת האם כשהיא מגיעה. האחוז שנשמר הוא הסופי, ולכן ההצעה חייבת
   להיות סופית גם היא. אין כאן מילוי אוטומטי; ההצעה מחכה ללחיצה.
 */
-const suggestedScope = t => ofekMomScope(t) ?? scopeWithMom(t);
+const suggestedScope = t => ofekMomScope(t) ?? ofekTableScope(t) ?? scopeWithMom(t);
 function calcNet(gross) { return Math.round(gross * 0.735); }
 // אחוז המשרה והשעות הפרונטליות קשורים זה בזה דרך השלב והפחתת הגיל.
 // אפשר להזין כל אחד מהם, והשני נגזר — לפעמים השעות ידועות, ולפעמים
