@@ -15,7 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'fs';
 
 const DIR = 'C:/tmp/work/salary-schools';
-const MARKER = `${DIR}/.onboarding-all-sent-2026-09-04`;
+const MARKER = `${DIR}/.onboarding-all-sent-${new Date().toISOString().slice(0, 10)}`;
 const LOG = `${DIR}/onboarding-send.log`;
 const SITE = 'https://salary-schools.vercel.app';
 const MONTH = '2026-09';
@@ -37,7 +37,7 @@ const body = (name, code) =>
 if (existsSync(MARKER)) { log('כבר נשלח — הסמן קיים.'); process.exit(0); }
 
 const { data: rows } = await sb.from('teacher_months')
-  .select('id, name, tz_id, phone, leave_type').eq('month_key', MONTH);
+  .select('id, name, tz_id, phone, leave_type, school_id').eq('month_key', MONTH);
 const all = (rows || []).filter(r => r.name && r.leave_type !== 'unpaid');
 const { data: ob } = await sb.from('teacher_onboarding').select('id, tz_id, name, code, form101_signed_at');
 const byKey = new Map((ob || []).map(o => [o.tz_id || o.name, o]));
@@ -54,7 +54,7 @@ for (const t of all) {
   if (!t.phone) { noPhone++; log(`בלי נייד: ${t.name}`); continue; }
   if (!rec) {
     const { data: made, error } = await sb.from('teacher_onboarding')
-      .insert({ name: t.name, tz_id: t.tz_id, phone: t.phone, code: obCode() }).select('code').single();
+      .insert({ name: t.name, tz_id: t.tz_id, phone: t.phone, school_id: t.school_id, code: obCode() }).select('code').single();
     if (error) { log(`✗ יצירת קישור נכשלה: ${t.name} — ${error.message}`); continue; }
     rec = made;
   }
