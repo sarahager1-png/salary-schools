@@ -3906,7 +3906,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       <div className="only-mobile">
         {fin === null ? (
           <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
-        ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
+        ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap }) => (
           <div key={'m-' + sc.id} className="apple-card mcard">
             <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
             <CardRow label="הכנסות משרד החינוך + מענק">
