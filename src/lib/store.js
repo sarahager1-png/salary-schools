@@ -394,6 +394,27 @@ export async function saveSlipGross(id, amount) {
   return rowToTeacher(data);
 }
 
+/*
+  ייבוא תלוש: הברוטו והעלות מהקובץ של הנהלת החשבונות נכתבים לשורות
+  שהוצלבו. "אסתר תתקן גם ברוטו" (שרה, 7.9) — לכן הברוטו נכתב גם
+  ל-official_gross (המספר שהמערכת מחשבת לפיו) וגם ל-slip_gross (העמודה
+  שלה, לתיעוד מה יצא בתלוש). עלות המעביד נכתבת כחלק שמעל הברוטו, כמו
+  שהשדה מצפה. שורה בלי ברוטו בקובץ לא נוגעת בברוטו הקיים.
+*/
+export async function importSlip(items) {
+  const now = new Date().toISOString();
+  let n = 0;
+  for (const it of items) {
+    const patch = { slip_issued_at: now };
+    if (it.gross != null)  { patch.official_gross = it.gross; patch.gross_set_at = now; patch.slip_gross = it.gross; }
+    if (it.actual != null) patch.actual_employer_cost = it.actual;
+    const { error } = await supabase.from('teacher_months').update(patch).eq('id', it.id);
+    raise(error, `העדכון של ${it.name || ''} נכשל`);
+    n++;
+  }
+  return n;
+}
+
 export async function approve(ids) {
   const { error } = await supabase.from('teacher_months').update({ approved: true }).in('id', ids);
   raise(error, 'האישור נכשל');

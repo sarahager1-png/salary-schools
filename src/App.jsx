@@ -9,6 +9,7 @@ import {
   ExternalLink, ShieldCheck, MessageCircle, Percent, Wallet,
 } from 'lucide-react';
 import * as store from './lib/store.js';
+import { readSheet, parseRows, matchRows } from './lib/slipImport.js';
 import { CreditLine } from './components/CreditLine.jsx';
 import './index.css';
 // v3 — רשת חינוך חב"ד design system
@@ -5266,6 +5267,155 @@ function ActualCostPanel({ teachers, schools, onSave }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   ייבוא תלוש — קובץ מהנהלת החשבונות במקום הקלדה שורה-שורה
+
+   "תן לה להעלות מסמך והמערכת תתעדכן" (שרה, 7.9). החשבת בוחרת קובץ,
+   רואה מה זוהה ומה לא, ורק אז מאשרת. שום דבר לא נכתב לפני הלחיצה.
+   הפענוח וההצלבה ב-lib/slipImport.js; הכתיבה ב-store.importSlip.
+═══════════════════════════════════════════════════════════════ */
+function SlipImportPanel({ teachers, schools, monthKey, onImport }) {
+  const [pickSchool, setPickSchool] = useState('');
+  const [file, setFile]   = useState(null);
+  const [res, setRes]     = useState(null);   // תוצאת ההצלבה, לפני כתיבה
+  const [err, setErr]     = useState('');
+  const [busy, setBusy]   = useState(false);
+  const [done, setDone]   = useState(null);   // כמה נכתבו
+  const fileRef = useRef(null);
+  const money = v => (v == null ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
+
+  const onPick = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setErr(''); setDone(null); setRes(null); setFile(f);
+    try {
+      const buf = await f.arrayBuffer();
+      const { rows, mode } = parseRows(readSheet(buf), schools.map(s => s.name));
+      if (!rows.length) throw new Error('לא נמצאו בקובץ שורות עם שם ומספרים');
+      const m = matchRows(rows, teachers.filter(t => !unpaidThisMonth(t)), { schoolId: pickSchool || null });
+      setRes({ ...m, mode, rows: rows.length });
+    } catch (ex) { setErr(ex.message); setFile(null); }
+    finally { if (fileRef.current) fileRef.current.value = ''; }
+  };
+
+  const writable = res ? res.matched.filter(m => m.gross != null || m.actual != null) : [];
+  const apply = async () => {
+    if (!writable.length) return;
+    setBusy(true);
+    const ok = await onImport(writable.map(m => ({ id: m.teacher.id, name: m.teacher.name, gross: m.gross, actual: m.actual })), file,
+      `ייבוא תלוש: ${writable.length} שורות עודכנו`);
+    setBusy(false);
+    if (ok) { setDone(writable.length); setRes(null); setFile(null); }
+  };
+
+  const howLabel = { tz: 'לפי ת.ז.', name: 'לפי שם', 'name-partial': 'לפי שם, חלקי' };
+  const [showAllMissing, setShowAllMissing] = useState(false);
+  // "בלי שורה בקובץ" — רק מבתי הספר שהקובץ נוגע בהם. קובץ של בית ספר
+  // אחד מול "כל בתי הספר" הציף 87 שמות שאינם עניינו.
+  const missing = (() => {
+    if (!res) return [];
+    const touched = new Set(res.matched.map(m => m.teacher.schoolId));
+    const list = touched.size ? res.unmatchedTeachers.filter(t => touched.has(t.schoolId)) : res.unmatchedTeachers;
+    return list;
+  })();
+  const num = v => <span style={{ whiteSpace:'nowrap' }}>{money(v)}</span>;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+      <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6 }}>
+        קובץ מרכז מהנהלת החשבונות — אקסל או CSV, עם או בלי כותרות. המערכת מזהה שם, ברוטו ועלות מעביד,
+        מצליבה מול עובדות {fmtMonth(monthKey)} ומראה מה נמצא. הברוטו והעלות נכתבים רק אחרי אישור.
+      </p>
+
+      <div style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}>
+        <select className="apple-select" value={pickSchool} onChange={e => { setPickSchool(e.target.value); setRes(null); }} style={{ fontSize:14.4, minHeight:36 }}>
+          <option value="">כל בתי הספר</option>
+          {schools.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+        </select>
+        <label className="apple-btn apple-btn-blue" style={{ minHeight:36, fontSize:14.4, cursor:'pointer' }}>
+          <FileSpreadsheet size={14} strokeWidth={2.3} />
+          {file ? file.name : 'בחירת קובץ'}
+          <input ref={fileRef} type="file" onChange={onPick} style={{ display:'none' }} accept=".xlsx,.xls,.csv" />
+        </label>
+      </div>
+      {err && <p style={{ fontSize:13.8, color:'var(--danger)' }}>{err}</p>}
+      {done != null && (
+        <div className="apple-card" style={{ padding:'12px 14px', background:'var(--ok-bg)', display:'flex', gap:8, alignItems:'center' }}>
+          <Check size={16} strokeWidth={2.4} color="var(--ok)" />
+          <p style={{ fontSize:15, fontWeight:600, color:'var(--text)' }}>{done} שורות עודכנו. הברוטו והעלות בפועל מופיעים עכשיו בכל הדוחות.</p>
+        </div>
+      )}
+
+      {res && (
+        <>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}>
+            <span className="apple-badge badge-purple" style={{ fontSize:13.2 }}>{res.matched.length} הוצלבו מתוך {res.rows}</span>
+            {res.unmatchedRows.length > 0 && <span className="apple-badge" style={{ fontSize:13.2, background:'#FFF9EF', border:'1px solid #F3E3C2', color:'#B4650A' }}>{res.unmatchedRows.length} בקובץ בלי עובדת</span>}
+            {missing.length > 0 && <span className="apple-badge" style={{ fontSize:13.2 }}>{missing.length} עובדות בלי שורה בקובץ</span>}
+            {res.mode === 'guess' && <span style={{ fontSize:13.2, color:'var(--text3)' }}>בלי כותרות — העמודות זוהו לפי המספרים, בדקי שהברוטו נכון</span>}
+          </div>
+
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {res.matched.map(m => {
+              const skip = m.gross == null && m.actual == null;
+              const jump = m.prevGross && m.gross ? Math.round((m.gross / m.prevGross - 1) * 100) : null;
+              return (
+                <div key={m.teacher.id} className="apple-card" style={{ padding:'10px 12px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', opacity: skip ? .55 : 1 }}>
+                  <div style={{ flex:'1 1 170px', minWidth:0 }}>
+                    <p style={{ fontSize:15.5, fontWeight:600, color:'var(--text)' }}>
+                      {m.teacher.name}
+                      <span style={{ fontWeight:500, fontSize:12.6, color:'var(--text3)', marginInlineStart:6 }}>{howLabel[m.how]}{m.how !== 'tz' && m.row.name !== m.teacher.name ? ` · בקובץ: ${m.row.name}` : ''}</span>
+                    </p>
+                    <p style={{ fontSize:13.2, color:'var(--text3)' }}>
+                      {skip ? (m.left ? 'ברוטו 0 בקובץ — עזבה? לא מעדכנים' : 'אין ברוטו בשורה — לא מעדכנים')
+                        : <>ברוטו {num(m.prevGross)} ← <b style={{ color:'var(--text)', whiteSpace:'nowrap' }}>{money(m.gross)}</b>
+                            {jump != null && Math.abs(jump) >= 10 && <span style={{ color:'#B4650A', marginInlineStart:6 }}>{jump > 0 ? '+' : ''}{jump}%</span>}
+                            {m.actual != null && <> · <span style={{ whiteSpace:'nowrap' }}>עלות מעל הברוטו <b style={{ color:'var(--text)' }}>{money(m.actual)}</b></span></>}</>}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {res.unmatchedRows.length > 0 && (
+            <div className="apple-card" style={{ padding:'10px 12px' }}>
+              <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text)', marginBottom:4 }}>בקובץ, בלי עובדת תואמת בחודש</p>
+              <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.7 }}>
+                {res.unmatchedRows.map(r => `${r.name}${r.gross ? ` (${money(r.gross)})` : ''}`).join(' · ')}
+              </p>
+              <p style={{ fontSize:12.6, color:'var(--text3)', marginTop:4 }}>שם שכתוב אחרת במערכת, או עובדת שאינה בחודש הזה. אפשר לתקן את השם בכרטיס העובדת ולייבא שוב.</p>
+            </div>
+          )}
+          {missing.length > 0 && (
+            <div className="apple-card" style={{ padding:'10px 12px' }}>
+              <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text)', marginBottom:4 }}>
+                במערכת, בלי שורה בקובץ <span style={{ fontWeight:500, color:'var(--text3)' }}>· {missing.length}</span>
+              </p>
+              <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.7 }}>
+                {(showAllMissing ? missing : missing.slice(0, 12)).map(t => t.name).join(' · ')}
+                {missing.length > 12 && !showAllMissing && (
+                  <button onClick={() => setShowAllMissing(true)} style={{ background:'none', border:'none', color:'var(--purple)', fontWeight:600, fontSize:13.2, cursor:'pointer', padding:0, marginInlineStart:6 }}>
+                    ועוד {missing.length - 12}
+                  </button>
+                )}
+              </p>
+            </div>
+          )}
+
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <button className="apple-btn apple-btn-blue" onClick={apply} disabled={busy || !writable.length} style={{ minHeight:44, padding:'0 18px', fontSize:15.5, flex:'1 1 220px' }}>
+              {busy ? 'מעדכנת…' : `עדכון ${writable.length} עובדות`}
+            </button>
+            <button className="apple-btn apple-btn-ghost" onClick={() => { setRes(null); setFile(null); }} disabled={busy} style={{ minHeight:44 }}>ביטול</button>
+            <span style={{ fontSize:12.6, color:'var(--text3)', flexBasis:'100%' }}>הקובץ נשמר גם במסמכי החודש.</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    שלב ראשון — אחוזי משרה
 
    המנהלת מזינה שם, ת.ז., שעות ודרגה. את אחוז המשרה קובעת שרה, ביד,
@@ -5700,7 +5850,7 @@ function SlipsHandoff({ monthKey, role }) {
   </>);
 }
 
-function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveScope,
+function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveScope, onImportSlip,
                        activeMonth, userRole, userId }) {
   const isClerk = userRole === 'clerk';
   const canSetScope = userRole === 'coordinator';
@@ -5736,6 +5886,10 @@ function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveSco
           style={{ padding:'6px 13px', fontSize:14.9 }}>
           עלות מעביד בפועל{missingCost > 0 ? ` (${missingCost})` : ''}
         </button>
+        <button onClick={() => setTab('import')} className={['apple-seg-item', tab === 'import' ? 'active' : ''].join(' ')}
+          style={{ padding:'6px 13px', fontSize:14.9 }}>
+          ייבוא תלוש
+        </button>
         <button onClick={() => setTab('docs')} className={['apple-seg-item', tab === 'docs' ? 'active' : ''].join(' ')}
           style={{ padding:'6px 13px', fontSize:14.9 }}>
           תלושים ומסמכים
@@ -5748,6 +5902,7 @@ function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveSco
       {tab === 'scope' && canSetScope && <ScopePanel teachers={teachers} schools={schools} onSave={onSaveScope} />}
       {tab === 'entry' && <PayrollEntry teachers={rows} schools={schools} onSave={onSavePayroll} />}
       {tab === 'cost'  && <ActualCostPanel teachers={teachers} schools={schools} onSave={onSaveActual} />}
+      {tab === 'import' && <SlipImportPanel teachers={teachers} schools={schools} monthKey={activeMonth} onImport={onImportSlip} />}
       {tab === 'docs'  && (
         <MonthDocuments monthKey={activeMonth} schools={schools} userRole={userRole} userId={userId} />
       )}
@@ -8162,6 +8317,11 @@ export default function App() {
             userId={user.id}
             onSavePayroll={(id, patch) => run(() => store.savePayroll(id, patch))}
             onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
+            onImportSlip={(items, file, note) => run(async () => {
+              await store.importSlip(items);
+              // הקובץ עצמו נשמר במסמכי החודש — שיהיה ברור מאיפה המספרים
+              if (file) await store.uploadDocument({ monthKey: activeMonth, schoolId: null, note, file }).catch(() => {});
+            })}
             onSaveScope={(id, which, val) => run(() => store.saveTeacher(
               which === 'gender' ? { id, gender: val }
                 : { id, scopePct: val, scopeSetAt: new Date().toISOString() }, activeMonth))}
@@ -8192,6 +8352,11 @@ export default function App() {
             userId={user.id}
             onSavePayroll={(id, patch) => run(() => store.savePayroll(id, patch))}
             onSaveActual={(id, amount) => run(() => store.saveActualCost(id, amount))}
+            onImportSlip={(items, file, note) => run(async () => {
+              await store.importSlip(items);
+              // הקובץ עצמו נשמר במסמכי החודש — שיהיה ברור מאיפה המספרים
+              if (file) await store.uploadDocument({ monthKey: activeMonth, schoolId: null, note, file }).catch(() => {});
+            })}
             onSaveScope={(id, which, val) => run(() => store.saveTeacher(
               which === 'gender' ? { id, gender: val }
                 : { id, scopePct: val, scopeSetAt: new Date().toISOString() }, activeMonth))}
