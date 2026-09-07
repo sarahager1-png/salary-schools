@@ -40,7 +40,15 @@ export default async function handler(req, res) {
     });
     if (!r.ok) return res.status(502).json({ error: `מבט-רשת החזיר ${r.status}` });
     const data = await r.json();
+    return res.status(200).json({ schools: mapHubSchools(data), fetchedAt: new Date().toISOString() });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'שגיאה בשרת' });
+  }
+}
 
+/* התרגום מתשובת מבט-רשת לשורות של דף עלות ההוראה. מיוצא כדי שגם סקריפט
+   מקומי יוכל למשוך באותו תרגום בדיוק, ולא בעותק שיסטה ממנו. */
+export function mapHubSchools(data) {
     const mapped = (data.schools || []).filter(s => !s.empty && !s.error).map(s => {
       const inc = s.income || {};
       // "מענק לתלמיד זה הכנסות עלות הוראה" (שרה, 3.9): משרד + מענק,
@@ -59,6 +67,28 @@ export default async function handler(req, res) {
       const hoursYieul = (s.efficiency?.saved === true ? (s.efficiency?.rows || []) : [])
         .filter(r => HOURS_YIEUL.test(r.label || ''))
         .reduce((a, r) => a + (Number(r.saving) || 0), 0);
+      /*
+        בית ספר במעקב פשוט (באר שבע, 6.9): אין כיתות ואין תחשיב — רק סכומים
+        שנתיים ידניים. אין לו סימולציית עלות הוראה, וכל ההוצאות שלו הן
+        "הוצאות אחרות" לפי הקטגוריות שהוקלדו. ההשתתפות נמשכת כמו לכולם.
+      */
+      if (s.mode === 'simple') {
+        return {
+          name: s.name,
+          ministry: 0,
+          teach: null,
+          incomeTotal: inc.total || 0,
+          yieul: null,
+          incomeOther: inc.total || 0,
+          detail: {
+            income: (inc.sources || []).map(x => ({ name: x.name, amount: Number(x.amount || 0) })).filter(x => x.amount > 0),
+            expenses: Object.entries(s.expenses?.byCategory || {}).map(([name, amount]) => ({ name, amount: Number(amount || 0) })).filter(x => x.amount > 0),
+          },
+          expensesOther: s.expenses?.total || 0,
+          teachingSim: null,
+          networkSupport: s.networkSupport ?? null,
+        };
+      }
       return {
         name: s.name,
         ministry,
@@ -106,6 +136,9 @@ export default async function handler(req, res) {
         // "הוצאות שעות הוראה, ייעוץ" (שרה, 3.9) — הסימולציה שלה מהתקציב
         // היא סכום שתי השורות, כדי שהסה"כ יתאים לפירוט.
         teachingSim: s.expenses?.teaching > 0 ? teachingBudget + counseling - hoursYieul : null,
+        // השתתפות רשת חב"ד שההנהלה מקלידה בכרטיס במבט-רשת (v19). בדף עלות
+        // ההוראה היא ממלאת רק תא ריק — הנתונים של רינה הם הקובעים (שרה, 6.9).
+        networkSupport: s.networkSupport ?? null,
       };
     });
     /*
@@ -140,9 +173,7 @@ export default async function handler(req, res) {
         };
       }
       cur.yieul = (cur.yieul == null && s.yieul == null) ? null : (cur.yieul || 0) + (s.yieul || 0);
+      cur.networkSupport = (cur.networkSupport == null && s.networkSupport == null) ? null : (cur.networkSupport || 0) + (s.networkSupport || 0);
     }
-    return res.status(200).json({ schools: [...byBase.values()], fetchedAt: new Date().toISOString() });
-  } catch (e) {
-    return res.status(500).json({ error: e.message || 'שגיאה בשרת' });
-  }
+    return [...byBase.values()];
 }

@@ -9,6 +9,7 @@ import {
   ExternalLink, ShieldCheck, MessageCircle, Percent, Wallet,
 } from 'lucide-react';
 import * as store from './lib/store.js';
+import { CreditLine } from './components/CreditLine.jsx';
 import './index.css';
 // v3 — רשת חינוך חב"ד design system
 
@@ -173,18 +174,38 @@ const needsSim      = t => Boolean(!unpaidThisMonth(t) && t._changedAt && !t._ap
 const needsApproval = t => Boolean(t._changedAt && !t._approved && simComplete(t));
 const isPending     = t => Boolean(t._changedAt && !t._approved); // = needsSim || needsApproval
 
+// "יש היעדרויות וצריך סיבה… מילואים, מחלת ילד ואחר" (שרה, 6.9)
+const ABSENCE_REASONS = [
+  ['sick',       'מחלה'],
+  ['child_sick', 'מחלת ילד'],
+  ['miluim',     'מילואים'],
+  ['maternity',  'חופשת לידה'],
+  ['unpaid',     'חופשה ללא תשלום (חל"ת)'],
+  ['other',      'אחר'],
+];
+const reasonLabel = id => (ABSENCE_REASONS.find(([k]) => k === id) || [])[1] || '';
+// סיבות שמצריכות צירוף טופס מחלה
+const needsSickForm = r => r === 'sick' || r === 'child_sick';
+// סיבות שהן יציאה לחופשה — נרשמות גם כסטטוס עם תאריכים
+const isLeaveReason = r => r === 'maternity' || r === 'unpaid';
+const fmtD = v => (v ? new Date(v).toLocaleDateString('he-IL') : '');
+
 // "אסתר צריכה לראות מי ממלאת מקום ובאיזה תקופה ואת מי מחליפה" (שרה, 3.9):
-// שורת מילוי המקום — שיבוץ זמני עם התקופה, במקום מי, ושעות ממ"מ שדווחו.
+// שורת מילוי המקום — שיבוץ זמני עם התקופה, במקום מי, שעות ותאריכי הממ"מ.
 // ריק כשאין — רוב השורות רגילות והמידע מופיע רק כשהוא קיים.
 const subInfo = (t) => {
   const bits = [];
   if (t.isTemp) {
-    const d = v => (v ? new Date(v).toLocaleDateString('he-IL') : '');
-    const from = d(t.startDate), to = d(t.endDate);
+    const from = fmtD(t.startDate), to = fmtD(t.endDate);
     bits.push(`מילוי מקום${from || to ? ` ${from}${from && to ? ' – ' : ''}${to}` : ''}`);
   }
   if (t.mmFor) bits.push(`במקום ${t.mmFor}`);
   if ((t.mmHours || 0) > 0) bits.push(`${t.mmHours} שעות ממ"מ`);
+  if (t.mmFrom) {
+    bits.push(!t.mmTo || t.mmTo === t.mmFrom
+      ? `ב-${fmtD(t.mmFrom)}`
+      : `${fmtD(t.mmFrom)} – ${fmtD(t.mmTo)}`);
+  }
   return bits.join(' · ');
 };
 
@@ -3622,7 +3643,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   const [openInc, setOpenInc] = useState({});
   // "אני צריכה חתכים שונים — חודשי/שנתי" (3.9): מתג אחד לכל הדף
   const [period, setPeriod] = useState('year');
-  // עלות מילוי מקום: 5% מעלות השכר בפועל (הכרעת שרה, 3.9)
+  // עלות מילוי מקום: "5 אחוז מההוראה" (שרה, 7.9) — 5% מברוטו שכר
+  // ההוראה בלבד: בלי מנהלת, בלי הפרשות מעסיק, בלי שעות ממ"מ שדווחו.
+  // עד 7.9 חושב על עלות המעסיק המלאה (כולל מנהלת והפרשות) — יצא גבוה מדי.
   const MM_PCT = 0.05;
   // מדד בכותרת כרטיס: תווית קטנה מעל מספר, רוחב קבוע — הכרטיסים מיושרים
   const Metric = ({ label, val, big }) => (
@@ -3671,9 +3694,13 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         const src = { ...(cur.src || {}) };
         const patch = {};
         const want = { ministryBudget: h.ministry > 0 ? h.ministry : null, yieul: h.yieul, teachingSim: h.teachingSim,
-          incomeTotal: h.incomeOther > 0 ? h.incomeOther : null, expensesOther: h.expensesOther > 0 ? h.expensesOther : null };
-        for (const k of ['ministryBudget', 'yieul', 'teachingSim', 'incomeTotal', 'expensesOther']) {
+          incomeTotal: h.incomeOther > 0 ? h.incomeOther : null, expensesOther: h.expensesOther > 0 ? h.expensesOther : null,
+          networkSupport: h.networkSupport };
+        for (const k of ['ministryBudget', 'yieul', 'teachingSim', 'incomeTotal', 'expensesOther', 'networkSupport']) {
           if (src[k] === 'manual') continue;
+          // השתתפות הרשת: "הנתונים של רינה הם הצודקים" (שרה, 6.9) — המשיכה
+          // ממבט-רשת ממלאת רק תא ריק ולעולם לא מחליפה סכום שכבר רשום כאן.
+          if (k === 'networkSupport' && cur[k] != null) continue;
           if (want[k] != null && want[k] !== cur[k]) { patch[k] = want[k]; src[k] = 'hub'; }
         }
         // הפירוט לשורות — עד היום לא נשמר במשיכה, והכרטיסים הציגו רק סכומים
@@ -3706,6 +3733,10 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   const monthlyCost = (sid) => teachers
     .filter(t => t.schoolId === sid)
     .reduce((sum, t) => sum + calcEmployer(t).total, 0);
+  // בסיס ה-5%: ברוטו עובדות ההוראה בלבד (המנהלת אינה מוחלפת)
+  const teachingGross = (sid) => teachers
+    .filter(t => t.schoolId === sid && !isPrincipalRow(t))
+    .reduce((sum, t) => sum + calcEmployer(t).gross, 0);
 
 
   const save = async (sid, patch) => {
@@ -3721,10 +3752,11 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const f = fin?.[sc.id] || {};
     const monthly = monthlyCost(sc.id);
     const annual  = monthly * 12;
+    const mmCost  = teachingGross(sc.id) * 12 * MM_PCT;
     // "תוסיף השתתפות רשת מרינה" (שרה, 3.9) — מצטרפת ליתרה בחיוב,
-    // "אין צורך" בייעול (שרה, 3.9): משרד − (שכר + מ"מ 5%) + השתתפות
+    // "אין צורך" בייעול (שרה, 3.9): משרד − (שכר + מ"מ 5% מההוראה) + השתתפות
     const left = (f.ministryBudget != null)
-      ? (f.ministryBudget || 0) - annual * (1 + MM_PCT) + (f.networkSupport || 0)
+      ? (f.ministryBudget || 0) - (annual + mmCost) + (f.networkSupport || 0)
       : null;
     /*
       "עשיתי סימולציית שכר לפני הסימולציה האמיתית — חשוב לי לדעת מה
@@ -3733,18 +3765,19 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     */
     // שני הצדדים כוללים מנהלת (הוראת שרה, 3.9) — השוואה מלאה מול מלאה
     const simGap = f.teachingSim != null && monthly > 0 ? f.teachingSim - annual : null;
-    return { sc, f, monthly, annual, left, simGap };
+    return { sc, f, monthly, annual, mmCost, left, simGap };
   });
   const tot = rows.reduce((a, r) => ({
     budget: a.budget + (r.f.ministryBudget || 0),
     yieul:  a.yieul  + (r.f.yieul || 0),
     monthly: a.monthly + r.monthly,
     annual: a.annual + r.annual,
+    mm: a.mm + r.mmCost,
     left: a.left + (r.left || 0),
     sim: a.sim + (r.f.teachingSim || 0),
     simGap: a.simGap + (r.simGap || 0),
     support: a.support + (r.f.networkSupport || 0),
-  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, left: 0, sim: 0, simGap: 0, support: 0 });
+  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, mm: 0, left: 0, sim: 0, simGap: 0, support: 0 });
 
   const TH = ({ children }) => (
     <th style={{ padding:'10px 8px', fontSize:13.8, fontWeight:700, color:'var(--text2)',
@@ -3825,14 +3858,14 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           <tbody>
             {fin === null ? (
               <tr><td colSpan={showSim ? 8 : 6} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : rows.map(({ sc, f, monthly, annual, left, simGap }) => (
+            ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
                   ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
                   : <span style={{ fontSize:16.1 }}>{money(per(f.ministryBudget))}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(period === 'month' ? monthly : annual)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}>{money(per(annual * MM_PCT))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}>{money(per(mmCost))}</td>
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}>{f.teachingSim == null ? '—' : money(per(f.teachingSim))}</td>}
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
                   color: simGap == null ? 'var(--text3)' : simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
@@ -3853,7 +3886,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 <td style={{ padding:'11px 12px', fontSize:16.1, fontWeight:800 }}>סה"כ הרשת</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.budget))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(period === 'month' ? tot.monthly : tot.annual)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.annual * MM_PCT))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.mm))}</td>
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.sim))}</td>}
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
                   color: tot.simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(per(tot.simGap))}</td>}
@@ -3882,7 +3915,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 : money(per(f.ministryBudget))}
             </CardRow>
             <CardRow label="עלות שכר">{money(period === 'month' ? monthly : annual)}</CardRow>
-            <CardRow label="מילוי מקום · 5%" color="var(--text2)">{money(per(annual * MM_PCT))}</CardRow>
+            <CardRow label="מילוי מקום · 5%" color="var(--text2)">{money(per(mmCost))}</CardRow>
             {showSim && (
               <CardRow label="עלות הוראה מהתקציב" color="var(--text2)">
                 {f.teachingSim == null ? '—' : money(per(f.teachingSim))}
@@ -3910,7 +3943,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
             <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ הרשת</p>
             <CardRow label="הכנסות משרד החינוך + מענק">{money(per(tot.budget))}</CardRow>
             <CardRow label="עלות שכר">{money(period === 'month' ? tot.monthly : tot.annual)}</CardRow>
-            <CardRow label="מילוי מקום · 5%" color="var(--text2)">{money(per(tot.annual * MM_PCT))}</CardRow>
+            <CardRow label="מילוי מקום · 5%" color="var(--text2)">{money(per(tot.mm))}</CardRow>
             {showSim && <CardRow label="עלות הוראה מהתקציב" color="var(--text2)">{money(per(tot.sim))}</CardRow>}
             {showSim && (
               <CardRow label="הפרש מול השכר בפועל"
@@ -3927,7 +3960,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         )}
       </div>
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
-        תקציב הכנסות משרד החינוך פחות עלות השכר ומילוי מקום (5% מעלות השכר), בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
+        תקציב הכנסות משרד החינוך פחות עלות השכר ומילוי מקום (5% מברוטו שכר ההוראה, בלי מנהלת), בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
         עלות השכר נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
         {' '}חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
       </p>
@@ -3941,9 +3974,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           המילויי מקום" (שרה, 3.9). */}
       <h2 className="section-head">כרטיסי בתי הספר</h2>
       <p className="section-sub">הפרשי עלות הוראה והוצאות לכל בית ספר — לחיצה על כרטיס פותחת את הפירוט המלא.</p>
-      {fin !== null && rows.map(({ sc, f, monthly, annual }) => {
+      {fin !== null && rows.map(({ sc, f, monthly, annual, mmCost }) => {
         const teachIncome = (f.ministryBudget || 0) + (f.networkSupport || 0);
-        const mmCost = annual * MM_PCT;
         const teachCost = annual + mmCost;
         const teachDiff = (f.ministryBudget != null) ? teachIncome - teachCost : null;
         // צד התפעול
@@ -3984,7 +4016,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   {dline('סה"כ הכנסות הוראה', per(teachIncome), true)}
                   <div style={{ height:8 }} />
                   {dline(`שכר הוראה (עובדי הוראה, מנהלת, תוספות)`, per(annual))}
-                  {dline('מילוי מקום — 5% מעלות השכר', per(mmCost))}
+                  {dline('מילוי מקום — 5% משכר ההוראה', per(mmCost))}
                   {dline('סה"כ הוצאות הוראה', per(teachCost), true)}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
                     borderTop:'2px solid var(--line)', color: gapColor(teachDiff) }}>
@@ -4028,9 +4060,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       {fin !== null && (() => {
         // סיכום רשתי — אותם חישובים בדיוק כמו בכרטיסים הבודדים
         let sumTeach = 0, sumOp = 0, any = false;
-        for (const { f, annual } of rows) {
+        for (const { f, annual, mmCost } of rows) {
           const ti = (f.ministryBudget || 0) + (f.networkSupport || 0);
-          const td = f.ministryBudget != null ? ti - annual * (1 + MM_PCT) : null;
+          const td = f.ministryBudget != null ? ti - (annual + mmCost) : null;
           const il = mergeLines(f.detail?.income), el = mergeLines(f.detail?.expenses);
           const is_ = il.reduce((a, x) => a + x.amount, 0) || (f.incomeTotal || 0);
           const es = el.reduce((a, x) => a + x.amount, 0) || (f.expensesOther || 0);
@@ -4069,7 +4101,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
 function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
   const [onlyReported, setOnlyReported] = useState(true);
   const has = t => (t.absenceDays || 0) > 0 || (t.mmHours || 0) > 0 || t.mmFor
-    || onLeave(t) || t.isTemp;
+    || onLeave(t) || t.isTemp || t.absenceReason || t.sickFormPath;
   const shown = teachers.filter(t => !onlyReported || has(t));
   const bySchool = schools
     .map(sc => ({ sc, list: shown.filter(t => t.schoolId === sc.id) }))
@@ -4080,15 +4112,25 @@ function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
   const exportCSV = () => {
     const headers = [
       { key:'school', label:'בית ספר' }, { key:'name', label:'שם' },
-      { key:'absence', label:'ימי היעדרות' }, { key:'status', label:'סטטוס' },
+      { key:'absence', label:'ימי היעדרות' }, { key:'reason', label:'סיבה' },
+      { key:'form', label:'טופס מחלה' }, { key:'status', label:'סטטוס' },
       { key:'mmHours', label:'שעות ממ"מ' }, { key:'mmFor', label:'במקום מי' },
-      { key:'period', label:'מילוי מקום' },
+      { key:'period', label:'תקופת ממ"מ' },
     ];
-    const body = bySchool.flatMap(({ sc, list }) => list.map(t => ({
-      school: sc.name, name: t.name, absence: t.absenceDays || 0,
-      status: onLeave(t) ? leaveText(t) : '', mmHours: t.mmHours || 0,
-      mmFor: t.mmFor || '', period: t.isTemp ? subInfo(t) : '',
-    })));
+    const body = bySchool.flatMap(({ sc, list }) => list.map(t => {
+      const replaced = t.mmFor ? teachers.find(x => x.name === t.mmFor) : null;
+      const weekly = Boolean(replaced &&
+        (replaced.leaveType === 'maternity' || replaced.absenceReason === 'maternity'));
+      return {
+        school: sc.name, name: t.name, absence: t.absenceDays || 0,
+        reason: reasonLabel(t.absenceReason) || '', form: t.sickFormPath ? 'כן' : '',
+        status: onLeave(t) ? leaveText(t) : '', mmHours: t.mmHours || 0,
+        mmFor: t.mmFor || '',
+        period: weekly ? 'שבועי — חל"ד'
+          : t.mmFrom ? (!t.mmTo || t.mmTo === t.mmFrom ? fmtD(t.mmFrom) : `${fmtD(t.mmFrom)} - ${fmtD(t.mmTo)}`)
+          : t.isTemp ? subInfo(t) : '',
+      };
+    }));
     downloadCSV(headers, body, `היעדרויות_וממ"מ_${monthKey}.csv`,
       { school:'סה"כ', absence: totAbs, mmHours: totMM });
   };
@@ -4126,18 +4168,32 @@ function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
               <thead><tr>
                 <th>שם</th>
                 <th style={{ textAlign:'center' }}>ימי היעדרות</th>
+                <th style={{ textAlign:'center' }}>סיבה</th>
+                <th style={{ textAlign:'center' }}>טופס</th>
                 <th style={{ textAlign:'center' }}>סטטוס</th>
                 <th style={{ textAlign:'center' }}>שעות ממ"מ</th>
                 <th>במקום מי</th>
-                <th>מילוי מקום</th>
+                <th>תקופת ממ"מ</th>
               </tr></thead>
               <tbody>
-                {list.map(t => (
+                {list.map(t => {
+                  const replaced = t.mmFor ? list.find(x => x.name === t.mmFor) || teachers.find(x => x.name === t.mmFor) : null;
+                  const weekly = Boolean(replaced &&
+                    (replaced.leaveType === 'maternity' || replaced.absenceReason === 'maternity'));
+                  return (
                   <tr key={t.id}>
                     <td style={{ fontWeight:600 }}>{t.name}</td>
                     <td style={{ textAlign:'center', fontWeight:(t.absenceDays||0)>0 ? 700 : 400,
                       color:(t.absenceDays||0)>0 ? 'var(--danger)' : 'var(--text3)' }}>
                       {(t.absenceDays||0) > 0 ? t.absenceDays : '—'}
+                    </td>
+                    <td style={{ textAlign:'center' }}>{reasonLabel(t.absenceReason) || '—'}</td>
+                    <td style={{ textAlign:'center' }}>
+                      {t.sickFormPath ? (
+                        <button className="apple-btn apple-btn-ghost" title="פתיחת טופס המחלה"
+                          onClick={async () => { try { window.open(await store.sickFormUrl(t.sickFormPath), '_blank'); } catch (e) { alert(e.message); } }}
+                          style={{ minHeight:28, padding:'0 9px', fontSize:13.8 }}>📎</button>
+                      ) : '—'}
                     </td>
                     <td style={{ textAlign:'center' }}>
                       {onLeave(t)
@@ -4146,12 +4202,17 @@ function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
                     </td>
                     <td style={{ textAlign:'center', fontWeight:(t.mmHours||0)>0 ? 700 : 400,
                       color:(t.mmHours||0)>0 ? 'var(--purple)' : 'var(--text3)' }}>
-                      {(t.mmHours||0) > 0 ? t.mmHours : '—'}
+                      {(t.mmHours||0) > 0 ? `${t.mmHours}${weekly ? ' שבועי' : ''}` : '—'}
                     </td>
                     <td>{t.mmFor || '—'}</td>
-                    <td style={{ fontSize:13.8, color:'var(--apple-orange)' }}>{t.isTemp ? subInfo(t) : '—'}</td>
+                    <td style={{ fontSize:13.8, color:'var(--apple-orange)' }}>
+                      {weekly ? 'שבועי — כל תקופת החל"ד'
+                        : t.mmFrom ? (!t.mmTo || t.mmTo === t.mmFrom ? fmtD(t.mmFrom) : `${fmtD(t.mmFrom)} – ${fmtD(t.mmTo)}`)
+                        : t.isTemp ? subInfo(t) : '—'}
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -6116,35 +6177,130 @@ function LinkCard({ teacher, locked, onSave }) {
    מורה ומזינה רק את נתוני החודש — היעדרויות, ממ"מ וסטטוס. נתוני
    ההעסקה נשארים בטאב שלהם. שרה ואסתר רואות את אותם דיווחים במסך
    "היעדרויות וממ"מ" שבמערכת. */
-function LinkMonthlyReport({ rows, locked, onSave }) {
-  const [drafts, setDrafts] = useState({});   // teacherId → שינויים שטרם נשמרו
-  const [state,  setState]  = useState({});   // teacherId → '' | saving | saved | שגיאה
-  const cur   = (t) => ({ ...t, ...(drafts[t.id] || {}) });
-  const set   = (t, patch) => setDrafts(m => ({ ...m, [t.id]: { ...(m[t.id] || {}), ...patch } }));
-  const dirty = (t) => Boolean(drafts[t.id] && Object.keys(drafts[t.id]).length);
+/*
+  "לא טוב — תן רשימה נפתחת, כל היעדרות המנהלת תחפש ותוסיף. במקביל
+  תפתח לה רשימה לממלאת מקום" (שרה, 6.9): במקום כרטיס לכל מורה —
+  שני טפסי הוספה עם חיפוש ברשימת עובדות ההוראה של בית הספר, ולמטה
+  רק מה שדווח החודש. "במקום מי" הוא בחירה מהרשימה, לא טקסט חופשי.
+*/
+function LinkMonthlyReport({ rows, locked, onSave, code }) {
+  const byName = (n) => rows.find(t => t.name === String(n || '').trim());
 
-  const save = async (t) => {
-    setState(s => ({ ...s, [t.id]: 'saving' }));
+  // ── טופס היעדרות ──
+  const [absName,  setAbsName]  = useState('');
+  const [absDraft, setAbsDraft] = useState({});
+  const [absState, setAbsState] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const absT = byName(absName);
+
+  // ── טופס מילוי מקום ──
+  const [subName,  setSubName]  = useState('');
+  const [subFor,   setSubFor]   = useState('');
+  const [subHours, setSubHours] = useState('');
+  const [subMode,  setSubMode]  = useState('day');   // יומי | לתקופה
+  const [subFrom,  setSubFrom]  = useState('');
+  const [subTo,    setSubTo]    = useState('');
+  const [subState, setSubState] = useState('');
+  const subT = byName(subName);
+
+  const reason = absDraft.absenceReason ?? absT?.absenceReason ?? '';
+
+  const attachFile = async (file) => {
+    if (!file || !absT) return;
+    setUploading(true); setAbsState('');
     try {
-      await onSave({ ...cur(t), _snapshot: t._snapshot || snapT(t) });
-      setDrafts(m => { const x = { ...m }; delete x[t.id]; return x; });
-      setState(s => ({ ...s, [t.id]: 'saved' }));
-      setTimeout(() => setState(s => (s[t.id] === 'saved' ? { ...s, [t.id]: '' } : s)), 2000);
-    } catch (e) { setState(s => ({ ...s, [t.id]: e.message })); }
+      const path = await store.linkUploadSickForm(code, absT.id, file);
+      setAbsDraft(m => ({ ...m, sickFormPath: path }));
+    } catch (e) { setAbsState(e.message); }
+    finally { setUploading(false); }
   };
 
-  const totAbs  = rows.reduce((s, t) => s + (Number(cur(t).absenceDays) || 0), 0);
-  const totMM   = rows.reduce((s, t) => s + (Number(cur(t).mmHours) || 0), 0);
-  const nLeave  = rows.filter(t => onLeave(cur(t))).length;
+  const saveAbs = async () => {
+    if (!absT) { setAbsState('בחרי עובדת הוראה מהרשימה'); return; }
+    if (!reason) { setAbsState('בחרי סיבה להיעדרות'); return; }
+    if (isLeaveReason(reason) && !(absDraft.leaveFrom ?? absT.leaveFrom)) {
+      setAbsState('יש למלא מאיזה תאריך'); return;
+    }
+    setAbsState('saving');
+    try {
+      /*
+        חופשת לידה וחל"ת הן גם סטטוס עם תאריכים — התלוש והאוטומציות
+        מסתכלים על leaveType. שאר הסיבות משאירות את המורה "עובדת".
+      */
+      const leave = isLeaveReason(reason)
+        ? { leaveType: reason === 'maternity' ? 'maternity' : 'unpaid',
+            leaveFrom: absDraft.leaveFrom ?? absT.leaveFrom,
+            leaveTo:   absDraft.leaveTo   ?? absT.leaveTo }
+        : { leaveType: 'none', leaveFrom: null, leaveTo: null };
+      await onSave({ ...absT, ...absDraft, absenceReason: reason, ...leave,
+        _snapshot: absT._snapshot || snapT(absT) });
+      setAbsName(''); setAbsDraft({}); setAbsState('saved');
+      setTimeout(() => setAbsState(s => (s === 'saved' ? '' : s)), 2500);
+    } catch (e) { setAbsState(e.message); }
+  };
+
+  const saveSub = async (maternitySub) => {
+    if (!subT) { setSubState('בחרי מי מילאה מקום — מהרשימה'); return; }
+    if (!byName(subFor)) { setSubState('בחרי במקום מי — מהרשימה'); return; }
+    const h = Number(subHours);
+    if (!h || h <= 0) { setSubState(maternitySub ? 'כמה שעות שבועיות?' : 'כמה שעות מילאה מקום?'); return; }
+    if (!maternitySub) {
+      if (!subFrom) { setSubState(subMode === 'day' ? 'באיזה תאריך?' : 'מאיזה תאריך?'); return; }
+      if (subMode === 'period' && !subTo) { setSubState('עד איזה תאריך?'); return; }
+    }
+    setSubState('saving');
+    try {
+      // ממ"מ לחל"ד: שעות שבועיות בלי תאריכים (שרה, 6.9)
+      await onSave({ ...subT, mmHours: h, mmFor: String(subFor).trim(),
+        mmFrom: maternitySub ? null : subFrom,
+        mmTo:   maternitySub ? null : (subMode === 'day' ? subFrom : subTo),
+        _snapshot: subT._snapshot || snapT(subT) });
+      setSubName(''); setSubFor(''); setSubHours(''); setSubFrom(''); setSubTo('');
+      setSubState('saved');
+      setTimeout(() => setSubState(s => (s === 'saved' ? '' : s)), 2500);
+    } catch (e) { setSubState(e.message); }
+  };
+
+  // עריכת דיווח קיים — מחזירה אותו לטפסים למעלה עם הערכים הנוכחיים
+  const editReport = (t) => {
+    if ((t.absenceDays || 0) > 0 || onLeave(t) || t.absenceReason) {
+      setAbsName(t.name);
+      setAbsDraft({ absenceDays: t.absenceDays, absenceReason: t.absenceReason || '',
+        leaveFrom: t.leaveFrom, leaveTo: t.leaveTo, sickFormPath: t.sickFormPath });
+    }
+    if ((t.mmHours || 0) > 0 || t.mmFor) {
+      setSubName(t.name); setSubFor(t.mmFor || ''); setSubHours(t.mmHours || '');
+      setSubMode(t.mmFrom && t.mmTo && t.mmTo !== t.mmFrom ? 'period' : 'day');
+      setSubFrom(t.mmFrom || ''); setSubTo(t.mmTo || '');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // "מחיקת דיווח" — ממצא הבדיקה: לא הייתה דרך לבטל דיווח שגוי מהטופס
+  const deleteReport = async (t) => {
+    if (!window.confirm(`למחוק את הדיווח של ${t.name} לחודש הזה?`)) return;
+    await onSave({ ...t,
+      absenceDays: 0, absenceReason: null, sickFormPath: null,
+      leaveType: 'none', leaveFrom: null, leaveTo: null,
+      mmHours: 0, mmFor: '', mmFrom: null, mmTo: null,
+      _snapshot: t._snapshot || snapT(t) });
+  };
+
+  const reported = rows.filter(t =>
+    (t.absenceDays || 0) > 0 || (t.mmHours || 0) > 0 || t.mmFor || onLeave(t) || t.absenceReason);
+  const totAbs = rows.reduce((s, t) => s + (t.absenceDays || 0), 0);
+  const totMM  = rows.reduce((s, t) => s + (t.mmHours || 0), 0);
+
+  const inputStyle = { minHeight:42, fontSize:16.1 };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:11 }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
       {/* הסיכום למעלה — מה שכבר דווח החודש, במבט אחד */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8 }}>
         {[
-          { label:'ימי היעדרות', val: totAbs,  color:'var(--danger)' },
-          { label:'שעות ממ"מ',   val: totMM,   color:'var(--purple)' },
-          { label:'בחופשה',      val: nLeave,  color:'var(--warn)'   },
+          { label:'ימי היעדרות', val: totAbs,           color:'var(--danger)' },
+          { label:'שעות ממ"מ',   val: totMM,            color:'var(--purple)' },
+          { label:'בחופשה',      val: rows.filter(onLeave).length, color:'var(--warn)' },
         ].map(x => (
           <div key={x.label} className="apple-card" style={{ padding:'10px 8px', textAlign:'center' }}>
             <p className="num" style={{ fontWeight:800, fontSize:23, color: x.val ? x.color : 'var(--text3)' }}>{x.val}</p>
@@ -6153,52 +6309,158 @@ function LinkMonthlyReport({ rows, locked, onSave }) {
         ))}
       </div>
 
-      {rows.map(t => {
-        const d = cur(t);
-        const st = state[t.id] || '';
-        const reported = (t.absenceDays || 0) > 0 || (t.mmHours || 0) > 0 || t.mmFor || onLeave(t);
-        return (
-          <div key={t.id} className="apple-card" style={{ padding:'12px 14px',
-            borderRight: reported ? '3px solid var(--purple)' : '3px solid transparent' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, flexWrap:'wrap' }}>
-              <p style={{ fontSize:16.1, fontWeight:700, color:'var(--text)' }}>{t.name}</p>
-              {/* הסיכום על המורה — מה רשום עליה כרגע, לפני כל הקלדה */}
-              <span style={{ fontSize:13.2, color:'var(--text3)' }}>
-                {reported
-                  ? [
-                      (t.absenceDays || 0) > 0 ? `${t.absenceDays} ימי היעדרות` : '',
-                      (t.mmHours || 0) > 0 ? `${t.mmHours} שעות ממ"מ` : '',
-                      t.mmFor ? `במקום ${t.mmFor}` : '',
-                      onLeave(t) ? leaveText(t) : '',
-                    ].filter(Boolean).join(' · ')
-                  : 'לא דווח דבר החודש'}
-              </span>
-            </div>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginTop:9 }}>
-              <LinkField label="ימי היעדרות" value={d.absenceDays} onChange={v => set(t, { absenceDays: v })} />
-              <LinkField label={'שעות ממ' + '"' + 'מ'} value={d.mmHours} onChange={v => set(t, { mmHours: v })} />
-              <LinkField label="במקום מי" type="text" value={d.mmFor} onChange={v => set(t, { mmFor: v })} hint="שם עובד/ת ההוראה" />
-              <LinkSelect label="סטטוס" value={d.leaveType || 'none'}
-                onChange={v => set(t, { leaveType: v, ...(v === 'none' ? { leaveFrom: null, leaveTo: null } : {}) })}
-                options={LEAVE_TYPES.map(x => [x.id, x.label])} />
-              {onLeave(d) && (
+      {/* הרשימה המשותפת לשני הטפסים — חיפוש לפי הקלדה */}
+      <datalist id="school-teachers">
+        {rows.map(t => <option key={t.id} value={t.name} />)}
+      </datalist>
+
+      {/* ── דיווח היעדרות ── */}
+      <div className="apple-card" style={{ padding:'14px 15px' }}>
+        <p style={{ fontSize:16.7, fontWeight:800, color:'var(--danger)', marginBottom:9 }}>דיווח היעדרות</p>
+        <input list="school-teachers" className="apple-input" style={{ ...inputStyle, width:'100%' }}
+          placeholder="חפשי שם עובדת הוראה…" value={absName}
+          onChange={e => { setAbsName(e.target.value); setAbsState(''); }} />
+        {absT && (
+          <>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginTop:10 }}>
+              <LinkSelect label="סיבה" value={reason}
+                onChange={v => setAbsDraft(m => ({ ...m, absenceReason: v }))}
+                options={[['', 'בחרי סיבה…'], ...ABSENCE_REASONS.map(([k, l]) => [k, l])]} />
+              {/* חל"ד/חל"ת נמדדות בתאריכים; שאר הסיבות — בימים */}
+              {!isLeaveReason(reason) && (
+                <LinkField label="ימי היעדרות" value={absDraft.absenceDays ?? absT.absenceDays}
+                  onChange={v => setAbsDraft(m => ({ ...m, absenceDays: v }))} />
+              )}
+              {isLeaveReason(reason) && (
                 <>
-                  <LinkField label="מתאריך" type="date" value={d.leaveFrom} onChange={v => set(t, { leaveFrom: v || null })} />
-                  <LinkField label="עד תאריך" type="date" value={d.leaveTo} onChange={v => set(t, { leaveTo: v || null })} hint="אם ידוע" />
+                  <LinkField label="מתאריך" type="date" value={absDraft.leaveFrom ?? absT.leaveFrom}
+                    onChange={v => setAbsDraft(m => ({ ...m, leaveFrom: v || null }))} />
+                  <LinkField label="עד תאריך" type="date" value={absDraft.leaveTo ?? absT.leaveTo}
+                    onChange={v => setAbsDraft(m => ({ ...m, leaveTo: v || null }))} hint="אם ידוע" />
+                </>
+              )}
+            </div>
+            {/* טופס מחלה — למחלה ולמחלת ילד */}
+            {needsSickForm(reason) && (
+              <div style={{ marginTop:9, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                <label className="apple-btn apple-btn-ghost" style={{ minHeight:40, paddingInline:14, cursor:'pointer' }}>
+                  📎 {uploading ? 'מעלה…' : (absDraft.sickFormPath || absT.sickFormPath) ? 'החלפת טופס המחלה' : 'צירוף טופס מחלה'}
+                  <input type="file" accept="image/*,application/pdf" hidden
+                    onChange={e => { attachFile(e.target.files?.[0]); e.target.value = ''; }} />
+                </label>
+                {(absDraft.sickFormPath || absT.sickFormPath) && !uploading &&
+                  <span style={{ fontSize:14.4, color:'var(--ok)', fontWeight:600 }}>✓ טופס מצורף</span>}
+              </div>
+            )}
+          </>
+        )}
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:10 }}>
+          <button className="apple-btn apple-btn-blue" disabled={locked || absState === 'saving' || uploading || !absT}
+            onClick={saveAbs} style={{ minHeight:40, paddingInline:20, opacity: (locked || !absT) ? .45 : 1 }}>
+            {absState === 'saving' ? 'שומרת…' : 'הוספת היעדרות'}
+          </button>
+          {absState === 'saved' && <span style={{ fontSize:14.4, color:'var(--ok)', fontWeight:600 }}>✓ נשמר</span>}
+          {absState && !['saving','saved'].includes(absState) &&
+            <span style={{ fontSize:13.8, color:'var(--danger)' }}>{absState}</span>}
+        </div>
+      </div>
+
+      {/* ── מילוי מקום ── */}
+      {(() => {
+        const replaced = byName(subFor);
+        /*
+          "ממ"מ לחופשת לידה זה שעות שבועיות, בלי צורך לדווח כל התקופה
+          של חל"ד" (שרה, 6.9): כשהמוחלפת בחל"ד — השעות שבועיות ואין
+          תאריכים. מזוהה מהסטטוס של המוחלפת, בלי שאלה נוספת.
+        */
+        const maternitySub = Boolean(replaced &&
+          (replaced.leaveType === 'maternity' || replaced.absenceReason === 'maternity'));
+        return (
+          <div className="apple-card" style={{ padding:'14px 15px' }}>
+            <p style={{ fontSize:16.7, fontWeight:800, color:'var(--purple)', marginBottom:9 }}>מילוי מקום</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
+              <input list="school-teachers" className="apple-input" style={{ ...inputStyle, width:'100%' }}
+                placeholder="מי מילאה מקום…" value={subName}
+                onChange={e => { setSubName(e.target.value); setSubState(''); }} />
+              <input list="school-teachers" className="apple-input" style={{ ...inputStyle, width:'100%' }}
+                placeholder="במקום מי…" value={subFor}
+                onChange={e => { setSubFor(e.target.value); setSubState(''); }} />
+              {maternitySub ? (
+                <>
+                  <LinkField label="שעות שבועיות" value={subHours} onChange={v => setSubHours(v)} />
+                  <p style={{ fontSize:13.8, color:'var(--purple)', fontWeight:600 }}>
+                    מילוי מקום לחופשת לידה — מדווחים שעות שבועיות בלבד, בלי תאריכים.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="apple-seg" style={{ alignSelf:'flex-start' }}>
+                    <button onClick={() => setSubMode('day')} className={['apple-seg-item', subMode === 'day' ? 'active' : ''].join(' ')}
+                      style={{ padding:'6px 13px', fontSize:14.4 }}>יומי</button>
+                    <button onClick={() => setSubMode('period')} className={['apple-seg-item', subMode === 'period' ? 'active' : ''].join(' ')}
+                      style={{ padding:'6px 13px', fontSize:14.4 }}>לתקופה</button>
+                  </div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:9 }}>
+                    <LinkField label={subMode === 'day' ? 'תאריך' : 'מתאריך'} type="date" value={subFrom}
+                      onChange={v => setSubFrom(v)} />
+                    {subMode === 'period' && (
+                      <LinkField label="עד תאריך" type="date" value={subTo} onChange={v => setSubTo(v)} />
+                    )}
+                    <LinkField label={'שעות ממ' + '"' + 'מ'} value={subHours} onChange={v => setSubHours(v)} />
+                  </div>
                 </>
               )}
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:10 }}>
-              <button className="apple-btn apple-btn-blue" disabled={!dirty(t) || locked || st === 'saving'}
-                onClick={() => save(t)} style={{ minHeight:38, paddingInline:18, opacity: (!dirty(t) || locked) ? .45 : 1 }}>
-                {st === 'saving' ? 'שומר…' : 'שמירה'}
+              <button className="apple-btn apple-btn-blue" disabled={locked || subState === 'saving' || !subT}
+                onClick={() => saveSub(maternitySub)} style={{ minHeight:40, paddingInline:20, opacity: (locked || !subT) ? .45 : 1 }}>
+                {subState === 'saving' ? 'שומרת…' : 'הוספת מילוי מקום'}
               </button>
-              {st === 'saved' && <span style={{ fontSize:14.4, color:'var(--ok)', fontWeight:600 }}>✓ נשמר</span>}
-              {st && st !== 'saving' && st !== 'saved' && <span style={{ fontSize:13.8, color:'var(--danger)' }}>{st}</span>}
+              {subState === 'saved' && <span style={{ fontSize:14.4, color:'var(--ok)', fontWeight:600 }}>✓ נשמר</span>}
+              {subState && !['saving','saved'].includes(subState) &&
+                <span style={{ fontSize:13.8, color:'var(--danger)' }}>{subState}</span>}
             </div>
           </div>
         );
-      })}
+      })()}
+
+      {/* ── מה שדווח החודש ── */}
+      <p style={{ fontSize:14.9, fontWeight:700, color:'var(--text2)', marginTop:2 }}>
+        {reported.length ? `דווח החודש (${reported.length})` : 'עוד לא דווח דבר החודש'}
+      </p>
+      {reported.map(t => (
+        <div key={t.id} className="apple-card"
+          style={{ padding:'11px 14px', borderRight:'3px solid var(--purple)',
+            display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+          <div>
+            <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)' }}>{t.name}</p>
+            <p style={{ fontSize:13.2, color:'var(--text3)' }}>
+              {(() => {
+                const replaced = byName(t.mmFor);
+                const weekly = Boolean(replaced &&
+                  (replaced.leaveType === 'maternity' || replaced.absenceReason === 'maternity'));
+                return [
+                  (t.absenceDays || 0) > 0 ? `${t.absenceDays} ימי היעדרות` : '',
+                  t.absenceReason ? reasonLabel(t.absenceReason) : '',
+                  t.sickFormPath ? '📎 טופס מצורף' : '',
+                  onLeave(t) ? leaveText(t) : '',
+                  (t.mmHours || 0) > 0 ? `${t.mmHours} שעות ממ"מ${weekly ? ' שבועיות' : ''}` : '',
+                  t.mmFor ? `במקום ${t.mmFor}${weekly ? ' (חל"ד)' : ''}` : '',
+                  t.mmFrom ? (!t.mmTo || t.mmTo === t.mmFrom ? `ב-${fmtD(t.mmFrom)}` : `${fmtD(t.mmFrom)} – ${fmtD(t.mmTo)}`) : '',
+                ].filter(Boolean).join(' · ');
+              })()}
+            </p>
+          </div>
+          {!locked && (
+            <div style={{ display:'flex', gap:6 }}>
+              <button className="apple-btn apple-btn-ghost" onClick={() => editReport(t)}
+                style={{ minHeight:34, paddingInline:12, fontSize:13.8 }}>עדכון</button>
+              <button className="apple-btn apple-btn-ghost" onClick={() => deleteReport(t)}
+                style={{ minHeight:34, paddingInline:12, fontSize:13.8, color:'var(--danger)' }}>מחיקה</button>
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -6255,7 +6517,7 @@ function Form101Print({ row, onClose }) {
   ];
 
   return (
-    <div className="print-sheet modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:60, overflowY:'auto' }} dir="rtl">
+    <div className="print-sheet modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:80, overflowY:'auto' }} dir="rtl">
       <div className="modal-card" style={{ maxWidth:820, margin:'20px auto', background:'#fff', padding:'26px 30px', borderRadius:8 }}>
         <div className="no-print modal-head" style={{ display:'flex', justifyContent:'space-between', marginBottom:16, gap:8, flexWrap:'wrap', background:'#fff' }}>
           <button className="apple-btn apple-btn-blue" onClick={() => window.print()}>
@@ -6366,6 +6628,151 @@ function Form101Print({ row, onClose }) {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   תיק המסמכים של עובד/ת — פאנל צד, לא חלון קופץ.
+
+   "אני רוצה צפיה בכל טופס עם אפשרות שמירה" ואז "החלון מסתיר את
+   הטפסים" (שרה, 6.9): המסמך מוצג בצד שמאל, הטבלה נשארת גלויה מימין,
+   ולחיצה על כל ✓ או שם אחר מחליפה את התוכן בלי לסגור. הקובץ יורד
+   כ-objectURL מקומי; שם הקובץ לשמירה נבנה מהעובד/ת והמסמך, לא
+   מהנתיב הפנימי.
+═══════════════════════════════════════════════════════════════ */
+const OB_DOCS = [
+  ['form101_file_path',       'טופס 101 סרוק'],
+  ['id_doc_path',             'צילום תעודת זהות'],
+  ['salary_form_path',        'טופס נתוני שכר'],
+  ['ministry_file_path',      'אסמכתת תיק משרד החינוך'],
+  ['police_doc_path',         'אישור משטרה'],
+  ['tax_coord_path',          'אישור תיאום מס'],
+  ['bank_doc_path',           'אישור ניהול חשבון'],
+  ['contract_signature_path', 'חתימה על החוזה'],
+];
+const OB_PANEL_W = 'min(520px, 100vw)';
+function ObPanel({ row, path, label, onSelect, onClose, onPrint101 }) {
+  const [url, setUrl] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState('');
+  const [copied, setCopied] = useState(false);
+  const docs = OB_DOCS.filter(([k]) => row[k]);
+  const ext = p => (String(p || '').split('.').pop() || 'bin').toLowerCase();
+  const cur = path ? ext(path) : '';
+  const isImg = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(cur);
+  const isPdf = cur === 'pdf';
+
+  useEffect(() => {
+    setUrl(null); setErr('');
+    if (!path) return undefined;
+    let alive = true; let made = null;
+    (async () => {
+      try { const u = await store.obDownload(path); made = u; if (alive) setUrl(u); else URL.revokeObjectURL(u); }
+      catch (e) { if (alive) setErr(e.message || 'הורדת הקובץ נכשלה'); }
+    })();
+    return () => { alive = false; if (made) URL.revokeObjectURL(made); };
+  }, [path]);
+
+  const fname = (p, l) => `${row.name} - ${l}.${ext(p)}`;
+  const save = async (p, l) => {
+    const u = (p === path && url) ? url : await store.obDownload(p);
+    const a = document.createElement('a'); a.href = u; a.download = fname(p, l); a.click();
+    if (u !== url) setTimeout(() => URL.revokeObjectURL(u), 30000);
+  };
+  const openTab = async (p) => {
+    // הכרטיסייה נפתחת בסינכרון עם הלחיצה — אחרת חוסם החלונות הקופצים עוצר אותה
+    const w = window.open('', '_blank');
+    try { w.location = (p === path && url) ? url : await store.obDownload(p); } catch (e) { w.close(); alert(e.message); }
+  };
+  const saveAll = async () => {
+    setBusy('מוריד…');
+    try { for (const [k, l] of docs) { await save(row[k], l); await new Promise(r => setTimeout(r, 400)); } }
+    catch (e) { alert(e.message); }
+    setBusy('');
+  };
+  const b = row.bank || {};
+  const bankLine = `${row.name}: בנק ${b.bank || '—'}, סניף ${b.branch || '—'}, חשבון ${b.account || '—'}, ע"ש ${b.owner || row.name}`;
+  const copyBank = () => { navigator.clipboard.writeText(bankLine); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+  const rowBtn = { minHeight:30, padding:'0 8px', fontSize:13.2 };
+
+  return (
+    <aside dir="rtl" style={{ position:'fixed', top:0, bottom:0, left:0, width:OB_PANEL_W, zIndex:80,
+      background:'var(--bg)', borderInlineStart:'1px solid var(--fill)', boxShadow:'0 0 28px rgba(26,11,53,0.18)',
+      display:'flex', flexDirection:'column' }}>
+      <div style={{ padding:'12px 14px 8px', borderBottom:'1px solid var(--fill)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+        <div style={{ minWidth:0 }}>
+          <p style={{ fontWeight:800, fontSize:16.5, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{row.name}</p>
+          <p style={{ fontSize:12.7, color:'var(--text3)' }}>{row.schools?.name || ''}{row.phone ? ` · ${row.phone}` : ''}</p>
+        </div>
+        <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ minHeight:32, flexShrink:0 }}><X size={14} /> סגירה</button>
+      </div>
+
+      {/* רשימת המסמכים — קומפקטית, כדי שהתצוגה למטה תקבל את רוב הגובה */}
+      <div style={{ padding:'6px 14px', borderBottom:'1px solid var(--fill)', maxHeight:'42vh', overflowY:'auto' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, padding:'6px 0' }}>
+          <span style={{ fontSize:14.4, fontWeight:600 }}>טופס 101</span>
+          {row.form101_signed_at
+            ? <button className="apple-btn apple-btn-ghost" onClick={onPrint101} style={rowBtn}><Printer size={13} /> צפייה / PDF</button>
+            : <span style={{ fontSize:12.7, color:'var(--text3)' }}>טרם נחתם</span>}
+        </div>
+        {docs.map(([k, l]) => {
+          const active = row[k] === path;
+          return (
+            <div key={k} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, padding:'5px 6px', margin:'0 -6px',
+              borderRadius:8, background: active ? '#F3EEFB' : 'transparent' }}>
+              <button onClick={() => onSelect(row[k], l)} title="הצגה בפאנל"
+                style={{ background:'none', border:0, cursor:'pointer', padding:0, font:'inherit', fontSize:14.4, fontWeight: active ? 800 : 600, color: active ? '#4A3A8A' : 'inherit', textAlign:'start' }}>
+                {l}<span style={{ color:'var(--text3)', fontWeight:400, fontSize:12 }}> · {ext(row[k]).toUpperCase()}</span>
+              </button>
+              <span style={{ display:'flex', gap:3, flexShrink:0 }}>
+                <button className="apple-btn apple-btn-ghost" onClick={() => openTab(row[k])} title="במציג של הדפדפן" style={rowBtn}><ExternalLink size={13} /></button>
+                <button className="apple-btn apple-btn-ghost" onClick={() => save(row[k], l).catch(e => alert(e.message))} title="שמירה" style={rowBtn}><Download size={13} /></button>
+              </span>
+            </div>
+          );
+        })}
+        {!docs.length && <p style={{ fontSize:13.2, color:'var(--text3)', padding:'5px 0' }}>עוד לא הועלו קבצים.</p>}
+        {row.bank_saved_at && (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, padding:'6px 0', fontSize:13.8 }}>
+            <span><span style={{ fontWeight:600 }}>בנק:</span> <span dir="ltr">{b.bank || '—'} · {b.branch || '—'} · {b.account || '—'}</span>{b.owner && b.owner !== row.name ? <span style={{ color:'var(--text3)' }}> · ע"ש {b.owner}</span> : null}</span>
+            <button className="apple-btn apple-btn-ghost" onClick={copyBank} style={rowBtn}>{copied ? 'הועתק ✓' : 'העתקה'}</button>
+          </div>
+        )}
+        {docs.length > 0 && (
+          <button className="apple-btn apple-btn-ghost" onClick={saveAll} disabled={!!busy} style={{ ...rowBtn, marginTop:4, width:'100%' }}>
+            <Download size={13} /> {busy || `הורדת הכול (${docs.length})`}
+          </button>
+        )}
+      </div>
+
+      {/* התצוגה — מקבלת את שאר הגובה */}
+      <div style={{ flex:1, minHeight:0, background:'var(--fill)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'auto' }}>
+        {!path ? <p style={{ color:'var(--text3)', fontSize:14.4, padding:20, textAlign:'center' }}>בחרי מסמך מהרשימה — יוצג כאן.</p> :
+         err ? <p style={{ color:'#C62828', padding:20, fontSize:14.4 }}>{err}</p> :
+         !url ? <p style={{ color:'var(--text3)', padding:20 }}>טוען…</p> :
+         isImg ? <img src={url} alt={label} style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain' }} /> :
+         isPdf ? <iframe title={label} src={url} style={{ width:'100%', height:'100%', border:0, background:'#fff' }} /> :
+         <p style={{ padding:20, fontSize:14.4 }}>אין תצוגה מקדימה ל-{cur.toUpperCase()} — "שמירה" תוריד אותו.</p>}
+      </div>
+      {path && url && (
+        <div style={{ padding:'8px 14px', borderTop:'1px solid var(--fill)', display:'flex', gap:8 }}>
+          <a className="apple-btn apple-btn-blue" href={url} download={fname(path, label)} style={{ flex:1, minHeight:34, textDecoration:'none', display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+            <Download size={14} /> שמירה — {label}
+          </a>
+          <button className="apple-btn apple-btn-ghost" onClick={() => window.open(url, '_blank')} title="במציג של הדפדפן" style={{ minHeight:34 }}><ExternalLink size={14} /></button>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+// dataURL של החתימה → File להעלאה (החתימה נקלטת כמחרוזת סינכרונית)
+function dataUrlToFile(dataUrl, name) {
+  const [head, b64] = String(dataUrl).split(',');
+  const mime = (head.match(/:(.*?);/) || [])[1] || 'image/png';
+  const bin = atob(b64 || '');
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new File([arr], name, { type: mime });
+}
+
 function SignaturePad({ onChange }) {
   const ref = useRef(null);
   const drawing = useRef(false);
@@ -6386,13 +6793,19 @@ function SignaturePad({ onChange }) {
   const move  = e => { if (!drawing.current) return; const c = ref.current.getContext('2d');
     c.lineWidth = 2.2; c.lineCap = 'round'; c.strokeStyle = '#1A0B35';
     const { x, y } = pos(e); c.lineTo(x, y); c.stroke(); dirty.current = true; e.preventDefault(); };
-  const end = () => { if (drawing.current && dirty.current) ref.current.toBlob(b => onChange(b), 'image/png'); drawing.current = false; };
+  /*
+    קליטה סינכרונית (toDataURL) ולא toBlob האסינכרוני: מורה שחתמה ומיד
+    לחצה "שליחה" קיבלה "יש לחתום" כי ה-blob עוד לא הוחזר (מרוץ, נמדד
+    6.9). toDataURL מחזיר מחרוזת מיד — אין חלון שבו החתימה "לא נקלטה".
+    onTouchCancel נוסף: בנייד המערכת מבטלת מגע לפעמים בלי touchend.
+  */
+  const end = () => { if (drawing.current && dirty.current) onChange(ref.current.toDataURL('image/png')); drawing.current = false; };
   const clear = () => { const c = ref.current.getContext('2d'); c.clearRect(0, 0, 400, 140); dirty.current = false; onChange(null); };
   return (
     <div>
       <canvas ref={ref} width={400} height={140}
         onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
-        onTouchStart={start} onTouchMove={move} onTouchEnd={end}
+        onTouchStart={start} onTouchMove={move} onTouchEnd={end} onTouchCancel={end}
         style={{ width:'100%', maxWidth:400, height:140, background:'#fff', border:'2px dashed var(--line)', borderRadius:12, touchAction:'none', display:'block' }} />
       <button type="button" onClick={clear} className="apple-btn apple-btn-ghost" style={{ marginTop:6, minHeight:30, padding:'0 12px', fontSize:13.8 }}>ניקוי חתימה</button>
     </div>
@@ -6483,7 +6896,11 @@ function ContractDoc({ me, form, sigUrl }) {
         const fh = Number(me.frontal_hours) || 0;
         if (me.reform === 'ofek' && fh > 0) {
           // הפירוט פרונטלי/פרטני/שהייה — רק לעובדות אופק (שרה, 3.9)
-          const d = deriveHours({ reform: 'ofek', level: me.level, frontalHours: me.frontal_hours, scopePct: me.scope_pct, scope: me.scope_pct });
+          // מין, ילדים וגיל קובעים את עמודת הטבלה הרשמית (אם / שעות גיל) —
+          // בלעדיהם ההסכם הציג לאם את עמודת המורה הרגילה (שרה, 6.9)
+          const d = deriveHours({ reform: 'ofek', level: me.level, frontalHours: me.frontal_hours,
+            scopePct: me.scope_pct, scope: me.scope_pct,
+            gender: me.gender, childrenUnder18: me.children_under_18, ageGroup: me.age_group });
           const ind = d?.individual ?? 0;
           const pres = d?.presence ?? 0;
           return <Hl>{fh} שעות פרונטליות + {ind} שעות פרטניות + {pres} שעות שהייה = {fh + ind + pres} שעות</Hl>;
@@ -6566,6 +6983,10 @@ function OnboardingView({ code }) {
   // אסמכתת התיק ירדה: "אם יש נתוני שכר אז יש תיק במשרד" (שרה, 3.9).
   // אישור משטרה — חובה לגברים בלבד (חוק למניעת העסקה של עברייני מין).
   const isMale = me.gender === 'm';
+  // "יש גם גברים" (שרה, 6.9): לשון הפנייה עוקבת אחרי המין שסומן בטופס
+  // עצמו, ולפני שסומן — אחרי הרישום במערכת. ברירת המחדל נשארת נקבה.
+  const male101 = (form.sex || (isMale ? 'm' : 'f')) === 'm';
+  const pick = male101 ? 'בחר' : 'בחרי';
   const steps = [
     me.form101_signed, me.has_id_doc, me.has_salary_form,
     isMale ? me.has_police_doc : null,
@@ -6584,7 +7005,7 @@ function OnboardingView({ code }) {
     if (!form.declare) { setMsg('יש לאשר את ההצהרה'); return; }
     if (!sig) { setMsg('יש לחתום במסגרת החתימה'); return; }
     setMsg('');
-    const path = await store.obUpload(code, 'signature', new File([sig], 'signature.png', { type:'image/png' }));
+    const path = await store.obUpload(code, 'signature', dataUrlToFile(sig, 'signature.png'));
     await store.obSave(code, { form101: form, sign101: true, signature_path: path });
     await load();
   };
@@ -6611,7 +7032,7 @@ function OnboardingView({ code }) {
   };
   const signContract = async () => {
     if (!contractSig) { setMsg('יש לחתום במסגרת החתימה על החוזה'); return; }
-    const path = await store.obUpload(code, 'contract-signature', new File([contractSig], 'contract-sig.png', { type:'image/png' }));
+    const path = await store.obUpload(code, 'contract-signature', dataUrlToFile(contractSig, 'contract-sig.png'));
     await store.obSave(code, { contract_signature_path: path, sign_contract: true });
     await load();
   };
@@ -6684,8 +7105,10 @@ function OnboardingView({ code }) {
                 </select></div>
               <div style={{ flex:'1 1 150px' }}><p className="apple-label">מצב משפחתי</p>
                 <select value={form.marital || ''} onChange={e => setF('marital', e.target.value)} className="apple-select" style={{ width:'100%' }}>
-                  <option value="">בחרי</option><option>רווקה</option><option>נשואה</option>
-                  <option>גרושה</option><option>אלמנה</option><option>פרודה</option>
+                  <option value="">{pick}</option>
+                  {(male101 ? ['רווק', 'נשוי', 'גרוש', 'אלמן', 'פרוד']
+                            : ['רווקה', 'נשואה', 'גרושה', 'אלמנה', 'פרודה'])
+                    .map(o => <option key={o}>{o}</option>)}
                 </select></div>
               {field('address','רחוב ומספר')}
               {field('city','יישוב')}
@@ -6694,13 +7117,13 @@ function OnboardingView({ code }) {
               {field('email','דוא"ל','email','ltr')}
               <div style={{ flex:'1 1 100%' }}><p className="apple-label">תושבות</p>
                 <select value={form.resident || 'yes'} onChange={e => setF('resident', e.target.value)} className="apple-select" style={{ width:'100%' }}>
-                  <option value="yes">תושבת ישראל</option>
-                  <option value="no">אינני תושבת ישראל</option>
+                  <option value="yes">{male101 ? 'תושב ישראל' : 'תושבת ישראל'}</option>
+                  <option value="no">{male101 ? 'אינני תושב ישראל' : 'אינני תושבת ישראל'}</option>
                 </select></div>
             </div>
 
-            {/* ── ג. בן/בת הזוג ── */}
-            {form.marital === 'נשואה' && (<>
+            {/* ── ג. בן/בת הזוג ── (נשואה או נשוי — הערך נשמר לפי הלשון שנבחרה) */}
+            {/^נשו/.test(form.marital || '') && (<>
               <p style={{ fontWeight:700, fontSize:15.5, color:'var(--purple)', margin:'14px 0 8px' }}>פרטי בן/בת הזוג</p>
               <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
                 {field('spouseName','שם מלא')}
@@ -6708,7 +7131,7 @@ function OnboardingView({ code }) {
                 {field('spouseBirth','תאריך לידה','date')}
                 <div style={{ flex:'1 1 100%' }}><p className="apple-label">האם יש לו/ה הכנסה?</p>
                   <select value={form.spouseIncome || ''} onChange={e => setF('spouseIncome', e.target.value)} className="apple-select" style={{ width:'100%' }}>
-                    <option value="">בחרי</option><option value="yes">כן</option><option value="no">לא</option>
+                    <option value="">{pick}</option><option value="yes">כן</option><option value="no">לא</option>
                   </select></div>
               </div>
             </>)}
@@ -6747,19 +7170,19 @@ function OnboardingView({ code }) {
             <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
               <div style={{ flex:'1 1 100%' }}><p className="apple-label">האם זו הכנסתך היחידה?</p>
                 <select value={form.otherIncome || ''} onChange={e => setF('otherIncome', e.target.value)} className="apple-select" style={{ width:'100%' }}>
-                  <option value="">בחרי</option>
-                  <option value="no">כן — זו הכנסתי היחידה, מבקשת חישוב מס רגיל</option>
+                  <option value="">{pick}</option>
+                  <option value="no">{`כן — זו הכנסתי היחידה, ${male101 ? 'מבקש' : 'מבקשת'} חישוב מס רגיל`}</option>
                   <option value="yes">לא — יש לי הכנסה נוספת, אמציא תיאום מס</option>
                 </select></div>
               {form.otherIncome === 'yes' && (<>
                 {field('otherEmployer','שם המעסיק הנוסף')}
                 <div style={{ flex:'1 1 150px' }}><p className="apple-label">סוג ההכנסה הנוספת</p>
                   <select value={form.otherKind || ''} onChange={e => setF('otherKind', e.target.value)} className="apple-select" style={{ width:'100%' }}>
-                    <option value="">בחרי</option><option>משכורת</option><option>קצבה</option>
+                    <option value="">{pick}</option><option>משכורת</option><option>קצבה</option>
                     <option>מלגה</option><option>עסק</option><option>אחר</option>
                   </select></div>
                 <p style={{ flex:'1 1 100%', fontSize:13.2, color:'#E65100', fontWeight:600 }}>
-                  שימי לב: בהמשך העמוד יש להעלות אישור תיאום מס.
+                  {male101 ? 'שים לב' : 'שימי לב'}: בהמשך העמוד יש להעלות אישור תיאום מס.
                 </p>
               </>)}
             </div>
@@ -6769,7 +7192,7 @@ function OnboardingView({ code }) {
             <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
               <div style={{ flex:'1 1 100%' }}><p className="apple-label">האם עבדת בעבר ברשת גני חב"ד?</p>
                 <select value={form.workedBefore || ''} onChange={e => setF('workedBefore', e.target.value)} className="apple-select" style={{ width:'100%' }}>
-                  <option value="">בחרי</option>
+                  <option value="">{pick}</option>
                   <option value="yes">כן — עבדתי בעבר ברשת גני חב"ד</option>
                   <option value="no">לא — זו העסקתי הראשונה ברשת</option>
                 </select></div>
@@ -6779,18 +7202,18 @@ function OnboardingView({ code }) {
             {/* ── ו. נקודות זיכוי ── */}
             <p style={{ fontWeight:700, fontSize:15.5, color:'var(--purple)', margin:'14px 0 4px' }}>בקשה לנקודות זיכוי</p>
             <p style={{ fontSize:13.2, color:'var(--text3)', marginBottom:8 }}>
-              סמני את מה שחל עלייך. לכל סעיף שתסמני יש לצרף אסמכתה.
+              {male101 ? 'סמן את מה שחל עליך. לכל סעיף שתסמן' : 'סמני את מה שחל עלייך. לכל סעיף שתסמני'} יש לצרף אסמכתה.
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
               {[
-                ['creditResident', 'תושבת ישראל'],
-                ['creditNewImmigrant', 'עולה חדשה'],
-                ['creditSoldier', 'חיילת משוחררת / שירות לאומי'],
+                ['creditResident', male101 ? 'תושב ישראל' : 'תושבת ישראל'],
+                ['creditNewImmigrant', male101 ? 'עולה חדש' : 'עולה חדשה'],
+                ['creditSoldier', male101 ? 'חייל משוחרר / שירות לאומי' : 'חיילת משוחררת / שירות לאומי'],
                 ['creditDegree', 'סיום תואר אקדמי או לימודי מקצוע'],
                 ['creditSingleParent', 'הורה יחיד'],
                 ['creditDisabled', 'ילד נטול יכולת'],
                 ['creditAlimony', 'תשלום מזונות'],
-                ['creditSettlement', 'תושבת יישוב מזכה'],
+                ['creditSettlement', male101 ? 'תושב יישוב מזכה' : 'תושבת יישוב מזכה'],
               ].map(([k, l]) => (
                 <label key={k} style={{ display:'flex', gap:8, alignItems:'center', fontSize:14.4, color:'var(--text2)' }}>
                   <input type="checkbox" checked={!!form[k]} onChange={e => setF(k, e.target.checked)} />
@@ -6801,7 +7224,7 @@ function OnboardingView({ code }) {
 
             <label style={{ display:'flex', gap:8, alignItems:'flex-start', marginTop:12, fontSize:14.4, color:'var(--text2)' }}>
               <input type="checkbox" checked={!!form.declare} onChange={e => setF('declare', e.target.checked)} style={{ marginTop:2 }} />
-              <span>אני מצהירה כי הפרטים שמסרתי בטופס זה מלאים ונכונים, וידוע לי שמסירת פרטים לא נכונים היא עבירה על פקודת מס הכנסה.</span>
+              <span>אני {male101 ? 'מצהיר' : 'מצהירה'} כי הפרטים שמסרתי בטופס זה מלאים ונכונים, וידוע לי שמסירת פרטים לא נכונים היא עבירה על פקודת מס הכנסה.</span>
             </label>
             <p className="apple-label" style={{ marginTop:12 }}>חתימה (בתוך המסגרת, באצבע או בעכבר)</p>
             <SignaturePad onChange={setSig} />
@@ -6813,7 +7236,7 @@ function OnboardingView({ code }) {
         </div>
 
         {/* ── שלבים 2–4: העלאות ── */}
-        <ObUpload label="2 · צילום תעודת זהות" hint="צלמי או העלי קובץ" done={me.has_id_doc} onFile={upload('id_doc')} />
+        <ObUpload label="2 · צילום תעודת זהות" hint={male101 ? 'צלם או העלה קובץ' : 'צלמי או העלי קובץ'} done={me.has_id_doc} onFile={upload('id_doc')} />
         <ObUpload label="3 · טופס נתוני שכר — משרד החינוך" hint="הטופס מהפורטל של משרד החינוך" done={me.has_salary_form} onFile={upload('salary_form')} />
         {/* "אם אין פרטים במשרד החינוך יש לפתוח תיק מקוון על שם סמל המוסד" (שרה, 3.9) */}
         {!me.has_salary_form && (
@@ -6882,7 +7305,7 @@ function OnboardingView({ code }) {
         <div className="apple-card" style={{ padding:18 }}>
           <p style={{ fontWeight:800, fontSize:18.4 }}>7 · חוזה העסקה</p>
           {!me.contract_available ? (
-            <p style={{ fontSize:14.9, color:'var(--text3)', marginTop:6 }}>החוזה יעלה בקרוב — תקבלי הודעה כשיהיה מוכן לחתימה.</p>
+            <p style={{ fontSize:14.9, color:'var(--text3)', marginTop:6 }}>החוזה יעלה בקרוב — {male101 ? 'תקבל' : 'תקבלי'} הודעה כשיהיה מוכן לחתימה.</p>
           ) : me.contract_signed ? (
             <div>
               <p style={{ color:'var(--ok)', fontWeight:700, fontSize:15.5, marginTop:6 }}>✓ נחתם. תודה!</p>
@@ -6910,6 +7333,8 @@ function OnboardingAdmin({ activeMonth, onClose }) {
   const [busy, setBusy] = useState('');
   const [copied, setCopied] = useState('');
   const [print101, setPrint101] = useState(null);   // הטופס הרשמי להדפסה
+  // תיק המסמכים בפאנל צד: {row, path?, label?} — הטבלה נשארת גלויה לצידו
+  const [panel, setPanel] = useState(null);
 
   const load = useCallback(async () => setRows(await store.listOnboarding()), []);
   useEffect(() => { Promise.resolve().then(load); }, [load]);
@@ -6917,12 +7342,12 @@ function OnboardingAdmin({ activeMonth, onClose }) {
   const makeLinks = async () => {
     setBusy('יוצר קישורים…');
     try { const n = await store.createOnboardingLinks(activeMonth); setBusy(''); await load();
-      alert(n ? `נוצרו ${n} קישורים חדשים` : 'לכל העובדות כבר יש קישור'); }
+      alert(n ? `נוצרו ${n} קישורים חדשים` : 'לכל העובדים כבר יש קישור'); }
     catch (e) { setBusy(''); alert(e.message); }
   };
   const uploadContract = async f => {
     setBusy('מעלה חוזה…');
-    try { await store.uploadContract(f); setBusy(''); alert('החוזה הועלה — יופיע אצל כל העובדות לחתימה'); }
+    try { await store.uploadContract(f); setBusy(''); alert('החוזה הועלה — יופיע אצל כל העובדים לחתימה'); }
     catch (e) { setBusy(''); alert(e.message); }
   };
   const copy = (code, name) => {
@@ -6936,17 +7361,25 @@ function OnboardingAdmin({ activeMonth, onClose }) {
   const total = (rows || []).length;
   const complete = (rows || []).filter(r => doneOf(r) >= 5).length;
 
-  return (
-    <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:70, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:16, overflowY:'auto', backdropFilter:'blur(6px)' }} onClick={onClose}>
+  /*
+    חלונות הצפייה מרונדרים מחוץ לשכבת הקליטה: ה-backdropFilter שלה הופך
+    אותה ל-containing block, ו-position:fixed שבתוכה נמדד ממנה ולא מהמסך —
+    "נפתח למעלה" (שרה, 6.9): מי שגללה לתחתית הרשימה ראתה את החלון בראשה.
+  */
+  return (<>
+    <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:70, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:16,
+        paddingLeft: panel ? `calc(${OB_PANEL_W} + 16px)` : 16,   // הטבלה זזה ימינה ונשארת גלויה ליד הפאנל
+        overflowY:'auto', backdropFilter:'blur(6px)' }} onClick={onClose}>
       <div className="apple-card modal-card" onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:860, padding:22, marginTop:20 }} dir="rtl">
         <div className="modal-head" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:4 }}>
           <div>
-            <p style={{ fontWeight:800, fontSize:20.7 }}>קליטת עובדות — טופס 101, מסמכים וחוזה</p>
+            {/* "יש גם גברים" (שרה, 6.9) — לשון כוללת בכל מסך הקליטה */}
+            <p style={{ fontWeight:800, fontSize:20.7 }}>קליטת עובדים — טופס 101, מסמכים וחוזה</p>
             <p style={{ fontSize:14.4, color:'var(--text3)' }}>דדליין: {OB_DEADLINE} · הושלמו {complete} / {total}</p>
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             <button className="apple-btn apple-btn-blue" onClick={makeLinks} style={{ minHeight:36, fontSize:14.4 }}>
-              יצירת קישורים לכל העובדות
+              יצירת קישורים לכל העובדים
             </button>
             <label className="apple-btn apple-btn-ghost" style={{ minHeight:36, fontSize:14.4, cursor:'pointer' }}>
               <Upload size={14} /> העלאת החוזה (PDF)
@@ -6962,35 +7395,60 @@ function OnboardingAdmin({ activeMonth, onClose }) {
          !rows.length ? (
           <div style={{ textAlign:'center', padding:'30px 10px' }}>
             <p style={{ fontWeight:700 }}>אין עדיין קישורי קליטה</p>
-            <p style={{ fontSize:14.4, color:'var(--text3)' }}>לחיצה על "יצירת קישורים" תפיק קישור אישי לכל עובדת בכל בתי הספר, מתוך חודש {fmtMonth(activeMonth)}.</p>
+            <p style={{ fontSize:14.4, color:'var(--text3)' }}>לחיצה על "יצירת קישורים" תפיק קישור אישי לכל עובד/ת בכל בתי הספר, מתוך חודש {fmtMonth(activeMonth)}.</p>
           </div>
         ) : Object.entries(bySchool).map(([sn, list]) => (
           <div key={sn} style={{ marginTop:14 }}>
-            <p style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:6 }}>{sn} · {list.filter(r => doneOf(r) >= 7).length}/{list.length} הושלמו</p>
+            {/* אותו סף כמו בכותרת למעלה — doneOf סופר 6 פריטים לכל היותר, והשוואה ל-7 הציגה תמיד 0 */}
+            <p style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:6 }}>{sn} · {list.filter(r => doneOf(r) >= 5).length}/{list.length} הושלמו</p>
             <div className="table-scroll">
               <table className="apple-table sticky-first" style={{ fontSize:13.8 }}>
                 <thead><tr>
-                  <th>עובדת</th><th style={{ textAlign:'center' }}>101</th><th style={{ textAlign:'center' }}>ת.ז.</th>
+                  <th>עובד/ת</th><th style={{ textAlign:'center' }}>101</th><th style={{ textAlign:'center' }}>ת.ז.</th>
                   <th style={{ textAlign:'center' }}>נתוני שכר</th><th style={{ textAlign:'center' }}>תיק משה"ח</th>
+                  <th style={{ textAlign:'center' }} title="אישור היעדר עבירות מין — גברים בלבד">משטרה</th>
                   <th style={{ textAlign:'center' }} title="פרטי חשבון הבנק">בנק</th>
                   <th style={{ textAlign:'center' }} title="אישור ניהול חשבון או צ׳ק מבוטל">אישור</th>
                   <th style={{ textAlign:'center' }}>חוזה</th><th style={{ textAlign:'center' }}>קישור</th>
                 </tr></thead>
                 <tbody>
                   {list.map(r => {
-                    const C = ok => ok
-                      ? <Check size={15} strokeWidth={2.6} color="var(--ok)" />
-                      : <span style={{ color:'var(--text3)' }}>—</span>;
+                    // ✓ לחיץ פותח את המסמך עצמו לצפייה ושמירה; בלי open — ✓ דומם
+                    const C = (ok, open, title) => !ok
+                      ? <span style={{ color:'var(--text3)' }}>—</span>
+                      : open
+                        ? <button onClick={open} title={title || 'צפייה ושמירה'}
+                            style={{ background:'none', border:0, cursor:'pointer', padding:3, lineHeight:0, borderRadius:6 }}>
+                            <Check size={15} strokeWidth={2.6} color="var(--ok)" />
+                          </button>
+                        : <Check size={15} strokeWidth={2.6} color="var(--ok)" />;
+                    const doc = (path, label) => () => setPanel({ row: r, path, label });
                     return (
                       <tr key={r.id}>
-                        <td style={{ fontWeight:600 }}>{r.name}<span style={{ color:'var(--text3)', fontWeight:400 }}>{r.phone ? ` · ${r.phone}` : ' · אין טלפון'}</span></td>
-                        <td style={{ textAlign:'center' }}>{C(r.form101_signed_at)}</td>
-                        <td style={{ textAlign:'center' }}>{C(r.id_doc_path)}</td>
-                        <td style={{ textAlign:'center' }}>{C(r.salary_form_path)}</td>
-                        <td style={{ textAlign:'center' }}>{C(r.ministry_file_path)}</td>
-                        <td style={{ textAlign:'center' }}>{C(r.bank_saved_at)}</td>
-                        <td style={{ textAlign:'center' }}>{C(r.bank_doc_path)}</td>
-                        <td style={{ textAlign:'center' }}>{C(r.contract_signed_at)}</td>
+                        <td style={{ fontWeight:600 }}>
+                          {/* השם פותח את תיק המסמכים המלא — "תחשוב על יעילות" (שרה, 6.9) */}
+                          <button onClick={() => setPanel({ row: r })} title="תיק המסמכים — כל המסמכים ברשימה אחת"
+                            style={{ background:'none', border:0, cursor:'pointer', padding:0, font:'inherit', fontWeight:600, color:'var(--purple)', display:'inline-flex', alignItems:'center', gap:5 }}>
+                            <FolderOpen size={14} strokeWidth={2.2} />{r.name}
+                          </button>
+                          <span style={{ color:'var(--text3)', fontWeight:400 }}>{r.phone ? ` · ${r.phone}` : ' · אין טלפון'}</span>
+                        </td>
+                        <td style={{ textAlign:'center', whiteSpace:'nowrap' }}>
+                          {C(r.form101_signed_at, () => setPrint101(r), 'טופס 101 — צפייה, הדפסה ושמירה כ-PDF')}
+                          {r.form101_file_path && (
+                            <button onClick={doc(r.form101_file_path, 'טופס 101 סרוק')} title="טופס 101 סרוק שהועלה"
+                              style={{ background:'none', border:0, cursor:'pointer', padding:3, lineHeight:0 }}>
+                              <Paperclip size={13} strokeWidth={2.2} color="var(--text3)" />
+                            </button>
+                          )}
+                        </td>
+                        <td style={{ textAlign:'center' }}>{C(r.id_doc_path, doc(r.id_doc_path, 'צילום תעודת זהות'))}</td>
+                        <td style={{ textAlign:'center' }}>{C(r.salary_form_path, doc(r.salary_form_path, 'טופס נתוני שכר'))}</td>
+                        <td style={{ textAlign:'center' }}>{C(r.ministry_file_path, doc(r.ministry_file_path, 'אסמכתת תיק משרד החינוך'))}</td>
+                        <td style={{ textAlign:'center' }}>{C(r.police_doc_path, doc(r.police_doc_path, 'אישור משטרה'))}</td>
+                        <td style={{ textAlign:'center' }}>{C(r.bank_saved_at, () => setPanel({ row: r }), 'פרטי חשבון הבנק')}</td>
+                        <td style={{ textAlign:'center' }}>{C(r.bank_doc_path, doc(r.bank_doc_path, 'אישור ניהול חשבון'))}</td>
+                        <td style={{ textAlign:'center' }}>{C(r.contract_signed_at, r.contract_signature_path ? doc(r.contract_signature_path, 'חתימה על החוזה') : null, 'החתימה על החוזה')}</td>
                         <td style={{ textAlign:'center', whiteSpace:'nowrap' }}>
                           <button className="apple-btn apple-btn-ghost" onClick={() => copy(r.code, r.name)} style={{ minHeight:28, padding:'0 10px', fontSize:13.2 }}>
                             {copied === r.name ? 'הועתק ✓' : 'העתקה'}
@@ -7013,12 +7471,17 @@ function OnboardingAdmin({ activeMonth, onClose }) {
           </div>
         ))}
         <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:14 }}>
+          לחיצה על שם או על ✓ פותחת את המסמכים בפאנל בצד — הטבלה נשארת גלויה ·
           השליחה בוואטסאפ נעשית דרך scripts/send-onboarding.mjs — הרצה יבשה קודם, שליחה רק באישורך.
         </p>
       </div>
-      {print101 && <Form101Print row={print101} onClose={() => setPrint101(null)} />}
     </div>
-  );
+    {print101 && <Form101Print row={print101} onClose={() => setPrint101(null)} />}
+    {panel && <ObPanel row={panel.row} path={panel.path} label={panel.label}
+      onSelect={(path, label) => setPanel(p => ({ ...p, path, label }))}
+      onClose={() => setPanel(null)}
+      onPrint101={() => setPrint101(panel.row)} />}
+  </>);
 }
 
 function LinkView({ code }) {
@@ -7149,7 +7612,7 @@ function LinkView({ code }) {
               </button>
             </div>
             {tab === 'report' ? (
-              <LinkMonthlyReport rows={rows} locked={locked} onSave={onSave} />
+              <LinkMonthlyReport rows={rows} locked={locked} onSave={onSave} code={code} />
             ) : (
               <>
                 <p style={{ fontSize:14.4, color:'var(--text3)', marginBottom:11 }}>
@@ -7329,27 +7792,40 @@ export default function App() {
     if (user?.role !== 'coordinator') return undefined;
     let alive = true;
     const tick = async () => {
+      let reqs;
       try {
-        const reqs = await store.openSimRequests();
-        if (!alive) return;
-        const st = {};
-        for (const r of reqs) {
+        reqs = await store.openSimRequests();
+      } catch { return; /* רשת רגעית — הסבב הבא ידביק */ }
+      if (!alive) return;
+      const st = {};
+      let needsRefresh = false;
+      for (const r of reqs) {
+        // כל בקשה בטיפול משלה: כשל בשמירה של אחת לא מדלג על ניקוי
+        // הספינרים של כל השאר (הבאג של "תקוע לנצח", 6.9).
+        try {
           if (r.status === 'done' && r.result_gross != null) {
-            const row = (months[activeMonth] || []).find(x => x.id === r.teacher_month_id);
-            await store.deleteSimRequest(r.id);
-            if (row && row._officialGross !== r.result_gross) {
-              await store.saveTeacher({ id: row.id, _officialGross: r.result_gross }, activeMonth);
-              await refresh();
+            // השורה מחפשׂת בכל החודשים, לא רק בפעיל — חישוב של חודש אחר
+            // נשמר גם הוא ולא נזרק (הברוטו אבד כשהיה מסונן ל-activeMonth).
+            let row = null, rowMonth = activeMonth;
+            for (const [mk, list] of Object.entries(months)) {
+              const hit = list.find(x => x.id === r.teacher_month_id);
+              if (hit) { row = hit; rowMonth = mk; break; }
             }
+            if (row && row._officialGross !== r.result_gross) {
+              await store.saveTeacher({ id: row.id, _officialGross: r.result_gross }, rowMonth);
+              needsRefresh = true;
+            }
+            await store.deleteSimRequest(r.id);
           } else if (r.status === 'failed') {
             setError('החישוב נכשל: ' + (r.error || 'סיבה לא ידועה'));
             await store.deleteSimRequest(r.id);
           } else {
             st[r.teacher_month_id] = r.status;
           }
-        }
-        if (alive) setSimState(st);
-      } catch { /* רשת רגעית — הסבב הבא ידביק */ }
+        } catch { /* בקשה בודדת נכשלה — לא נועלים את המסך בגללה */ }
+      }
+      if (alive) setSimState(st);        // תמיד — הספינרים מתנקים לפי המצב האמיתי
+      if (alive && needsRefresh) { try { await refresh(); } catch { /* הסבב הבא */ } }
     };
     const iv = setInterval(tick, 7000);
     tick();
@@ -7864,6 +8340,11 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* שורת הקרדיט — פעם אחת, בתחתית המעטפת, בכל מסך אחרי התחברות */}
+      <footer className="no-print" style={{ marginTop:'auto' }}>
+        <CreditLine className="px-4 pt-6 pb-[calc(1rem+env(safe-area-inset-bottom))]" />
+      </footer>
 
       {showApproval && (
         <ApprovalView

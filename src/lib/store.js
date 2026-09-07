@@ -40,8 +40,12 @@ const TEACHER_FIELDS = [
   ['leave_from',           'leaveFrom'],
   ['leave_to',             'leaveTo'],
   ['absence_days',         'absenceDays'],
+  ['absence_reason',       'absenceReason'],
+  ['sick_form_path',       'sickFormPath'],
   ['mm_hours',             'mmHours'],
   ['mm_for',               'mmFor'],
+  ['mm_from',              'mmFrom'],
+  ['mm_to',                'mmTo'],
   ['monthly_extras',       'monthlyExtras'],
   ['travel_days',          'travelDays'],
   ['daycare_children',     'daycareChildren'],
@@ -466,6 +470,34 @@ export async function linkSaveRow(code, teacher) {
   const { data, error } = await supabase.rpc('link_save_row', { p_code: code, p_row: row });
   raise(error, 'השמירה נכשלה');
   return data ? rowToTeacher(data) : null;
+}
+
+/*
+  טופס מחלה מהקישור — הקובץ עולה דרך השרת (אין session לקישור), והנתיב
+  שחוזר נשמר על השורה דרך link_save_row כמו כל שדה אחר.
+*/
+export async function linkUploadSickForm(code, teacherMonthId, file) {
+  const dataBase64 = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1]);
+    r.onerror = () => reject(new Error('קריאת הקובץ נכשלה'));
+    r.readAsDataURL(file);
+  });
+  const res = await fetch('/api/link-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, teacherMonthId, contentType: file.type, dataBase64 }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || 'העלאת טופס המחלה נכשלה');
+  return j.path;
+}
+
+// קישור צפייה לטופס מחלה — לשרה ולחשבת (מדיניות הדלי מגבילה לקריאה שלהן)
+export async function sickFormUrl(path) {
+  const { data, error } = await supabase.storage.from('sick-forms').createSignedUrl(path, 600);
+  raise(error, 'פתיחת טופס המחלה נכשלה');
+  return data.signedUrl;
 }
 
 /* ── מסמכים מהנהלת החשבונות ────────────────────────────────────
