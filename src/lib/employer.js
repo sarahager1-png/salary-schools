@@ -541,26 +541,24 @@ function calcEmployer(t) {
   const extras = calcExtras(t);
   const { parts, total: itemized } = employerParts(t, base, supplement);
 
-  // רצפת תקצוב: העלות למעסיק לא יורדת מ-140% מהברוטו. הפירוט למעלה מגיע
-  // ל-127%–142% לפי תמהיל הבסיס והתוספת, ואינו כולל עדיין נסיעות ומעונות —
-  // ולכן תקצוב לפיו בלבד יוצא חסר. ההשלמה מוצגת כשורה נפרדת ולא מובלעת
-  // ברכיבים, כדי שיישאר ברור מה מפורט ומה אומדן, וכדי שברגע שנסיעות
-  // ומעונות ייכנסו כרכיבים אמיתיים היא תצטמצם מעצמה. הוראת שרה 29.8.
-  const FLOOR_RATE = 0.40;
+  // רצפת תקצוב: העלות למעסיק לא יורדת מ-150% מהברוטו המתוכנן. הפירוט
+  // למעלה מגיע ל-127%–142% לפי תמהיל הבסיס והתוספת, ואינו כולל עדיין
+  // נסיעות ומעונות — ולכן תקצוב לפיו בלבד יוצא חסר. ההשלמה מוצגת כשורה
+  // נפרדת ולא מובלעת ברכיבים, כדי שיישאר ברור מה מפורט ומה אומדן, וכדי
+  // שברגע שנסיעות ומעונות ייכנסו כרכיבים אמיתיים היא תצטמצם מעצמה.
+  // היה 140% (הוראת שרה 29.8). הועלה ל-150% ב-7.9 אחרי הצלבת תלוש מרכז
+  // של שנה שעברה מול התכנון ברמת ישי: אצל ארבע מורות שניתן היה להצליב,
+  // הברוטו בפועל יצא 1.146 מהמתוכנן ועלות המעביד 1.308 מהברוטו בפועל —
+  // 1.499 מהברוטו המתוכנן, בטווח צר (1.13–1.16). המנהלת הוצאה מהמדגם.
+  const FLOOR_RATE = 0.50;
   const floorGap = Math.max(0, Math.round(gross * FLOOR_RATE) - itemized);
   if (floorGap > 0) {
     parts.push({
       key: 'floor',
-      label: 'השלמה ל-140% (נסיעות, מעונות ותוספות שטרם פורטו)',
+      label: 'השלמה ל-150% (נסיעות, מעונות ותוספות שטרם פורטו)',
       rate: null, on: null, amount: floorGap,
     });
   }
-  const estimate = itemized + floorGap;
-
-  const employerSupp = supplementCost(base, supplement, extras.biguud, extras.havraah);
-  const employerBase = estimate - employerSupp;
-  const actual   = Number(t._actualEmployerCost) || 0;
-  const social   = actual || estimate;
   /*
     מילוי מקום: 100 ₪ לשעה (משרה מלאה = 90 שעות בחודש — שרה, 3.9).
     התשלום למ"מ אינו נכנס לתלוש — הוא מתווסף לעלות ההוראה בלבד,
@@ -574,12 +572,29 @@ function calcEmployer(t) {
   if (mmPay > 0) parts.push({ key: 'mm',
     label: `מילוי מקום (${t.mmHours} שעות × ${MM_HOUR_RATE} ₪)`,
     rate: null, on: null, amount: mmPay });
+
+  // רזרבת מילוי מקום: 5% מעלות ההוראה המתוכננת (ברוטו + הוצאות מעביד),
+  // הוראת שרה 7.9. זה תכנון, לא תשלום — ולכן, כמו רצפת ה-150%, היא
+  // שורה נפרדת שמצטמצמת מעצמה ככל שמדווחות שעות מילוי מקום בפועל על
+  // השורה הזו, ונעלמת לגמרי ברגע שהנהלת החשבונות מקלידה עלות בפועל.
+  const MM_RESERVE_RATE = 0.05;
+  const mmReserve = Math.max(0,
+    Math.round((gross + itemized + floorGap) * MM_RESERVE_RATE) - mmPay);
+  if (mmReserve > 0) parts.push({ key: 'mmReserve',
+    label: 'רזרבת מילוי מקום (5% מעלות ההוראה המתוכננת)',
+    rate: MM_RESERVE_RATE, on: null, amount: mmReserve });
+  const estimate = itemized + floorGap + mmReserve;
+
+  const employerSupp = supplementCost(base, supplement, extras.biguud, extras.havraah);
+  const employerBase = estimate - employerSupp;
+  const actual   = Number(t._actualEmployerCost) || 0;
+  const social   = actual || estimate;
   return {
     gross, base, mom, supplement, employerBase, employerSupp, social,
     estimate, isEstimate: !actual, mmPay,
     total: gross + social + mmPay,
     parts,                                    // הפירוט המלא, שורה לכל רכיב
-    // השיעור בפועל, מעל הברוטו לעובדת. עם רצפת ה-140% הוא לא יורד מ-40%,
+    // השיעור בפועל, מעל הברוטו לעובדת. עם רצפת ה-150% ורזרבת המ"מ הוא לא יורד מ-57.5%,
     // ועולה מעליה במורה שרוב שכרה בסיס (פנסיה וקרן חלות על הבסיס בלבד).
     pct: gross ? Math.round(estimate / gross * 1000) / 10 : 0,
     extras,
