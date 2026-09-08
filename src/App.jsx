@@ -652,7 +652,15 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
     ['ותק בהוראה',       `${x.seniority || 0} שנים`],
     ['שלב חינוך',        LEVELS[x.level]?.label || '—'],
     ['שעות פרונטליות',   d ? d.frontal : (x.frontalHours || '—')],
-    ...(d ? [['שעות פרטניות', d.individual], ['שעות שהייה', d.presence]] : []),
+    /*
+      תיקון ידני גובר על הטבלה הרשמית (שרה, 8.9). מורות טענו שבהסכם
+      שלהן רשום מספר אחר — ולכן הוספנו שדות לתיקון, אבל המסמך המשיך
+      לחשב מהטבלה והתיקון לא הגיע לנייר שהן חותמות עליו.
+    */
+    ...(d || x.individualHours != null || x.presenceHours != null
+      ? [['שעות פרטניות', x.individualHours ?? d?.individual ?? '—'],
+         ['שעות שהייה',   x.presenceHours ?? d?.presence ?? '—']]
+      : []),
     ['אחוז משרה',        `${effectiveScope(x)}%`],
     ...(x.isTemp ? [['שיבוץ', `זמני${x.endDate ? ` · עד ${fmt(x.endDate)}` : ''}`]] : []),
   ];
@@ -6398,7 +6406,7 @@ function LinkCard({ teacher, locked, onSave }) {
 // מחנכת בעולם ישן מקבלת 3 שעות גמול מעל מה שהיא מלמדת
 const isPreHomeroomRow = t => t?.reform === 'pre' && /^homeroom/.test(t?.gamulRole || t?.role || '');
 
-function LinkApproval({ rows, code, onSave, schoolName }) {
+function LinkApproval({ rows, code, onSave, schoolName, male }) {
   const [ap,    setAp]    = useState(null);
   const [busy,  setBusy]  = useState(false);
   const [err,   setErr]   = useState('');
@@ -6462,7 +6470,7 @@ function LinkApproval({ rows, code, onSave, schoolName }) {
       <div className="apple-card" style={{ padding:'13px 15px' }}>
         <p style={{ fontSize:14.4, color:'var(--text)', lineHeight:1.7 }}>
           לפנייך הנתונים שהוזנו מ{schoolName ? schoolName : 'בית הספר'}. <b>אין כאן שכר ואין חישוב.</b>{' '}
-          יש לפתוח כל עובדת, לוודא שהפרטים נכונים, לתקן אם צריך — ולסמן שנבדקה.
+          {male ? 'יש לפתוח כל עובד, לוודא שהפרטים נכונים, לתקן אם צריך — ולסמן שנבדק.' : 'יש לפתוח כל עובדת, לוודא שהפרטים נכונים, לתקן אם צריך — ולסמן שנבדקה.'}
         </p>
         <div style={{ display:'flex', alignItems:'center', gap:9, marginTop:10 }}>
           <div style={{ flex:1, height:7, background:'#EFEBF7', borderRadius:20, overflow:'hidden' }}>
@@ -6529,7 +6537,7 @@ function LinkApproval({ rows, code, onSave, schoolName }) {
         <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)', marginBottom:7 }}>אישור סופי</p>
         <p style={{ fontSize:14.4, color:'var(--text)', lineHeight:1.75, background:'var(--surface)',
           border:'1px solid var(--line)', borderRadius:9, padding:'10px 12px' }}>
-          אני מאשרת שהפרטים נכונים ומעודכנים, ושזהו מספר השעות לשנה זו —{' '}
+          {male ? 'אני מאשר' : 'אני מאשרת'} שהפרטים נכונים ומעודכנים, ושזהו מספר השעות לשנה זו —{' '}
           <b style={{ color:'var(--purple)' }}>{hours} שעות שבועיות</b> — ולא אחרוג מכך.
         </p>
         <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginTop:11 }}>
@@ -7266,8 +7274,9 @@ function ContractDoc({ me, form, sigUrl }) {
           const d = deriveHours({ reform: 'ofek', level: me.level, frontalHours: me.frontal_hours,
             scopePct: me.scope_pct, scope: me.scope_pct,
             gender: me.gender, childrenUnder18: me.children_under_18, ageGroup: me.age_group });
-          const ind = d?.individual ?? 0;
-          const pres = d?.presence ?? 0;
+          // תיקון ידני של המנהלת גובר על הטבלה — זה מה שהמורה חותמת עליו
+          const ind = me.individual_hours ?? d?.individual ?? 0;
+          const pres = me.presence_hours ?? d?.presence ?? 0;
           return <Hl>{fh} שעות פרונטליות + {ind} שעות פרטניות + {pres} שעות שהייה = {fh + ind + pres} שעות</Hl>;
         }
         // עולם ישן: פרונטליות בלבד; מחנכת — בתוספת 3 שעות חינוך
@@ -8005,7 +8014,7 @@ function LinkView({ code }) {
               </button>
             </div>
             {tab === 'approve' ? (
-              <LinkApproval rows={rows} code={code} onSave={onSave} schoolName={me?.schoolName} />
+              <LinkApproval rows={rows} code={code} onSave={onSave} schoolName={me?.schoolName} male={male} />
             ) : tab === 'report' ? (
               <LinkMonthlyReport rows={rows} locked={locked} onSave={onSave} code={code} />
             ) : (
