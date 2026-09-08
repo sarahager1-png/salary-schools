@@ -1,0 +1,353 @@
+[
+ {
+  "id": "326b964f-6c54-448d-93fe-5b53cf2db905",
+  "month_key": "2026-09",
+  "name": "בתיה בן אודיז",
+  "reform": "ofek",
+  "frontal_hours": 21,
+  "scope_pct": 86,
+  "scope_pct_pre": 90,
+  "scope_pre_set_at": "2026-09-01T12:40:55.956+00:00",
+  "schools": {
+   "name": "שלהבות אור עקיבא"
+  }
+ },
+ {
+  "id": "3bffac2b-9f57-45f1-8489-ef0fc5f3f077",
+  "month_key": "2026-09",
+  "name": "חנה מוריה הבא",
+  "reform": "pre",
+  "frontal_hours": 8,
+  "scope_pct": 27,
+  "scope_pct_pre": 27,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "שלהבות אשקלון"
+  }
+ },
+ {
+  "id": "02e8fd9e-71ab-4b99-a9c1-de1e67495208",
+  "month_key": "2026-09",
+  "name": "טוהר פחימה",
+  "reform": "pre",
+  "frontal_hours": 17,
+  "scope_pct": 57,
+  "scope_pct_pre": 57,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "שלהבות אשקלון"
+  }
+ },
+ {
+  "id": "5daffb4d-124d-4b93-aa71-e0664f793fcf",
+  "month_key": "2026-09",
+  "name": "אסתי ליפקין",
+  "reform": "ofek",
+  "frontal_hours": 21,
+  "scope_pct": 86,
+  "scope_pct_pre": 90,
+  "scope_pre_set_at": "2026-09-01T12:36:40.037+00:00",
+  "schools": {
+   "name": "שלהבות גני תקוה"
+  }
+ },
+ {
+  "id": "37e3f33d-b2c8-4a97-9816-4f7e7eff18c9",
+  "month_key": "2026-09",
+  "name": "יוסף ברוד",
+  "reform": "pre",
+  "frontal_hours": 30,
+  "scope_pct": 100,
+  "scope_pct_pre": 80,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "בית חינוך עפולה"
+  }
+ },
+ {
+  "id": "5bf0be1f-baee-4f64-9648-5c39c15fb766",
+  "month_key": "2026-09",
+  "name": "יוכבד דובקין",
+  "reform": "pre",
+  "frontal_hours": 21,
+  "scope_pct": 90,
+  "scope_pct_pre": 91,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "שלהבות אשקלון"
+  }
+ },
+ {
+  "id": "73b2af08-6cb7-456f-9686-042b47c50e66",
+  "month_key": "2026-09",
+  "name": "דבורה דרשן",
+  "reform": "pre",
+  "frontal_hours": 9,
+  "scope_pct": 30,
+  "scope_pct_pre": 30,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "שלהבות אשקלון"
+  }
+ },
+ {
+  "id": "891663cd-9b59-426f-8de1-fd8f73d7294b",
+  "month_key": "2026-09",
+  "name": "מושקי אלפנביין",
+  "reform": "ofek",
+  "frontal_hours": 18,
+  "scope_pct": 69,
+  "scope_pct_pre": 66,
+  "scope_pre_set_at": "2026-09-01T12:36:19.75+00:00",
+  "schools": {
+   "name": "שלהבות אור עקיבא"
+  }
+ },
+ {
+  "id": "14538116-1446-4885-84f4-b26030b65844",
+  "month_key": "2026-09",
+  "name": "מנחם בן ציון אדלר",
+  "reform": "pre",
+  "frontal_hours": 36,
+  "scope_pct": 100,
+  "scope_pct_pre": 100,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "בית חינוך עפולה"
+  }
+ },
+ {
+  "id": "691466ea-862f-42f7-8348-33c26cf421d8",
+  "month_key": "2026-09",
+  "name": "גאיה ניסים",
+  "reform": "pre",
+  "frontal_hours": 15,
+  "scope_pct": 50,
+  "scope_pct_pre": 50,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "שלהבות מזכרת בתיה"
+  }
+ },
+ {
+  "id": "82461c4f-7fc1-4481-9009-182f430497bc",
+  "month_key": "2026-09",
+  "name": "מושקי הורביץ",
+  "reform": "ofek",
+  "frontal_hours": 18,
+  "scope_pct": 69,
+  "scope_pct_pre": 75,
+  "scope_pre_set_at": "2026-09-01T12:38:59.858+00:00",
+  "schools": {
+   "name": "שלהבות גני תקוה"
+  }
+ },
+ {
+  "id": "9ff5d069-15b3-4003-9a88-c50eee7263db",
+  "month_key": "2026-09",
+  "name": "יעל ליפשיץ",
+  "reform": "pre",
+  "frontal_hours": 21,
+  "scope_pct": 70,
+  "scope_pct_pre": 70,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "שלהבות אשקלון"
+  }
+ },
+ {
+  "id": "a4acaecd-81c3-4bd1-b53c-c6a9941f2992",
+  "month_key": "2026-09",
+  "name": "אביה אהרון",
+  "reform": "pre",
+  "frontal_hours": 19,
+  "scope_pct": 73,
+  "scope_pct_pre": 73,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "שלהבות אשקלון"
+  }
+ },
+ {
+  "id": "95e99ece-594a-46c2-b7cd-7b20c47802bb",
+  "month_key": "2026-09",
+  "name": "חיים אלימלך שטראקס",
+  "reform": "pre",
+  "frontal_hours": 23,
+  "scope_pct": 87,
+  "scope_pct_pre": 87,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "בית חינוך עפולה"
+  }
+ },
+ {
+  "id": "a81e57a0-17e8-4283-972c-135d817be00a",
+  "month_key": "2026-09",
+  "name": "חיה מושקא וינטרוב",
+  "reform": "pre",
+  "frontal_hours": 15,
+  "scope_pct": 50,
+  "scope_pct_pre": 50,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "שלהבות מזכרת בתיה"
+  }
+ },
+ {
+  "id": "b24dde4e-14a7-4866-8363-38a9f1eb1444",
+  "month_key": "2026-09",
+  "name": "דינה שניאורסון",
+  "reform": "pre",
+  "frontal_hours": 21,
+  "scope_pct": 80,
+  "scope_pct_pre": 87,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "בית חינוך עפולה"
+  }
+ },
+ {
+  "id": "5db96856-0a88-4aa1-ac0f-1f228cb5f9e6",
+  "month_key": "2026-09",
+  "name": "נחמי סוקניק",
+  "reform": "ofek",
+  "frontal_hours": 21,
+  "scope_pct": 86,
+  "scope_pct_pre": 90,
+  "scope_pre_set_at": "2026-09-01T12:32:31.536+00:00",
+  "schools": {
+   "name": "שלהבות אור עקיבא"
+  }
+ },
+ {
+  "id": "fcbd7d7c-361e-4728-879c-e53143e3f783",
+  "month_key": "2026-09",
+  "name": "חני אלבז",
+  "reform": "pre",
+  "frontal_hours": 22,
+  "scope_pct": 83,
+  "scope_pct_pre": 83,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "שלהבות אשקלון"
+  }
+ },
+ {
+  "id": "40eea906-edca-458a-bac3-41daa04e703a",
+  "month_key": "2026-09",
+  "name": "אסתר רינה גאליץ",
+  "reform": "pre",
+  "frontal_hours": 6,
+  "scope_pct": 20,
+  "scope_pct_pre": 20,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "שלהבות מזכרת בתיה"
+  }
+ },
+ {
+  "id": "2a4a7eed-da86-4a9a-86d2-cf28c922ae7a",
+  "month_key": "2026-09",
+  "name": "מושקא סגל",
+  "reform": "ofek",
+  "frontal_hours": 21,
+  "scope_pct": 86,
+  "scope_pct_pre": 90,
+  "scope_pre_set_at": "2026-09-01T12:36:56.995+00:00",
+  "schools": {
+   "name": "שלהבות גני תקוה"
+  }
+ },
+ {
+  "id": "148135da-9c8c-4769-81a0-84e874867255",
+  "month_key": "2026-09",
+  "name": "לוי חרותי",
+  "reform": "pre",
+  "frontal_hours": 22,
+  "scope_pct": 83,
+  "scope_pct_pre": 83,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "בית חינוך עפולה"
+  }
+ },
+ {
+  "id": "310f3f79-4c5f-40e0-801e-fe975ddc49c4",
+  "month_key": "2026-09",
+  "name": "קיילא גרוזמן",
+  "reform": "pre",
+  "frontal_hours": 9,
+  "scope_pct": 30,
+  "scope_pct_pre": 30,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "שלהבות אשקלון"
+  }
+ },
+ {
+  "id": "476a5c70-e8f1-4f5a-b70a-4b4af63a75aa",
+  "month_key": "2026-09",
+  "name": "מושקא קראוס",
+  "reform": "ofek",
+  "frontal_hours": 21,
+  "scope_pct": 86,
+  "scope_pct_pre": 90,
+  "scope_pre_set_at": "2026-09-01T12:33:41.667+00:00",
+  "schools": {
+   "name": "שלהבות גני תקוה"
+  }
+ },
+ {
+  "id": "4add9525-ae18-4d2b-9137-8f47903954b3",
+  "month_key": "2026-09",
+  "name": "חני אלבוים",
+  "reform": "pre",
+  "frontal_hours": 20,
+  "scope_pct": 77,
+  "scope_pct_pre": 86,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "שלהבות אשקלון"
+  }
+ },
+ {
+  "id": "4989e97d-2426-4c63-b594-227053cf2667",
+  "month_key": "2026-09",
+  "name": "מושקי רוזנשיין",
+  "reform": "ofek",
+  "frontal_hours": 21,
+  "scope_pct": 86,
+  "scope_pct_pre": 90,
+  "scope_pre_set_at": "2026-09-01T12:34:48.699+00:00",
+  "schools": {
+   "name": "שלהבות גני תקוה"
+  }
+ },
+ {
+  "id": "4feabebf-967c-4977-855b-efc197675e1a",
+  "month_key": "2026-09",
+  "name": "טל מויאל",
+  "reform": "pre",
+  "frontal_hours": 15,
+  "scope_pct": 50,
+  "scope_pct_pre": 50,
+  "scope_pre_set_at": null,
+  "schools": {
+   "name": "בית חינוך עפולה"
+  }
+ },
+ {
+  "id": "94f61824-6bad-4a24-9843-b9b74dce0556",
+  "month_key": "2026-09",
+  "name": "אלישבע ברטוב",
+  "reform": "ofek",
+  "frontal_hours": 21,
+  "scope_pct": 86,
+  "scope_pct_pre": 90,
+  "scope_pre_set_at": "2026-09-01T12:37:11.911+00:00",
+  "schools": {
+   "name": "שלהבות גני תקוה"
+  }
+ }
+]
