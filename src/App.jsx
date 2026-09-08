@@ -6215,7 +6215,9 @@ function LinkTeacherFields({ draft, apply }) {
         const d = (() => { try { return deriveHours({ ...draft, gamulRole: draft.role || draft.gamulRole }); }
                            catch { return null; } })();
         const hint = n => (n === null || n === undefined ? 'לפי הטבלה' : `לפי הטבלה: ${n}`);
-        const pres = d ? d.presence + (d.momPresence || 0) : null;
+        // שהייה בלבד. בטבלת האם עמודת השהייה ועמודת "שהיית אם" מחזיקות
+        // את אותו מספר, וחיבורן הכפיל אותה (שרה, 8.9).
+        const pres = d ? d.presence : null;
         return (
           <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginBottom:9 }}>
             <LinkField label="שעות פרטניות" value={draft.individualHours ?? ''}
@@ -6509,7 +6511,7 @@ function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, mal
                     const d = (() => { try { return deriveHours({ ...t, gamulRole: t.role || t.gamulRole }); }
                                        catch { return null; } })();
                     const ind = t.individualHours ?? d?.individual;
-                    const pre = t.presenceHours ?? (d ? d.presence + (d.momPresence || 0) : null);
+                    const pre = t.presenceHours ?? d?.presence ?? null;
                     return (ind ?? pre) != null ? ` · פרטני ${ind ?? '—'} · שהייה ${pre ?? '—'}` : '';
                   })()}
                 </p>

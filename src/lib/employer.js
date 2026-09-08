@@ -368,7 +368,12 @@ function deriveHours(t, scopeOverride) {
     return {
       scopePct: cur.scopePct || Math.round(row[2] * 100),
       frontal, individual: row[0], presence: row[1],
-      momPresence: row[3] || 0,               // שהיית אם — קיימת רק בעמודות האם
+      /*
+        שהיית אם — **אותו מספר** שכבר יושב ב-presence, לא תוספת עליו.
+        חיבור השניים הכפיל את השהייה (שרה, 8.9: "השהייה לא מתאים
+        בכלל הוא כפול"). נשאר לתצוגה בלבד; מי שמציג שהייה — presence.
+      */
+      momPresence: row[3] || 0,
       officialCoef: row[2],                    // המקדם הרשמי, 4 ספרות
     };
   }

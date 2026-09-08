@@ -102,7 +102,8 @@ const derived = r => {
   // תיקון ידני של המנהלת גובר על הטבלה הרשמית (שרה, 8.9)
   return { scope: r.scope_pct,
     ind: r.individual_hours ?? d?.individual ?? null,
-    pres: r.presence_hours ?? (d ? d.presence + (d.momPresence || 0) : null) };
+    // שהייה בלבד — momPresence הוא אותו מספר, וחיבורו הכפיל (שרה, 8.9)
+    pres: r.presence_hours ?? d?.presence ?? null };
 };
 const num = v => (v === null || v === undefined ? '—' : String(v));
 
