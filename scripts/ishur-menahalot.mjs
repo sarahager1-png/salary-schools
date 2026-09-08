@@ -8,6 +8,7 @@
 import { createClient } from '@supabase/supabase-js';
 import fs from 'node:fs';
 import path from 'node:path';
+import * as emp from '../src/lib/employer.js';
 
 const OUT = process.argv[2] || 'ishur';
 const MONTH = process.argv[3] || '2026-09';
@@ -59,6 +60,50 @@ const checkEmail = v => {
   return { ok: true, html: esc(v) };
 };
 
+/*
+  דרגה קיימת רק באופק חדש (שרה, 8.9). בעולם ישן רשומה לכולן "1" —
+  ברירת מחדל שאינה אומרת דבר, ומוצגת היא רק מזמינה תיקון מיותר.
+*/
+const gradeCell = r => r.reform !== 'ofek' ? '—'
+  : (r.grade === 'intern' ? 'מתמחה' : (r.grade ?? '—'));
+
+/*
+  מחנכת בעולם ישן: המנהלת רושמת את השעות שהיא מלמדת בפועל, והמערכת
+  מוסיפה 3 שעות גמול חינוך לחישוב אחוז המשרה. מציגים את שתי המספרים
+  כדי שהמנהלת תראה מה נעשה עם המספר שלה — ותתפוס אם הוא כבר כלל את
+  התוספת (שרה, 8.9).
+*/
+const isPreHomeroom = r => r.reform === 'pre' && /^homeroom/.test(r.gamul_role || '');
+const hoursCell = r => {
+  const h = r.frontal_hours;
+  if (h === null || h === undefined) return '—';
+  // בעברית "22 +3 = 25" מתהפך ונקרא "25 = 3+ 22". מנוסח במילים במקום.
+  return isPreHomeroom(r) ? `${h} <span class="plus">· עם גמול ${Number(h) + 3}</span>` : String(h);
+};
+
+/*
+  אחוז משרה, פרטני ושהייה — באופק בלבד, ומהטבלה הרשמית של משרד החינוך
+  (שרה, 8.9). אלה אינם נתונים שהמנהלת מזינה אלא מה שנגזר מהשעות שלה,
+  ולכן הם מוצגים כדי שתראה מה יצא — לא כדי שתתקן אותם.
+  בעולם ישן אין פרטני ושהייה בטבלה הרשמית, ואחוז המשרה הוא (שעות+גמול)/30.
+*/
+const toT = r => ({
+  reform: r.reform, level: r.level || 'elementary', grade: r.grade, degree: r.degree,
+  seniority: r.seniority, frontalHours: r.frontal_hours, scopePct: r.scope_pct, scope: r.scope_pct,
+  role: r.gamul_role, gamulRole: r.gamul_role, ageGroup: r.age_group || 'none',
+  gender: r.gender, childrenUnder18: r.children_under_18, monthKey: r.month_key,
+  schoolId: r.school_id, name: r.name,
+});
+const derived = r => {
+  if (r.gamul_role === 'principal') return { scope: r.scope_pct, ind: null, pres: null };
+  if (r.reform !== 'ofek') return { scope: r.scope_pct, ind: null, pres: null };
+  let d = null;
+  try { d = emp.deriveHours(toT(r)); } catch { d = null; }
+  return { scope: r.scope_pct, ind: d?.individual ?? null,
+    pres: d ? (d.presence + (d.momPresence || 0)) : null };
+};
+const num = v => (v === null || v === undefined ? '—' : String(v));
+
 const bySchool = {};
 for (const r of data) { const n = r.schools?.name || 'ללא בית ספר'; (bySchool[n] ||= []).push(r); }
 fs.mkdirSync(OUT, { recursive: true });
@@ -100,9 +145,12 @@ for (const [school, raw] of Object.entries(bySchool)) {
     <td class="ltr em">${c.em.html}</td>
     <td>${REFORM[r.reform] || '—'}</td>
     <td>${DEGREE[r.degree] || '—'}</td>
-    <td>${r.grade === 'intern' ? 'מתמחה' : (r.grade ?? '—')}</td>
+    <td>${gradeCell(r)}</td>
     <td class="c">${r.seniority ?? '—'}</td>
-    <td class="c b">${r.frontal_hours ?? '—'}</td>
+    <td class="c b">${hoursCell(r)}</td>
+    <td class="c d">${num(derived(r).ind)}</td>
+    <td class="c d">${num(derived(r).pres)}</td>
+    <td class="c d sc">${r.scope_pct ? r.scope_pct + '%' : '—'}</td>
     <td>${ROLE[r.gamul_role] || '—'}</td>
     <td class="c">${r.children_under_18 ?? '—'}</td>
     <td>${r.gender === 'f' ? 'נקבה' : r.gender === 'm' ? 'זכר' : MISS}</td>
@@ -150,6 +198,12 @@ for (const [school, raw] of Object.entries(bySchool)) {
   .tag { font-size:9.5px; background:#FFF4E6; color:#B4650A; border:1px solid #F3E3C2;
          border-radius:20px; padding:1px 5px; font-weight:600 }
   .miss { color:#C2410C; font-weight:600 }
+  .plus { color:var(--turq); font-weight:600; font-size:10px; white-space:nowrap }
+  .th2 { font-weight:500; font-size:9.5px; color:var(--mid) }
+  th.d, td.d { background:#F7FCFD }
+  tr:nth-child(even) td.d { background:#F2FAFC }
+  td.d { color:var(--mid) }
+  td.sc { font-weight:700; color:var(--ink) }
   .sum { display:flex; gap:8px; flex-wrap:wrap; margin:11px 0 }
   .chip { background:var(--soft); border:1px solid var(--line); border-radius:20px; padding:4px 11px; font-size:11.5px }
   .chip b { color:var(--purple); font-family:Rubik; font-weight:700 }
@@ -174,12 +228,19 @@ for (const [school, raw] of Object.entries(bySchool)) {
   אבקש לעבור שורה-שורה, לסמן כל טעות או חוסר, ולהחזיר אליי.
   <b>הנתונים האלה הם הבסיס לחישוב השכר</b>, ולכן שגיאה כאן מגיעה לתלוש.
   ${gaps ? `יש כאן <b>${gaps}</b> שורות שדורשות תיקון, מסומנות באדום ומפורטות בסוף הדף.` : 'הפרטים המזהים כולם מלאים ותקינים.'}
+  ${rows.some(isPreHomeroom) ? '<br><b>מחנכת בעולם ישן:</b> רושמים את השעות שהיא מלמדת בפועל, והמערכת מוסיפה 3 שעות גמול חינוך — מוצג בעמודת השעות.' : ''}
+  <br>שלוש העמודות בתכלת — <b>פרטני, שהייה ואחוז משרה</b> — אינן מוזנות אלא נגזרות מהשעות לפי הטבלה הרשמית של משרד החינוך.
+  אין צורך לתקן אותן; הן כאן כדי שתראי מה יצא מהמספרים שמסרת.
 </div>
 
 <table>
   <thead><tr>
     <th class="n">#</th><th>שם</th><th>ת.ז.</th><th>טלפון</th><th>מייל</th>
-    <th>מסלול</th><th>תואר</th><th>דרגה</th><th class="c">ותק</th><th class="c">שעות</th>
+    <th>מסלול</th><th>תואר</th><th>דרגה<br><span class="th2">אופק בלבד</span></th><th class="c">ותק</th>
+    <th class="c">שעות פרונטליות</th>
+    <th class="c d">פרטני<br><span class="th2">אופק</span></th>
+    <th class="c d">שהייה<br><span class="th2">אופק</span></th>
+    <th class="c d">אחוז<br><span class="th2">משרה</span></th>
     <th>תפקיד</th><th class="c">ילדים עד 18</th><th>מין</th><th>הפחתת גיל</th>
   </tr></thead>
   <tbody>${body}</tbody>
