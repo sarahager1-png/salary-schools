@@ -6406,7 +6406,7 @@ function LinkCard({ teacher, locked, onSave }) {
 // מחנכת בעולם ישן מקבלת 3 שעות גמול מעל מה שהיא מלמדת
 const isPreHomeroomRow = t => t?.reform === 'pre' && /^homeroom/.test(t?.gamulRole || t?.role || '');
 
-function LinkApproval({ rows, code, onSave, schoolName, male }) {
+function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, male }) {
   const [ap,    setAp]    = useState(null);
   const [busy,  setBusy]  = useState(false);
   const [err,   setErr]   = useState('');
@@ -6532,6 +6532,21 @@ function LinkApproval({ rows, code, onSave, schoolName, male }) {
           </div>
         );
       })}
+
+      {/*
+        "איפה מוסיפים עובד או עובדת חסרה" (שרה, 8.9). המסך הזה הוא
+        הרגע שבו מתגלה מי חסרה — עוברים שורה-שורה — ולכן ההוספה חייבת
+        להיות כאן ולא רק בטאב השני. שורה שנוספת נכנסת לרשימה כלא-נבדקה,
+        ולכן האישור הסופי לא נסגר בלעדיה.
+      */}
+      {onAdd && (
+        <div>
+          <p style={{ fontSize:13.8, color:'var(--text3)', marginBottom:7, lineHeight:1.6 }}>
+            חסרה עובדת ברשימה? אפשר להוסיף אותה כאן, והיא תצטרף לבדיקה.
+          </p>
+          <LinkNewCard schoolReform={schoolReform} onAdd={onAdd} male={male} />
+        </div>
+      )}
 
       <div className="apple-card" style={{ padding:'15px 16px' }}>
         <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)', marginBottom:7 }}>אישור סופי</p>
@@ -8022,7 +8037,8 @@ function LinkView({ code }) {
               </button>
             </div>
             {tab === 'approve' ? (
-              <LinkApproval rows={rows} code={code} onSave={onSave} schoolName={me?.schoolName} male={male} />
+              <LinkApproval rows={rows} code={code} onSave={onSave} onAdd={locked ? null : onAdd}
+                schoolReform={me?.schoolReform} schoolName={me?.schoolName} male={male} />
             ) : tab === 'report' ? (
               <LinkMonthlyReport rows={rows} locked={locked} onSave={onSave} code={code} />
             ) : (
