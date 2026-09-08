@@ -7887,8 +7887,16 @@ function LinkView({ code }) {
   const [rows,    setRows]    = useState([]);
   const [loading, setLoading] = useState(true);
   const [fatal,   setFatal]   = useState('');
-  // הדשבורד החודשי הוא העבודה השוטפת — הוא נפתח ראשון; נתוני העסקה בטאב
-  const [tab,     setTab]     = useState('report');
+  /*
+    "מסך הפניה לא דיווח חודשי אלא נתוני העסקה" (שרה, 8.9). הקישור נפתח
+    על נתוני ההעסקה, כי זו העבודה שהמנהלת נשלחת אליה; הדיווח החודשי
+    נשאר טאב לצידו. `?t=` מאפשר להפנות ישירות לטאב מסוים — הודעת
+    האישור מפנה ל-approve.
+  */
+  const [tab,     setTab]     = useState(() => {
+    const t = new URLSearchParams(window.location.search).get('t') || '';
+    return ['report', 'cards', 'approve'].includes(t) ? t : 'cards';
+  });
 
   useEffect(() => {
     let alive = true;
