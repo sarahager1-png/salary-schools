@@ -451,9 +451,15 @@ function bituachLeumi(wage) {
 function employerParts(t, base, supplement) {
   const { biguud, havraah } = calcExtras(t);
   const { travel, daycare } = calcReimb(t);
-  // נסיעות ומעונות נכנסים לבסיס של מס שכר וביטוח לאומי, אך לא לפנסיה
-  // ולקרן ההשתלמות — הם החזר הוצאות ולא שכר.
-  const wage = base + supplement + biguud + havraah + travel + daycare;
+  /*
+    נסיעות ומעונות נכנסים לבסיס של מס שכר וביטוח לאומי, אך לא לפנסיה
+    ולקרן ההשתלמות — הם החזר הוצאות ולא שכר.
+
+    תוספת בית חב"ד אינה נכנסת לשום בסיס: **"לתוספת אין עלויות נוספות"**
+    (שרה, 8.9). קודם היא נשאה מס שכר וביטוח לאומי, ולפני כן 30% מלאים.
+    היא כולה מכיס הרשת, בלי הפרשות ובלי מסים מעליה.
+  */
+  const wage = base + biguud + havraah + travel + daycare;
   const parts = [
     { key:'pension',  label:'פנסיה ופיצויים',   rate:PENSION_RATE, on:base, amount: Math.round(base * PENSION_RATE) },
     { key:'keren',    label:'קרן השתלמות',      rate:KEREN_RATE,   on:base, amount: Math.round(base * KEREN_RATE) },
@@ -467,11 +473,13 @@ function employerParts(t, base, supplement) {
   return { parts, total: parts.reduce((s, x) => s + x.amount, 0), wage };
 }
 
-// כמה מהעלות נגרר מרכיב התוספת בלבד — מס שכר וביטוח לאומי שוליים עליו
-function supplementCost(base, supplement, biguud, havraah) {
-  if (supplement <= 0) return 0;
-  const without = base + biguud + havraah;
-  return Math.round(supplement * MAS_SACHAR + (bituachLeumi(without + supplement) - bituachLeumi(without)));
+/*
+  כמה מהעלות נגרר מרכיב התוספת בלבד — **אפס** (שרה, 8.9):
+  "לתוספת אין עלויות נוספות". הפונקציה נשארת כדי שהקוראים שלה לא
+  יישברו, ומחזירה 0 במפורש ולא בשקט.
+*/
+function supplementCost(/* base, supplement, biguud, havraah */) {
+  return 0;
 }
 
 /*

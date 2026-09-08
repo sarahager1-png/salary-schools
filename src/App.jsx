@@ -4273,16 +4273,16 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
     if (!gross) return { skip: 'אין עדיין ברוטו' };
     const supp = paysSupp ? (Number(t._chabadSupp) || 0) : 0;
     /*
-      "אמור להיות תואם… אתה משאיר את האחוזים" (שרה, 8.9). slipScope
-      חישב כאן אחוז מחדש בנוסחת העולם הישן — (שעות+3)/30 ועוד תוספת אם
-      — והציג 90% למי שרשום לה 86%. שני מסכים הראו שני מספרים לאותה
-      מורה. האחוז שנקבע במערכת הוא היחיד, וכאן רק מציגים אותו.
-      slipScope נשאר לחישוב *השעות* לתלוש, שם ה-3 של מחנכת אמיתיות.
+      האחוז כאן נגזר מחדש בנוסחת העולם הישן — (שעות + 3 למחנכת) / 30,
+      ועוד תוספת אם — ואינו האחוז של אופק שרשום בטבלת המורות. ההצגה
+      הוחזרה לכך ב-8.9 אחרי ששרה זיהתה שהפער בין השניים אינו תקלת
+      תצוגה אלא סימן לבעיה בסימולציה עצמה: הבסיס בעולם הישן חושב
+      באחוז אחד והברוטו באופק באחר.
     */
     const scope = t.reform === 'ofek' ? slipScope(t) : null;
     return {
       darga: slipDarga(t), vetek: t.seniority,
-      pct: t.scopePct ?? t.scope ?? (scope ? scope.total : 100),
+      pct: scope ? scope.total : (t.scope ?? t.scopePct ?? 100),
       hours: scope ? scope.hours : t.frontalHours,
       kita: t.role && /^homeroom/.test(t.role),
       base: gross - supp, supp, gross, paysSupp,

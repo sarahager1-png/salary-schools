@@ -29,9 +29,8 @@ const TEACHER_FIELDS = [
   ['presence_hours',       'presenceHours'],
   ['scope_pct',            'scopePct'],
   ['scope_set_at',         'scopeSetAt'],
-  // scope_pct_pre / scope_pre_set_at הוסרו מהמיפוי ב-8.9: שתי הסימולציות
-  // רצות על scope_pct, והפער ביניהן הוא תוספת בית חב"ד — אין אחוז שני
-  // (שרה, 8.9). העמודות נשארו במסד עם הנתונים, מסומנות כלא-בשימוש.
+  ['scope_pct_pre',        'scopePctPre'],
+  ['scope_pre_set_at',     'scopePreSetAt'],
   ['gender',               'gender'],
   ['gamul_role',           'role'],
   ['age_group',            'ageGroup'],
