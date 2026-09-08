@@ -6696,7 +6696,7 @@ function Form101Print({ row, onClose }) {
         <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
           <F101Field label="שם משפחה" value={f.lastName} />
           <F101Field label="שם פרטי" value={f.firstName} />
-          <F101Field label="מספר זהות" value={row.tz_id || f.tz} />
+          <F101Field label="מספר זהות" value={f.tz || row.tz_id} />
           <F101Field label="תאריך לידה" value={day(f.birth)} />
           <F101Field label="תאריך עלייה" value={day(f.aliyaDate)} />
           <F101Field label="מין" value={f.sex === 'm' ? 'זכר' : f.sex === 'f' ? 'נקבה' : ''} />
@@ -7022,7 +7022,7 @@ function ContractDoc({ me, form, sigUrl }) {
       </p>
       <Sec n="1">שם המעסיקה: <b>רשת גני חב"ד</b> · אישיות משפטית: ע.ר. 58-0141-026 ·
         מען: ת.ד 271 כפר חב"ד (להלן — "המעסיקה")<br/>
-        שם העובד/ת: <Hl>{me.name}</Hl> · מס' זהות: <Hl dir="ltr">{me.tz_id || form.tz || '____'}</Hl> ·
+        שם העובד/ת: <Hl>{me.name}</Hl> · מס' זהות: <Hl dir="ltr">{form.tz || me.tz_id || '____'}</Hl> ·
         כתובת: <Hl>{[form.address, form.city].filter(Boolean).join(', ') || '____'}</Hl></Sec>
       <Sec n="2">תאריך תחילת העבודה: <Hl>{CONTRACT_FROM}</Hl> ·
         תקופת החוזה מיום <Hl>{CONTRACT_FROM}</Hl> עד יום <Hl>{CONTRACT_TO}</Hl><br/>
@@ -7126,7 +7126,11 @@ function OnboardingView({ code }) {
     if (state !== 'ok' || me?.form101_signed || !Object.keys(form).length) return undefined;
     clearTimeout(draftTimer.current);
     draftTimer.current = setTimeout(() => {
-      store.obSave(code, { form101: form }).catch(() => { /* רשת רגעית — הניסיון הבא ישמור */ });
+      // ת.ז. נשמרת גם לעמודה עצמה, לא רק בתוך הטופס — ההצלבה עם תלוש
+      // הנהלת החשבונות קוראת את tz_id (שרה, 8.9). קצרה מדי = לא נשלחת.
+      const tzPatch = String(form.tz ?? '').replace(/\D/g, '');
+      store.obSave(code, { form101: form, ...(tzPatch.length >= 5 ? { tz_id: tzPatch } : {}) })
+        .catch(() => { /* רשת רגעית — הניסיון הבא ישמור */ });
     }, 1500);
     return () => clearTimeout(draftTimer.current);
   }, [form, state, me?.form101_signed, code]);
@@ -7135,6 +7139,12 @@ function OnboardingView({ code }) {
   if (state === 'bad') return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:24, textAlign:'center' }} dir="rtl"><p style={{ fontWeight:700 }}>הקישור אינו תקף. פני לשרה הגר.</p></div>;
 
   const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  /*
+    ת.ז. — מה שהוקלד גובר על מה שבמסד. form.tz הוא undefined עד
+    ההקלדה הראשונה, ולכן `??` (ולא `||`) — כדי שמחיקה מלאה של השדה
+    תישאר ריקה ולא תקפוץ בחזרה לערך הישן באמצע הקלדה.
+  */
+  const tz = form.tz ?? me.tz_id ?? '';
   // אסמכתת התיק ירדה: "אם יש נתוני שכר אז יש תיק במשרד" (שרה, 3.9).
   // אישור משטרה — חובה לגברים בלבד (חוק למניעת העסקה של עברייני מין).
   const isMale = me.gender === 'm';
@@ -7249,9 +7259,20 @@ function OnboardingView({ code }) {
             <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
               {field('lastName','שם משפחה')}
               {field('firstName','שם פרטי')}
+              {/*
+                ת.ז. ניתנת לתיקון (שרה, 8.9). קודם היה כאן
+                value={me.tz_id || form.tz} — כלומר מה שבמסד גבר על מה
+                שהוקלד, וכל הקלדה נבלעה בלי הודעה. עכשיו ההקלדה גוברת,
+                והמסד הוא רק נקודת הפתיחה. הערך נשמר גם ל-tz_id עצמו
+                (ob_save, מיגרציה 20260908090000) כי ההצלבה עם תלוש
+                הנהלת החשבונות נשענת על ת.ז. לפני השם.
+              */}
               <div style={{ flex:'1 1 150px' }}><p className="apple-label">מספר זהות</p>
-                <input value={me.tz_id || form.tz || ''} onChange={e => setF('tz', e.target.value)}
-                  className="apple-input" dir="ltr" inputMode="numeric" style={{ width:'100%' }} /></div>
+                <input value={tz} onChange={e => setF('tz', e.target.value.replace(/\D/g, '').slice(0, 9))}
+                  className="apple-input" dir="ltr" inputMode="numeric" style={{ width:'100%' }} />
+                {tz && tz.length < 5 && (
+                  <p style={{ fontSize:12.6, color:'#B4650A', marginTop:3 }}>מספר זהות קצר מדי</p>
+                )}</div>
               {field('birth','תאריך לידה','date')}
               {field('aliyaDate','תאריך עלייה — אם עלית','date')}
               <div style={{ flex:'1 1 130px' }}><p className="apple-label">מין</p>
