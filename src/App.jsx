@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import * as store from './lib/store.js';
 import { readSheet, parseRows, matchRows } from './lib/slipImport.js';
+import { rowIssues } from './lib/dataCheck.js';
 import { CreditLine } from './components/CreditLine.jsx';
 import './index.css';
 // v3 — רשת חינוך חב"ד design system
@@ -1008,7 +1009,8 @@ function parseRole(raw) {
   if (s.includes('מקצוע')) return 'subject6';
   if (s.includes('צוות') || s.includes('שכבה')) return 'team';
   if (s.includes('יועץ') || s.includes('יועצ')) return 'counselor';
-  const known = ['homeroom','homeroom1','homeroom2','subject6','subject8','team','counselor','counselor2'];
+  if (s.includes('שילוב')) return 'inclusion';
+  const known = ['homeroom','homeroom1','inclusion','subject6','subject8','team','counselor','counselor2'];
   return known.includes(s) ? s : 'none';
 }
 
@@ -6171,6 +6173,28 @@ function LinkTeacherFields({ draft, apply }) {
         )}
         <LinkField label="ותק בהוראה" value={draft.seniority} onChange={v => apply({ seniority: v })} />
       </div>
+      {/*
+        פרטני ושהייה — באופק בלבד (שרה, 8.9). ברירת המחדל היא הטבלה
+        הרשמית של משרד החינוך, והמספר ממנה מוצג כרמז בשדה. מי שמקלידה
+        מספר — הוא גובר; מחיקה מחזירה לטבלה. כך תיקון ידני לא נמחק
+        כששעות משתנות, ושורה שלא נגעו בה ממשיכה לעקוב אחרי הטבלה.
+      */}
+      {isOfek && !isPrincipalRow(draft) && (() => {
+        const d = (() => { try { return deriveHours({ ...draft, gamulRole: draft.role || draft.gamulRole }); }
+                           catch { return null; } })();
+        const hint = n => (n === null || n === undefined ? 'לפי הטבלה' : `לפי הטבלה: ${n}`);
+        const pres = d ? d.presence + (d.momPresence || 0) : null;
+        return (
+          <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginBottom:9 }}>
+            <LinkField label="שעות פרטניות" value={draft.individualHours ?? ''}
+              onChange={v => apply({ individualHours: v === '' ? null : v })}
+              hint={hint(d?.individual)} />
+            <LinkField label="שעות שהייה" value={draft.presenceHours ?? ''}
+              onChange={v => apply({ presenceHours: v === '' ? null : v })}
+              hint={hint(pres)} />
+          </div>
+        );
+      })()}
       <div style={{ display:'flex', flexWrap:'wrap', gap:9 }}>
         <LinkSelect label="שלב" value={draft.level || 'elementary'} onChange={v => apply({ level: v })}
           options={Object.entries(LEVELS).map(([k, v]) => [k, v.label])} />
@@ -6338,6 +6362,168 @@ function LinkCard({ teacher, locked, onSave }) {
   שני טפסי הוספה עם חיפוש ברשימת עובדות ההוראה של בית הספר, ולמטה
   רק מה שדווח החודש. "במקום מי" הוא בחירה מהרשימה, לא טקסט חופשי.
 */
+/* ═══════════════════════════════════════════════════════════════
+   אישור נתונים — המנהלת עוברת שורה-שורה, מתקנת, ומתחייבת על השעות
+
+   "כל נתון שיבדקו ויערכו במידת הצורך" (שרה, 8.9). לכן זה אינו כפתור
+   אחד: כל עובדת נפתחת, נבדקת ומסומנת בנפרד, והאישור הסופי נחסם בשרת
+   עד שכולן סומנו. שורה ששונתה יורדת מהסימון ומחכה לבדיקה חוזרת.
+
+   ההצהרה ומספר השעות נבנים בשרת — המסך רק מציג אותם.
+═══════════════════════════════════════════════════════════════ */
+// מחנכת בעולם ישן מקבלת 3 שעות גמול מעל מה שהיא מלמדת
+const isPreHomeroomRow = t => t?.reform === 'pre' && /^homeroom/.test(t?.gamulRole || t?.role || '');
+
+function LinkApproval({ rows, code, onSave, schoolName }) {
+  const [ap,    setAp]    = useState(null);
+  const [busy,  setBusy]  = useState(false);
+  const [err,   setErr]   = useState('');
+  const [open,  setOpen]  = useState(null);   // איזו שורה פתוחה לעריכה
+  const [name,  setName]  = useState('');
+  const [note,  setNote]  = useState('');
+
+  const load = useCallback(async () => {
+    try { setAp(await store.linkApproval(code)); } catch (e) { setErr(e.message); }
+  }, [code]);
+  useEffect(() => { load(); }, [load, rows]);
+
+  const checked = new Set(ap?.checked || []);
+  const hours = rows.filter(t => !isPrincipalRow(t) && !unpaidThisMonth(t))
+    .reduce((a, t) => a + (Number(t.frontalHours) || 0), 0);
+  const done = rows.filter(t => checked.has(t.id)).length;
+  const all  = rows.length;
+  const approved = Boolean(ap?.approved_at);
+
+  const toggle = async (t) => {
+    setErr('');
+    try { setAp(await store.linkCheckRow(code, t.id, !checked.has(t.id))); }
+    catch (e) { setErr(e.message); }
+  };
+
+  const approve = async () => {
+    if (!name.trim()) { setErr('יש למלא את שמך'); return; }
+    setBusy(true); setErr('');
+    try { setAp(await store.linkApproveData(code, name.trim(), note)); }
+    catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
+
+  if (approved) return (
+    <div className="apple-card" style={{ padding:'18px 17px', background:'var(--ok-bg)', border:'1px solid #CBE9D6' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:8 }}>
+        <Check size={19} strokeWidth={2.5} color="var(--ok)" />
+        <p style={{ fontSize:17.2, fontWeight:700, color:'var(--text)' }}>הנתונים אושרו</p>
+      </div>
+      <p style={{ fontSize:14.9, color:'var(--text)', lineHeight:1.7 }}>{ap.declaration}</p>
+      <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:8 }}>
+        {ap.approved_by} · {new Date(ap.approved_at).toLocaleString('he-IL', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' })}
+        {ap.note ? ` · ${ap.note}` : ''}
+      </p>
+      <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:9, lineHeight:1.6 }}>
+        כל שינוי בנתונים יבטל את האישור ויבקש לעבור שוב על השורה ששונתה.
+      </p>
+    </div>
+  );
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:11 }}>
+      {ap?.revoked_at && (
+        <div className="apple-card" style={{ padding:'11px 13px', background:'#FFF9EF', border:'1px solid #F3E3C2' }}>
+          <p style={{ fontSize:14.4, color:'#B4650A', lineHeight:1.6 }}>
+            האישור בוטל אחרי שינוי{ap.revoked_rows ? ` אצל ${ap.revoked_rows}` : ''}. יש לעבור על השורה שוב ולאשר מחדש.
+          </p>
+        </div>
+      )}
+
+      <div className="apple-card" style={{ padding:'13px 15px' }}>
+        <p style={{ fontSize:14.4, color:'var(--text)', lineHeight:1.7 }}>
+          לפנייך הנתונים שהוזנו מ{schoolName ? schoolName : 'בית הספר'}. <b>אין כאן שכר ואין חישוב.</b>{' '}
+          יש לפתוח כל עובדת, לוודא שהפרטים נכונים, לתקן אם צריך — ולסמן שנבדקה.
+        </p>
+        <div style={{ display:'flex', alignItems:'center', gap:9, marginTop:10 }}>
+          <div style={{ flex:1, height:7, background:'#EFEBF7', borderRadius:20, overflow:'hidden' }}>
+            <div style={{ width:`${all ? done / all * 100 : 0}%`, height:'100%', borderRadius:20,
+              background:'linear-gradient(270deg,var(--purple),#00B4CC)', transition:'width .25s' }} />
+          </div>
+          <span style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', whiteSpace:'nowrap' }}>{done} / {all}</span>
+        </div>
+      </div>
+
+      {rows.map(t => {
+        const { issues, hard } = rowIssues(t);
+        const isOpen = open === t.id;
+        const ok = checked.has(t.id);
+        return (
+          <div key={t.id} className="apple-card"
+            style={{ padding:'12px 14px', borderColor: ok ? '#CBE9D6' : hard ? '#F3E3C2' : 'var(--line)',
+                     background: ok ? '#FBFEFC' : hard ? '#FFFDF8' : '#fff' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+              <button onClick={() => toggle(t)} aria-label={ok ? 'בטלי סימון' : 'סמני שנבדקה'}
+                style={{ width:26, height:26, borderRadius:8, flexShrink:0, cursor:'pointer',
+                  border:`1.5px solid ${ok ? 'var(--ok)' : '#C9C2DC'}`, background: ok ? 'var(--ok)' : '#fff',
+                  display:'flex', alignItems:'center', justifyContent:'center' }}>
+                {ok && <Check size={15} strokeWidth={3} color="#fff" />}
+              </button>
+              <div style={{ flex:'1 1 140px', minWidth:0 }}>
+                <p style={{ fontSize:16.1, fontWeight:700, color:'var(--text)' }}>{t.name}</p>
+                <p style={{ fontSize:13.2, color:'var(--text3)' }}>
+                  {reformLabel(t.reform)} · {t.frontalHours ?? '—'} שעות
+                  {isPreHomeroomRow(t) ? ` · עם גמול ${Number(t.frontalHours || 0) + 3}` : ''}
+                  {t.scopePct ? ` · ${t.scopePct}%` : ''}
+                  {t.reform === 'ofek' && !isPrincipalRow(t) && (() => {
+                    const d = (() => { try { return deriveHours({ ...t, gamulRole: t.role || t.gamulRole }); }
+                                       catch { return null; } })();
+                    const ind = t.individualHours ?? d?.individual;
+                    const pre = t.presenceHours ?? (d ? d.presence + (d.momPresence || 0) : null);
+                    return (ind ?? pre) != null ? ` · פרטני ${ind ?? '—'} · שהייה ${pre ?? '—'}` : '';
+                  })()}
+                </p>
+              </div>
+              <button className="apple-btn apple-btn-ghost" onClick={() => setOpen(isOpen ? null : t.id)}
+                style={{ minHeight:36, fontSize:14.4 }}>{isOpen ? 'סגירה' : 'פרטים ותיקון'}</button>
+            </div>
+
+            {hard > 0 && !isOpen && (
+              <p style={{ fontSize:13.2, color:'#B4650A', marginTop:7, lineHeight:1.6 }}>
+                {issues.filter(x => !x.soft).map(x => x.why).join(' · ')}
+              </p>
+            )}
+            {hard === 0 && issues.length > 0 && !isOpen && (
+              <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:7 }}>{issues.map(x => x.why).join(' · ')}</p>
+            )}
+
+            {isOpen && (
+              <div style={{ marginTop:11, paddingTop:11, borderTop:'1px solid var(--line)' }}>
+                <LinkCard teacher={t} locked={false} onSave={onSave} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <div className="apple-card" style={{ padding:'15px 16px' }}>
+        <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)', marginBottom:7 }}>אישור סופי</p>
+        <p style={{ fontSize:14.4, color:'var(--text)', lineHeight:1.75, background:'var(--surface)',
+          border:'1px solid var(--line)', borderRadius:9, padding:'10px 12px' }}>
+          אני מאשרת שהפרטים נכונים ומעודכנים, ושזהו מספר השעות לשנה זו —{' '}
+          <b style={{ color:'var(--purple)' }}>{hours} שעות שבועיות</b> — ולא אחרוג מכך.
+        </p>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:9, marginTop:11 }}>
+          <input className="apple-input" value={name} onChange={e => setName(e.target.value)}
+            placeholder="שמי המלא" style={{ flex:'1 1 160px', minHeight:42, fontSize:15.5 }} />
+          <input className="apple-input" value={note} onChange={e => setNote(e.target.value)}
+            placeholder="הערה (לא חובה)" style={{ flex:'1 1 160px', minHeight:42, fontSize:15.5 }} />
+        </div>
+        {err && <p style={{ fontSize:13.8, color:'var(--danger)', marginTop:8 }}>{err}</p>}
+        <button className="apple-btn apple-btn-blue" onClick={approve} disabled={busy || done < all || !all}
+          style={{ width:'100%', minHeight:48, fontSize:16.1, marginTop:11 }}>
+          {busy ? 'שולחת…' : done < all ? `נותרו ${all - done} עובדות לבדיקה` : 'מאשרת ושולחת'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function LinkMonthlyReport({ rows, locked, onSave, code }) {
   const byName = (n) => rows.find(t => t.name === String(n || '').trim());
 
@@ -7777,17 +7963,26 @@ function LinkView({ code }) {
           </>
         ) : (
           <>
-            <div className="apple-seg" style={{ marginBottom:12 }}>
+            {/* שלושה טאבים אינם נכנסים ל-390px. הרצועה גוללת בתוך עצמה
+                ולא דוחפת את העמוד, והכותרת הראשונה קוצרה. */}
+            <div className="apple-seg" style={{ marginBottom:12, maxWidth:'100%', overflowX:'auto',
+                 flexWrap:'nowrap', WebkitOverflowScrolling:'touch' }}>
               <button onClick={() => setTab('report')} className={['apple-seg-item', tab === 'report' ? 'active' : ''].join(' ')}
-                style={{ padding:'7px 14px', fontSize:14.9 }}>
-                דיווח חודשי — היעדרויות וממ"מ
+                style={{ padding:'7px 14px', fontSize:14.9, whiteSpace:'nowrap' }}>
+                דיווח חודשי
               </button>
               <button onClick={() => setTab('cards')} className={['apple-seg-item', tab === 'cards' ? 'active' : ''].join(' ')}
-                style={{ padding:'7px 14px', fontSize:14.9 }}>
+                style={{ padding:'7px 14px', fontSize:14.9, whiteSpace:'nowrap' }}>
                 נתוני העסקה
               </button>
+              <button onClick={() => setTab('approve')} className={['apple-seg-item', tab === 'approve' ? 'active' : ''].join(' ')}
+                style={{ padding:'7px 14px', fontSize:14.9, whiteSpace:'nowrap' }}>
+                אישור נתונים
+              </button>
             </div>
-            {tab === 'report' ? (
+            {tab === 'approve' ? (
+              <LinkApproval rows={rows} code={code} onSave={onSave} schoolName={me?.schoolName} />
+            ) : tab === 'report' ? (
               <LinkMonthlyReport rows={rows} locked={locked} onSave={onSave} code={code} />
             ) : (
               <>

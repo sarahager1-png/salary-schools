@@ -25,6 +25,8 @@ const TEACHER_FIELDS = [
   ['degree',               'degree'],
   ['seniority',            'seniority'],
   ['frontal_hours',        'frontalHours'],
+  ['individual_hours',     'individualHours'],
+  ['presence_hours',       'presenceHours'],
   ['scope_pct',            'scopePct'],
   ['scope_set_at',         'scopeSetAt'],
   ['scope_pct_pre',        'scopePctPre'],
@@ -491,6 +493,41 @@ export async function linkSaveRow(code, teacher) {
   const { data, error } = await supabase.rpc('link_save_row', { p_code: code, p_row: row });
   raise(error, 'השמירה נכשלה');
   return data ? rowToTeacher(data) : null;
+}
+
+/* ── אישור נתונים על ידי המנהלת ────────────────────────────────
+   כל שורה מסומנת בנפרד, והאישור הכולל נחסם בשרת עד שכולן סומנו.
+   ההצהרה ומספר השעות נבנים בשרת מהנתונים עצמם — הלקוח רק מציג. */
+export async function linkApproval(code) {
+  const { data, error } = await supabase.rpc('link_approval', { p_code: code });
+  raise(error, 'טעינת מצב האישור נכשלה');
+  return Array.isArray(data) ? (data[0] || null) : (data || null);
+}
+
+export async function linkCheckRow(code, rowId, on) {
+  const { data, error } = await supabase.rpc('link_check_row', { p_code: code, p_row: rowId, p_on: !!on });
+  raise(error, 'סימון השורה נכשל');
+  return Array.isArray(data) ? (data[0] || null) : (data || null);
+}
+
+export async function linkApproveData(code, name, note) {
+  const { data, error } = await supabase.rpc('link_approve_data',
+    { p_code: code, p_name: name, p_note: note || null });
+  raise(error, 'האישור נכשל');
+  return Array.isArray(data) ? (data[0] || null) : (data || null);
+}
+
+/* לשרה ולחשבת — מי אישרה, על כמה שעות, ומה תוקן */
+export async function approvals(monthKey) {
+  const { data, error } = await supabase.rpc('hours_vs_committed', { p_month: monthKey });
+  raise(error, 'טעינת האישורים נכשלה');
+  return data || [];
+}
+
+export async function dataFixes(monthKey) {
+  const { data, error } = await supabase.rpc('data_fixes', { p_month: monthKey });
+  raise(error, 'טעינת התיקונים נכשלה');
+  return data || [];
 }
 
 /*
