@@ -6406,7 +6406,7 @@ function LinkCard({ teacher, locked, onSave }) {
 // מחנכת בעולם ישן מקבלת 3 שעות גמול מעל מה שהיא מלמדת
 const isPreHomeroomRow = t => t?.reform === 'pre' && /^homeroom/.test(t?.gamulRole || t?.role || '');
 
-function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, male }) {
+function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, male, quota }) {
   const [ap,    setAp]    = useState(null);
   const [busy,  setBusy]  = useState(false);
   const [err,   setErr]   = useState('');
@@ -6545,6 +6545,27 @@ function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, mal
             חסרה עובדת ברשימה? אפשר להוסיף אותה כאן, והיא תצטרף לבדיקה.
           </p>
           <LinkNewCard schoolReform={schoolReform} onAdd={onAdd} male={male} />
+        </div>
+      )}
+
+      {/*
+        תקן השעות (שרה, 8.9): "מי שיש פחות אל תציין, רק מי שיש יותר;
+        אם תוסיף ותגע בגג תציין". שקט כל עוד מתחת לתקן — ומופיע ברגע
+        שנוגעים בו, כדי שההוספה במסך הזה לא תעבור אותו בלי לשים לב.
+      */}
+      {quota > 0 && hours >= quota && (
+        <div className="apple-card" style={{ padding:'12px 14px',
+          background: hours > quota ? '#FFF9EF' : 'var(--surface)',
+          border: `1px solid ${hours > quota ? '#F3E3C2' : 'var(--line)'}` }}>
+          <p style={{ fontSize:14.9, fontWeight:700, color: hours > quota ? '#B4650A' : 'var(--text)' }}>
+            {hours > quota
+              ? `חריגה מתקן השעות — ${hours - quota} שעות מעל התקן`
+              : 'הגעת בדיוק לתקן השעות'}
+          </p>
+          <p style={{ fontSize:13.8, color: hours > quota ? '#7A4A08' : 'var(--text3)', marginTop:3, lineHeight:1.6 }}>
+            תקן בית הספר {quota} שעות שבועיות, ורשומות {hours}.
+            {hours > quota ? ' אפשר לאשר, אבל כדאי לוודא שזה מכוון.' : ' הוספת שעות תעבור את התקן.'}
+          </p>
         </div>
       )}
 
@@ -8038,7 +8059,8 @@ function LinkView({ code }) {
             </div>
             {tab === 'approve' ? (
               <LinkApproval rows={rows} code={code} onSave={onSave} onAdd={locked ? null : onAdd}
-                schoolReform={me?.schoolReform} schoolName={me?.schoolName} male={male} />
+                schoolReform={me?.schoolReform} schoolName={me?.schoolName} male={male}
+                quota={me?.hoursQuota} />
             ) : tab === 'report' ? (
               <LinkMonthlyReport rows={rows} locked={locked} onSave={onSave} code={code} />
             ) : (
