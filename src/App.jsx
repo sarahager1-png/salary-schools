@@ -6422,6 +6422,7 @@ function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, mal
   const checked = new Set(ap?.checked || []);
   const hours = rows.filter(t => !isPrincipalRow(t) && !unpaidThisMonth(t))
     .reduce((a, t) => a + (Number(t.frontalHours) || 0), 0);
+  const over = quota > 0 && hours > quota;
   const done = rows.filter(t => checked.has(t.id)).length;
   const all  = rows.length;
   const approved = Boolean(ap?.approved_at);
@@ -6434,6 +6435,8 @@ function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, mal
 
   const approve = async () => {
     if (!name.trim()) { setErr('יש למלא את שמך'); return; }
+    // מעל התקן — נדרש נימוק. השרת חוסם גם הוא; כאן זו רק ההודעה המוקדמת.
+    if (over && !note.trim()) { setErr('השעות מעל תקן בית הספר — יש לכתוב מה הסיבה לחריגה'); return; }
     setBusy(true); setErr('');
     try { setAp(await store.linkApproveData(code, name.trim(), note)); }
     catch (e) { setErr(e.message); }
@@ -6564,7 +6567,7 @@ function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, mal
           </p>
           <p style={{ fontSize:13.8, color: hours > quota ? '#7A4A08' : 'var(--text3)', marginTop:3, lineHeight:1.6 }}>
             תקן בית הספר {quota} שעות שבועיות, ורשומות {hours}.
-            {hours > quota ? ' אפשר לאשר, אבל כדאי לוודא שזה מכוון.' : ' הוספת שעות תעבור את התקן.'}
+            {hours > quota ? ' כדי לאשר יש לכתוב בהערה מה הסיבה לחריגה, או להוריד שעות.' : ' הוספת שעות תעבור את התקן.'}
           </p>
         </div>
       )}
@@ -6580,12 +6583,18 @@ function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, mal
           <input className="apple-input" value={name} onChange={e => setName(e.target.value)}
             placeholder="שמי המלא" style={{ flex:'1 1 160px', minHeight:42, fontSize:15.5 }} />
           <input className="apple-input" value={note} onChange={e => setNote(e.target.value)}
-            placeholder="הערה (לא חובה)" style={{ flex:'1 1 160px', minHeight:42, fontSize:15.5 }} />
+            placeholder={over ? 'הסיבה לחריגה מהתקן — חובה' : 'הערה (לא חובה)'}
+            style={{ flex:'1 1 160px', minHeight:42, fontSize:15.5,
+              borderColor: over && !note.trim() ? '#E8A33D' : undefined }} />
         </div>
         {err && <p style={{ fontSize:13.8, color:'var(--danger)', marginTop:8 }}>{err}</p>}
-        <button className="apple-btn apple-btn-blue" onClick={approve} disabled={busy || done < all || !all}
+        <button className="apple-btn apple-btn-blue" onClick={approve}
+          disabled={busy || done < all || !all || (over && !note.trim())}
           style={{ width:'100%', minHeight:48, fontSize:16.1, marginTop:11 }}>
-          {busy ? 'שולחת…' : done < all ? `נותרו ${all - done} עובדות לבדיקה` : 'מאשרת ושולחת'}
+          {busy ? 'שולחת…'
+            : done < all ? `נותרו ${all - done} עובדות לבדיקה`
+            : (over && !note.trim()) ? 'יש לכתוב את הסיבה לחריגה'
+            : 'מאשרת ושולחת'}
         </button>
       </div>
     </div>
