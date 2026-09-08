@@ -4272,10 +4272,17 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
     const gross = Number(t._agreedGross) || Number(t._officialGross) || 0;
     if (!gross) return { skip: 'אין עדיין ברוטו' };
     const supp = paysSupp ? (Number(t._chabadSupp) || 0) : 0;
+    /*
+      "אמור להיות תואם… אתה משאיר את האחוזים" (שרה, 8.9). slipScope
+      חישב כאן אחוז מחדש בנוסחת העולם הישן — (שעות+3)/30 ועוד תוספת אם
+      — והציג 90% למי שרשום לה 86%. שני מסכים הראו שני מספרים לאותה
+      מורה. האחוז שנקבע במערכת הוא היחיד, וכאן רק מציגים אותו.
+      slipScope נשאר לחישוב *השעות* לתלוש, שם ה-3 של מחנכת אמיתיות.
+    */
     const scope = t.reform === 'ofek' ? slipScope(t) : null;
     return {
       darga: slipDarga(t), vetek: t.seniority,
-      pct: scope ? scope.total : (t.scope ?? t.scopePct ?? 100),
+      pct: t.scopePct ?? t.scope ?? (scope ? scope.total : 100),
       hours: scope ? scope.hours : t.frontalHours,
       kita: t.role && /^homeroom/.test(t.role),
       base: gross - supp, supp, gross, paysSupp,
@@ -5441,11 +5448,19 @@ function ScopePanel({ teachers, schools, onSave }) {
     "כל העובדות" כל השורות פתוחות לשינוי, עם מה שרשום בהן היום.
   */
   const [showAll, setShowAll] = useState(false);
+  const [q, setQ] = useState('');
 
+  /*
+    "תן לי אפשרות לשנות עכשיו את אחוזי המשרה" (שרה, 8.9). "כל העובדות"
+    סינן isPending — ומכיוון ש-83 מ-85 השורות כבר מאושרות, המצב הזה
+    הציג עובדת אחת ונראה שבור. אחוז משרה אינו נעול אחרי אישור: שינוי
+    שלו מחזיר את השורה לאישור מחדש דרך הטריגר, וזה בדיוק הרצוי.
+  */
   const missing = teachers.filter(scopeMissing);
-  const rows = showAll
-    ? teachers.filter(t => isPending(t) && !isPrincipalRow(t))
-    : missing;
+  const all = teachers.filter(t => !isPrincipalRow(t) && !unpaidThisMonth(t));
+  const term = q.trim();
+  const rows = (showAll ? all : missing)
+    .filter(t => !term || String(t.name || '').includes(term) || String(t.tzId || '').includes(term));
   const bySchool = schools
     .map(sc => ({ school: sc, list: rows.filter(t => t.schoolId === sc.id) }))
     .filter(g => g.list.length);
@@ -5495,9 +5510,9 @@ function ScopePanel({ teachers, schools, onSave }) {
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
         <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6, flex:'1 1 220px' }}>
           {showAll
-            ? `${rows.length} עובדות — כולל מי שאחוזה כבר נקבע. הקלדה דורסת את הקיים.`
+            ? `${rows.length} עובדות — כולל מי שאחוזה כבר נקבע ומי שכבר אושרה. הקלדה דורסת את הקיים.`
             : `${rows.length} עובדות שאחוז המשרה שלהן עדיין ברירת המחדל — 100 שאיש לא בחר.`}
-          {' '}הקלדה כאן לפני הסימולציה; אחריה היא מוחקת את השכר שהוזן.
+          {' '}הקלדה כאן לפני הסימולציה; אחריה היא מוחקת את השכר שהוזן{showAll ? ' ומחזירה את השורה לאישור' : ''}.
         </p>
         <div className="apple-seg" style={{ flexShrink:0 }}>
           <button onClick={() => setShowAll(false)}
@@ -5508,10 +5523,19 @@ function ScopePanel({ teachers, schools, onSave }) {
           <button onClick={() => setShowAll(true)}
             className={['apple-seg-item', showAll ? 'active' : ''].join(' ')}
             style={{ padding:'5px 11px', fontSize:13.8 }}>
-            כל העובדות
+            {`כל העובדות (${all.length})`}
           </button>
         </div>
       </div>
+      {showAll && (
+        <div style={{ position:'relative' }}>
+          <Search size={15} strokeWidth={2.2} color="var(--text3)"
+            style={{ position:'absolute', insetInlineStart:11, top:'50%', transform:'translateY(-50%)' }} />
+          <input className="apple-input" value={q} onChange={e => setQ(e.target.value)}
+            placeholder="חיפוש לפי שם או ת.ז."
+            style={{ width:'100%', minHeight:40, fontSize:15.5, paddingInlineStart:34 }} />
+        </div>
+      )}
       {bySchool.map(({ school, list }) => (
         <div key={school.id}>
           <div style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
