@@ -123,10 +123,11 @@ export function mapHubSchools(data) {
             ...(inc.sources || []).map(x => ({ name: x.name, amount: Number(x.amount || 0) })),
           ].filter(x => x.amount > 0),
           expenses: [
-            { name: 'חוגים', amount: s.expenses?.clubsExpense || 0 },
             { name: 'הוצאות פר תלמיד', amount: s.expenses?.studentExp || 0 },
             { name: 'התמקצעות', amount: s.expenses?.profDev || 0 },
             ...Object.entries(s.expenses?.byCategory || {}).map(([name, amount]) => ({ name, amount: Number(amount || 0) })),
+            // חוגים — הוצאה שוטפת, אחרי הסעיפים השוטפים ("משולמים בנפרד", שרה 10.9)
+            { name: 'חוגים (הוצאה שוטפת)', amount: s.expenses?.clubsExpense || 0 },
           ].filter(x => x.amount > 0),
         },
         expensesOther: Math.max(0, (s.expenses?.total || 0) - (s.expenses?.teaching || 0) - (s.expenses?.counselingCost || 0)),
@@ -139,6 +140,11 @@ export function mapHubSchools(data) {
         // השתתפות רשת חב"ד שההנהלה מקלידה בכרטיס במבט-רשת (v19). בדף עלות
         // ההוראה היא ממלאת רק תא ריק — הנתונים של רינה הם הקובעים (שרה, 6.9).
         networkSupport: s.networkSupport ?? null,
+        // "כמה עלות שכר לפי התחשיב שלי לשעה" (שרה, 10.9): התעריף שהתקציב
+        // מניח לשעה שבועית לחודש (700 באופק, 550 בעולם ישן) — מוצג בעמודה
+        // המוסתרת ליד העלות בפועל לשעה, כערכים ולא כהפרש.
+        hourRate: Number(s.raw?.constants?.actual_hourly_rate) || null,
+        weeklyHours: Number(s.raw?.constants?.actual_weekly_hours) || null,
       };
     });
     /*
@@ -174,6 +180,9 @@ export function mapHubSchools(data) {
       }
       cur.yieul = (cur.yieul == null && s.yieul == null) ? null : (cur.yieul || 0) + (s.yieul || 0);
       cur.networkSupport = (cur.networkSupport == null && s.networkSupport == null) ? null : (cur.networkSupport || 0) + (s.networkSupport || 0);
+      // תעריף לשעה אינו מסתכם — בפיצול בנים/בנות נלקח הראשון שקיים
+      cur.hourRate = cur.hourRate ?? s.hourRate ?? null;
+      cur.weeklyHours = cur.weeklyHours ?? s.weeklyHours ?? null;
     }
     return [...byBase.values()];
 }

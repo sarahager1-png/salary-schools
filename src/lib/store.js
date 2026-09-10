@@ -821,7 +821,7 @@ export async function slipsHandoff(key, action) {
    והמסך כלל אינו מוצג לו. תקציב וייעול שנתיים, בהקלדה ידנית. */
 export async function loadFinance() {
   const { data, error } = await supabase.from('school_finance')
-    .select('school_id, ministry_budget, yieul, teaching_sim, network_support, income_total, expenses_other, detail, note, src, updated_at');
+    .select('school_id, ministry_budget, yieul, teaching_sim, network_support, network_support_adj, income_total, expenses_other, detail, note, src, updated_at');
   raise(error, 'טעינת נתוני התקציב נכשלה');
   return (data || []).map(r => ({
     schoolId: r.school_id,
@@ -829,6 +829,8 @@ export async function loadFinance() {
     yieul: r.yieul == null ? null : Number(r.yieul),
     teachingSim: r.teaching_sim == null ? null : Number(r.teaching_sim),
     networkSupport: r.network_support == null ? null : Number(r.network_support),
+    // "דיוק השתתפות הרשת" — הקלדה ידנית בעמודה המוסתרת (שרה, 10.9)
+    networkSupportAdj: r.network_support_adj == null ? null : Number(r.network_support_adj),
     incomeTotal: r.income_total == null ? null : Number(r.income_total),
     expensesOther: r.expenses_other == null ? null : Number(r.expenses_other),
     detail: r.detail || null,
@@ -845,6 +847,7 @@ export async function saveFinance(schoolId, f) {
     yieul: f.yieul ?? null,
     teaching_sim: f.teachingSim ?? null,
     network_support: f.networkSupport ?? null,
+    network_support_adj: f.networkSupportAdj ?? null,
     income_total: f.incomeTotal ?? null,
     expenses_other: f.expensesOther ?? null,
     detail: f.detail ?? null,

@@ -3737,7 +3737,11 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           if (want[k] != null && want[k] !== cur[k]) { patch[k] = want[k]; src[k] = 'hub'; }
         }
         // הפירוט לשורות — עד היום לא נשמר במשיכה, והכרטיסים הציגו רק סכומים
-        const wantDetail = (h.detail || h.teach) ? { ...(h.detail || {}), teach: h.teach || null } : null;
+        // basis: התעריף לשעה שבועית שהתקציב מניח — לעמודת "עלות שכר לשעה" (שרה, 10.9)
+        const wantDetail = (h.detail || h.teach)
+          ? { ...(h.detail || {}), teach: h.teach || null,
+              basis: (h.hourRate || h.weeklyHours) ? { hourRate: h.hourRate ?? null, weeklyHours: h.weeklyHours ?? null } : null }
+          : null;
         if (wantDetail && JSON.stringify(wantDetail) !== JSON.stringify(cur.detail)) {
           patch.detail = wantDetail;
         }
@@ -3796,8 +3800,41 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     // חריגה מתקן השעות, בשעות (שרה, 10.9)
     const ts = teachers.filter(t => t.schoolId === sc.id);
     const hoursOverQ = hoursOver(ts, sc.hoursQuota);
-    return { sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ };
+    /*
+      "כמה עלות שכר לפי התחשיב שלי לשעה (לא ההפרש)" (שרה, 10.9): שני
+      ערכים לשעה שבועית לחודש, זה ליד זה. התחשיב = התעריף שהתקציב מניח
+      (נמשך ממבט-רשת ונשמר ב-detail.basis). בפועל = עלות המעביד של עובדות
+      ההוראה בלי המנהלת ובלי מי שבחל"ד/חל"ת, חלקי השעות הפרונטליות שלהן.
+      באור עקיבא: 700 מול 551 — וזה כל הפער מול הסימולציה, לא חוגים.
+    */
+    const teaching = ts.filter(t => !isPrincipalRow(t) && !unpaidThisMonth(t));
+    const teachHours = teaching.reduce((a, t) => a + (Number(t.frontalHours) || 0), 0);
+    const teachCost  = teaching.reduce((a, t) => a + calcEmployer(t).total, 0);
+    const perHourActual = teachHours > 0 ? teachCost / teachHours : null;
+    const perHourSim    = f.detail?.basis?.hourRate ?? null;
+    /*
+      "כמה בית חב"ד היה אמור להעביר לפי התחשיב שלי לרשת" (שרה, 10.9):
+      עלות ההוראה מהתקציב (כולל מנהלת וייעוץ, אחרי ייעול) פחות הכנסות
+      משרד החינוך ופחות השתתפות הרשת. חיובי = מה שנשאר לבית חב"ד לכסות.
+      אותה נוסחה כמו gap-per-chabad-house.mjs במערכת התקציב.
+    */
+    const chabadTransfer = (f.teachingSim != null && f.ministryBudget != null)
+      ? f.teachingSim - (f.ministryBudget || 0) - (f.networkSupport || 0)
+      : null;
+    return { sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer };
   });
+  // תצוגת "תחשיב · בפועל" לשעה — אותו רכיב בטבלה ובכרטיס
+  const PerHour = ({ sim, actual }) => (
+    <span style={{ fontSize:15.5, whiteSpace:'nowrap' }}>
+      <span style={{ color:'var(--text2)' }}>תחשיב </span>
+      <span className="num" style={{ fontWeight:700 }}>{sim == null ? '—' : Math.round(sim).toLocaleString('he-IL')}</span>
+      <span style={{ color:'var(--text3)' }}> · </span>
+      <span style={{ color:'var(--text2)' }}>בפועל </span>
+      <span className="num" style={{ fontWeight:800, color: actual == null ? 'var(--text3)' : sim != null && actual > sim ? 'var(--danger)' : 'var(--text)' }}>
+        {actual == null ? '—' : Math.round(actual).toLocaleString('he-IL')}
+      </span>
+    </span>
+  );
   // סה"כ חריגה ברשת: רק בתי הספר שמעל התקן (מי שמתחת אינו מקזז)
   const totOverHours = rows.reduce((a, r) => a + (r.hoursOverQ > 0 ? r.hoursOverQ : 0), 0);
   const tot = rows.reduce((a, r) => ({
@@ -3884,6 +3921,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <TH>מילוי מקום · 5%</TH>
               {showSim && <TH>עלות הוראה מהתקציב</TH>}
               {showSim && <TH>הפרש מול השכר בפועל</TH>}
+              {showSim && <TH>עלות שכר לשעה שבועית</TH>}
+              {showSim && <TH>העברה מבית חב"ד לפי התחשיב</TH>}
+              {showSim && <TH>דיוק השתתפות הרשת</TH>}
               <TH>השתתפות הרשת</TH>
               <TH>יתרה לאחר שכר</TH>
               <TH>חריגה מתקן השעות</TH>
@@ -3891,8 +3931,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={showSim ? 9 : 7} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ }) => (
+              <tr><td colSpan={showSim ? 12 : 7} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+            ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
@@ -3904,6 +3944,14 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
                   color: simGap == null ? 'var(--text3)' : simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
                   {simGap == null ? '—' : money(per(simGap))}</td>}
+                {showSim && <td style={{ textAlign:'center' }}><PerHour sim={perHourSim} actual={perHourActual} /></td>}
+                {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
+                  color: chabadTransfer == null ? 'var(--text3)' : chabadTransfer > 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
+                  {chabadTransfer == null ? '—' : money(per(chabadTransfer))}</td>}
+                {/* עמודה ריקה להקלדה — "דיוק השתתפות הרשת" (שרה, 10.9); לא נכנסת לשום חישוב */}
+                {showSim && <td style={{ textAlign:'center' }}>{period === 'year'
+                  ? moneyInput(sc.id, 'networkSupportAdj', f.networkSupportAdj)
+                  : <span style={{ fontSize:16.1 }}>{money(per(f.networkSupportAdj))}</span>}</td>}
                 <td style={{ textAlign:'center' }}>{period === 'year'
                   ? moneyInput(sc.id, 'networkSupport', f.networkSupport)
                   : <span style={{ fontSize:16.1 }}>{money(per(f.networkSupport))}</span>}</td>
@@ -3942,7 +3990,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       <div className="only-mobile">
         {fin === null ? (
           <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
-        ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ }) => (
+        ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer }) => (
           <div key={'m-' + sc.id} className="apple-card mcard">
             <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
             <CardRow label="הכנסות משרד החינוך + מענק">
@@ -3961,6 +4009,22 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <CardRow label="הפרש מול השכר בפועל"
                 color={simGap == null ? 'var(--text3)' : simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
                 {simGap == null ? '—' : money(per(simGap))}
+              </CardRow>
+            )}
+            {showSim && (
+              <CardRow label="עלות שכר לשעה שבועית"><PerHour sim={perHourSim} actual={perHourActual} /></CardRow>
+            )}
+            {showSim && (
+              <CardRow label='העברה מבית חב"ד לפי התחשיב'
+                color={chabadTransfer == null ? 'var(--text3)' : chabadTransfer > 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
+                {chabadTransfer == null ? '—' : money(per(chabadTransfer))}
+              </CardRow>
+            )}
+            {showSim && (
+              <CardRow label="דיוק השתתפות הרשת">
+                {period === 'year'
+                  ? moneyInput(sc.id, 'networkSupportAdj', f.networkSupportAdj)
+                  : money(per(f.networkSupportAdj))}
               </CardRow>
             )}
             <CardRow label="השתתפות הרשת">
