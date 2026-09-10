@@ -59,9 +59,21 @@ try {
   let i = 0;
   for (const t of rows) {
     i++;
+    /*
+      הבסיס רץ באחוז ה**ישן**, לא באחוז האופק (שרה, 8.9 — אושר על
+      חיה מושקא בק: שכר משולב 2,945 מתקבל ב-90% בלבד).
+      האחוז הישן = (שעות + 3 למחנכת) / 30, ומעל 79% אֵם מקבלת עוד 10.
+    */
+    const hrs = Number(t.frontal_hours) || 0;
+    const kitaH = /^homeroom/.test(t.gamul_role || '') ? 3 : 0;
+    const raw = (hrs + kitaH) / 30 * 100;
+    const isMom = t.gender === 'f' && (t.children_under_18 || 0) > 0;
+    const oldPct = t.reform === 'ofek'
+      ? (isMom && raw > 79 ? Math.min(100, Math.floor(raw) + 10) : Math.round(raw))
+      : Number(t.scope_pct);
     const plan = { calc: 'old', darga: dargaFor(t), kita: kitaFor(t),
       vetek: String(Math.max(1, Math.min(40, Number(t.seniority) || 1))),
-      pct: String(t.scope_pct) };
+      pct: String(oldPct) };
     if (!plan.darga) { console.log(`${String(i).padStart(2)}/${rows.length}`, t.name.padEnd(21), 'דילוג: אין דרגה בעולם הישן'); continue; }
     let base = null, err = null;
     for (let a = 0; a < 2 && base == null; a++) {
@@ -76,11 +88,11 @@ try {
     const delta = isOfek ? newSupp - oldSupp : null;
     const grossGap = isOfek ? null : Math.round(base) - t.official_gross;
     out.push({ id: t.id, name: t.name, school: t.schools?.name, reform: t.reform, pct: t.scope_pct,
-      gross: t.official_gross, calc: Math.round(base),
+      gross: t.official_gross, calc: Math.round(base), oldPct,
       oldBase: isOfek ? oldBase : null, newBase: isOfek ? Math.round(base) : null,
       oldSupp: isOfek ? oldSupp : null, newSupp: isOfek ? newSupp : null, delta, grossGap });
     console.log(`${String(i).padStart(2)}/${rows.length}`, t.name.padEnd(21), (t.schools?.name || '').padEnd(17),
-      `${t.scope_pct}%`.padStart(5), isOfek
+      `${oldPct}%`.padStart(5), isOfek
         ? `| בסיס ${String(oldBase).padStart(6)} → ${String(Math.round(base)).padStart(6)} | תוספת ${String(oldSupp).padStart(5)} → ${String(newSupp).padStart(5)} ${delta === 0 ? '| תואם' : `| ${delta > 0 ? '+' : ''}${delta}`}`
         : `| ישן · ברוטו ${String(t.official_gross).padStart(6)} מול מחשבון ${String(Math.round(base)).padStart(6)} ${grossGap === 0 ? '| תואם' : `| ${grossGap > 0 ? '+' : ''}${grossGap}`}`);
   }

@@ -469,7 +469,8 @@ export async function linkWhoami(code) {
 export async function linkMonths(code) {
   const { data, error } = await supabase.rpc('link_months', { p_code: code });
   raise(error, 'טעינת החודשים נכשלה');
-  return (data || []).map(m => ({ key: m.key, locked: m.locked }));
+  // locked כבר כולל את נעילת ה-10 (private.link_locked); lock_due להצגת "עד מתי"
+  return (data || []).map(m => ({ key: m.key, locked: m.locked, lockDue: m.lock_due ?? null }));
 }
 
 export async function linkRows(code, monthKey) {

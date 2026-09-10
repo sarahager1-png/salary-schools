@@ -72,5 +72,6 @@ export function dueDatesFor(monthKey) {
   const [y, m] = monthKey.split('-').map(Number);
   const d = new Date(Date.UTC(y, m, 1));            // החודש הבא
   const k = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-  return { report: `${k}-05`, submit: `${k}-06` };
+  // lock: מה-10 המנהלות אינן משנות עוד ("תנעל ב-10 לחודש לשינויים תמיד", שרה 10.9)
+  return { report: `${k}-05`, submit: `${k}-06`, lock: `${k}-10` };
 }

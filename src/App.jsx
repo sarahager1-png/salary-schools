@@ -173,6 +173,27 @@ const simComplete = t => {
 // needs_approval: הנתונים הושלמו, ממתין לאישור שרה
 // approved: שרה אישרה
 const needsSim      = t => Boolean(!unpaidThisMonth(t) && t._changedAt && !t._approved && !simComplete(t));
+
+// שעות בית הספר מול תקן השעות — כלל אחד לכל המסכים, זהה ל-p_hours_of
+// בשרת: שעות פרונטליות של עובדות ההוראה, בלי מנהלת, בלי מי שבחל"ד/חל"ת
+// החודש (שרה, 8.9), ובלי מורה לשילוב — "שעות שילוב יורדות גם מהספירה"
+// (שרה, 10.9). "חשוב שיהיה כתוב כמה חריגה יש לכל בית ספר, בשעות" (10.9)
+// — לכן החריגה היא מספר שעות מפורש, לא רק צבע.
+const isInclusionRow = t => (t?.gamulRole || t?.role) === 'inclusion';
+const schoolHours = ts => ts
+  .filter(t => !isPrincipalRow(t) && !isInclusionRow(t) && !unpaidThisMonth(t))
+  .reduce((a, t) => a + (Number(t.frontalHours) || 0), 0);
+// null = אין תקן; חיובי = מעל התקן; שלילי/אפס = בתוך התקן
+const hoursOver = (ts, quota) => {
+  const q = Number(quota) || 0;
+  return q > 0 ? schoolHours(ts) - q : null;
+};
+// תצוגת החריגה: "+3 שעות" באדום, "בתקן" בשקט, "—" בלי תקן
+const OverHours = ({ over, size = 15.5 }) => (
+  over == null ? <span style={{ color:'var(--text3)', fontSize:size }}>—</span>
+  : over > 0   ? <span className="num" style={{ color:'var(--danger)', fontWeight:800, fontSize:size }}>+{over} שעות</span>
+  :              <span style={{ color:'var(--ok, #2e7d32)', fontWeight:600, fontSize:size }}>בתקן</span>
+);
 const needsApproval = t => Boolean(t._changedAt && !t._approved && simComplete(t));
 const isPending     = t => Boolean(t._changedAt && !t._approved); // = needsSim || needsApproval
 
@@ -3654,9 +3675,10 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   const [openInc, setOpenInc] = useState({});
   // "אני צריכה חתכים שונים — חודשי/שנתי" (3.9): מתג אחד לכל הדף
   const [period, setPeriod] = useState('year');
-  // עלות מילוי מקום: "5 אחוז מההוראה" (שרה, 7.9) — 5% מברוטו שכר
-  // ההוראה בלבד: בלי מנהלת, בלי הפרשות מעסיק, בלי שעות ממ"מ שדווחו.
-  // עד 7.9 חושב על עלות המעסיק המלאה (כולל מנהלת והפרשות) — יצא גבוה מדי.
+  // עלות מילוי מקום: "לכל בית ספר צריך להיות 5 אחוז מסך הכולל של עלות
+  // ההוראה" (שרה, 10.9) — 5% אחד לבית ספר, על עלות ההוראה השנתית המלאה
+  // (ברוטו + עלות מעביד, כולל מנהלת). מחליף את הנוסח מ-7.9 (ברוטו הוראה
+  // בלבד) ואת הרזרבה למורה ב-calcEmployer שנספרה פעמיים.
   const MM_PCT = 0.05;
   // מדד בכותרת כרטיס: תווית קטנה מעל מספר, רוחב קבוע — הכרטיסים מיושרים
   const Metric = ({ label, val, big }) => (
@@ -3744,11 +3766,6 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   const monthlyCost = (sid) => teachers
     .filter(t => t.schoolId === sid)
     .reduce((sum, t) => sum + calcEmployer(t).total, 0);
-  // בסיס ה-5%: ברוטו עובדות ההוראה בלבד (המנהלת אינה מוחלפת)
-  const teachingGross = (sid) => teachers
-    .filter(t => t.schoolId === sid && !isPrincipalRow(t))
-    .reduce((sum, t) => sum + calcEmployer(t).gross, 0);
-
 
   const save = async (sid, patch) => {
     const cur = { ...(fin?.[sid] || {}), ...patch };
@@ -3763,7 +3780,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const f = fin?.[sc.id] || {};
     const monthly = monthlyCost(sc.id);
     const annual  = monthly * 12;
-    const mmCost  = teachingGross(sc.id) * 12 * MM_PCT;
+    const mmCost  = annual * MM_PCT;   // 5% מסך עלות ההוראה השנתית
     // "תוסיף השתתפות רשת מרינה" (שרה, 3.9) — מצטרפת ליתרה בחיוב,
     // "אין צורך" בייעול (שרה, 3.9): משרד − (שכר + מ"מ 5% מההוראה) + השתתפות
     const left = (f.ministryBudget != null)
@@ -3776,8 +3793,13 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     */
     // שני הצדדים כוללים מנהלת (הוראת שרה, 3.9) — השוואה מלאה מול מלאה
     const simGap = f.teachingSim != null && monthly > 0 ? f.teachingSim - annual : null;
-    return { sc, f, monthly, annual, mmCost, left, simGap };
+    // חריגה מתקן השעות, בשעות (שרה, 10.9)
+    const ts = teachers.filter(t => t.schoolId === sc.id);
+    const hoursOverQ = hoursOver(ts, sc.hoursQuota);
+    return { sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ };
   });
+  // סה"כ חריגה ברשת: רק בתי הספר שמעל התקן (מי שמתחת אינו מקזז)
+  const totOverHours = rows.reduce((a, r) => a + (r.hoursOverQ > 0 ? r.hoursOverQ : 0), 0);
   const tot = rows.reduce((a, r) => ({
     budget: a.budget + (r.f.ministryBudget || 0),
     yieul:  a.yieul  + (r.f.yieul || 0),
@@ -3864,12 +3886,13 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               {showSim && <TH>הפרש מול השכר בפועל</TH>}
               <TH>השתתפות הרשת</TH>
               <TH>יתרה לאחר שכר</TH>
+              <TH>חריגה מתקן השעות</TH>
             </tr>
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={showSim ? 8 : 6} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap }) => (
+              <tr><td colSpan={showSim ? 9 : 7} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+            ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
@@ -3888,6 +3911,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   color: left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
                   {left == null ? '—' : money(per(left))}
                 </td>
+                <td style={{ textAlign:'center' }}><OverHours over={hoursOverQ} size={16.1} /></td>
               </tr>
             ))}
           </tbody>
@@ -3904,6 +3928,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.support))}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(per(tot.left))}</td>
+                <td style={{ textAlign:'center' }}><OverHours over={totOverHours} size={16.1} /></td>
               </tr>
             </tfoot>
           )}
@@ -3917,7 +3942,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       <div className="only-mobile">
         {fin === null ? (
           <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
-        ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap }) => (
+        ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ }) => (
           <div key={'m-' + sc.id} className="apple-card mcard">
             <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
             <CardRow label="הכנסות משרד החינוך + מענק">
@@ -3947,6 +3972,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               color={left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
               {left == null ? '—' : money(per(left))}
             </CardRow>
+            <CardRow label="חריגה מתקן השעות"><OverHours over={hoursOverQ} /></CardRow>
           </div>
         ))}
         {fin !== null && rows.length > 1 && (
@@ -3967,11 +3993,12 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               color={tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
               {money(per(tot.left))}
             </CardRow>
+            <CardRow label="חריגה מתקן השעות"><OverHours over={totOverHours} /></CardRow>
           </div>
         )}
       </div>
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
-        תקציב הכנסות משרד החינוך פחות עלות השכר ומילוי מקום (5% מברוטו שכר ההוראה, בלי מנהלת), בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
+        תקציב הכנסות משרד החינוך פחות עלות השכר ומילוי מקום (5% מסך עלות ההוראה), בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
         עלות השכר נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
         {' '}חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
       </p>
@@ -4027,7 +4054,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   {dline('סה"כ הכנסות הוראה', per(teachIncome), true)}
                   <div style={{ height:8 }} />
                   {dline(`שכר הוראה (עובדי הוראה, מנהלת, תוספות)`, per(annual))}
-                  {dline('מילוי מקום — 5% משכר ההוראה', per(mmCost))}
+                  {dline('מילוי מקום — 5% מעלות ההוראה', per(mmCost))}
                   {dline('סה"כ הוצאות הוראה', per(teachCost), true)}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
                     borderTop:'2px solid var(--line)', color: gapColor(teachDiff) }}>
@@ -4632,9 +4659,11 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
     const gross    = tsOff.reduce((sum, t) => sum + calcEmployer(t).gross, 0);
     const empTot   = tsOff.reduce((sum, t) => sum + calcEmployer(t).total, 0);
     const pending  = ts.filter(isPending).length;
-    const usedHours = ts.reduce((sum, t) => sum + (Number(t.frontalHours) || 0), 0);
+    const usedHours = schoolHours(ts);   // בלי מנהלת וחל"ד/חל"ת — כמו במסך האישור
+    const quota     = Number(s.hoursQuota) || null;
     return { ...s, ts, count: ts.length, officialCount: tsOff.length, gross, empTot,
-             annual: empTot * 12, pending, usedHours, quota: Number(s.hoursQuota) || null };
+             annual: empTot * 12, pending, usedHours, quota,
+             overHours: quota ? usedHours - quota : null };
   }).sort((a,b) => b.empTot - a.empTot);
 
   const totGross  = rows.reduce((s,r) => s + r.gross, 0);
@@ -4645,23 +4674,26 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
   const totOfficial = rows.reduce((s,r) => s + r.officialCount, 0);
   const totUsedHours = rows.reduce((s,r) => s + r.usedHours, 0);
   const totQuota     = rows.reduce((s,r) => s + (r.quota || 0), 0) || null;
+  const totOverHours = rows.reduce((s,r) => s + (r.overHours > 0 ? r.overHours : 0), 0);
 
   const exportCSV = () => {
     const headers = [
       { key:'name', label:'בית ספר' }, { key:'city', label:'עיר' },
       { key:'count', label:'עובדי הוראה' }, { key:'officialCount', label:'מתוכן עם סימולציה מלאה' },
       { key:'usedHours', label:'שעות בשימוש' }, { key:'quota', label:'מכסת שעות' },
+      { key:'overHours', label:'חריגה מהתקן (שעות)' },
       { key:'gross', label:'ברוטו / חודש (₪)' }, { key:'empTot', label:'ברוטו למעסיק (₪)' },
       { key:'annual', label:'עלות שנתית (₪)' }, { key:'pending', label:'ממתינים לאישור' },
     ];
     const body = rows.map(r => ({
       name: r.name, city: r.city || '', count: r.count, officialCount: r.officialCount,
       usedHours: r.usedHours, quota: r.quota || '',
+      overHours: r.overHours > 0 ? r.overHours : '',
       gross: r.gross || '', empTot: r.empTot || '', annual: r.annual || '', pending: r.pending,
     }));
     const footer = {
       name: 'סה"כ רשת', count: totCount, officialCount: totOfficial,
-      usedHours: totUsedHours, quota: totQuota || '',
+      usedHours: totUsedHours, quota: totQuota || '', overHours: totOverHours || '',
       gross: totGross, empTot: totEmp, annual: totAnnual, pending: totPending,
     };
     downloadCSV(headers, body, `דוח_רשת_${stampToday()}.csv`, footer);
@@ -4713,6 +4745,7 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
                 <th>עיר</th>
                 <th style={{ textAlign:'center' }}>עובדי הוראה</th>
                 <th style={{ textAlign:'center' }}>שעות / מכסה</th>
+                <th style={{ textAlign:'center' }}>חריגה</th>
                 <th style={{ textAlign:'center' }}>ברוטו / חודש</th>
                 <th style={{ textAlign:'center' }}>ברוטו למעסיק</th>
                 <th style={{ textAlign:'center', color:'var(--apple-purple)' }}>עלות שנתית</th>
@@ -4748,6 +4781,7 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
                          : r.quota && r.usedHours / r.quota >= 0.9 ? 'var(--warn)' : 'var(--text2)' }}>
                     {r.quota ? `${r.usedHours} / ${r.quota}` : (r.usedHours || '—')}
                   </td>
+                  <td style={{ textAlign:'center' }}><OverHours over={r.overHours} size={14.9} /></td>
                   <td style={{ textAlign:'center', color:'var(--text)', fontWeight:600 }}>{r.gross>0 ? r.gross.toLocaleString('he-IL')+' ₪' : '—'}</td>
                   <td style={{ textAlign:'center', fontWeight:700, color:'var(--text)' }}>{r.empTot>0 ? r.empTot.toLocaleString('he-IL')+' ₪' : '—'}</td>
                   <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>{r.annual>0 ? r.annual.toLocaleString('he-IL')+' ₪' : '—'}</td>
@@ -4818,6 +4852,7 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
                      : r.quota && r.usedHours / r.quota >= 0.9 ? 'var(--warn)' : 'var(--text2)'}>
                 {r.quota ? `${r.usedHours} / ${r.quota}` : (r.usedHours || '—')}
               </CardRow>
+              <CardRow label="חריגה מהתקן"><OverHours over={r.overHours} size={14.9} /></CardRow>
               <CardRow label="ברוטו / חודש">{r.gross > 0 ? r.gross.toLocaleString('he-IL') + ' ₪' : '—'}</CardRow>
               <CardRow label="ברוטו למעסיק">{r.empTot > 0 ? r.empTot.toLocaleString('he-IL') + ' ₪' : '—'}</CardRow>
               <CardRow label="עלות שנתית" strong color="var(--purple)">
@@ -6408,7 +6443,7 @@ function LinkCard({ teacher, locked, onSave }) {
 // מחנכת בעולם ישן מקבלת 3 שעות גמול מעל מה שהיא מלמדת
 const isPreHomeroomRow = t => t?.reform === 'pre' && /^homeroom/.test(t?.gamulRole || t?.role || '');
 
-function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, male, quota }) {
+function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, male, quota, locked = false }) {
   const [ap,    setAp]    = useState(null);
   const [busy,  setBusy]  = useState(false);
   const [err,   setErr]   = useState('');
@@ -6422,8 +6457,7 @@ function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, mal
   useEffect(() => { load(); }, [load, rows]);
 
   const checked = new Set(ap?.checked || []);
-  const hours = rows.filter(t => !isPrincipalRow(t) && !unpaidThisMonth(t))
-    .reduce((a, t) => a + (Number(t.frontalHours) || 0), 0);
+  const hours = schoolHours(rows);
   const over = quota > 0 && hours > quota;
   const done = rows.filter(t => checked.has(t.id)).length;
   const all  = rows.length;
@@ -6531,7 +6565,7 @@ function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, mal
 
             {isOpen && (
               <div style={{ marginTop:11, paddingTop:11, borderTop:'1px solid var(--line)' }}>
-                <LinkCard teacher={t} locked={false} onSave={onSave} />
+                <LinkCard teacher={t} locked={locked} onSave={onSave} />
               </div>
             )}
           </div>
@@ -7770,7 +7804,8 @@ function OnboardingView({ code }) {
 }
 
 /* ═══ לוח קליטה — לשליחה: מי השלימה מה, קישורים וחוזה ═══ */
-function OnboardingAdmin({ activeMonth, onClose }) {
+// readOnly: חשבת השכר רואה הכול ופותחת כל מסמך, אך אינה יוצרת קישורים ואינה מעלה חוזה
+function OnboardingAdmin({ activeMonth, onClose, readOnly = false }) {
   const [rows, setRows] = useState(null);
   const [busy, setBusy] = useState('');
   const [copied, setCopied] = useState('');
@@ -7820,14 +7855,18 @@ function OnboardingAdmin({ activeMonth, onClose }) {
             <p style={{ fontSize:14.4, color:'var(--text3)' }}>דדליין: {OB_DEADLINE} · הושלמו {complete} / {total}</p>
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            <button className="apple-btn apple-btn-blue" onClick={makeLinks} style={{ minHeight:36, fontSize:14.4 }}>
-              יצירת קישורים לכל העובדים
-            </button>
-            <label className="apple-btn apple-btn-ghost" style={{ minHeight:36, fontSize:14.4, cursor:'pointer' }}>
-              <Upload size={14} /> העלאת החוזה (PDF)
-              <input type="file" accept="application/pdf" style={{ display:'none' }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) uploadContract(f); }} />
-            </label>
+            {!readOnly && (
+              <>
+                <button className="apple-btn apple-btn-blue" onClick={makeLinks} style={{ minHeight:36, fontSize:14.4 }}>
+                  יצירת קישורים לכל העובדים
+                </button>
+                <label className="apple-btn apple-btn-ghost" style={{ minHeight:36, fontSize:14.4, cursor:'pointer' }}>
+                  <Upload size={14} /> העלאת החוזה (PDF)
+                  <input type="file" accept="application/pdf" style={{ display:'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadContract(f); }} />
+                </label>
+              </>
+            )}
             <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ minHeight:36 }}>סגירה</button>
           </div>
         </div>
@@ -7837,7 +7876,11 @@ function OnboardingAdmin({ activeMonth, onClose }) {
          !rows.length ? (
           <div style={{ textAlign:'center', padding:'30px 10px' }}>
             <p style={{ fontWeight:700 }}>אין עדיין קישורי קליטה</p>
-            <p style={{ fontSize:14.4, color:'var(--text3)' }}>לחיצה על "יצירת קישורים" תפיק קישור אישי לכל עובד/ת בכל בתי הספר, מתוך חודש {fmtMonth(activeMonth)}.</p>
+            <p style={{ fontSize:14.4, color:'var(--text3)' }}>
+              {readOnly
+                ? 'הקישורים טרם נוצרו. כשייווצרו, הטפסים והמסמכים יופיעו כאן.'
+                : `לחיצה על "יצירת קישורים" תפיק קישור אישי לכל עובד/ת בכל בתי הספר, מתוך חודש ${fmtMonth(activeMonth)}.`}
+            </p>
           </div>
         ) : Object.entries(bySchool).map(([sn, list]) => (
           <div key={sn} style={{ marginTop:14 }}>
@@ -7978,7 +8021,19 @@ function LinkView({ code }) {
     return () => { alive = false; };
   }, [code, month]);
 
-  const locked = months.find(m => m.key === month)?.locked;
+  const monthRow = months.find(m => m.key === month);
+  const locked   = monthRow?.locked;
+  // "תנעל ב-10 לחודש לשינויים תמיד" (שרה, 10.9): מ-lock_due — ה-10 בחודש
+  // שאחרי חודש העבודה — השרת דוחה כל שמירה מהקישור. כאן רק מספרים למנהלת
+  // מראש עד מתי אפשר, ואחרי כן למה הכפתורים כבויים.
+  const lockDue  = monthRow?.lockDue || null;
+  const fmtDay   = iso => (iso ? String(iso).slice(0, 10).split('-').reverse().join('.') : '');
+  const dayBefore = iso => {
+    if (!iso) return '';
+    const d = new Date(String(iso).slice(0, 10) + 'T12:00:00');
+    d.setDate(d.getDate() - 1);
+    return fmtDay(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  };
 
   const onSave = async (draft) => {
     const saved = await store.linkSaveRow(code, draft);
@@ -8030,11 +8085,20 @@ function LinkView({ code }) {
       </header>
 
       <main className="pb-safe-bottom" style={{ maxWidth:760, margin:'0 auto', padding:'16px 16px 40px' }}>
-        {locked && (
+        {locked ? (
           <div style={{ background:'var(--warn-bg)', border:'1px solid var(--warn)', borderRadius:12, padding:'11px 14px', marginBottom:14 }}>
-            <p style={{ fontSize:14.9, fontWeight:600, color:'var(--warn)' }}>החודש נעול — אי אפשר לשנות נתונים.</p>
+            <p style={{ fontSize:14.9, fontWeight:600, color:'var(--warn)' }}>
+              החודש נעול לשינויים{lockDue ? ` מ-${fmtDay(lockDue)}` : ''}. הנתונים הועברו לשכר.
+            </p>
+            <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:4, lineHeight:1.6 }}>
+              אפשר לצפות בכל הנתונים. תיקון יתקבל בחודש הבא, או בפנייה לרשת.
+            </p>
           </div>
-        )}
+        ) : lockDue ? (
+          <p style={{ fontSize:13.8, color:'var(--text3)', marginBottom:12, lineHeight:1.6 }}>
+            אפשר לעדכן עד {dayBefore(lockDue)}. ב-{fmtDay(lockDue)} החודש ננעל לשינויים.
+          </p>
+        ) : null}
 
         {loading ? (
           <p style={{ fontSize:16.1, color:'var(--text3)', textAlign:'center', padding:'40px 0' }}>טוען…</p>
@@ -8069,7 +8133,7 @@ function LinkView({ code }) {
               </button>
             </div>
             {tab === 'approve' ? (
-              <LinkApproval rows={rows} code={code} onSave={onSave} onAdd={locked ? null : onAdd}
+              <LinkApproval rows={rows} code={code} onSave={onSave} onAdd={locked ? null : onAdd} locked={!!locked}
                 schoolReform={me?.schoolReform} schoolName={me?.schoolName} male={male}
                 quota={me?.hoursQuota} />
             ) : tab === 'report' ? (
@@ -8530,7 +8594,9 @@ export default function App() {
             {isCoord && <span className="nav-sep" />}
 
             {/* ── ניהול ── */}
-            {isCoord && (
+            {/* "גם אסתר תראה את הטפסים" (שרה, 10.9) — טפסי 101, המסמכים
+                והחוזים פתוחים לחשבת לצפייה; יצירת קישורים והעלאת חוזה נשארו של שרה */}
+            {(isCoord || isClerk) && (
               <button className="nav-btn" onClick={() => setShowOnboarding(true)}>
                 <FileText size={15} strokeWidth={2.2} />
                 קליטה
@@ -8732,7 +8798,7 @@ export default function App() {
                   const empTot  = ts.reduce((sum, t) => sum + calcEmployer(t).total, 0);
                   const simN    = ts.filter(needsSim).length;
                   const apprN   = ts.filter(needsApproval).length;
-                  const used    = ts.reduce((sum, t) => sum + (Number(t.frontalHours) || 0), 0);
+                  const used    = schoolHours(ts);   // בלי מנהלת וחל"ד/חל"ת — כמו במסך האישור
                   const quota   = Number(s.hoursQuota) || null;
                   const overQuota = quota ? used > quota : false;
                   return (
@@ -8784,6 +8850,11 @@ export default function App() {
                           <p className="num" style={{ fontWeight:700, fontSize:16.1, color: overQuota ? 'var(--danger)' : 'var(--text)' }}>
                             {quota ? `${used} / ${quota}` : used || '—'}
                           </p>
+                          {overQuota && (
+                            <p className="num" style={{ fontSize:12.6, fontWeight:800, color:'var(--danger)', marginTop:1 }}>
+                              +{used - quota} שעות מעל התקן
+                            </p>
+                          )}
                         </div>
                         <div className="sc-money" style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
                           <p style={{ fontSize:13.2, color:'var(--text2)', marginBottom:2 }}>למעסיק/חודש</p>
@@ -8826,7 +8897,7 @@ export default function App() {
           onClose={() => setShowApproval(false)}
         />
       )}
-      {showOnboarding && <OnboardingAdmin activeMonth={activeMonth} onClose={() => setShowOnboarding(false)} />}
+      {showOnboarding && <OnboardingAdmin activeMonth={activeMonth} readOnly={user.role === 'clerk'} onClose={() => setShowOnboarding(false)} />}
       {schoolModal  && <SchoolModal  school={schoolModal}  onSave={onSaveSchool}  onClose={() => setSchoolModal(null)} />}
       {showBackup && <BackupModal schools={schools} months={months} onClose={() => setShowBackup(false)} />}
       {teacherModal && <TeacherModal teacher={teacherModal} schools={schools} userRole={user.role} onSave={onSaveTeacher} onClose={() => setTeacherModal(null)} />}

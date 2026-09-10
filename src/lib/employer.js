@@ -624,17 +624,11 @@ function calcEmployer(t) {
     label: `מילוי מקום (${t.mmHours} שעות × ${MM_HOUR_RATE} ₪)`,
     rate: null, on: null, amount: mmPay });
 
-  // רזרבת מילוי מקום: 5% מעלות ההוראה המתוכננת (ברוטו + הוצאות מעביד),
-  // הוראת שרה 7.9. זה תכנון, לא תשלום — ולכן, כמו רצפת ה-150%, היא
-  // שורה נפרדת שמצטמצמת מעצמה ככל שמדווחות שעות מילוי מקום בפועל על
-  // השורה הזו, ונעלמת לגמרי ברגע שהנהלת החשבונות מקלידה עלות בפועל.
-  const MM_RESERVE_RATE = 0.05;
-  const mmReserve = Math.max(0,
-    Math.round((gross + itemized + floorGap) * MM_RESERVE_RATE) - mmPay);
-  if (mmReserve > 0) parts.push({ key: 'mmReserve',
-    label: 'רזרבת מילוי מקום (5% מעלות ההוראה המתוכננת)',
-    rate: MM_RESERVE_RATE, on: null, amount: mmReserve });
-  const estimate = itemized + floorGap + mmReserve;
+  // מילוי מקום אינו רזרבה על כל מורה: "לכל בית ספר צריך להיות 5 אחוז
+  // מסך הכולל של עלות ההוראה" (שרה, 10.9). ה-5% מחושב פעם אחת לבית ספר
+  // במסך עלות ההוראה (MM_PCT) וב-api/shalhavot-budget — לא כאן.
+  // (הרזרבה למורה מ-7.9 בלילה נספרה פעמיים יחד עם שורת בית הספר.)
+  const estimate = itemized + floorGap;
 
   const employerSupp = supplementCost(base, supplement, extras.biguud, extras.havraah);
   const employerBase = estimate - employerSupp;
@@ -645,7 +639,7 @@ function calcEmployer(t) {
     estimate, isEstimate: !actual, mmPay,
     total: gross + social + mmPay,
     parts,                                    // הפירוט המלא, שורה לכל רכיב
-    // השיעור בפועל, מעל הברוטו לעובדת. עם רצפת ה-140% ורזרבת המ"מ הוא לא יורד מ-47%,
+    // השיעור בפועל, מעל הברוטו לעובדת. עם רצפת ה-140% הוא לא יורד מ-40%,
     // ועולה מעליה במורה שרוב שכרה בסיס (פנסיה וקרן חלות על הבסיס בלבד).
     pct: gross ? Math.round(estimate / gross * 1000) / 10 : 0,
     extras,

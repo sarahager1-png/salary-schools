@@ -30,8 +30,8 @@ const toTeacher = (r) => ({
   _chabadSupp: r.chabad_supp, _actualEmployerCost: r.actual_employer_cost,
 });
 
-// עלות מילוי מקום: "5 אחוז מההוראה" (שרה, 7.9) — 5% מברוטו שכר ההוראה בלבד,
-// בלי מנהלת ובלי הפרשות מעסיק. זהה ל-MM_PCT ול-teachingGross באפליקציה.
+// עלות מילוי מקום: "לכל בית ספר צריך להיות 5 אחוז מסך הכולל של עלות ההוראה"
+// (שרה, 10.9) — 5% אחד לבית ספר על עלות ההוראה השנתית המלאה. זהה ל-MM_PCT באפליקציה.
 const MM_PCT = 0.05;
 
 // שורות באותו שם מאוחדות לשורה אחת — כמו mergeLines בכרטיסים
@@ -93,12 +93,10 @@ export default async function handler(req, res) {
     const out = shalhavot.map(s => {
       // עלות שכר שנתית — אותו סכום כמו monthlyCost * 12 בכרטיסים (כולל מנהלת)
       let monthly = 0;
-      let teachingGross = 0;
       for (const r of (rows || []).filter(r => r.school_id === s.id)) {
         const t = toTeacher(r);
         const c = emp.calcEmployer(t);
         monthly += c.total;
-        if (!emp.isPrincipalRow(t)) teachingGross += c.gross;
       }
       const annual = monthly * 12;
 
@@ -111,7 +109,7 @@ export default async function handler(req, res) {
 
       // ─ צד ההוראה — זהה שורה-לשורה לכרטיס ב-TeachingCostView ─
       const teachIncome = (ministryBudget || 0) + (networkSupport || 0);
-      const mmCost = teachingGross * 12 * MM_PCT;
+      const mmCost = annual * MM_PCT;
       const teachCost = annual + mmCost;
       const teachDiff = (ministryBudget != null) ? teachIncome - teachCost : null;
 
@@ -122,7 +120,7 @@ export default async function handler(req, res) {
       if (networkSupport) teachIncomeLines.push({ name: 'השתתפות הרשת', amount: networkSupport });
       const teachExpenseLines = [
         { name: 'שכר הוראה (עובדי הוראה, מנהלת, תוספות)', amount: Math.round(annual) },
-        { name: 'מילוי מקום — 5% משכר ההוראה', amount: Math.round(mmCost) },
+        { name: 'מילוי מקום — 5% מעלות ההוראה', amount: Math.round(mmCost) },
       ];
 
       // ─ צד התקציב הנוסף — כמו בכרטיסים ─

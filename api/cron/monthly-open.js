@@ -31,6 +31,7 @@ export default async function handler(req, res) {
     // הדיווח על חודש העבודה מגיע בחודש שאחריו
     report_due: dueDatesFor(key).report,
     submit_due: dueDatesFor(key).submit,
+    lock_due:   dueDatesFor(key).lock,
   });
   if (mErr) return res.status(500).json({ error: mErr.message });
 
