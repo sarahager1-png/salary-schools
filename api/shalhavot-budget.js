@@ -33,6 +33,8 @@ const toTeacher = (r) => ({
 // עלות מילוי מקום: "לכל בית ספר צריך להיות 5 אחוז מסך הכולל של עלות ההוראה"
 // (שרה, 10.9) — 5% אחד לבית ספר על עלות ההוראה השנתית המלאה. זהה ל-MM_PCT באפליקציה.
 const MM_PCT = 0.05;
+// כרית ביטחון 10% על עלות ההוראה השנתית, בנוסף למילוי המקום (שרה, 15.9). זהה ל-BUFFER_PCT באפליקציה.
+const BUFFER_PCT = 0.10;
 
 // שורות באותו שם מאוחדות לשורה אחת — כמו mergeLines בכרטיסים
 const mergeLines = (lines) => {
@@ -110,7 +112,8 @@ export default async function handler(req, res) {
       // ─ צד ההוראה — זהה שורה-לשורה לכרטיס ב-TeachingCostView ─
       const teachIncome = (ministryBudget || 0) + (networkSupport || 0);
       const mmCost = annual * MM_PCT;
-      const teachCost = annual + mmCost;
+      const bufferCost = annual * BUFFER_PCT;
+      const teachCost = annual + bufferCost + mmCost;
       const teachDiff = (ministryBudget != null) ? teachIncome - teachCost : null;
 
       // שורות ההכנסות: משרד + מענק בנפרד כשיש פירוט, אחרת שורה מאוחדת
@@ -120,6 +123,7 @@ export default async function handler(req, res) {
       if (networkSupport) teachIncomeLines.push({ name: 'השתתפות הרשת', amount: networkSupport });
       const teachExpenseLines = [
         { name: 'שכר הוראה (עובדי הוראה, מנהלת, תוספות)', amount: Math.round(annual) },
+        { name: 'תוספת ביטחון — 10% מעלות ההוראה', amount: Math.round(bufferCost) },
         { name: 'מילוי מקום — 5% מעלות ההוראה', amount: Math.round(mmCost) },
       ];
 

@@ -3687,6 +3687,10 @@ function TeachingCostView({ schools, teachers, monthKey }) {
   // (ברוטו + עלות מעביד, כולל מנהלת). מחליף את הנוסח מ-7.9 (ברוטו הוראה
   // בלבד) ואת הרזרבה למורה ב-calcEmployer שנספרה פעמיים.
   const MM_PCT = 0.05;
+  // "היתרה לאחר שכר צריכה להיות בתוספת 10 אחוז ו-5 אחוז מ"מ" (שרה, 15.9):
+  // כרית ביטחון של 10% על עלות ההוראה השנתית, בנוסף ל-5% מילוי מקום.
+  // שתיהן יחד = הרזרבה שיורדת מהיתרה. זהה ל-BUFFER_PCT ב-api/shalhavot-budget.
+  const BUFFER_PCT = 0.10;
   // מדד בכותרת כרטיס: תווית קטנה מעל מספר, רוחב קבוע — הכרטיסים מיושרים
   const Metric = ({ label, val, big }) => (
     <div style={{ minWidth:150, flexShrink:0 }}>
@@ -3792,10 +3796,12 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const monthly = monthlyCost(sc.id);
     const annual  = monthly * 12;
     const mmCost  = annual * MM_PCT;   // 5% מסך עלות ההוראה השנתית
+    const bufferCost = annual * BUFFER_PCT;   // 10% כרית ביטחון (שרה, 15.9)
+    const reserve = mmCost + bufferCost;       // מה שיורד מהיתרה מעבר לשכר עצמו
     // "תוסיף השתתפות רשת מרינה" (שרה, 3.9) — מצטרפת ליתרה בחיוב,
-    // "אין צורך" בייעול (שרה, 3.9): משרד − (שכר + מ"מ 5% מההוראה) + השתתפות
+    // "אין צורך" בייעול (שרה, 3.9): משרד − (שכר + 10% + מ"מ 5%) + השתתפות
     const left = (f.ministryBudget != null)
-      ? (f.ministryBudget || 0) - (annual + mmCost) + (f.networkSupport || 0)
+      ? (f.ministryBudget || 0) - (annual + reserve) + (f.networkSupport || 0)
       : null;
     /*
       "עשיתי סימולציית שכר לפני הסימולציה האמיתית — חשוב לי לדעת מה
@@ -3847,7 +3853,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const cover = f.networkCover;
     const coverPct = (cover != null && noNetwork > 0) ? Math.round(cover / noNetwork * 100) : null;
     const remains  = (cover != null && noNetwork != null) ? noNetwork - cover : null;
-    return { sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer,
+    return { sc, f, monthly, annual, mmCost, bufferCost, reserve, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer,
       noNetwork, cover, coverPct, remains };
   });
   // תצוגת "תחשיב · בפועל" לשעה — אותו רכיב בטבלה ובכרטיס
@@ -3869,7 +3875,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     yieul:  a.yieul  + (r.f.yieul || 0),
     monthly: a.monthly + r.monthly,
     annual: a.annual + r.annual,
-    mm: a.mm + r.mmCost,
+    mm: a.mm + r.reserve,
     left: a.left + (r.left || 0),
     sim: a.sim + (r.f.teachingSim || 0),
     simGap: a.simGap + (r.simGap || 0),
@@ -3973,7 +3979,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <TH>בית ספר</TH>
               <TH>הכנסות משרד החינוך + מענק</TH>
               <TH>עלות שכר</TH>
-              <TH>מילוי מקום · 5%</TH>
+              <TH>תוספת 10% + מ"מ 5%</TH>
               {showSim && <TH>עלות הוראה מהתקציב</TH>}
               {showSim && <TH>הפרש מול השכר בפועל</TH>}
               {showSim && <TH>עלות שכר לשעה שבועית</TH>}
@@ -3990,14 +3996,15 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           <tbody>
             {fin === null ? (
               <tr><td colSpan={showSim ? 15 : 10} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork, cover, coverPct, remains }) => (
+            ) : rows.map(({ sc, f, monthly, annual, reserve, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork, cover, coverPct, remains }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
                   ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
                   : <span style={{ fontSize:16.1 }}>{money(per(f.ministryBudget))}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(period === 'month' ? monthly : annual)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}>{money(per(mmCost))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}
+                  title="כרית ביטחון 10% ומילוי מקום 5%, שניהם על עלות השכר השנתית">{money(per(reserve))}</td>
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}>{f.teachingSim == null ? '—' : money(per(f.teachingSim))}</td>}
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
                   color: simGap == null ? 'var(--text3)' : simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
@@ -4066,7 +4073,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       <div className="only-mobile">
         {fin === null ? (
           <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
-        ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork, cover, coverPct, remains }) => (
+        ) : rows.map(({ sc, f, monthly, annual, reserve, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork, cover, coverPct, remains }) => (
           <div key={'m-' + sc.id} className="apple-card mcard">
             <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
             <CardRow label="הכנסות משרד החינוך + מענק">
@@ -4075,7 +4082,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 : money(per(f.ministryBudget))}
             </CardRow>
             <CardRow label="עלות שכר">{money(period === 'month' ? monthly : annual)}</CardRow>
-            <CardRow label="מילוי מקום · 5%" color="var(--text2)">{money(per(mmCost))}</CardRow>
+            <CardRow label='תוספת 10% + מ"מ 5%' color="var(--text2)">{money(per(reserve))}</CardRow>
             {showSim && (
               <CardRow label="עלות הוראה מהתקציב" color="var(--text2)">
                 {f.teachingSim == null ? '—' : money(per(f.teachingSim))}
@@ -4131,7 +4138,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
             <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ הרשת</p>
             <CardRow label="הכנסות משרד החינוך + מענק">{money(per(tot.budget))}</CardRow>
             <CardRow label="עלות שכר">{money(period === 'month' ? tot.monthly : tot.annual)}</CardRow>
-            <CardRow label="מילוי מקום · 5%" color="var(--text2)">{money(per(tot.mm))}</CardRow>
+            <CardRow label='תוספת 10% + מ"מ 5%' color="var(--text2)">{money(per(tot.mm))}</CardRow>
             {showSim && <CardRow label="עלות הוראה מהתקציב" color="var(--text2)">{money(per(tot.sim))}</CardRow>}
             {showSim && (
               <CardRow label="הפרש מול השכר בפועל"
@@ -4152,7 +4159,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         )}
       </div>
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
-        תקציב הכנסות משרד החינוך פחות עלות השכר ומילוי מקום (5% מסך עלות ההוראה), בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
+        תקציב הכנסות משרד החינוך פחות עלות השכר, פחות תוספת ביטחון 10% ומילוי מקום 5% (שניהם על עלות ההוראה השנתית), בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
         עלות השכר נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
         {' '}חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
         {' '}<b>בלי הרשת · בפועל +10%</b> — מה שבית חב"ד היה מכסה לבדו: עלות ההוראה בפועל ועוד 10%, פחות הכנסות משרד החינוך, בלי השתתפות הרשת.
@@ -4168,9 +4175,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           המילויי מקום" (שרה, 3.9). */}
       <h2 className="section-head">כרטיסי בתי הספר</h2>
       <p className="section-sub">הפרשי עלות הוראה והוצאות לכל בית ספר — לחיצה על כרטיס פותחת את הפירוט המלא.</p>
-      {fin !== null && rows.map(({ sc, f, monthly, annual, mmCost }) => {
+      {fin !== null && rows.map(({ sc, f, monthly, annual, mmCost, bufferCost, reserve }) => {
         const teachIncome = (f.ministryBudget || 0) + (f.networkSupport || 0);
-        const teachCost = annual + mmCost;
+        const teachCost = annual + reserve;
         const teachDiff = (f.ministryBudget != null) ? teachIncome - teachCost : null;
         // צד התפעול
         const incLines = mergeLines(f.detail?.income);
@@ -4210,6 +4217,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   {dline('סה"כ הכנסות הוראה', per(teachIncome), true)}
                   <div style={{ height:8 }} />
                   {dline(`שכר הוראה (עובדי הוראה, מנהלת, תוספות)`, per(annual))}
+                  {dline('תוספת ביטחון — 10% מעלות ההוראה', per(bufferCost))}
                   {dline('מילוי מקום — 5% מעלות ההוראה', per(mmCost))}
                   {dline('סה"כ הוצאות הוראה', per(teachCost), true)}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', fontSize:15.5, fontWeight:800,
@@ -4254,9 +4262,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       {fin !== null && (() => {
         // סיכום רשתי — אותם חישובים בדיוק כמו בכרטיסים הבודדים
         let sumTeach = 0, sumOp = 0, any = false;
-        for (const { f, annual, mmCost } of rows) {
+        for (const { f, annual, reserve } of rows) {
           const ti = (f.ministryBudget || 0) + (f.networkSupport || 0);
-          const td = f.ministryBudget != null ? ti - (annual + mmCost) : null;
+          const td = f.ministryBudget != null ? ti - (annual + reserve) : null;
           const il = mergeLines(f.detail?.income), el = mergeLines(f.detail?.expenses);
           const is_ = il.reduce((a, x) => a + x.amount, 0) || (f.incomeTotal || 0);
           const es = el.reduce((a, x) => a + x.amount, 0) || (f.expensesOther || 0);
