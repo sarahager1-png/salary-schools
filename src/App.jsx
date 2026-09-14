@@ -195,6 +195,13 @@ const OverHours = ({ over, size = 15.5 }) => (
   :              <span style={{ color:'var(--ok, #2e7d32)', fontWeight:600, fontSize:size }}>בתקן</span>
 );
 const needsApproval = t => Boolean(t._changedAt && !t._approved && simComplete(t));
+
+// כפתור "חישוב": למורה התוצאה נכנסת לברוטו; למנהלת הברוטו קבוע (אופק
+// ניהול / שכר מוסכם) והחישוב הוא התלוש בעולם ישן — "תחשב את תלושי
+// המנהלות כמו כל עובדי ההוראה" (שרה, 14.9).
+const computeTitle = t => (isPrincipalRow(t)
+  ? 'חישוב התלוש בעולם ישן — דרגה+ותק וגמול ניהול; ההפרש עד הברוטו הוא תוספת בית חב"ד'
+  : 'חישוב במחשבון משרד החינוך — התוצאה תיכנס לברוטו');
 const isPending     = t => Boolean(t._changedAt && !t._approved); // = needsSim || needsApproval
 
 // "יש היעדרויות וצריך סיבה… מילואים, מחלת ילד ואחר" (שרה, 6.9)
@@ -1828,7 +1835,7 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                   {t._officialGross && <button onClick={() => set('_officialGross', null)} style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer' }}><X size={15} strokeWidth={2.4} /></button>}
                 </div>
                 <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:5 }}>
-                  הסכום הזה הוא הבסיס במלואו — אין למנהלת רכיב תוספת בית חב"ד.
+                  הברוטו של המנהלת. הבסיס בעולם ישן (דרגה+ותק וגמול ניהול) מחושב בלחיצה על "חישוב", וההפרש הוא תוספת בית חב"ד — כמו אצל כל עובדי ההוראה.
                 </p>
               </div>
             ) : t.reform === 'ofek' ? (<>
@@ -3236,10 +3243,10 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                         {isCoord && isAppr && onApproveTeacher && (
                           <button className="apple-btn apple-btn-green" title="אישור" onClick={() => onApproveTeacher(t.id)} style={{ padding:'0 9px', minHeight:30 }}><Check size={14} strokeWidth={2.8} /></button>
                         )}
-                        {isCoord && onCompute && !isPrincipalRow(t) && (
+                        {isCoord && onCompute && (
                           simState?.[t.id] === 'pending' || simState?.[t.id] === 'running'
                             ? <span className="apple-badge badge-purple" style={{ alignSelf:'center' }}>מחשב…</span>
-                            : <button className="apple-btn apple-btn-ghost" title="חישוב במחשבון משרד החינוך — התוצאה תיכנס לברוטו"
+                            : <button className="apple-btn apple-btn-ghost" title={computeTitle(t)}
                                 onClick={() => onCompute(t)} style={{ padding:'0 9px', minHeight:30 }}>
                                 <Calculator size={13} strokeWidth={2.2} />
                               </button>
@@ -3380,10 +3387,10 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       אישור
                     </button>
                   )}
-                  {isCoord && onCompute && !isPrincipalRow(t) && (
+                  {isCoord && onCompute && (
                     simState?.[t.id] === 'pending' || simState?.[t.id] === 'running'
                       ? <span className="apple-badge badge-purple" style={{ alignSelf:'center' }}>מחשב…</span>
-                      : <button className="apple-btn apple-btn-ghost" title="חישוב במחשבון משרד החינוך — התוצאה תיכנס לברוטו"
+                      : <button className="apple-btn apple-btn-ghost" title={computeTitle(t)}
                           onClick={() => onCompute(t)}>
                           <Calculator size={14} strokeWidth={2.2} />
                           חישוב
@@ -3594,11 +3601,11 @@ function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute
                     ) : (
                       <span className={`apple-badge ${st.cls}`}>{st.label}</span>
                     )}
-                    {onCompute && !isPrincipalRow(t) && (
+                    {onCompute && (
                       simState?.[t.id] === 'pending' || simState?.[t.id] === 'running' ? (
                         <span className="apple-badge badge-purple" style={{ marginInlineStart:6 }}>מחשב…</span>
                       ) : (
-                        <button className="apple-btn apple-btn-ghost" title="חישוב במחשבון משרד החינוך — התוצאה תיכנס לברוטו"
+                        <button className="apple-btn apple-btn-ghost" title={computeTitle(t)}
                           onClick={() => onCompute(t)}
                           style={{ padding:'3px 10px', fontSize:13.8, minHeight:30, marginInlineStart:6 }}>
                           <Calculator size={13} strokeWidth={2.2} />חשב
@@ -8392,7 +8399,7 @@ export default function App() {
         // כל בקשה בטיפול משלה: כשל בשמירה של אחת לא מדלג על ניקוי
         // הספינרים של כל השאר (הבאג של "תקוע לנצח", 6.9).
         try {
-          if (r.status === 'done' && r.result_gross != null) {
+          if (r.status === 'done') {
             // השורה מחפשׂת בכל החודשים, לא רק בפעיל — חישוב של חודש אחר
             // נשמר גם הוא ולא נזרק (הברוטו אבד כשהיה מסונן ל-activeMonth).
             let row = null, rowMonth = activeMonth;
@@ -8400,10 +8407,12 @@ export default function App() {
               const hit = list.find(x => x.id === r.teacher_month_id);
               if (hit) { row = hit; rowMonth = mk; break; }
             }
-            if (row && row._officialGross !== r.result_gross) {
+            // ברוטו ריק = חישוב של מנהלת: התלוש נכתב ל-slip_lines והברוטו
+            // הקבוע שלה נשאר. רק מרעננים, כדי שמסך התלושים יראה אותו.
+            if (r.result_gross != null && row && row._officialGross !== r.result_gross) {
               await store.saveTeacher({ id: row.id, _officialGross: r.result_gross }, rowMonth);
-              needsRefresh = true;
             }
+            needsRefresh = true;
             await store.deleteSimRequest(r.id);
           } else if (r.status === 'failed') {
             setError('החישוב נכשל: ' + (r.error || 'סיבה לא ידועה'));
@@ -8511,10 +8520,11 @@ export default function App() {
           "חושב לא נכון — מייד עלה לאישור וחושב מחדש" (שרה, 3.9):
           שינוי נתון שכר לא רק מפיל את האישור — הוא שולח מעצמו בקשת
           חישוב לתור. המספר הטרי נכנס לברוטו, והשורה ממתינה לאישורה.
-          נשלח רק כשיש מה להריץ: לא מנהלת, לא בחופשה, יש שעות.
+          נשלח רק כשיש מה להריץ: לא בחופשה, ויש שעות — או מנהלת, שאצלה
+          השעות אינן קלט (100% תמיד) והחישוב הוא התלוש בעולם ישן.
         */
-        if (user?.role === 'coordinator' && t.id && !isPrincipalRow(next)
-            && (next.leaveType ?? 'none') === 'none' && Number(next.frontalHours) > 0) {
+        if (user?.role === 'coordinator' && t.id && (next.leaveType ?? 'none') === 'none'
+            && (isPrincipalRow(next) || Number(next.frontalHours) > 0)) {
           store.requestSim(t.id)
             .then(() => setSimState(m => ({ ...m, [t.id]: 'pending' })))
             .catch(() => { /* התור לא זמין — הכפתור הידני עדיין שם */ });

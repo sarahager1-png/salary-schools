@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import { chromium } from 'file:///C:/tmp/node_modules/playwright/index.mjs';
 import { createClient } from '@supabase/supabase-js';
-import { formFields, openForm, runOne, readResultRows, dargaFor, kitaFor, pickEnv, resetForm } from './sim-form.mjs';
+import { formFields, openForm, runOne, readResultRows, dargaFor, kitaFor, pickEnv, resetForm, principalPlanFor } from './sim-form.mjs';
 import { scopeWithMom } from './src/lib/employer.js';
 
 const { env } = pickEnv(fs, true);
@@ -29,8 +29,91 @@ const getPage = async () => {
   resetForm();
   return page;
 };
+const dropPage = async () => {
+  try { await browser?.close(); } catch { /* הדפדפן ממילא מת */ }
+  page = null;
+};
 
 const stamp = () => new Date().toLocaleTimeString('he-IL');
+const finish = (id, patch) => sb.from('sim_requests').update({ ...patch, done_at: new Date().toISOString() }).eq('id', id);
+
+/*
+  האתר של המשרד נתקע לסירוגין (קליק תלוי, ניווט באמצע evaluate) —
+  וריצה חוזרת כמעט תמיד מצליחה. לכן כישלון ראשון אינו "נכשל":
+  הדפדפן נזרק, נפתח חדש, ורק כישלון שני עולה לבקשה.
+*/
+const runWithRetry = async (plan, monthKey, name) => {
+  for (let att = 1; ; att++) {
+    try {
+      const p = await getPage();
+      await openForm(p, plan.calc || 'old');
+      const gross = await runOne(p, plan, monthKey);
+      if (!gross) throw new Error('לא נקרא ברוטו מהטופס');
+      return gross;
+    } catch (e) {
+      await dropPage();
+      if (att >= 2) throw e;
+      console.log(`[${stamp()}] ${name} — ניסיון ${att} נפל (${e.message?.slice(0, 60)}), מנסה שוב`);
+    }
+  }
+};
+
+const saveSlip = async (t, gross) => {
+  const lines = await readResultRows(await getPage());
+  await sb.from('slip_lines').upsert({ teacher_month_id: t.id, lines, gross, computed_at: new Date().toISOString() });
+  console.log(`[${stamp()}]   ↳ תלוש: ${lines.length} שורות · ${gross.toLocaleString('he-IL')} ₪`);
+};
+
+/*
+  מנהלת — "תחשב את תלושי המנהלות כמו כל עובדי ההוראה" (שרה, 14.9).
+  הברוטו שלה קבוע (אופק ניהול / שכר מוסכם) ואינו נכתב מכאן; מה שמחושב
+  הוא התלוש בעולם ישן — דרגה+ותק ב-100% וגמול ניהול לפי מספר הכיתות —
+  אל slip_lines, וההפרש עד הברוטו הוא תוספת בית חב"ד. לכן result_gross
+  נשאר ריק: הדפדפן לא ידרוס את הברוטו, רק יסגור את הבקשה.
+*/
+const runPrincipal = async (req, t) => {
+  const plan = principalPlanFor(t, t.schools?.name);
+  if (plan.skip) {
+    console.log(`[${stamp()}] ${t.name} — ${plan.skip}`);
+    await finish(req.id, { status: 'failed', error: plan.skip });
+    return;
+  }
+  const gross = await runWithRetry(plan, t.month_key, t.name);
+  console.log(`[${stamp()}] ${t.name} · מנהלת · ${plan.nihul.classes} כיתות → עולם ישן ${gross.toLocaleString('he-IL')} ₪`);
+  await saveSlip(t, gross);
+  await finish(req.id, { status: 'done', result_gross: null });
+};
+
+const runTeacher = async (req, t) => {
+  const f = formFields(t);
+  if (f.skip) {
+    console.log(`[${stamp()}] ${t.name} — ${f.skip}`);
+    await finish(req.id, { status: 'failed', error: f.skip });
+    return;
+  }
+  const gross = await runWithRetry(f, t.month_key, t.name);
+  console.log(`[${stamp()}] ${t.name} · ${f.pct}%${f.kita ? ' · מחנכת' : ''} → ${gross.toLocaleString('he-IL')} ₪`);
+  await finish(req.id, { status: 'done', result_gross: gross });
+  /*
+    שורות התלוש מתרעננות עם החישוב: התלוש בעולם ישן לפי השעות
+    (+3 למחנכת, +10 לאם) — הרצה שנייה, והרכיבים נשמרים כפי שהם.
+  */
+  try {
+    let slipPct = t.scope_pct;
+    if (t.reform === 'ofek') {
+      const pseudo = { reform: 'pre', frontalHours: t.frontal_hours, role: t.gamul_role,
+        gender: t.gender, childrenUnder18: t.children_under_18 };
+      slipPct = scopeWithMom(pseudo); // אם: בסיס חתוך + 10 (הכלל של שרה, 4.9)
+    }
+    const slipPlan = { calc: 'old', darga: dargaFor(t),
+      vetek: String(Math.max(1, Math.min(40, Number(t.seniority) || 1))),
+      pct: String(slipPct), kita: kitaFor(t) };
+    if (slipPlan.darga) {
+      const slipGross = await runOne(await getPage(), slipPlan, t.month_key);
+      if (slipGross) await saveSlip(t, slipGross);
+    }
+  } catch (e2) { console.log(`[${stamp()}]   ↳ תלוש נכשל: ${e2.message?.slice(0, 60)}`); }
+};
 
 while (true) {
   try {
@@ -46,67 +129,16 @@ while (true) {
         .update({ status: 'running' }).eq('id', req.id).eq('status', 'pending').select('id');
       if (!claimed?.length) continue;
       const { data: t } = await sb.from('teacher_months')
-        .select('id, month_key, name, reform, degree, grade, seniority, scope_pct, scope_set_at, gamul_role, leave_type, frontal_hours, children_under_18, official_gross')
+        .select('id, month_key, name, reform, degree, grade, seniority, scope_pct, scope_set_at, gamul_role, leave_type, frontal_hours, children_under_18, gender, official_gross, schools(name)')
         .eq('id', req.teacher_month_id).single();
-      if (!t) { await sb.from('sim_requests').update({ status: 'failed', error: 'השורה לא נמצאה', done_at: new Date().toISOString() }).eq('id', req.id); continue; }
-      const f = formFields(t);
-      if (f.skip) {
-        console.log(`[${stamp()}] ${t.name} — ${f.skip}`);
-        await sb.from('sim_requests').update({ status: 'failed', error: f.skip, done_at: new Date().toISOString() }).eq('id', req.id);
-        continue;
-      }
+      if (!t) { await finish(req.id, { status: 'failed', error: 'השורה לא נמצאה' }); continue; }
       try {
-        /*
-          האתר של המשרד נתקע לסירוגין (קליק תלוי, ניווט באמצע evaluate) —
-          וריצה חוזרת כמעט תמיד מצליחה. לכן כישלון ראשון אינו "נכשל":
-          הדפדפן נזרק, נפתח חדש, ורק כישלון שני עולה לבקשה.
-        */
-        let gross = null, p = null;
-        for (let att = 1; ; att++) {
-          try {
-            p = await getPage();
-            await openForm(p, f.calc || 'old');
-            gross = await runOne(p, f, t.month_key);
-            break;
-          } catch (e) {
-            try { await browser?.close(); } catch { /* הדפדפן ממילא מת */ }
-            page = null;
-            if (att >= 2) throw e;
-            console.log(`[${stamp()}] ${t.name} — ניסיון ${att} נפל (${e.message?.slice(0, 60)}), מנסה שוב`);
-          }
-        }
-        if (!gross) throw new Error('לא נקרא ברוטו מהטופס');
-        p = await getPage();
-        console.log(`[${stamp()}] ${t.name} · ${f.pct}%${f.kita ? ' · מחנכת' : ''} → ${gross.toLocaleString('he-IL')} ₪`);
-        await sb.from('sim_requests').update({ status: 'done', result_gross: gross, done_at: new Date().toISOString() }).eq('id', req.id);
-        /*
-          שורות התלוש מתרעננות עם החישוב: התלוש בעולם ישן לפי השעות
-          (+3 למחנכת, +10 לאם) — הרצה שנייה, והרכיבים נשמרים כפי שהם.
-        */
-        try {
-          let slipPct = t.scope_pct;
-          if (t.reform === 'ofek') {
-            const pseudo = { reform: 'pre', frontalHours: t.frontal_hours, role: t.gamul_role,
-              gender: t.gender, childrenUnder18: t.children_under_18 };
-            slipPct = scopeWithMom(pseudo); // אם: בסיס חתוך + 10 (הכלל של שרה, 4.9)
-          }
-          const slipPlan = { calc: 'old', darga: dargaFor(t),
-            vetek: String(Math.max(1, Math.min(40, Number(t.seniority) || 1))),
-            pct: String(slipPct), kita: kitaFor(t) };
-          if (slipPlan.darga) {
-            const slipGross = await runOne(p, slipPlan, t.month_key);
-            if (slipGross) {
-              const lines = await readResultRows(p);
-              await sb.from('slip_lines').upsert({ teacher_month_id: t.id, lines, gross: slipGross, computed_at: new Date().toISOString() });
-              console.log(`[${stamp()}]   ↳ תלוש: ${lines.length} שורות · ${slipGross.toLocaleString('he-IL')} ₪`);
-            }
-          }
-        } catch (e2) { console.log(`[${stamp()}]   ↳ תלוש נכשל: ${e2.message?.slice(0, 60)}`); }
+        if (t.gamul_role === 'principal') await runPrincipal(req, t);
+        else await runTeacher(req, t);
       } catch (e) {
         console.log(`[${stamp()}] ${t.name} — נכשל: ${e.message?.slice(0, 100)}`);
-        await sb.from('sim_requests').update({ status: 'failed', error: String(e.message || e).slice(0, 300), done_at: new Date().toISOString() }).eq('id', req.id);
-        try { await browser?.close(); } catch { /* הדפדפן ממילא מת */ }
-        page = null;
+        await finish(req.id, { status: 'failed', error: String(e.message || e).slice(0, 300) });
+        await dropPage();
       }
     }
   } catch (e) {
