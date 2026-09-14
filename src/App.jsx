@@ -3838,7 +3838,17 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const noNetwork = (f.ministryBudget != null && monthly > 0)
       ? annual * (1 + NO_NET_PCT) - (f.ministryBudget || 0)
       : null;
-    return { sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork };
+    /*
+      "על פי זה יוחלט כמה השלמה הרשת לוקחת על עצמה" (שרה, 14.9): ההחלטה
+      עצמה — "הרשת מכסה" — סכום שנתי מול המספר שלמעלה. לצידו: איזה חלק
+      זה מהצורך, ומה נשאר לבית חב"ד. ההחלטה נכנסת לחישוב רק בלחיצה
+      מפורשת שמעתיקה אותה ל"השתתפות הרשת".
+    */
+    const cover = f.networkCover;
+    const coverPct = (cover != null && noNetwork > 0) ? Math.round(cover / noNetwork * 100) : null;
+    const remains  = (cover != null && noNetwork != null) ? noNetwork - cover : null;
+    return { sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer,
+      noNetwork, cover, coverPct, remains };
   });
   // תצוגת "תחשיב · בפועל" לשעה — אותו רכיב בטבלה ובכרטיס
   const PerHour = ({ sim, actual }) => (
@@ -3865,9 +3875,34 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     simGap: a.simGap + (r.simGap || 0),
     support: a.support + (r.f.networkSupport || 0),
     noNetwork: a.noNetwork + (r.noNetwork || 0),
-  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, mm: 0, left: 0, sim: 0, simGap: 0, support: 0, noNetwork: 0 });
+    cover: a.cover + (r.cover || 0),
+    remains: a.remains + (r.remains ?? r.noNetwork ?? 0),
+  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, mm: 0, left: 0, sim: 0, simGap: 0, support: 0, noNetwork: 0, cover: 0, remains: 0 });
   // צבע לסכום שבית חב"ד מכסה: חיובי = נטל על בית חב"ד (אדום), אפס/שלילי = מכוסה
   const coverColor = v => (v == null ? 'var(--text3)' : v > 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)');
+  // "הרשת מכסה" → "השתתפות הרשת": ההחלטה נכנסת לחישוב. הקלדה ידנית
+  // (src manual) — המשיכה ממבט-רשת לא תדרוס אותה.
+  const applyCover = (sid, cover) => save(sid, { networkSupport: Math.round(cover),
+    src: { ...((fin?.[sid] || {}).src || {}), networkSupport: 'manual' } });
+  // מה שנשאר לבית חב"ד אחרי ההחלטה — או כל הצורך, כשטרם הוחלט
+  const Remains = ({ cover, coverPct, remains, noNetwork }) => (
+    cover == null
+      ? <span style={{ fontSize:13.8, color:'var(--text3)' }}>{noNetwork == null ? '—' : 'טרם הוחלט'}</span>
+      : <span style={{ whiteSpace:'nowrap' }}>
+          <span className="num" style={{ fontSize:16.1, fontWeight:700, color: coverColor(remains) }}>{money(per(remains))}</span>
+          {coverPct != null && <span style={{ fontSize:13.2, color:'var(--text3)', marginInlineStart:5 }}>הרשת {coverPct}%</span>}
+        </span>
+  );
+  // כפתור ההעתקה — מופיע רק כשיש החלטה שעדיין לא נכנסה ל"השתתפות הרשת"
+  const ApplyBtn = ({ sid, cover, f }) => (
+    cover != null && Math.round(cover) !== Math.round(f.networkSupport || 0)
+      ? <button className="apple-btn apple-btn-ghost" onClick={() => applyCover(sid, cover)}
+          title='מעתיק את "הרשת מכסה" ל"השתתפות הרשת" — היתרה וכרטיסי בתי הספר יתעדכנו'
+          style={{ minHeight:28, padding:'0 9px', fontSize:13.2, marginInlineStart:6, whiteSpace:'nowrap' }}>
+          <Check size={12} strokeWidth={2.6} />קבע כהשתתפות
+        </button>
+      : null
+  );
 
   const TH = ({ children }) => (
     <th style={{ padding:'10px 8px', fontSize:13.8, fontWeight:700, color:'var(--text2)',
@@ -3947,13 +3982,15 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               <TH>השתתפות הרשת</TH>
               <TH>יתרה לאחר שכר</TH>
               <TH>בלי הרשת · בפועל +10%</TH>
+              <TH>הרשת מכסה</TH>
+              <TH>נשאר לבית חב"ד</TH>
               <TH>חריגה מתקן השעות</TH>
             </tr>
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={showSim ? 13 : 8} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork }) => (
+              <tr><td colSpan={showSim ? 15 : 10} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+            ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork, cover, coverPct, remains }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
@@ -3984,6 +4021,12 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   title='מה שבית חב"ד היה מכסה לבדו: עלות ההוראה בפועל ועוד 10%, פחות הכנסות משרד החינוך, בלי השתתפות הרשת'>
                   {noNetwork == null ? '—' : money(per(noNetwork))}
                 </td>
+                <td style={{ textAlign:'center', whiteSpace:'nowrap' }}>
+                  {period === 'year'
+                    ? <>{moneyInput(sc.id, 'networkCover', f.networkCover)}<ApplyBtn sid={sc.id} cover={cover} f={f} /></>
+                    : <span style={{ fontSize:16.1 }}>{money(per(f.networkCover))}</span>}
+                </td>
+                <td style={{ textAlign:'center' }}><Remains cover={cover} coverPct={coverPct} remains={remains} noNetwork={noNetwork} /></td>
                 <td style={{ textAlign:'center' }}><OverHours over={hoursOverQ} size={16.1} /></td>
               </tr>
             ))}
@@ -4007,6 +4050,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(per(tot.left))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color: coverColor(tot.noNetwork) }}>{money(per(tot.noNetwork))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.cover))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color: coverColor(tot.remains) }}>{money(per(tot.remains))}</td>
                 <td style={{ textAlign:'center' }}><OverHours over={totOverHours} size={16.1} /></td>
               </tr>
             </tfoot>
@@ -4021,7 +4066,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       <div className="only-mobile">
         {fin === null ? (
           <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
-        ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork }) => (
+        ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork, cover, coverPct, remains }) => (
           <div key={'m-' + sc.id} className="apple-card mcard">
             <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
             <CardRow label="הכנסות משרד החינוך + מענק">
@@ -4070,6 +4115,14 @@ function TeachingCostView({ schools, teachers, monthKey }) {
             <CardRow label="בלי הרשת · בפועל +10%" color={coverColor(noNetwork)}>
               {noNetwork == null ? '—' : money(per(noNetwork))}
             </CardRow>
+            <CardRow label="הרשת מכסה">
+              {period === 'year'
+                ? <span style={{ display:'inline-flex', alignItems:'center', flexWrap:'wrap', gap:4, justifyContent:'flex-end' }}>
+                    {moneyInput(sc.id, 'networkCover', f.networkCover)}<ApplyBtn sid={sc.id} cover={cover} f={f} />
+                  </span>
+                : money(per(f.networkCover))}
+            </CardRow>
+            <CardRow label='נשאר לבית חב"ד'><Remains cover={cover} coverPct={coverPct} remains={remains} noNetwork={noNetwork} /></CardRow>
             <CardRow label="חריגה מתקן השעות"><OverHours over={hoursOverQ} /></CardRow>
           </div>
         ))}
@@ -4092,6 +4145,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               {money(per(tot.left))}
             </CardRow>
             <CardRow label="בלי הרשת · בפועל +10%" color={coverColor(tot.noNetwork)}>{money(per(tot.noNetwork))}</CardRow>
+            <CardRow label="הרשת מכסה">{money(per(tot.cover))}</CardRow>
+            <CardRow label='נשאר לבית חב"ד' color={coverColor(tot.remains)}>{money(per(tot.remains))}</CardRow>
             <CardRow label="חריגה מתקן השעות"><OverHours over={totOverHours} /></CardRow>
           </div>
         )}
@@ -4101,6 +4156,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         עלות השכר נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
         {' '}חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
         {' '}<b>בלי הרשת · בפועל +10%</b> — מה שבית חב"ד היה מכסה לבדו: עלות ההוראה בפועל ועוד 10%, פחות הכנסות משרד החינוך, בלי השתתפות הרשת.
+        {' '}<b>הרשת מכסה</b> — ההחלטה: כמה מזה הרשת לוקחת על עצמה (שנתי). "קבע כהשתתפות" מעתיק את ההחלטה ל"השתתפות הרשת" והכול מתעדכן.
       </p>
 
       {/* "לכל בית ספר תעשה הכנסות מול הוצאות ללא עלות הוראה" (שרה, 3.9) —
