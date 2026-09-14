@@ -3828,7 +3828,17 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const chabadTransfer = (f.teachingSim != null && f.ministryBudget != null)
       ? f.teachingSim - (f.ministryBudget || 0) - (f.networkSupport || 0)
       : null;
-    return { sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer };
+    /*
+      "אילו הרשת לא הייתה משתתפת — עלות ההוראה בפועל פלוס 10 אחוז" (שרה,
+      14.9): מה שבית חב"ד היה צריך לכסות לבדו. העלות בפועל השנתית ועוד
+      10% (במקום 5% המילוי מקום — כרית רחבה יותר), פחות הכנסות משרד
+      החינוך, ובלי השתתפות הרשת. חיובי = על בית חב"ד לכסות.
+    */
+    const NO_NET_PCT = 0.10;
+    const noNetwork = (f.ministryBudget != null && monthly > 0)
+      ? annual * (1 + NO_NET_PCT) - (f.ministryBudget || 0)
+      : null;
+    return { sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork };
   });
   // תצוגת "תחשיב · בפועל" לשעה — אותו רכיב בטבלה ובכרטיס
   const PerHour = ({ sim, actual }) => (
@@ -3854,7 +3864,10 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     sim: a.sim + (r.f.teachingSim || 0),
     simGap: a.simGap + (r.simGap || 0),
     support: a.support + (r.f.networkSupport || 0),
-  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, mm: 0, left: 0, sim: 0, simGap: 0, support: 0 });
+    noNetwork: a.noNetwork + (r.noNetwork || 0),
+  }), { budget: 0, yieul: 0, monthly: 0, annual: 0, mm: 0, left: 0, sim: 0, simGap: 0, support: 0, noNetwork: 0 });
+  // צבע לסכום שבית חב"ד מכסה: חיובי = נטל על בית חב"ד (אדום), אפס/שלילי = מכוסה
+  const coverColor = v => (v == null ? 'var(--text3)' : v > 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)');
 
   const TH = ({ children }) => (
     <th style={{ padding:'10px 8px', fontSize:13.8, fontWeight:700, color:'var(--text2)',
@@ -3933,13 +3946,14 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               {showSim && <TH>דיוק השתתפות הרשת</TH>}
               <TH>השתתפות הרשת</TH>
               <TH>יתרה לאחר שכר</TH>
+              <TH>בלי הרשת · בפועל +10%</TH>
               <TH>חריגה מתקן השעות</TH>
             </tr>
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={showSim ? 12 : 7} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer }) => (
+              <tr><td colSpan={showSim ? 13 : 8} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+            ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
@@ -3966,6 +3980,10 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   color: left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
                   {left == null ? '—' : money(per(left))}
                 </td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color: coverColor(noNetwork) }}
+                  title='מה שבית חב"ד היה מכסה לבדו: עלות ההוראה בפועל ועוד 10%, פחות הכנסות משרד החינוך, בלי השתתפות הרשת'>
+                  {noNetwork == null ? '—' : money(per(noNetwork))}
+                </td>
                 <td style={{ textAlign:'center' }}><OverHours over={hoursOverQ} size={16.1} /></td>
               </tr>
             ))}
@@ -3980,9 +3998,15 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.sim))}</td>}
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
                   color: tot.simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(per(tot.simGap))}</td>}
+                {/* שלוש עמודות התחשיב בלי סיכום — לשעה, העברה ודיוק הן פר בית ספר.
+                    בלי התאים האלה שורת הסיכום נדדה שלוש עמודות ימינה. */}
+                {showSim && <td /> }
+                {showSim && <td /> }
+                {showSim && <td /> }
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.support))}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(per(tot.left))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color: coverColor(tot.noNetwork) }}>{money(per(tot.noNetwork))}</td>
                 <td style={{ textAlign:'center' }}><OverHours over={totOverHours} size={16.1} /></td>
               </tr>
             </tfoot>
@@ -3997,7 +4021,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       <div className="only-mobile">
         {fin === null ? (
           <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
-        ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer }) => (
+        ) : rows.map(({ sc, f, monthly, annual, mmCost, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork }) => (
           <div key={'m-' + sc.id} className="apple-card mcard">
             <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
             <CardRow label="הכנסות משרד החינוך + מענק">
@@ -4043,6 +4067,9 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               color={left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
               {left == null ? '—' : money(per(left))}
             </CardRow>
+            <CardRow label="בלי הרשת · בפועל +10%" color={coverColor(noNetwork)}>
+              {noNetwork == null ? '—' : money(per(noNetwork))}
+            </CardRow>
             <CardRow label="חריגה מתקן השעות"><OverHours over={hoursOverQ} /></CardRow>
           </div>
         ))}
@@ -4064,6 +4091,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               color={tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
               {money(per(tot.left))}
             </CardRow>
+            <CardRow label="בלי הרשת · בפועל +10%" color={coverColor(tot.noNetwork)}>{money(per(tot.noNetwork))}</CardRow>
             <CardRow label="חריגה מתקן השעות"><OverHours over={totOverHours} /></CardRow>
           </div>
         )}
@@ -4072,6 +4100,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         תקציב הכנסות משרד החינוך פחות עלות השכר ומילוי מקום (5% מסך עלות ההוראה), בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
         עלות השכר נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
         {' '}חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
+        {' '}<b>בלי הרשת · בפועל +10%</b> — מה שבית חב"ד היה מכסה לבדו: עלות ההוראה בפועל ועוד 10%, פחות הכנסות משרד החינוך, בלי השתתפות הרשת.
       </p>
 
       {/* "לכל בית ספר תעשה הכנסות מול הוצאות ללא עלות הוראה" (שרה, 3.9) —
