@@ -3840,7 +3840,8 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       10% (במקום 5% המילוי מקום — כרית רחבה יותר), פחות הכנסות משרד
       החינוך, ובלי השתתפות הרשת. חיובי = על בית חב"ד לכסות.
     */
-    const NO_NET_PCT = 0.10;
+    // "מה עם 10 אחוז נוספים?" (שרה, 15.9) — אותו כלל כמו ביתרה: 10% ביטחון + 5% מ"מ
+    const NO_NET_PCT = BUFFER_PCT + MM_PCT;
     const noNetwork = (f.ministryBudget != null && monthly > 0)
       ? annual * (1 + NO_NET_PCT) - (f.ministryBudget || 0)
       : null;
@@ -3987,7 +3988,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               {showSim && <TH>דיוק השתתפות הרשת</TH>}
               <TH>השתתפות הרשת</TH>
               <TH>יתרה לאחר שכר</TH>
-              <TH>בלי הרשת · בפועל +10%</TH>
+              <TH>בלי הרשת · בפועל +10% +5%</TH>
               <TH>הרשת מכסה</TH>
               <TH>נשאר לבית חב"ד</TH>
               <TH>חריגה מתקן השעות</TH>
@@ -4025,7 +4026,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                   {left == null ? '—' : money(per(left))}
                 </td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color: coverColor(noNetwork) }}
-                  title='מה שבית חב"ד היה מכסה לבדו: עלות ההוראה בפועל ועוד 10%, פחות הכנסות משרד החינוך, בלי השתתפות הרשת'>
+                  title='מה שבית חב"ד היה מכסה לבדו: עלות ההוראה בפועל ועוד 10% ביטחון ו-5% מילוי מקום, פחות הכנסות משרד החינוך, בלי השתתפות הרשת'>
                   {noNetwork == null ? '—' : money(per(noNetwork))}
                 </td>
                 <td style={{ textAlign:'center', whiteSpace:'nowrap' }}>
@@ -4119,7 +4120,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               color={left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
               {left == null ? '—' : money(per(left))}
             </CardRow>
-            <CardRow label="בלי הרשת · בפועל +10%" color={coverColor(noNetwork)}>
+            <CardRow label="בלי הרשת · בפועל +10% +5%" color={coverColor(noNetwork)}>
               {noNetwork == null ? '—' : money(per(noNetwork))}
             </CardRow>
             <CardRow label="הרשת מכסה">
@@ -4151,7 +4152,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
               color={tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
               {money(per(tot.left))}
             </CardRow>
-            <CardRow label="בלי הרשת · בפועל +10%" color={coverColor(tot.noNetwork)}>{money(per(tot.noNetwork))}</CardRow>
+            <CardRow label="בלי הרשת · בפועל +10% +5%" color={coverColor(tot.noNetwork)}>{money(per(tot.noNetwork))}</CardRow>
             <CardRow label="הרשת מכסה">{money(per(tot.cover))}</CardRow>
             <CardRow label='נשאר לבית חב"ד' color={coverColor(tot.remains)}>{money(per(tot.remains))}</CardRow>
             <CardRow label="חריגה מתקן השעות"><OverHours over={totOverHours} /></CardRow>
@@ -4162,7 +4163,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
         תקציב הכנסות משרד החינוך פחות עלות השכר, פחות תוספת ביטחון 10% ומילוי מקום 5% (שניהם על עלות ההוראה השנתית), בתוספת השתתפות הרשת. התקציב שנתי ומוקלד כאן;
         עלות השכר נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
         {' '}חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
-        {' '}<b>בלי הרשת · בפועל +10%</b> — מה שבית חב"ד היה מכסה לבדו: עלות ההוראה בפועל ועוד 10%, פחות הכנסות משרד החינוך, בלי השתתפות הרשת.
+        {' '}<b>בלי הרשת · בפועל +10% +5%</b> — מה שבית חב"ד היה מכסה לבדו: עלות ההוראה בפועל ועוד 10% ביטחון ו-5% מילוי מקום, פחות הכנסות משרד החינוך, בלי השתתפות הרשת.
         {' '}<b>הרשת מכסה</b> — ההחלטה: כמה מזה הרשת לוקחת על עצמה (שנתי). "קבע כהשתתפות" מעתיק את ההחלטה ל"השתתפות הרשת" והכול מתעדכן.
       </p>
 
@@ -6116,7 +6117,7 @@ function CalibrationView({ schools, teachers, monthKey }) {
   const num   = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL'));
   const pct   = v => (v == null ? '' : `${v > 0 ? '+' : ''}${v}%`);
 
-  const rows = schools.map(sc => {
+  const raw = schools.map(sc => {
     // עובדות הוראה בלבד, בלי מנהלת ובלי מי שבחל"ד/חל"ת — כמו "עלות שכר לשעה"
     // בדף עלות ההוראה: מכיילים לפי מי שמלמדת בפועל, עלות מול שעות.
     const ts = teachers.filter(t => t.schoolId === sc.id && !isPrincipalRow(t) && !unpaidThisMonth(t));
@@ -6132,9 +6133,26 @@ function CalibrationView({ schools, teachers, monthKey }) {
     const slipSum  = withSlip.reduce((a, x) => a + x.slip, 0);
     const modelOfSlipped = withSlip.reduce((a, x) => a + x.model, 0);
     const coverage = list.length ? withSlip.length / list.length : 0;
-    // הבסיס לכיול: תלושים כשיש לכולן; חלקי = תלושים למי שיש + מודל לשאר
-    const basisSum = withSlip.length ? slipSum + (modelSum - modelOfSlipped) : modelSum;
-    const basisKind = !withSlip.length ? 'model' : coverage === 1 ? 'slip' : 'mixed';
+    return { sc, list, hours, modelSum, withSlip, slipSum, modelOfSlipped, coverage };
+  }).filter(r => r.list.length);
+
+  /*
+    "לפי מה שלמדת ממזכרת בתיה… הכל במערכת?" (שרה, 15.9): מקדם כיול רשתי —
+    כל התלושים שיובאו חלקי המודל של אותן עובדות. בית ספר בלי תלושים
+    מוצג לפי המודל × המקדם ("מכויל"), עד שיגיעו התלושים שלו. עם תלושי
+    מזכרת בלבד המקדם היה 0.95.
+  */
+  const slipAll  = raw.reduce((a, r) => a + r.slipSum, 0);
+  const modelAll = raw.reduce((a, r) => a + r.modelOfSlipped, 0);
+  const kFactor  = modelAll > 0 ? slipAll / modelAll : null;
+  const kTeachers = raw.reduce((a, r) => a + r.withSlip.length, 0);
+
+  const rows = raw.map(({ sc, list, hours, modelSum, withSlip, slipSum, modelOfSlipped, coverage }) => {
+    // הבסיס לכיול: תלושים כשיש לכולן; חלקי = תלושים למי שיש + מודל מכויל לשאר;
+    // בלי תלושים = מודל × המקדם הרשתי (או המודל עצמו כשעוד אין תלושים בכלל)
+    const k = kFactor ?? 1;
+    const basisSum = withSlip.length ? slipSum + (modelSum - modelOfSlipped) * k : modelSum * k;
+    const basisKind = coverage === 1 ? 'slip' : withSlip.length ? 'mixed' : kFactor != null ? 'calibrated' : 'model';
     const h = (hub || []).find(x => norm(x.name) === norm(sc.name)) || null;
     const classes = h?.classCount || 0;
     const hpc = classes && hours ? Math.round(hours / classes) : null;
@@ -6143,10 +6161,10 @@ function CalibrationView({ schools, teachers, monthKey }) {
     const budgetAnnual = h?.hourRate && h?.weeklyHours && classes ? h.hourRate * h.weeklyHours * 12 * classes : null;
     return { sc, list, hours, modelSum, slipSum, withSlip: withSlip.length, coverage, basisSum, basisKind,
       perHourModel: hours ? modelSum / hours : null,
-      perHourSlip: withSlip.length ? basisSum / hours : null,
+      perHourSlip: hours && basisKind !== 'model' ? basisSum / hours : null,
       schoolDiff: withSlip.length && modelOfSlipped ? Math.round((slipSum - modelOfSlipped) / modelOfSlipped * 1000) / 10 : null,
       classes, hpc, rate, annualProt: annual * (1 + PROT), budgetRate: h?.hourRate ?? null, budgetHours: h?.weeklyHours ?? null, budgetAnnual };
-  }).filter(r => r.list.length);
+  });
 
   const tot = rows.reduce((a, r) => ({ hours: a.hours + r.hours, model: a.model + r.modelSum, basis: a.basis + r.basisSum,
     n: a.n + r.list.length, slips: a.slips + r.withSlip }), { hours: 0, model: 0, basis: 0, n: 0, slips: 0 });
@@ -6154,11 +6172,11 @@ function CalibrationView({ schools, teachers, monthKey }) {
   const TH = ({ children }) => (
     <th style={{ padding:'10px 8px', fontSize:13.8, fontWeight:700, color:'var(--text2)', textAlign:'center', whiteSpace:'nowrap' }}>{children}</th>
   );
-  const kindLabel = k => k === 'slip' ? 'תלושים' : k === 'mixed' ? 'תלושים חלקי' : 'מודל';
-  const kindColor = k => k === 'slip' ? 'var(--ok, #2e7d32)' : k === 'mixed' ? 'var(--apple-orange)' : 'var(--text3)';
+  const kindLabel = k => k === 'slip' ? 'תלושים' : k === 'mixed' ? 'תלושים חלקי' : k === 'calibrated' ? `מכויל ×${kFactor.toFixed(2)}` : 'מודל';
+  const kindColor = k => k === 'slip' ? 'var(--ok, #2e7d32)' : k === 'mixed' ? 'var(--apple-orange)' : k === 'calibrated' ? 'var(--purple)' : 'var(--text3)';
   const Basis = ({ r }) => (
     <span style={{ fontSize:12.6, fontWeight:700, color: kindColor(r.basisKind) }}>
-      {kindLabel(r.basisKind)}{r.basisKind !== 'model' ? ` ${r.withSlip}/${r.list.length}` : ''}
+      {kindLabel(r.basisKind)}{r.basisKind === 'slip' || r.basisKind === 'mixed' ? ` ${r.withSlip}/${r.list.length}` : ''}
     </span>
   );
 
@@ -6180,7 +6198,10 @@ function CalibrationView({ schools, teachers, monthKey }) {
       )}
       <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6, marginBottom:12 }}>
         תלושים נכנסים דרך <b>שולחן השכר ← ייבוא תלוש</b> (קובץ דו"ח עלות עבודה מתוכנת השכר).
-        {' '}בתי ספר בלי תלושים מוצגים לפי המודל, והתעריף שלהם הוא אומדן. {tot.n ? `${tot.slips} מתוך ${tot.n} עובדות הוראה עם תלוש.` : ''}
+        {' '}{tot.n ? `${tot.slips} מתוך ${tot.n} עובדות הוראה עם תלוש.` : ''}
+        {kFactor != null
+          ? <> <b>מקדם כיול רשתי ×{kFactor.toFixed(3)}</b> — סך התלושים חלקי המודל של אותן {kTeachers} עובדות. בית ספר בלי תלושים מוצג לפי המודל × המקדם ("מכויל"), עד שייבאו לו תלושים.</>
+          : ' עדיין אין תלושים במערכת — הכול לפי המודל, והתעריפים הם אומדן. ברגע שמייבאים תלוש ראשון, כל בתי הספר מתכיילים לפיו.'}
       </p>
 
       <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
@@ -6191,10 +6212,10 @@ function CalibrationView({ schools, teachers, monthKey }) {
               <TH>מורות</TH>
               <TH>ש"ש</TH>
               <TH>עלות הוראה לחודש · מודל</TH>
-              <TH>עלות הוראה לחודש · תלושים</TH>
+              <TH>עלות הוראה לחודש · תלושים / מכויל</TH>
               <TH>תלושים מול מודל</TH>
               <TH>לשעה · מודל</TH>
-              <TH>לשעה · תלושים</TH>
+              <TH>לשעה · תלושים / מכויל</TH>
               <TH>כיתות</TH>
               <TH>ש"ש לכיתה</TH>
               <TH>תעריף +15%</TH>
@@ -6218,14 +6239,14 @@ function CalibrationView({ schools, teachers, monthKey }) {
                   <td style={{ textAlign:'center', fontSize:15.5 }}>{r.hours}</td>
                   <td style={{ textAlign:'center', fontSize:15.5, color:'var(--text2)' }}>{money(r.modelSum)}</td>
                   <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700 }}>
-                    {r.withSlip ? money(r.basisSum) : '—'}<br /><Basis r={r} />
+                    {r.basisKind !== 'model' ? money(r.basisSum) : '—'}<br /><Basis r={r} />
                   </td>
                   <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700,
                     color: r.schoolDiff == null ? 'var(--text3)' : Math.abs(r.schoolDiff) > 10 ? 'var(--warn)' : 'var(--text)' }}>
                     {r.schoolDiff == null ? '—' : pct(r.schoolDiff)}
                   </td>
                   <td style={{ textAlign:'center', fontSize:15.5, color:'var(--text2)' }}>{num(r.perHourModel)}</td>
-                  <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700 }}>{r.withSlip ? num(r.perHourSlip) : '—'}</td>
+                  <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700 }}>{r.basisKind !== 'model' ? num(r.perHourSlip) : '—'}</td>
                   <td style={{ textAlign:'center', fontSize:15.5 }}>{r.classes || '—'}</td>
                   <td style={{ textAlign:'center', fontSize:15.5 }}>{r.hpc ?? '—'}</td>
                   <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800, color: r.basisKind === 'slip' ? 'var(--ok, #2e7d32)' : 'var(--text)' }}>
@@ -6290,9 +6311,9 @@ function CalibrationView({ schools, teachers, monthKey }) {
             <p className="mcard-name" style={{ marginBottom:4 }}>{r.sc.name} <Basis r={r} /></p>
             <CardRow label='מורות · ש"ש'>{r.list.length} · {r.hours}</CardRow>
             <CardRow label="עלות הוראה לחודש · מודל" color="var(--text2)">{money(r.modelSum)}</CardRow>
-            <CardRow label="עלות הוראה לחודש · תלושים" strong>{r.withSlip ? money(r.basisSum) : '—'}</CardRow>
+            <CardRow label="עלות הוראה לחודש · תלושים" strong>{r.basisKind !== 'model' ? money(r.basisSum) : '—'}</CardRow>
             <CardRow label="תלושים מול מודל">{r.schoolDiff == null ? '—' : pct(r.schoolDiff)}</CardRow>
-            <CardRow label="לשעה · מודל / תלושים">{num(r.perHourModel)} / {r.withSlip ? num(r.perHourSlip) : '—'}</CardRow>
+            <CardRow label="לשעה · מודל / תלושים">{num(r.perHourModel)} / {r.basisKind !== 'model' ? num(r.perHourSlip) : '—'}</CardRow>
             <CardRow label='כיתות · ש"ש לכיתה'>{r.classes || '—'} · {r.hpc ?? '—'}</CardRow>
             <CardRow label="תעריף +15%" strong color={r.basisKind === 'slip' ? 'var(--ok, #2e7d32)' : undefined}>{r.rate ?? '—'}</CardRow>
             <CardRow label="היום בתקציב">{r.budgetRate ? `${r.budgetRate} × ${r.budgetHours}` : '—'}</CardRow>
