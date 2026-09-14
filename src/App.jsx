@@ -6083,6 +6083,233 @@ function SlipsHandoff({ monthKey, role }) {
   </>);
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   תלושים מול תחשיב — כיול תעריף השעה מהתלושים האמיתיים
+
+   "כשראיתי תלושים של אסתר בפועל היה נראה אחרת… כן, במסך נפרד" (שרה, 15.9).
+   המודל (calcEmployer) מנפח ב-5%–10% מול תלושי מזכרת בתיה: פנסיה 14.83%
+   וקה"ש 8.4% על כולן, בעוד שבתלוש 12.5% על בסיס נמוך יותר וקה"ש רק לחלק.
+   לכן התעריף לתקציב נגזר כאן מהתלושים כשיש, ומהמודל רק כשאין.
+
+   לכל בית ספר: עלות ההוראה לחודש (בלי מנהלת, בלי חל"ת) לפי המודל ולפי
+   התלושים, השעות הפעילות, העלות לשעה שבועית בשני המקורות, ומה שיוצא
+   ממנה לתקציב: ש"ש לכיתה (שעות ÷ כיתות) ותעריף עם 10% + 5% מ"מ, מול מה
+   שרשום היום במערכת התקציב. התלושים נכנסים דרך שולחן השכר ← ייבוא תלוש.
+═══════════════════════════════════════════════════════════════ */
+function CalibrationView({ schools, teachers, monthKey }) {
+  const PROT = 0.15;   // 10% ביטחון + 5% מילוי מקום — כמו BUFFER_PCT + MM_PCT
+  const [hub, setHub]   = useState(null);   // null: עוד נטען
+  const [err, setErr]   = useState('');
+  const [open, setOpen] = useState({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try { const h = await store.fetchHubBudget(); if (alive) setHub(h); }
+      catch (e) { if (alive) { setErr(e.message); setHub([]); } }
+    })();
+    return () => { alive = false; };
+  }, [monthKey]);
+
+  const norm = n => String(n || '').replace(/["'״׳־-]/g, '').replace(/\s+/g, ' ')
+    .replace(/^(בית חינוך|שלהבות)\s+/, '').replace(/גני תקווה/, 'גני תקוה').trim();
+  const money = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
+  const num   = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL'));
+  const pct   = v => (v == null ? '' : `${v > 0 ? '+' : ''}${v}%`);
+
+  const rows = schools.map(sc => {
+    // עובדות הוראה בלבד, בלי מנהלת ובלי מי שבחל"ד/חל"ת — כמו "עלות שכר לשעה"
+    // בדף עלות ההוראה: מכיילים לפי מי שמלמדת בפועל, עלות מול שעות.
+    const ts = teachers.filter(t => t.schoolId === sc.id && !isPrincipalRow(t) && !unpaidThisMonth(t));
+    const list = ts.map(t => {
+      const model = calcEmployer({ ...t, _actualEmployerCost: null }).total;
+      const slip  = t._actualEmployerCost ? calcEmployer(t).total : null;
+      return { t, hours: Number(t.frontalHours) || 0, model, slip,
+        diff: slip != null && model ? Math.round((slip - model) / model * 1000) / 10 : null };
+    });
+    const hours    = list.reduce((a, x) => a + x.hours, 0);
+    const modelSum = list.reduce((a, x) => a + x.model, 0);
+    const withSlip = list.filter(x => x.slip != null);
+    const slipSum  = withSlip.reduce((a, x) => a + x.slip, 0);
+    const modelOfSlipped = withSlip.reduce((a, x) => a + x.model, 0);
+    const coverage = list.length ? withSlip.length / list.length : 0;
+    // הבסיס לכיול: תלושים כשיש לכולן; חלקי = תלושים למי שיש + מודל לשאר
+    const basisSum = withSlip.length ? slipSum + (modelSum - modelOfSlipped) : modelSum;
+    const basisKind = !withSlip.length ? 'model' : coverage === 1 ? 'slip' : 'mixed';
+    const h = (hub || []).find(x => norm(x.name) === norm(sc.name)) || null;
+    const classes = h?.classCount || 0;
+    const hpc = classes && hours ? Math.round(hours / classes) : null;
+    const annual = basisSum * 12;
+    const rate = classes && hpc ? Math.round(annual * (1 + PROT) / (hpc * 12 * classes)) : null;
+    const budgetAnnual = h?.hourRate && h?.weeklyHours && classes ? h.hourRate * h.weeklyHours * 12 * classes : null;
+    return { sc, list, hours, modelSum, slipSum, withSlip: withSlip.length, coverage, basisSum, basisKind,
+      perHourModel: hours ? modelSum / hours : null,
+      perHourSlip: withSlip.length ? basisSum / hours : null,
+      schoolDiff: withSlip.length && modelOfSlipped ? Math.round((slipSum - modelOfSlipped) / modelOfSlipped * 1000) / 10 : null,
+      classes, hpc, rate, annualProt: annual * (1 + PROT), budgetRate: h?.hourRate ?? null, budgetHours: h?.weeklyHours ?? null, budgetAnnual };
+  }).filter(r => r.list.length);
+
+  const tot = rows.reduce((a, r) => ({ hours: a.hours + r.hours, model: a.model + r.modelSum, basis: a.basis + r.basisSum,
+    n: a.n + r.list.length, slips: a.slips + r.withSlip }), { hours: 0, model: 0, basis: 0, n: 0, slips: 0 });
+
+  const TH = ({ children }) => (
+    <th style={{ padding:'10px 8px', fontSize:13.8, fontWeight:700, color:'var(--text2)', textAlign:'center', whiteSpace:'nowrap' }}>{children}</th>
+  );
+  const kindLabel = k => k === 'slip' ? 'תלושים' : k === 'mixed' ? 'תלושים חלקי' : 'מודל';
+  const kindColor = k => k === 'slip' ? 'var(--ok, #2e7d32)' : k === 'mixed' ? 'var(--apple-orange)' : 'var(--text3)';
+  const Basis = ({ r }) => (
+    <span style={{ fontSize:12.6, fontWeight:700, color: kindColor(r.basisKind) }}>
+      {kindLabel(r.basisKind)}{r.basisKind !== 'model' ? ` ${r.withSlip}/${r.list.length}` : ''}
+    </span>
+  );
+
+  return (
+    <div className="page-wrap fade-in" style={{ maxWidth:1380 }} dir="rtl">
+      <PageHead
+        title={`תלושים מול תחשיב · ${fmtMonth(monthKey)}`}
+        badge={
+          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700,
+            color:'var(--purple)', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, padding:'3px 11px' }}>
+            <ShieldCheck size={14} strokeWidth={2.4} />לעינייך בלבד
+          </span>
+        }
+        subtitle="עלות ההוראה לפי התלושים האמיתיים מול המודל, ומה שיוצא ממנה לתקציב: שעות לכיתה ותעריף לשעה עם 10% + 5% מילוי מקום."
+      />
+      {err && (
+        <div style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'1px solid var(--danger-line)', borderRadius:10,
+          padding:'9px 14px', fontSize:14.9, fontWeight:600, marginBottom:12 }}>{err}</div>
+      )}
+      <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6, marginBottom:12 }}>
+        תלושים נכנסים דרך <b>שולחן השכר ← ייבוא תלוש</b> (קובץ דו"ח עלות עבודה מתוכנת השכר).
+        {' '}בתי ספר בלי תלושים מוצגים לפי המודל, והתעריף שלהם הוא אומדן. {tot.n ? `${tot.slips} מתוך ${tot.n} עובדות הוראה עם תלוש.` : ''}
+      </p>
+
+      <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
+        <table className="sticky-first" style={{ width:'100%', borderCollapse:'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
+              <TH>בית ספר</TH>
+              <TH>מורות</TH>
+              <TH>ש"ש</TH>
+              <TH>עלות הוראה לחודש · מודל</TH>
+              <TH>עלות הוראה לחודש · תלושים</TH>
+              <TH>תלושים מול מודל</TH>
+              <TH>לשעה · מודל</TH>
+              <TH>לשעה · תלושים</TH>
+              <TH>כיתות</TH>
+              <TH>ש"ש לכיתה</TH>
+              <TH>תעריף +15%</TH>
+              <TH>היום בתקציב</TH>
+              <TH>הוראה שנתי +15%</TH>
+              <TH>היום בתקציב</TH>
+            </tr>
+          </thead>
+          <tbody>
+            {hub === null ? (
+              <tr><td colSpan={14} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+            ) : rows.map(r => (
+              <Fragment key={r.sc.id}>
+                <tr style={{ borderBottom:'1px solid var(--line)', cursor:'pointer' }}
+                  onClick={() => setOpen(o => ({ ...o, [r.sc.id]: !o[r.sc.id] }))}>
+                  <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>
+                    <ChevronLeft size={14} strokeWidth={2.4} style={{ color:'var(--text3)', transform: open[r.sc.id] ? 'rotate(-90deg)' : 'none', marginInlineEnd:4 }} />
+                    {r.sc.name}
+                  </td>
+                  <td style={{ textAlign:'center', fontSize:15.5 }}>{r.list.length}</td>
+                  <td style={{ textAlign:'center', fontSize:15.5 }}>{r.hours}</td>
+                  <td style={{ textAlign:'center', fontSize:15.5, color:'var(--text2)' }}>{money(r.modelSum)}</td>
+                  <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700 }}>
+                    {r.withSlip ? money(r.basisSum) : '—'}<br /><Basis r={r} />
+                  </td>
+                  <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700,
+                    color: r.schoolDiff == null ? 'var(--text3)' : Math.abs(r.schoolDiff) > 10 ? 'var(--warn)' : 'var(--text)' }}>
+                    {r.schoolDiff == null ? '—' : pct(r.schoolDiff)}
+                  </td>
+                  <td style={{ textAlign:'center', fontSize:15.5, color:'var(--text2)' }}>{num(r.perHourModel)}</td>
+                  <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700 }}>{r.withSlip ? num(r.perHourSlip) : '—'}</td>
+                  <td style={{ textAlign:'center', fontSize:15.5 }}>{r.classes || '—'}</td>
+                  <td style={{ textAlign:'center', fontSize:15.5 }}>{r.hpc ?? '—'}</td>
+                  <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800, color: r.basisKind === 'slip' ? 'var(--ok, #2e7d32)' : 'var(--text)' }}>
+                    {r.rate ?? '—'}
+                  </td>
+                  <td style={{ textAlign:'center', fontSize:15.5, color:'var(--text2)', whiteSpace:'nowrap' }}>
+                    {r.budgetRate ? `${r.budgetRate} × ${r.budgetHours}` : '—'}
+                  </td>
+                  <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700 }}>{r.classes ? money(r.annualProt) : '—'}</td>
+                  <td style={{ textAlign:'center', fontSize:15.5, color: r.budgetAnnual != null && r.classes && r.budgetAnnual < r.annualProt ? 'var(--danger)' : 'var(--text2)' }}>
+                    {money(r.budgetAnnual)}
+                  </td>
+                </tr>
+                {open[r.sc.id] && (
+                  <tr style={{ background:'var(--apple-fill, #f5f3fa)' }}>
+                    <td colSpan={14} style={{ padding:'8px 18px 12px' }}>
+                      <table style={{ width:'100%', maxWidth:760, borderCollapse:'collapse' }}>
+                        <thead><tr>
+                          <TH>עובדת הוראה</TH><TH>ש"ש</TH><TH>מודל</TH><TH>תלוש</TH><TH>הפרש</TH>
+                        </tr></thead>
+                        <tbody>
+                          {r.list.map(x => (
+                            <tr key={x.t.id} style={{ borderTop:'1px dashed var(--line)' }}>
+                              <td style={{ padding:'6px 8px', fontSize:14.4, fontWeight:600 }}>{x.t.name}{subInfo(x.t) ? <span style={{ color:'var(--apple-orange)', fontSize:12.6 }}>{` · ${subInfo(x.t)}`}</span> : null}</td>
+                              <td style={{ textAlign:'center', fontSize:14.4 }}>{x.hours}</td>
+                              <td style={{ textAlign:'center', fontSize:14.4, color:'var(--text2)' }}>{money(x.model)}</td>
+                              <td style={{ textAlign:'center', fontSize:14.4, fontWeight:700 }}>{x.slip == null ? '—' : money(x.slip)}</td>
+                              <td style={{ textAlign:'center', fontSize:14.4, color: x.diff == null ? 'var(--text3)' : Math.abs(x.diff) > 10 ? 'var(--warn)' : 'var(--text)' }}>{x.diff == null ? '—' : pct(x.diff)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+          {hub !== null && rows.length > 1 && (
+            <tfoot>
+              <tr style={{ borderTop:'2px solid var(--line)', background:'var(--apple-fill)' }}>
+                <td style={{ padding:'11px 12px', fontSize:16.1, fontWeight:800 }}>סה"כ הרשת</td>
+                <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700 }}>{tot.n}</td>
+                <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700 }}>{tot.hours}</td>
+                <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700 }}>{money(tot.model)}</td>
+                <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700 }}>{tot.slips ? money(tot.basis) : '—'}</td>
+                <td />
+                <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700 }}>{tot.hours ? num(tot.model / tot.hours) : '—'}</td>
+                <td style={{ textAlign:'center', fontSize:15.5, fontWeight:700 }}>{tot.slips && tot.hours ? num(tot.basis / tot.hours) : '—'}</td>
+                <td colSpan={6} />
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+
+      <div className="only-mobile">
+        {hub === null ? (
+          <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
+        ) : rows.map(r => (
+          <div key={'m-' + r.sc.id} className="apple-card mcard">
+            <p className="mcard-name" style={{ marginBottom:4 }}>{r.sc.name} <Basis r={r} /></p>
+            <CardRow label='מורות · ש"ש'>{r.list.length} · {r.hours}</CardRow>
+            <CardRow label="עלות הוראה לחודש · מודל" color="var(--text2)">{money(r.modelSum)}</CardRow>
+            <CardRow label="עלות הוראה לחודש · תלושים" strong>{r.withSlip ? money(r.basisSum) : '—'}</CardRow>
+            <CardRow label="תלושים מול מודל">{r.schoolDiff == null ? '—' : pct(r.schoolDiff)}</CardRow>
+            <CardRow label="לשעה · מודל / תלושים">{num(r.perHourModel)} / {r.withSlip ? num(r.perHourSlip) : '—'}</CardRow>
+            <CardRow label='כיתות · ש"ש לכיתה'>{r.classes || '—'} · {r.hpc ?? '—'}</CardRow>
+            <CardRow label="תעריף +15%" strong color={r.basisKind === 'slip' ? 'var(--ok, #2e7d32)' : undefined}>{r.rate ?? '—'}</CardRow>
+            <CardRow label="היום בתקציב">{r.budgetRate ? `${r.budgetRate} × ${r.budgetHours}` : '—'}</CardRow>
+            <CardRow label="הוראה שנתי +15% / בתקציב">{r.classes ? money(r.annualProt) : '—'} / {money(r.budgetAnnual)}</CardRow>
+          </div>
+        ))}
+      </div>
+      <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
+        <b>תלושים</b> — עלות המעביד מהתלוש (ברוטו + הפרשות) למי שיובא לה תלוש; לשאר המודל. <b>לשעה</b> — עלות ההוראה החודשית חלקי השעות
+        השבועיות הפעילות. <b>ש"ש לכיתה</b> — השעות הפעילות חלקי מספר הכיתות במבט-רשת, מעוגל. <b>תעריף +15%</b> — עלות ההוראה השנתית
+        × 1.15 חלקי (ש"ש לכיתה × 12 × כיתות): המספר להזין ב"תעריף שעת הוראה בפועל" במערכת התקציב, יחד עם ש"ש לכיתה.
+        ירוק = נגזר מתלושים מלאים.
+      </p>
+    </div>
+  );
+}
+
 function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveScope, onImportSlip,
                        activeMonth, userRole, userId }) {
   const isClerk = userRole === 'clerk';
@@ -8769,6 +8996,12 @@ export default function App() {
                 עלות הוראה
               </button>
             )}
+            {(isCoord || isClerk) && (
+              <button className={`nav-btn ${view==='calibration' ? 'active' : ''}`} onClick={() => setView('calibration')}>
+                <Percent size={15} strokeWidth={2.2} />
+                תלושים מול תחשיב
+              </button>
+            )}
             {isCoord && <span className="nav-sep" />}
 
             {/* ── ניהול ── */}
@@ -8858,7 +9091,7 @@ export default function App() {
       <div className="flex-1">
         {/* לחשבת יש כפתורי תלושים/התראות בניווט, אבל הענף הזה רונדר תמיד
             לפניהם — הכפתורים היו מתים (ממצא QA, 3.9). עכשיו הם עוברים. */}
-        {isClerk && view !== 'slips' && view !== 'alerts' && view !== 'finance' && view !== 'mm' ? (
+        {isClerk && view !== 'slips' && view !== 'alerts' && view !== 'finance' && view !== 'mm' && view !== 'calibration' ? (
           <PayrollDesk
             teachers={teachers}
             schools={schools}
@@ -8917,6 +9150,8 @@ export default function App() {
           <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} onApprove={onApproveTeacher} simState={simState} onCompute={onCompute} onDelete={onDeleteTeacher} />
         ) : view === 'finance' && (user.role === 'coordinator' || user.role === 'clerk') ? (
           <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} />
+        ) : view === 'calibration' && (user.role === 'coordinator' || user.role === 'clerk') ? (
+          <CalibrationView schools={schools} teachers={teachers} monthKey={activeMonth} />
         ) : view === 'mm' && (user.role === 'coordinator' || user.role === 'clerk') ? (
           <AbsencesView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} />
         ) : view === 'slips' ? (

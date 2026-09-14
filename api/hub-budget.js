@@ -145,6 +145,8 @@ export function mapHubSchools(data) {
         // המוסתרת ליד העלות בפועל לשעה, כערכים ולא כהפרש.
         hourRate: Number(s.raw?.constants?.actual_hourly_rate) || null,
         weeklyHours: Number(s.raw?.constants?.actual_weekly_hours) || null,
+        // מספר הכיתות — למסך "תלושים מול תחשיב": ש"ש לכיתה = שעות בפועל ÷ כיתות (שרה, 15.9)
+        classCount: Number(s.classCount) || 0,
       };
     });
     /*
@@ -159,6 +161,7 @@ export function mapHubSchools(data) {
       if (!cur) { byBase.set(base, { ...s, name: base }); continue; }
       cur.ministry += s.ministry;
       cur.incomeTotal += s.incomeTotal;
+      cur.classCount = (cur.classCount || 0) + (s.classCount || 0);
       cur.teachingSim = (cur.teachingSim == null && s.teachingSim == null) ? null : (cur.teachingSim || 0) + (s.teachingSim || 0);
       cur.expensesOther = (cur.expensesOther || 0) + (s.expensesOther || 0);
       cur.incomeOther = (cur.incomeOther || 0) + (s.incomeOther || 0);
