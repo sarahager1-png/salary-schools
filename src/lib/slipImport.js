@@ -46,12 +46,34 @@ function stripSchoolTag(name, schoolNames = []) {
 }
 const words = s => stripSchoolTag(s).split(' ').filter(w => w.length > 1);
 
+/*
+  מילה תואמת מילה גם בהבדל של אות אחת: "ויינטרוב"/"וינטרוב", "נסים"/"ניסים",
+  וכינוי מול שם מלא בהבדל של סיומת: "דבורי"/"דבורה". תלושי מזכרת בתיה
+  (15.9) נפלו על שלושת אלה. רק במילים של 4 אותיות ומעלה, כדי ש"חיה"
+  לא תתאים ל"חנה".
+*/
+function editDistance(a, b) {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > 1) return 2;
+  const m = a.length, n = b.length;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+const wordMatch = (x, y) => x === y || (x.length >= 4 && y.length >= 4 && editDistance(x, y) <= 1);
+
 // שתי קבוצות מילים מתאימות אם הקטנה מוכלת בגדולה (שם שני חסר) —
 // אבל לפחות שתי מילים משותפות, כדי ש"חיה" לבדה לא תתאים לשתי חיות.
 function nameScore(a, b) {
   const A = new Set(words(a)), B = new Set(words(b));
   if (!A.size || !B.size) return 0;
-  const common = [...A].filter(w => B.has(w)).length;
+  const common = [...A].filter(w => [...B].some(v => wordMatch(w, v))).length;
   if (common === A.size && common === B.size) return 3;          // זהות
   if (common >= 2 && (common === A.size || common === B.size)) return 2; // הכלה
   return 0;
