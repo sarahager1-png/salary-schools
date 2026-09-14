@@ -2574,7 +2574,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
         style={{ fontSize:13.8, padding:'4px 8px', borderRadius:6, width:90, textAlign:'center',
                  background: bg || undefined }} /></td>
     );
-    const supplies = !isPrincipalRow(v) && schoolPaysSupp(v.schoolId);
+    // גם למנהלת: "תלוש עולם ישן פלוס תוספת בית חב"ד עם כל הרכיבים" (שרה, 14.9)
+    const supplies = schoolPaysSupp(v.schoolId);
     return (
       <>
         {numCell('_officialGross')}
@@ -3190,9 +3191,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           background:'var(--surface)', color:'var(--text)', fontFamily:'inherit' }} />
                     </td>
                     {!isPrincipal && <td style={{ textAlign:'center' }}>
-                      {isPrincipalRow(t) || !schoolPaysSupp(t.schoolId)
-                        ? <span style={{ color:'var(--text3)' }}
-                            title={isPrincipalRow(t) ? 'מנהלת — תשלום ישיר' : 'בית ספר בלי תוספת בית חב"ד'}>—</span>
+                      {!schoolPaysSupp(t.schoolId)
+                        ? <span style={{ color:'var(--text3)' }} title='בית ספר בלי תוספת בית חב"ד'>—</span>
                         : <input type="number" min="0" dir="ltr"
                             key={`supp-${t.id}`}
                             defaultValue={t._chabadSupp || ''}
@@ -3307,7 +3307,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
             const isSim   = needsSim(t);
             const isAppr  = needsApproval(t);
             const done    = simComplete(t);
-            const supplies = !isPrincipalRow(t) && schoolPaysSupp(t.schoolId);
+            const supplies = schoolPaysSupp(t.schoolId);   // גם למנהלת (שרה, 14.9)
             return (
               <div key={'m-' + t.id} className="apple-card mcard" style={{
                 borderInlineStart: isSim ? '3px solid var(--warn)' : isAppr ? '3px solid var(--teal)' : '3px solid transparent' }}>
@@ -8492,9 +8492,20 @@ export default function App() {
               const hit = list.find(x => x.id === r.teacher_month_id);
               if (hit) { row = hit; rowMonth = mk; break; }
             }
-            // ברוטו ריק = חישוב של מנהלת: התלוש נכתב ל-slip_lines והברוטו
-            // הקבוע שלה נשאר. רק מרעננים, כדי שמסך התלושים יראה אותו.
-            if (r.result_gross != null && row && row._officialGross !== r.result_gross) {
+            /*
+              מנהלת: התוצאה היא העולם הישן (התלוש נכתב ל-slip_lines), והברוטו
+              הקבוע שלה נשאר. מה שנשמר הוא תוספת בית חב"ד = ברוטו − עולם ישן,
+              כדי שמסך בית הספר, עלות המעביד והתלוש יראו אותו מספר.
+              שכר מוסכם/שווה לברוטו — התוספת נגזרת ממנו; אפס נשמר כאפס.
+            */
+            if (r.result_gross != null && row && isPrincipalRow(row)) {
+              const gross = Number(row._agreedGross) || Number(row._officialGross) || 0;
+              const supp = gross ? Math.max(0, Math.round(gross - r.result_gross)) : null;
+              // אפס מפורש = "הכול בסיס" (חני אסולין, שרה 9.9) — חישוב חוזר לא דורס אותו
+              if (supp != null && row._chabadSupp !== 0 && supp !== (row._chabadSupp ?? null)) {
+                await store.saveTeacher({ id: row.id, _chabadSupp: supp }, rowMonth);
+              }
+            } else if (r.result_gross != null && row && row._officialGross !== r.result_gross) {
               await store.saveTeacher({ id: row.id, _officialGross: r.result_gross }, rowMonth);
             }
             needsRefresh = true;

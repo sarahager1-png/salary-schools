@@ -68,8 +68,8 @@ const saveSlip = async (t, gross) => {
   מנהלת — "תחשב את תלושי המנהלות כמו כל עובדי ההוראה" (שרה, 14.9).
   הברוטו שלה קבוע (אופק ניהול / שכר מוסכם) ואינו נכתב מכאן; מה שמחושב
   הוא התלוש בעולם ישן — דרגה+ותק ב-100% וגמול ניהול לפי מספר הכיתות —
-  אל slip_lines, וההפרש עד הברוטו הוא תוספת בית חב"ד. לכן result_gross
-  נשאר ריק: הדפדפן לא ידרוס את הברוטו, רק יסגור את הבקשה.
+  אל slip_lines. result_gross מקבל את העולם הישן, והדפדפן של שרה שומר
+  ממנו את תוספת בית חב"ד (ברוטו − עולם ישן) — לא את הברוטו.
 */
 const runPrincipal = async (req, t) => {
   const plan = principalPlanFor(t, t.schools?.name);
@@ -81,7 +81,7 @@ const runPrincipal = async (req, t) => {
   const gross = await runWithRetry(plan, t.month_key, t.name);
   console.log(`[${stamp()}] ${t.name} · מנהלת · ${plan.nihul.classes} כיתות → עולם ישן ${gross.toLocaleString('he-IL')} ₪`);
   await saveSlip(t, gross);
-  await finish(req.id, { status: 'done', result_gross: null });
+  await finish(req.id, { status: 'done', result_gross: gross });
 };
 
 const runTeacher = async (req, t) => {
