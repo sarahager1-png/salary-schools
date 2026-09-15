@@ -19,7 +19,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 34;
+const BUILD = 35;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -198,9 +198,11 @@ const needsSim      = t => Boolean(!unpaidThisMonth(t) && t._changedAt && !t._ap
 // (שרה, 10.9). "חשוב שיהיה כתוב כמה חריגה יש לכל בית ספר, בשעות" (10.9)
 // — לכן החריגה היא מספר שעות מפורש, לא רק צבע.
 const isInclusionRow = t => (t?.gamulRole || t?.role) === 'inclusion';
+// ייעוץ מתומחר בתקציב בנפרד מהשעות לכיתה — מחוץ לתקן (שרה, 15.9, ירושלים)
+const isCounselorRow = t => /^counselor/.test(t?.gamulRole || t?.role || '');
 // שעות צהרון ומשרה שעתית אינן שעות משרד החינוך — מחוץ למכסה (15.9)
 const schoolHours = ts => ts
-  .filter(t => !isPrincipalRow(t) && !isInclusionRow(t) && !isHourlyRow(t) && !unpaidThisMonth(t))
+  .filter(t => !isPrincipalRow(t) && !isInclusionRow(t) && !isCounselorRow(t) && !isHourlyRow(t) && !unpaidThisMonth(t))
   .reduce((a, t) => a + (Number(t.frontalHours) || 0), 0);
 // null = אין תקן; חיובי = מעל התקן; שלילי/אפס = בתוך התקן
 const hoursOver = (ts, quota) => {
