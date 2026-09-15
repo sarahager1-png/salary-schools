@@ -96,11 +96,20 @@ export default async function handler(req, res) {
     const out = shalhavot.map(s => {
       // עלות שכר שנתית — אותו סכום כמו monthlyCost * 12 בכרטיסים (כולל מנהלת)
       // הוראה בלבד: צהרון ומשרות שעתיות ממומנים בנפרד ואינם מול תקציב המשרד (15.9)
-      let monthly = 0, hourlyMonthly = 0;
+      // "גם הפירוט עלות הוראה ועלויות נוספות מפורשות" (שרה, 15.9): שכר ההוראה
+      // מפורק לרכיביו — סכומים בית-ספריים בלבד. total = gross + social + mmPay.
+      let monthly = 0, hourlyMonthly = 0, staff = 0;
+      const pay = { base: 0, supp: 0, social: 0, mm: 0 };
       for (const r of (rows || []).filter(r => r.school_id === s.id)) {
         const t = toTeacher(r);
         const c = emp.calcEmployer(t);
-        if (emp.isHourlyRow(t)) hourlyMonthly += c.total; else monthly += c.total;
+        if (emp.isHourlyRow(t)) { hourlyMonthly += c.total; continue; }
+        monthly += c.total;
+        if (c.total > 0) staff++;
+        pay.base += (c.gross || 0) - (c.supplement || 0);
+        pay.supp += c.supplement || 0;
+        pay.social += c.social || 0;
+        pay.mm += c.mmPay || 0;
       }
       const annual = monthly * 12;
 
@@ -123,11 +132,24 @@ export default async function handler(req, res) {
         ? detail.teach.income.map(x => ({ name: x.name, amount: Number(x.amount || 0) }))
         : [{ name: 'הכנסות משרד החינוך + מענק', amount: ministryBudget || 0 }]);
       if (networkSupport) teachIncomeLines.push({ name: 'השתתפות הרשת', amount: networkSupport });
+      // עיגול הרכיבים כך שסכומם שווה בדיוק לשכר השנתי המעוגל
+      const payLines = [
+        { name: `שכר ברוטו — ${staff} עובדי הוראה כולל מנהלת`, amount: Math.round(pay.base * 12) },
+        { name: 'תוספת בית חב"ד', amount: Math.round(pay.supp * 12) },
+        { name: 'עלויות מעביד — הפרשות סוציאליות, ביטוח לאומי, מס שכר ותוספות', amount: Math.round(pay.social * 12) },
+        { name: 'מילוי מקום בתשלום', amount: Math.round(pay.mm * 12) },
+      ];
+      payLines[0].amount += Math.round(annual) - payLines.reduce((a, x) => a + x.amount, 0);
       const teachExpenseLines = [
-        { name: 'שכר הוראה (עובדי הוראה, מנהלת, תוספות)', amount: Math.round(annual) },
+        ...payLines.filter(x => x.amount !== 0),
         { name: 'תוספת ביטחון — 10% מעלות ההוראה', amount: Math.round(bufferCost) },
         { name: 'מילוי מקום — 5% מעלות ההוראה', amount: Math.round(mmCost) },
-      ];
+      ].filter(x => x.amount !== 0);
+      // השורה האחרונה סופגת שקל עיגול — סכום השורות שווה תמיד לסה"כ המוצג
+      if (teachExpenseLines.length) {
+        teachExpenseLines[teachExpenseLines.length - 1].amount +=
+          Math.round(teachCost) - teachExpenseLines.reduce((a, x) => a + x.amount, 0);
+      }
 
       // ─ צד התקציב הנוסף — כמו בכרטיסים ─
       const incLines = mergeLines(detail?.income);
