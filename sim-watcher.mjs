@@ -129,9 +129,14 @@ while (true) {
         .update({ status: 'running' }).eq('id', req.id).eq('status', 'pending').select('id');
       if (!claimed?.length) continue;
       const { data: t } = await sb.from('teacher_months')
-        .select('id, month_key, name, reform, degree, grade, seniority, scope_pct, scope_set_at, gamul_role, leave_type, frontal_hours, children_under_18, gender, official_gross, schools(name)')
+        .select('id, month_key, name, reform, degree, grade, seniority, scope_pct, scope_set_at, gamul_role, leave_type, frontal_hours, children_under_18, gender, official_gross, job, schools(name)')
         .eq('id', req.teacher_month_id).single();
       if (!t) { await finish(req.id, { status: 'failed', error: 'השורה לא נמצאה' }); continue; }
+      // משרה שעתית (צהרון): שעות × תעריף, אין מה להריץ במחשבון המשרד
+      if (t.job && t.job !== 'teaching') {
+        await finish(req.id, { status: 'failed', error: 'משרה שעתית — הברוטו הוא שעות × תעריף, לא סימולציה' });
+        continue;
+      }
       try {
         if (t.gamul_role === 'principal') await runPrincipal(req, t);
         else await runTeacher(req, t);

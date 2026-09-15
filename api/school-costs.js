@@ -24,6 +24,7 @@ const toTeacher = (r) => ({
   gender: r.gender, childrenUnder18: r.children_under_18,
   travelDays: r.travel_days, daycareChildren: r.daycare_children,
   leaveType: r.leave_type, mmFor: r.mm_for,
+  job: r.job || 'teaching', hourlyRate: r.hourly_rate,
   _officialGross: r.official_gross, _agreedGross: r.agreed_gross,
   _chabadSupp: r.chabad_supp, _actualEmployerCost: r.actual_employer_cost,
 });
@@ -70,16 +71,20 @@ export default async function handler(req, res) {
         בלבד, והשוואה שכוללת את המנהלת מייצרת "פער לא מוסבר" (מזכרת
         בתיה, 3.9) — 312 אלף ₪ של מנהלת שנראו כחריגת הוראה.
       */
-      let teaching = 0, principal = 0;
+      // צהרון ומשרות שעתיות — דלי משלהן, מחוץ להוראה (15.9)
+      let teaching = 0, principal = 0, hourly = 0;
       for (const t of ts) {
         const c = emp.calcEmployer(t).total;
-        if (emp.isPrincipalRow(t)) principal += c; else teaching += c;
+        if (emp.isPrincipalRow(t)) principal += c;
+        else if (emp.isHourlyRow(t)) hourly += c;
+        else teaching += c;
       }
       const monthly = teaching + principal;
       return { name: s.name,
         monthly: Math.round(monthly), annual: Math.round(monthly * 12),
         teachingMonthly: Math.round(teaching), teachingAnnual: Math.round(teaching * 12),
         principalMonthly: Math.round(principal),
+        hourlyMonthly: Math.round(hourly), hourlyAnnual: Math.round(hourly * 12),
         teachers: ts.length };
     });
     res.setHeader('access-control-allow-origin', '*');

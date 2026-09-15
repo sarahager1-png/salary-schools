@@ -19,7 +19,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 31;
+const BUILD = 32;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -41,6 +41,16 @@ import {
   PRINCIPAL_OFEK_GROSS,
   PRINCIPAL_CHABAD_SUPP,
   isPrincipalRow,
+  JOBS,
+  jobLabel,
+  isHourlyRow,
+  MIN_WAGE_HOUR,
+  HOURLY_WEEKS,
+  hourlyRateOf,
+  hourlyGross,
+  EXTRA_ROLE_IDS,
+  allRolesOf,
+  rolesText,
   NIHUL_GRADES,
   ROLE_SHORT,
   principalDefaults,
@@ -114,6 +124,12 @@ const FIELDS = [
   { key:'ageGroup',        label:'קבוצת גיל',      base:true,  tracked:true,  fmt: v => AGE_RED[v]?.label || v },
   { key:'seniority',       label:'ותק',            base:true,  tracked:true },
   { key:'role',            label:'תפקיד',          base:true,  tracked:true,  fmt: v => ROLES.find(r => r.id === v)?.label.split('(')[0].trim() || 'ללא תפקיד נוסף' },
+  // תפקידים נוספים בשורת ההוראה (שרה, 15.9) — משנים גמול, ולכן בסיס
+  { key:'extraRoles',      label:'תפקידים נוספים', base:true,  tracked:true,
+    fmt: v => (Array.isArray(v) && v.length ? v.map(id => ROLE_SHORT[id] || id).join(' · ') : 'אין') },
+  // סוג המשרה ותעריף לשעה — משרה שעתית (צהרון). שניהם משנים שכר.
+  { key:'job',             label:'סוג משרה',       base:true,  tracked:true,  fmt: v => jobLabel(v || 'teaching') },
+  { key:'hourlyRate',      label:'תעריף לשעה',     base:true,  tracked:true,  fmt: v => (v ? `${v} ₪` : 'שכר מינימום') },
   { key:'scopePct',        label:'% משרה',         base:true,  tracked:true,  fmt: v => `${v}%` },
   { key:'frontalHours',    label:'שעות פרונטלי',   base:true,  tracked:true },
   { key:'scope',           label:'% משרה',         base:true,  tracked:false, fmt: v => `${v}%` },
@@ -165,6 +181,8 @@ const hasContact = t => Boolean(String(t?.phone || '').trim() && String(t?.email
 const simComplete = t => {
   if (t._agreedGross) return true;
   if (isPrincipalRow(t)) return Boolean(t._officialGross) || t.reform === 'ofek';
+  // משרה שעתית: שעות × תעריף הם המספר, עד שחשבת השכר מזינה ברוטו מהתלוש
+  if (isHourlyRow(t)) return Boolean(t._officialGross) || Number(t.frontalHours) > 0;
   return Boolean(t._officialGross);
 };
 
@@ -180,8 +198,9 @@ const needsSim      = t => Boolean(!unpaidThisMonth(t) && t._changedAt && !t._ap
 // (שרה, 10.9). "חשוב שיהיה כתוב כמה חריגה יש לכל בית ספר, בשעות" (10.9)
 // — לכן החריגה היא מספר שעות מפורש, לא רק צבע.
 const isInclusionRow = t => (t?.gamulRole || t?.role) === 'inclusion';
+// שעות צהרון ומשרה שעתית אינן שעות משרד החינוך — מחוץ למכסה (15.9)
 const schoolHours = ts => ts
-  .filter(t => !isPrincipalRow(t) && !isInclusionRow(t) && !unpaidThisMonth(t))
+  .filter(t => !isPrincipalRow(t) && !isInclusionRow(t) && !isHourlyRow(t) && !unpaidThisMonth(t))
   .reduce((a, t) => a + (Number(t.frontalHours) || 0), 0);
 // null = אין תקן; חיובי = מעל התקן; שלילי/אפס = בתוך התקן
 const hoursOver = (ts, quota) => {
@@ -199,6 +218,8 @@ const needsApproval = t => Boolean(t._changedAt && !t._approved && simComplete(t
 // כפתור "חישוב": למורה התוצאה נכנסת לברוטו; למנהלת הברוטו קבוע (אופק
 // ניהול / שכר מוסכם) והחישוב הוא התלוש בעולם ישן — "תחשב את תלושי
 // המנהלות כמו כל עובדי ההוראה" (שרה, 14.9).
+// משרה שעתית אין לה סימולטור — כפתור החישוב אינו מוצג (canCompute)
+const canCompute = t => !isHourlyRow(t);
 const computeTitle = t => (isPrincipalRow(t)
   ? 'חישוב התלוש בעולם ישן — דרגה+ותק וגמול ניהול; ההפרש עד הברוטו הוא תוספת בית חב"ד'
   : 'חישוב במחשבון משרד החינוך — התוצאה תיכנס לברוטו');
@@ -320,6 +341,8 @@ const EMPTY_TEACHER = {
   // אין ותק 0 — שנה ראשונה בהוראה היא 1, וה-CHECK במסד דוחה אפס
   seniority: 1, frontalHours: 26, scopePct: 100, scope: 100,
   role: 'none', ageGroup: 'none',
+  job: 'teaching', hourlyRate: null,   // סוג משרה; תעריף לשעה למשרה שעתית
+  extraRoles: [],                      // תפקידים נוספים מעבר לגמול הראשי
   isTemp: false, startDate: '', endDate: '', scopeChanges: [],
   leaveType: 'none', leaveFrom: null, leaveTo: null,
   childrenUnder18: 0,
@@ -668,14 +691,24 @@ function TeacherDiff({ t }) {
 function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
   const emp = calcEmployer(x);
   const d   = deriveHours(x);
-  const rows = [
+  // משרה שעתית (צהרון): שעות × תעריף. בלי דרגה, מסלול ושלב.
+  const rows = isHourlyRow(x) ? [
+    ['שם העובדת',        x.name],
+    ['תעודת זהות',       x.tzId || '—'],
+    ['בית הספר',         school?.name || '—'],
+    ['סוג המשרה',        jobLabel(x.job)],
+    ['שעות שבועיות',     x.frontalHours || '—'],
+    ['תעריף לשעה',       `${hourlyRateOf(x)} ₪${x.hourlyRate ? '' : ' (שכר מינימום)'}`],
+    ['אחוז משרה',        `${effectiveScope(x)}%`],
+  ] : [
     ['שם העובדת',        x.name],
     ['תעודת זהות',       x.tzId || '—'],
     ['בית הספר',         school?.name || '—'],
     ['מסלול',            reformLabel(x.reform)],
     ...(x.reform === 'ofek' && !isPrincipalRow(x)
       ? [['דרגה באופק', x.grade === 'intern' ? 'מתמחה' : `דרגה ${x.grade}`]] : []),
-    ...(isPrincipalRow(x) ? [['תפקיד', 'מנהלת בית ספר']] : []),
+    ...(isPrincipalRow(x) ? [['תפקיד', 'מנהלת בית ספר']]
+      : rolesText(x) ? [[allRolesOf(x).length > 1 ? 'תפקידים' : 'תפקיד', rolesText(x)]] : []),
     ['תואר',             DEGREE_LABELS[x.degree] || x.degree || '—'],
     ['ותק בהוראה',       `${x.seniority || 0} שנים`],
     ['שלב חינוך',        LEVELS[x.level]?.label || '—'],
@@ -1443,6 +1476,33 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
             </div>
           </div>
 
+          {/* סוג המשרה — עובדת עם כמה תפקידים = שורה לכל תפקיד (שרה, 15.9) */}
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+            <div style={{ flex:'1 1 150px' }}>
+              <p className="apple-label">סוג המשרה בשורה הזו</p>
+              <select value={t.job || 'teaching'} onChange={e => set('job', e.target.value)} className="apple-select">
+                {JOBS.map(j => <option key={j.id} value={j.id}>{j.label}</option>)}
+              </select>
+            </div>
+            {isHourlyRow(t) && (
+              <>
+                <div style={{ flex:'1 1 110px' }}>
+                  <p className="apple-label">שעות שבועיות</p>
+                  <input type="number" min="0" dir="ltr" className="apple-input" value={t.frontalHours ?? ''}
+                    onChange={e => set('frontalHours', e.target.value === '' ? 0 : Number(e.target.value))} />
+                </div>
+                {userRole !== 'principal' && (
+                  <div style={{ flex:'1 1 110px' }}>
+                    <p className="apple-label">תעריף לשעה (₪)</p>
+                    <input type="number" min="0" dir="ltr" className="apple-input" value={t.hourlyRate ?? ''}
+                      placeholder={String(MIN_WAGE_HOUR)}
+                      onChange={e => set('hourlyRate', e.target.value === '' ? null : Number(e.target.value))} />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
           {/* דרכי קשר — לשליחת נתוני ההעסקה לחתימה ולכל בירור על התלוש */}
           <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
             <div style={{ flex:'1 1 150px' }}>
@@ -1689,6 +1749,12 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 </option>
               ))}
             </select>
+            {!isPrincipalRow(t) && (
+              <div style={{ marginTop:8 }}>
+                <p className="apple-label">תפקידים נוספים</p>
+                <ExtraRoles t={t} onChange={v => set('extraRoles', v)} />
+              </div>
+            )}
           </div>
 
           {/* דרגת ניהול — ברירת המחדל א, ניתנת לשינוי ידני */}
@@ -2405,6 +2471,250 @@ function ReportMonth({ school, teachers, monthKey, due, onReport }) {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   תפקידים נוספים — "תוסיף גם אפשרות מספר תפקידים למורה", "תפקיד נוסף
+   ברגיל, לא בצהרון" (שרה, 15.9). הגמול הראשי נשאר בבורר שלו; כאן
+   תגיות לתפקידים הנוספים, כל אחת עם ×, ובורר "+ תפקיד נוסף".
+═══════════════════════════════════════════════════════════════ */
+function ExtraRoles({ t, onChange, disabled = false, compact = false }) {
+  const main  = t.role || t.gamulRole || 'none';
+  const extra = Array.isArray(t.extraRoles) ? t.extraRoles : [];
+  const free  = EXTRA_ROLE_IDS.filter(id => id !== main && !extra.includes(id));
+  const name  = id => (compact ? (ROLE_SHORT[id] || id) : (ROLES.find(r => r.id === id)?.label.split('(')[0].trim() || id));
+  if (isPrincipalRow(t)) return null;
+  return (
+    <div style={{ display:'flex', flexWrap:'wrap', gap:4, alignItems:'center', justifyContent: compact ? 'center' : 'flex-start', marginTop: compact ? 4 : 0 }}
+      onClick={e => e.stopPropagation()}>
+      {extra.map(id => (
+        <span key={id} className="apple-badge badge-purple" style={{ fontSize:12.6, padding:'1px 4px 1px 8px', gap:3 }}>
+          {name(id)}
+          {!disabled && (
+            <button type="button" aria-label={`הסרת התפקיד ${name(id)}`}
+              onClick={() => onChange(extra.filter(x => x !== id))}
+              style={{ border:'none', background:'transparent', cursor:'pointer', color:'var(--purple)', padding:'0 3px', display:'inline-flex' }}>
+              <X size={11} strokeWidth={2.8} />
+            </button>
+          )}
+        </span>
+      ))}
+      {!disabled && free.length > 0 && (
+        <select className="apple-select" value="" aria-label="הוספת תפקיד נוסף"
+          onChange={e => { if (e.target.value) onChange([...extra, e.target.value]); }}
+          style={{ fontSize:12.6, padding:'1px 6px', width: compact ? 118 : 'auto', minHeight:0,
+            color:'var(--purple)', borderStyle:'dashed' }}>
+          <option value="">+ תפקיד נוסף</option>
+          {free.map(id => <option key={id} value={id}>{name(id)}</option>)}
+        </select>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   צהרון ומשרות שעתיות — חלק משלהן במסך בית הספר
+
+   "תחלק את גני תקוה שורה של צהרון" ו"תוסיף גם אפשרות מספר תפקידים
+   למורה" (שרה, 15.9.2026). עובדת עם כמה תפקידים = כמה שורות; שורת
+   הצהרון מחזיקה רק מה שנחוץ לשכר שעתי: שעות שבועיות, תעריף לשעה,
+   וברוטו מהתלוש כשחשבת השכר מזינה אותו.
+═══════════════════════════════════════════════════════════════ */
+const nisH = v => (v > 0 ? Math.round(v).toLocaleString('he-IL') + ' ₪' : '—');
+const HourlyNum = ({ id, value, onCommit, width = 64, placeholder = '—', title, disabled }) => (
+  <input type="number" min="0" dir="ltr" inputMode="decimal" className="apple-input"
+    key={`${id}-${value ?? ''}`} defaultValue={value ?? ''} placeholder={placeholder}
+    title={title} disabled={disabled} aria-label={title}
+    onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+    onBlur={e => {
+      const v = e.target.value === '' ? null : Number(e.target.value);
+      if ((v ?? null) !== (value ?? null)) onCommit(v);
+    }}
+    style={{ width, textAlign:'center', fontSize:14.4, padding:'3px 6px', fontWeight:700 }} />
+);
+// מי מזינה תעריף וברוטו: שרה וחשבת השכר. המנהלת — שעות בלבד.
+const hourlyRateNote = t => (t.hourlyRate ? '' : `שכר מינימום ${MIN_WAGE_HOUR} ₪`);
+
+function HourlyJobsTable({ rows, school, isCoord, isPrincipal, saveRow, onAdd, onDelete, onApprove, onDetails, onFullEdit, hasSearch }) {
+  const totHours = rows.reduce((a, t) => a + (Number(t.frontalHours) || 0), 0);
+  const totGross = rows.reduce((a, t) => a + calcEmployer(t).gross, 0);
+  const totEmp   = rows.reduce((a, t) => a + calcEmployer(t).total, 0);
+  if (!rows.length && hasSearch) return null;
+  return (
+    <section aria-label="צהרון ומשרות שעתיות" style={{ marginTop:22 }}>
+      <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:8 }}>
+        <div>
+          <h3 style={{ fontSize:17.2, fontWeight:800, color:'var(--purple)' }}>
+            צהרון ומשרות שעתיות{rows.length ? ` · ${rows.length}` : ''}
+          </h3>
+          <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:2 }}>
+            שעות שבועיות × תעריף לשעה. לא נספר במכסת השעות של {school.name}.
+          </p>
+        </div>
+        <button className="apple-btn apple-btn-ghost" onClick={onAdd} style={{ minHeight:36, fontSize:14.4 }}>
+          <Plus size={14} strokeWidth={2.5} />
+          הוספת עובד/ת צהרון
+        </button>
+      </div>
+      {rows.length === 0 ? (
+        <div className="apple-card" style={{ padding:'16px', textAlign:'center', color:'var(--text3)', fontSize:14.4 }}>
+          אין עדיין שורות צהרון.
+        </div>
+      ) : (
+        <div className="sheet-wrap table-scroll">
+          <table className="apple-table" style={{ fontSize:14.9 }}>
+            <thead>
+              <tr>
+                <th>שם</th>
+                <th style={{ textAlign:'center' }}>סוג משרה</th>
+                <th style={{ textAlign:'center' }}>שעות שבועיות</th>
+                <th style={{ textAlign:'center' }}>תעריף לשעה (₪)</th>
+                <th style={{ textAlign:'center' }} title="ברוטו מהתלוש. ריק = אומדן משעות × תעריף">ברוטו (₪)</th>
+                {!isPrincipal && <th style={{ textAlign:'center', color:'var(--purple)' }}>סה״כ למעסיק</th>}
+                <th style={{ width:120 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(t => {
+                const emp = calcEmployer(t);
+                const pb  = payBreakdown(t);
+                return (
+                  <tr key={t.id}>
+                    <td style={{ fontWeight:600 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                        <span>{t.name}</span>
+                        {needsApproval(t) && <span className="apple-badge badge-orange" style={{ fontSize:13.2, padding:'2px 8px' }}>לאישור</span>}
+                      </div>
+                    </td>
+                    <td style={{ textAlign:'center' }}>
+                      <select className="apple-select" value={t.job} aria-label="סוג משרה"
+                        onChange={e => saveRow({ ...t, job: e.target.value })}
+                        style={{ fontSize:13.8, padding:'3px 7px', minWidth:96 }}>
+                        {JOBS.map(j => <option key={j.id} value={j.id}>{j.label}</option>)}
+                      </select>
+                    </td>
+                    <td style={{ textAlign:'center' }}>
+                      <HourlyNum id={`hh-${t.id}`} value={Number(t.frontalHours) || null} title="שעות שבועיות"
+                        onCommit={v => saveRow({ ...t, frontalHours: v || 0 })} />
+                    </td>
+                    <td style={{ textAlign:'center' }}>
+                      {isPrincipal ? (
+                        <span>{hourlyRateOf(t)}</span>
+                      ) : (
+                        <HourlyNum id={`hr-${t.id}`} value={t.hourlyRate ?? null} placeholder={String(MIN_WAGE_HOUR)}
+                          title="תעריף לשעה — ריק = שכר מינימום" onCommit={v => saveRow({ ...t, hourlyRate: v })} />
+                      )}
+                      {!t.hourlyRate && <span style={{ display:'block', fontSize:12.6, color:'var(--text3)' }}>{hourlyRateNote(t)}</span>}
+                    </td>
+                    <td style={{ textAlign:'center' }}>
+                      {isPrincipal ? nisH(emp.gross) : (
+                        <HourlyNum id={`hg-${t.id}`} value={t._officialGross ?? null} width={96}
+                          placeholder={String(hourlyGross(t) || '₪')} title="ברוטו מהתלוש — ריק = אומדן"
+                          onCommit={v => saveRow({ ...t, _officialGross: v })} />
+                      )}
+                      {pb.hourlyEstimate && emp.gross > 0 && (
+                        <span style={{ display:'block', fontSize:12.6, color:'var(--text3)' }}>
+                          אומדן · {Math.round((Number(t.frontalHours) || 0) * HOURLY_WEEKS)} שעות בחודש
+                        </span>
+                      )}
+                    </td>
+                    {!isPrincipal && <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>{nisH(emp.total)}</td>}
+                    <td>
+                      <div style={{ display:'flex', gap:4, justifyContent:'flex-end' }}>
+                        <button className="apple-btn apple-btn-ghost" title="פרטים מלאים" aria-label={`פרטים מלאים — ${t.name}`}
+                          onClick={() => onFullEdit(t)} style={{ padding:'0 9px', minHeight:30 }}><Pencil size={13} strokeWidth={2.2} /></button>
+                        {fullyApproved(t) && hasContact(t) && (
+                          <button className="apple-btn apple-btn-ghost" title="נתוני העסקה לחתימה" aria-label={`נתוני העסקה — ${t.name}`}
+                            onClick={() => onDetails(t)} style={{ padding:'0 9px', minHeight:30 }}><FileText size={13} strokeWidth={2.2} /></button>
+                        )}
+                        {isCoord && needsApproval(t) && onApprove && (
+                          <button className="apple-btn apple-btn-green" title="אישור" aria-label={`אישור — ${t.name}`}
+                            onClick={() => onApprove(t.id)} style={{ padding:'0 9px', minHeight:30 }}><Check size={14} strokeWidth={2.8} /></button>
+                        )}
+                        {isCoord && onDelete && (
+                          <button className="apple-btn apple-btn-ghost" title="מחיקת שורת הצהרון" aria-label={`מחיקת שורת הצהרון — ${t.name}`}
+                            onClick={() => { if (window.confirm(`למחוק את שורת ה${jobLabel(t.job)} של ${t.name}?`)) onDelete(t.id); }}
+                            style={{ padding:'0 9px', minHeight:30, color:'var(--danger)' }}><Trash2 size={13} strokeWidth={2.2} /></button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={2} style={{ fontWeight:800 }}>סה״כ צהרון</td>
+                <td style={{ textAlign:'center', fontWeight:700 }}>{totHours}</td>
+                <td></td>
+                <td style={{ textAlign:'center', fontWeight:700 }}>{nisH(totGross)}</td>
+                {!isPrincipal && <td style={{ textAlign:'center', fontWeight:800, color:'var(--purple)' }}>{nisH(totEmp)}</td>}
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function HourlyJobCard({ t, isCoord, isPrincipal, saveRow, onDelete, onApprove, onDetails, onFullEdit }) {
+  const emp = calcEmployer(t);
+  return (
+    <div className="apple-card mcard" style={{ borderInlineStart:'3px solid var(--purple)' }}>
+      <div className="mcard-head">
+        <div style={{ minWidth:0 }}>
+          <p className="mcard-name">{t.name}</p>
+          <div className="mcard-badges">
+            <span className="apple-badge badge-purple" style={{ fontSize:12.6, padding:'1px 8px' }}>{jobLabel(t.job)}</span>
+          </div>
+        </div>
+        {needsApproval(t) && <span className="apple-badge badge-orange" style={{ flexShrink:0 }}>לאישור</span>}
+      </div>
+      <div className="mcard-row">
+        <span className="mcard-label">שעות שבועיות</span>
+        <HourlyNum id={`mhh-${t.id}`} value={Number(t.frontalHours) || null} width={110} title="שעות שבועיות"
+          onCommit={v => saveRow({ ...t, frontalHours: v || 0 })} />
+      </div>
+      {isPrincipal ? (
+        <CardRow label="תעריף לשעה">{hourlyRateOf(t)} ₪</CardRow>
+      ) : (
+        <div className="mcard-row">
+          <span className="mcard-label">תעריף לשעה (₪)</span>
+          <HourlyNum id={`mhr-${t.id}`} value={t.hourlyRate ?? null} width={110} placeholder={String(MIN_WAGE_HOUR)}
+            title="תעריף לשעה — ריק = שכר מינימום" onCommit={v => saveRow({ ...t, hourlyRate: v })} />
+        </div>
+      )}
+      <CardRow label="ברוטו">{nisH(emp.gross)}</CardRow>
+      {!isPrincipal && <CardRow label="סה״כ למעסיק" strong color="var(--purple)">{nisH(emp.total)}</CardRow>}
+      <div className="mcard-actions">
+        <button className="apple-btn apple-btn-ghost" onClick={() => onFullEdit(t)}>
+          <Pencil size={14} strokeWidth={2.2} />
+          כל הפרטים
+        </button>
+        {isCoord && needsApproval(t) && onApprove && (
+          <button className="apple-btn apple-btn-green" onClick={() => onApprove(t.id)}>
+            <Check size={15} strokeWidth={2.8} />
+            אישור
+          </button>
+        )}
+        {fullyApproved(t) && hasContact(t) && (
+          <button className="apple-btn apple-btn-ghost" onClick={() => onDetails(t)}>
+            <FileText size={14} strokeWidth={2.2} />
+            נתוני העסקה
+          </button>
+        )}
+        {isCoord && onDelete && (
+          <button className="apple-btn apple-btn-ghost" aria-label={`מחיקת שורת הצהרון — ${t.name}`}
+            onClick={() => { if (window.confirm(`למחוק את שורת ה${jobLabel(t.job)} של ${t.name}?`)) onDelete(t.id); }}
+            style={{ color:'var(--danger)', flex:'0 0 auto', minWidth:48 }}>
+            <Trash2 size={14} strokeWidth={2.2} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDeleteTeacher, onApproveTeacher, onImportTeachers, activeMonth, fmtMonthFn, userId, monthDue, onReportMonth, simState, onCompute }) {
   const [search, setSearch]           = useState('');
   const [showReport, setShowReport]   = useState(false);
@@ -2417,10 +2727,18 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   const [editingId, setEditingId]   = useState(null);   // teacher id or 'new'
   const [editData,  setEditData]    = useState(null);
   const ts       = teachers.filter(t => t.schoolId === school.id);
-  const filtered = ts
-    .filter(t => t.name.includes(search) || (t.tzId || '').includes(search))
+  const searched = ts.filter(t => t.name.includes(search) || (t.tzId || '').includes(search));
+  // הגיליון הראשי הוא הוראה. צהרון ומשרות שעתיות — בחלק משלהן מתחתיו
+  // ("תחלק את גני תקוה שורה של צהרון", שרה 15.9).
+  const filtered = searched
+    .filter(t => !isHourlyRow(t))
     // שורת המנהלת ראשונה — היא ראש הצוות וגם הסעיף הגדול בתקציב
     .sort((a, b) => (isPrincipalRow(b) ? 1 : 0) - (isPrincipalRow(a) ? 1 : 0));
+  const hourlyRows = searched.filter(isHourlyRow).sort((a, b) => a.name.localeCompare(b.name, 'he'));
+  const addHourlyNew = () => onSaveTeacher({
+    ...EMPTY_TEACHER, schoolId: school.id, name: 'עובד/ת צהרון חדש/ה', reform: 'pre', grade: null,
+    job: 'tzaharon', frontalHours: 0, scopePct: 0, scope: 0, hourlyRate: null,
+  });
   const tsOfficial = ts.filter(simComplete);
   const totEmp    = tsOfficial.reduce((s, t) => s + calcEmployer(t).total, 0);
   const totGross  = tsOfficial.reduce((s, t) => s + calcEmployer(t).gross, 0);
@@ -2441,11 +2759,12 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   const hoursQuota = baseQuota !== null ? baseQuota + extraHours : (extraHours ? null : null);
   // המכסה נספרת לפי מה שהעובדת מלמדת בפועל. שלוש שעות גמול החינוך של
   // מחנכת בעולם ישן הן מעל המכסה — היא מלמדת 21 ומשולמת על 24.
-  const usedHours  = ts.reduce((s, t) => s + (Number(t.frontalHours) || 0), 0);
+  // שעות צהרון אינן במכסה
+  const usedHours  = ts.filter(t => !isHourlyRow(t)).reduce((s, t) => s + (Number(t.frontalHours) || 0), 0);
   const freeHours  = hoursQuota ? hoursQuota - usedHours : null;
   // כמה שעות מותר להקצות לרשומה מסוימת בלי לחרוג — כולל השעות שכבר רשומות לה
   const hoursCeiling = (rec) => {
-    if (!hoursQuota) return null;
+    if (!hoursQuota || isHourlyRow(rec)) return null;
     const own = Number(ts.find(x => x.id === rec?.id)?.frontalHours) || 0;
     return hoursQuota - usedHours + own;
   };
@@ -3104,6 +3423,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                           color: t.role && t.role !== 'none' ? 'var(--text)' : 'var(--text3)' }}>
                         {ROLES.map(r => <option key={r.id} value={r.id}>{ROLE_SHORT[r.id] || r.label}</option>)}
                       </select>
+                      <ExtraRoles t={t} compact onChange={v => saveRow({ ...t, extraRoles: v })} />
                     </td>
                     <td style={{ textAlign:'center', fontSize:13.8 }}>{LEVELS[t.level]?.label || '—'}</td>
                     <td style={{ textAlign:'center', fontSize:13.8 }}>
@@ -3289,6 +3609,15 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
           </div>
         </div>
 
+        {/* ── צהרון ומשרות שעתיות — חלק משלהן מתחת לגיליון ההוראה.
+            "תחלק את גני תקוה שורה של צהרון" (שרה, 15.9). שעות שבועיות ×
+            תעריף לשעה; לא במכסה ולא בסימולטור. ── */}
+        <div className="only-desktop">
+          <HourlyJobsTable rows={hourlyRows} school={school} isCoord={isCoord} isPrincipal={isPrincipal}
+            saveRow={saveRow} onAdd={addHourlyNew} onDelete={onDeleteTeacher} onApprove={onApproveTeacher}
+            onDetails={setDetails} onFullEdit={setFullEdit} hasSearch={Boolean(search)} />
+        </div>
+
         {/* ── מובייל: כרטיס לעובדת במקום גיליון 26 העמודות ("עדיין לא
             נח", שרה 4.9). המספרים שפותחים בשבילם את המסך — שעות, אחוז,
             ברוטו וסה"כ למעסיק — על הכרטיס; הברוטו והתוספת נערכים בו
@@ -3413,6 +3742,24 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
               </div>
             );
           })}
+          {/* צהרון במובייל — כרטיס לכל שורה שעתית, ואחריהם כפתור הוספה */}
+          {(hourlyRows.length > 0 || !search) && (
+            <p style={{ fontSize:14.4, fontWeight:800, color:'var(--purple)', margin:'14px 2px 6px' }}>
+              צהרון ומשרות שעתיות{hourlyRows.length ? ` · ${hourlyRows.length}` : ''}
+            </p>
+          )}
+          {hourlyRows.map(t => (
+            <HourlyJobCard key={'mh-' + t.id} t={t} isCoord={isCoord} isPrincipal={isPrincipal}
+              saveRow={saveRow} onDelete={onDeleteTeacher} onApprove={onApproveTeacher}
+              onDetails={setDetails} onFullEdit={setFullEdit} />
+          ))}
+          {!search && (
+            <button className="apple-btn apple-btn-ghost" onClick={addHourlyNew}
+              style={{ width:'100%', minHeight:44, borderStyle:'dashed', marginBottom:12 }}>
+              <Plus size={15} strokeWidth={2.5} />
+              הוספת עובד/ת צהרון
+            </button>
+          )}
           {tsOfficial.length > 0 && !isPrincipal && (
             <div className="apple-card mcard" style={{ background:'var(--fill)' }}>
               <p className="mcard-name" style={{ marginBottom:4 }}>סה״כ · {tsOfficial.length} עובדי הוראה</p>
@@ -3486,7 +3833,7 @@ function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute
   const tot = ts.reduce((a, t) => {
     const e = calcEmployer(t);
     if (simComplete(t)) { a.gross += e.gross; a.total += e.total; }
-    a.hours += Number(t.frontalHours) || 0;
+    if (!isHourlyRow(t)) a.hours += Number(t.frontalHours) || 0;   // צהרון מחוץ לשעות ההוראה
     return a;
   }, { gross: 0, total: 0, hours: 0 });
 
@@ -3522,7 +3869,8 @@ function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute
               const done = simComplete(t);
               return (
                 <tr key={t.id}>
-                  <td style={{ fontWeight:600 }}>{isPrincipalRow(t) && <Briefcase size={11} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}{t.name}</td>
+                  <td style={{ fontWeight:600 }}>{isPrincipalRow(t) && <Briefcase size={11} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}{t.name}
+                    {isHourlyRow(t) && <span className="apple-badge badge-purple" style={{ fontSize:12.6, padding:'1px 7px', marginInlineStart:6 }}>{jobLabel(t.job)}</span>}</td>
                   <td style={{ color:'var(--text2)' }}>
                     {onSaveTeacher ? (
                       <select className="apple-select" value={t.role || 'none'}
@@ -3530,7 +3878,8 @@ function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute
                         style={{ fontSize:13.8, padding:'3px 7px', maxWidth:150, minWidth:96 }}>
                         {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
                       </select>
-                    ) : (t.role && t.role !== 'none' ? (ROLES.find(x => x.id === t.role)?.label.split('(')[0].trim() || '—') : '—')}
+                    ) : (rolesText(t) || '—')}
+                    {onSaveTeacher && <ExtraRoles t={t} compact onChange={v => onSaveTeacher({ ...t, extraRoles: v })} />}
                   </td>
                   <td style={{ textAlign:'center' }}>
                     {onSaveTeacher ? (
@@ -3601,7 +3950,7 @@ function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute
                     ) : (
                       <span className={`apple-badge ${st.cls}`}>{st.label}</span>
                     )}
-                    {onCompute && (
+                    {onCompute && canCompute(t) && (
                       simState?.[t.id] === 'pending' || simState?.[t.id] === 'running' ? (
                         <span className="apple-badge badge-purple" style={{ marginInlineStart:6 }}>מחשב…</span>
                       ) : (
@@ -3778,8 +4127,13 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     return () => { alive = false; };
   }, []);
 
+  // עלות ההוראה מול תקציב משרד החינוך — הוראה בלבד. צהרון ומשרות
+  // שעתיות ממומנים בנפרד ומוצגים כשורה משלהם בכרטיס (15.9).
   const monthlyCost = (sid) => teachers
-    .filter(t => t.schoolId === sid)
+    .filter(t => t.schoolId === sid && !isHourlyRow(t))
+    .reduce((sum, t) => sum + calcEmployer(t).total, 0);
+  const hourlyCost = (sid) => teachers
+    .filter(t => t.schoolId === sid && isHourlyRow(t))
     .reduce((sum, t) => sum + calcEmployer(t).total, 0);
 
   const save = async (sid, patch) => {
@@ -3795,6 +4149,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const f = fin?.[sc.id] || {};
     const monthly = monthlyCost(sc.id);
     const annual  = monthly * 12;
+    const hourlyMonthly = hourlyCost(sc.id);   // צהרון — מחוץ להשוואה מול המשרד
     const mmCost  = annual * MM_PCT;   // 5% מסך עלות ההוראה השנתית
     const bufferCost = annual * BUFFER_PCT;   // 10% כרית ביטחון (שרה, 15.9)
     const reserve = mmCost + bufferCost;       // מה שיורד מהיתרה מעבר לשכר עצמו
@@ -3854,7 +4209,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
     const cover = f.networkCover;
     const coverPct = (cover != null && noNetwork > 0) ? Math.round(cover / noNetwork * 100) : null;
     const remains  = (cover != null && noNetwork != null) ? noNetwork - cover : null;
-    return { sc, f, monthly, annual, mmCost, bufferCost, reserve, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer,
+    return { sc, f, monthly, hourlyMonthly, annual, mmCost, bufferCost, reserve, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer,
       noNetwork, cover, coverPct, remains };
   });
   // תצוגת "תחשיב · בפועל" לשעה — אותו רכיב בטבלה ובכרטיס
@@ -3997,13 +4352,13 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           <tbody>
             {fin === null ? (
               <tr><td colSpan={showSim ? 15 : 10} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : rows.map(({ sc, f, monthly, annual, reserve, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork, cover, coverPct, remains }) => (
+            ) : rows.map(({ sc, f, monthly, hourlyMonthly, annual, reserve, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork, cover, coverPct, remains }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
                   ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
                   : <span style={{ fontSize:16.1 }}>{money(per(f.ministryBudget))}</span>}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(period === 'month' ? monthly : annual)}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(period === 'month' ? monthly : annual)}{hourlyMonthly > 0 && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }} title="צהרון ומשרות שעתיות — לא נכללים בהשוואה מול משרד החינוך">+ צהרון {money(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}
                   title="כרית ביטחון 10% ומילוי מקום 5%, שניהם על עלות השכר השנתית">{money(per(reserve))}</td>
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}>{f.teachingSim == null ? '—' : money(per(f.teachingSim))}</td>}
@@ -4074,7 +4429,7 @@ function TeachingCostView({ schools, teachers, monthKey }) {
       <div className="only-mobile">
         {fin === null ? (
           <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
-        ) : rows.map(({ sc, f, monthly, annual, reserve, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork, cover, coverPct, remains }) => (
+        ) : rows.map(({ sc, f, monthly, hourlyMonthly, annual, reserve, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork, cover, coverPct, remains }) => (
           <div key={'m-' + sc.id} className="apple-card mcard">
             <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
             <CardRow label="הכנסות משרד החינוך + מענק">
@@ -4083,6 +4438,11 @@ function TeachingCostView({ schools, teachers, monthKey }) {
                 : money(per(f.ministryBudget))}
             </CardRow>
             <CardRow label="עלות שכר">{money(period === 'month' ? monthly : annual)}</CardRow>
+            {hourlyMonthly > 0 && (
+              <CardRow label="צהרון ומשרות שעתיות (מחוץ להשוואה)" color="var(--text3)">
+                {money(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}
+              </CardRow>
+            )}
             <CardRow label='תוספת 10% + מ"מ 5%' color="var(--text2)">{money(per(reserve))}</CardRow>
             {showSim && (
               <CardRow label="עלות הוראה מהתקציב" color="var(--text2)">
@@ -6682,8 +7042,15 @@ function LinkTeacherFields({ draft, apply }) {
         <LinkSelect label="קבוצת גיל" value={draft.ageGroup || 'none'} onChange={v => apply({ ageGroup: v })}
           options={Object.entries(AGE_RED).map(([k, v]) => [k, v.label])} />
         <LinkSelect label="גמול תפקיד" value={draft.gamulRole || draft.role || 'none'}
-          onChange={v => apply({ role: v, ...principalDefaults({ ...draft, role: v }) })}
+          onChange={v => apply({ role: v, extraRoles: (draft.extraRoles || []).filter(x => x !== v),
+                                  ...principalDefaults({ ...draft, role: v }) })}
           options={ROLES.map(r => [r.id, r.label.split('(')[0].trim()])} />
+        {!isPrincipalRow(draft) && (
+          <div style={{ flex:'1 1 100%' }}>
+            <p style={{ fontSize:13.8, fontWeight:600, color:'var(--text2)', marginBottom:4 }}>תפקידים נוספים</p>
+            <ExtraRoles t={draft} onChange={v => apply({ extraRoles: v })} />
+          </div>
+        )}
         {/* תוספת אם היא רכיב של העולם הישן, אבל המספר עצמו נאסף תמיד:
             מסלול משתנה, וילד שלא נרשם אינו מתגלה אחר כך. */}
         <LinkField label="ילדים עד 18" value={draft.childrenUnder18}
@@ -8876,6 +9243,7 @@ export default function App() {
           השעות אינן קלט (100% תמיד) והחישוב הוא התלוש בעולם ישן.
         */
         if (user?.role === 'coordinator' && t.id && (next.leaveType ?? 'none') === 'none'
+            && canCompute(next)
             && (isPrincipalRow(next) || Number(next.frontalHours) > 0)) {
           store.requestSim(t.id)
             .then(() => setSimState(m => ({ ...m, [t.id]: 'pending' })))

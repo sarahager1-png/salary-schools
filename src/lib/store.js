@@ -14,6 +14,9 @@ import { supabase } from './supabase.js';
 // [שם בטבלה, שם באפליקציה]
 const TEACHER_FIELDS = [
   ['school_id',            'schoolId'],
+  ['job',                  'job'],
+  ['extra_roles',          'extraRoles'],
+  ['hourly_rate',          'hourlyRate'],
   ['name',                 'name'],
   ['tz_id',                'tzId'],
   ['email',                'email'],
@@ -76,6 +79,7 @@ const TEACHER_FIELDS = [
 const rowToTeacher = (r) => {
   const t = { id: r.id, monthKey: r.month_key, scope: r.scope_pct, _files: [], sickFiles: [] };
   for (const [col, key] of TEACHER_FIELDS) t[key] = r[col];
+  if (!Array.isArray(t.extraRoles)) t.extraRoles = [];
   return t;
 };
 

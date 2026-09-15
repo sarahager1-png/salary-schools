@@ -26,6 +26,7 @@ const toTeacher = (r) => ({
   gender: r.gender, childrenUnder18: r.children_under_18,
   travelDays: r.travel_days, daycareChildren: r.daycare_children,
   leaveType: r.leave_type, mmFor: r.mm_for,
+  job: r.job || 'teaching', hourlyRate: r.hourly_rate,
   _officialGross: r.official_gross, _agreedGross: r.agreed_gross,
   _chabadSupp: r.chabad_supp, _actualEmployerCost: r.actual_employer_cost,
 });
@@ -94,11 +95,12 @@ export default async function handler(req, res) {
 
     const out = shalhavot.map(s => {
       // עלות שכר שנתית — אותו סכום כמו monthlyCost * 12 בכרטיסים (כולל מנהלת)
-      let monthly = 0;
+      // הוראה בלבד: צהרון ומשרות שעתיות ממומנים בנפרד ואינם מול תקציב המשרד (15.9)
+      let monthly = 0, hourlyMonthly = 0;
       for (const r of (rows || []).filter(r => r.school_id === s.id)) {
         const t = toTeacher(r);
         const c = emp.calcEmployer(t);
-        monthly += c.total;
+        if (emp.isHourlyRow(t)) hourlyMonthly += c.total; else monthly += c.total;
       }
       const annual = monthly * 12;
 

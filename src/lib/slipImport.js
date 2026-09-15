@@ -175,7 +175,10 @@ export function parseRows(matrix, schoolNames = []) {
   כל התאמה נושאת את מה שיכתב: gross (ברוטו) ו-actual (עלות מעל הברוטו).
 */
 export function matchRows(rows, teachers, { schoolId = null } = {}) {
-  const pool = teachers.filter(t => !schoolId || t.schoolId === schoolId);
+  // עובדת עם כמה תפקידים = כמה שורות; התלוש אחד. שורת ההוראה קודמת,
+  // כדי שהברוטו מהתלוש יתיישב עליה ולא על שורת הצהרון.
+  const pool = teachers.filter(t => !schoolId || t.schoolId === schoolId)
+    .sort((a, b) => (a.job && a.job !== 'teaching' ? 1 : 0) - (b.job && b.job !== 'teaching' ? 1 : 0));
   const used = new Set();
   const matched = [], unmatchedRows = [];
   for (const r of rows) {

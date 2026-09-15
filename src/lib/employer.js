@@ -85,6 +85,50 @@ const PRINCIPAL_OFEK_GROSS = 19087;
 // תוספת בית חב"ד של מנהלת — סכום קבוע, מתוך השכר (שרה, 2.9.2026)
 const PRINCIPAL_CHABAD_SUPP = 4700;
 const isPrincipalRow = t => t?.role === PRINCIPAL_ROLE;
+
+/*
+  סוג המשרה (שרה, 15.9.2026): "תחלק את גני תקוה שורה של צהרון" ו"תוסיף
+  גם אפשרות מספר תפקידים למורה".
+
+  עובדת עם כמה תפקידים = כמה שורות באותו חודש, אחת לכל תפקיד. שורת
+  הוראה נשארת כפי שהייתה: מחשבון המשרד, מכסת השעות, גמולים. שורה
+  שעתית (צהרון וכדומה) היא עולם אחר: שעות שבועיות × תעריף לשעה, לא
+  במכסה, לא בסימולטור, בלי תוספת בית חב"ד ובלי קרן השתלמות.
+*/
+const JOBS = [
+  { id: 'teaching', label: 'הוראה',         short: 'הוראה' },
+  { id: 'tzaharon', label: 'צהרון',         short: 'צהרון' },
+  { id: 'other',    label: 'משרה שעתית אחרת', short: 'שעתי' },
+];
+const jobLabel   = id => (JOBS.find(j => j.id === id) || JOBS[0]).label;
+const isHourlyRow = t => Boolean(t?.job && t.job !== 'teaching');
+// שכר מינימום לשעה (מאפריל 2025: 6,247.67 ₪ לחודש / 182 שעות). ברירת
+// המחדל כשלא נקבע תעריף לשורה; חשבת השכר מתקנת בשורה עצמה.
+const MIN_WAGE_HOUR = 34.32;
+// שעות שבועיות → חודשיות. משרה מלאה = 42 שעות שבועיות = 182 חודשיות.
+const HOURLY_WEEKS  = 182 / 42;
+const HOURLY_FULL_WEEK = 42;
+const hourlyRateOf = t => {
+  const r = Number(t?.hourlyRate);
+  return r > 0 ? r : MIN_WAGE_HOUR;
+};
+// אומדן הברוטו החודשי למשרה שעתית — עד שחשבת השכר מזינה ברוטו מהתלוש
+const hourlyGross = t => Math.round((Number(t?.frontalHours) || 0) * HOURLY_WEEKS * hourlyRateOf(t));
+// אחוז משרה של שורה שעתית — נגזר מהשעות, לתצוגה ולהבראה
+const hourlyScope = t => Math.min(200, Math.round((Number(t?.frontalHours) || 0) / HOURLY_FULL_WEEK * 100));
+/*
+  כמה תפקידים בשורת הוראה אחת (שרה, 15.9): "תפקיד נוסף ברגיל — לא
+  בצהרון". gamul_role נשאר הראשי; extraRoles מחזיק את הנוספים. מנהלת
+  ו"ללא" אינם תפקיד נוסף.
+*/
+const EXTRA_ROLE_IDS = ['homeroom', 'homeroom1', 'inclusion', 'subject6', 'subject8', 'team', 'counselor', 'counselor2'];
+const allRolesOf = t => {
+  const main = t?.role || t?.gamulRole;
+  const extra = Array.isArray(t?.extraRoles) ? t.extraRoles : [];
+  return [...new Set([...(main && main !== 'none' ? [main] : []), ...extra.filter(r => r && r !== 'none')])];
+};
+const rolesText = t => allRolesOf(t)
+  .map(id => ROLES.find(r => r.id === id)?.label.split('(')[0].trim() || id).join(' · ');
 // דרגת הניהול היא א..ד ואינה סולם המורים. נשמרת כמספר 1..4.
 const NIHUL_GRADES = [{ v:1, l:'א' }, { v:2, l:'ב' }, { v:3, l:'ג' }, { v:4, l:'ד' }];
 // שם קצר לבורר שבתוך הטבלה — השם המלא נחתך שם ואי אפשר להבחין
@@ -159,6 +203,7 @@ function currentScope(t) {
   חיה ב-computedBaseScope ומוצעת ככפתור; היא אינה רצה מעצמה.
 */
 function effectiveScope(t) {
+  if (isHourlyRow(t)) return hourlyScope(t);
   if (t.reform === 'ofek') return currentScope(t).scopePct || 100;
   return (t.scope ?? t.scopePct ?? 100);
 }
@@ -406,7 +451,8 @@ function havraahDays(sen) {
 function calcExtras(t) {
   // ביגוד והבראה משולמים יחסית לאחוז משרה
   const factor  = effectiveScope(t) / 100;
-  const biguud  = Math.round(BIGUUD_ANNUAL * factor / 12);
+  // ביגוד הוא של עובדי הוראה; עובדת צהרון מקבלת הבראה בלבד
+  const biguud  = isHourlyRow(t) ? 0 : Math.round(BIGUUD_ANNUAL * factor / 12);
   const havraah = Math.round(havraahDays(t.seniority) * HAVRAAH_DAY * factor / 12);
   return { biguud, havraah, total: biguud + havraah };
 }
@@ -467,11 +513,14 @@ function employerParts(t, base, supplement) {
   const wage = base + biguud + havraah + travel + daycare;
   const parts = [
     { key:'pension',  label:'פנסיה ופיצויים',   rate:PENSION_RATE, on:base, amount: Math.round(base * PENSION_RATE) },
-    { key:'keren',    label:'קרן השתלמות',      rate:KEREN_RATE,   on:base, amount: Math.round(base * KEREN_RATE) },
+    // קרן השתלמות עובדי הוראה — לא למשרה שעתית (צהרון)
+    ...(isHourlyRow(t) ? [] : [
+    { key:'keren',    label:'קרן השתלמות',      rate:KEREN_RATE,   on:base, amount: Math.round(base * KEREN_RATE) }]),
     { key:'masSachar',label:'מס שכר (מלכ"ר)',   rate:MAS_SACHAR,   on:wage, amount: Math.round(wage * MAS_SACHAR) },
     { key:'bl',       label:'ביטוח לאומי',      rate:null,         on:wage, amount: Math.round(bituachLeumi(wage)) },
     { key:'havraah',  label:'הבראה',            rate:null,         on:null, amount: havraah },
-    { key:'biguud',   label:'ביגוד',            rate:null,         on:null, amount: biguud },
+    ...(isHourlyRow(t) ? [] : [
+    { key:'biguud',   label:'ביגוד',            rate:null,         on:null, amount: biguud }]),
   ];
   if (travel > 0) parts.push({ key:'travel', label:`נסיעות (${t.travelDays} ימים × ₪${TRAVEL_DAY})`, rate:null, on:null, amount: travel });
   if (daycare > 0) parts.push({ key:'daycare', label:`מעונות (${t.daycareChildren} ילדים עד גיל 5)`, rate:null, on:null, amount: daycare });
@@ -542,6 +591,15 @@ function payBreakdown(t) {
     return { base: gross - psupp, mom: 0, supplement: psupp, gross, agreed: !!agreed };
   }
 
+  /*
+    משרה שעתית (צהרון): הברוטו שהוזן מהתלוש גובר; עד אז אומדן —
+    שעות שבועיות × תעריף לשעה × שבועות בחודש. בלי תוספת בית חב"ד.
+  */
+  if (isHourlyRow(t)) {
+    const gross = agreed || gross0 || hourlyGross(t);
+    return { base: gross, mom: 0, supplement: 0, gross, agreed: !!agreed, hourlyEstimate: !agreed && !gross0 };
+  }
+
   const gross = agreed || gross0;
   // בית ספר שאינו משלם תוספת (מזכרת בתיה) — כל הברוטו הוא בסיס רגיל
   const supplement = schoolPaysSupp(t.schoolId) ? Math.min(supp0, gross) : 0;
@@ -602,7 +660,8 @@ function calcEmployer(t) {
     הברוטו מתוקן בייבוא של החשבת, לא במקדם.
   */
   const FLOOR_RATE = 0.40;
-  const floorGap = Math.max(0, Math.round(gross * FLOOR_RATE) - itemized);
+  // הרצפה היא כרית על שכר הוראה. משרה שעתית: הפירוט בלבד, בלי כרית.
+  const floorGap = isHourlyRow(t) ? 0 : Math.max(0, Math.round(gross * FLOOR_RATE) - itemized);
   if (floorGap > 0) {
     parts.push({
       key: 'floor',
@@ -665,6 +724,18 @@ export {
   PRINCIPAL_OFEK_GROSS,
   PRINCIPAL_CHABAD_SUPP,
   isPrincipalRow,
+  JOBS,
+  jobLabel,
+  isHourlyRow,
+  MIN_WAGE_HOUR,
+  HOURLY_WEEKS,
+  HOURLY_FULL_WEEK,
+  hourlyRateOf,
+  hourlyGross,
+  hourlyScope,
+  EXTRA_ROLE_IDS,
+  allRolesOf,
+  rolesText,
   NIHUL_GRADES,
   ROLE_SHORT,
   principalDefaults,
