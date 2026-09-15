@@ -158,7 +158,12 @@ export function mapHubSchools(data) {
           const rate = Number(s.raw?.constants?.actual_hourly_rate) || 0;
           if (!perClass || !s.classCount) return null;
           const extra = (s.raw?.classes || []).reduce((a, c) => a + (Number(c.extra_hours) || 0), 0);
-          const cut = rate ? hoursYieul / (rate * 12) : 0;
+          // "החיסכון לכיתה בין 4 ל-5 שעות" (שרה, 15.9): שעה פרטנית כפרונטלית
+          // נלמדת מתוך המשרה הקיימת — חוסכת כסף, לא שעת הוראה. לכן אינה יורדת מהתקן.
+          const frontalCut = (s.efficiency?.saved === true ? (s.efficiency?.rows || []) : [])
+            .filter(r => HOURS_YIEUL.test(r.label || '') && !/^שעות פרטניות/.test(r.label || ''))
+            .reduce((a, r) => a + (Number(r.saving) || 0), 0);
+          const cut = rate ? frontalCut / (rate * 12) : 0;
           return Math.round(s.classCount * perClass + extra - cut);
         })(),
       };
