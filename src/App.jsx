@@ -19,7 +19,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 32;
+const BUILD = 33;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4023,7 +4023,7 @@ function CardRow({ label, strong, color, children }) {
   );
 }
 
-function TeachingCostView({ schools, teachers, monthKey }) {
+function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
   const [fin, setFin]     = useState(null);   // null: עוד נטען
   const [err, setErr]     = useState('');
   const [flash, setFlash] = useState(0);
@@ -4106,6 +4106,11 @@ function TeachingCostView({ schools, teachers, monthKey }) {
           patch.detail = wantDetail;
         }
         if (Object.keys(patch).length) { await save(sc.id, { ...patch, src }); filled++; }
+        // תקן השעות מהתקציב — "לא רואה שהתעדכנו השעות" (שרה, 15.9)
+        if (h.budgetHours > 0 && h.budgetHours !== Number(sc.hoursQuota) && onSaveSchool) {
+          await onSaveSchool({ ...sc, hoursQuota: h.budgetHours });
+          filled++;
+        }
       }
       // "נשמר" רק כשבאמת נשמר משהו — כשל שקט שמוצג כהצלחה גרוע מכשל
       setErr(misses.length
@@ -9538,7 +9543,7 @@ export default function App() {
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} onApprove={onApproveTeacher} simState={simState} onCompute={onCompute} onDelete={onDeleteTeacher} />
         ) : view === 'finance' && (user.role === 'coordinator' || user.role === 'clerk') ? (
-          <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} />
+          <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} onSaveSchool={onSaveSchool} />
         ) : view === 'calibration' && (user.role === 'coordinator' || user.role === 'clerk') ? (
           <CalibrationView schools={schools} teachers={teachers} monthKey={activeMonth} />
         ) : view === 'mm' && (user.role === 'coordinator' || user.role === 'clerk') ? (

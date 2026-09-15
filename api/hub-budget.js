@@ -147,6 +147,20 @@ export function mapHubSchools(data) {
         weeklyHours: Number(s.raw?.constants?.actual_weekly_hours) || null,
         // מספר הכיתות — למסך "תלושים מול תחשיב": ש"ש לכיתה = שעות בפועל ÷ כיתות (שרה, 15.9)
         classCount: Number(s.classCount) || 0,
+        /*
+          תקן השעות השבועיות לפי התקציב (שרה, 15.9: "לא רואה שהתעדכנו
+          השעות"): כיתות × שעות בפועל לכיתה, ועוד שעות נוספות לכיתה, פחות
+          ייעול השעות שנבחר. זה בדיוק מה שעלות ההוראה בתקציב מתמחרת:
+          שעות × תעריף × 12 = expenses.teaching, והייעול בשעות = שעות × תעריף × 12.
+        */
+        budgetHours: (() => {
+          const perClass = Number(s.raw?.constants?.actual_weekly_hours) || 0;
+          const rate = Number(s.raw?.constants?.actual_hourly_rate) || 0;
+          if (!perClass || !s.classCount) return null;
+          const extra = (s.raw?.classes || []).reduce((a, c) => a + (Number(c.extra_hours) || 0), 0);
+          const cut = rate ? hoursYieul / (rate * 12) : 0;
+          return Math.round(s.classCount * perClass + extra - cut);
+        })(),
       };
     });
     /*
@@ -162,6 +176,7 @@ export function mapHubSchools(data) {
       cur.ministry += s.ministry;
       cur.incomeTotal += s.incomeTotal;
       cur.classCount = (cur.classCount || 0) + (s.classCount || 0);
+      cur.budgetHours = (cur.budgetHours == null && s.budgetHours == null) ? null : (cur.budgetHours || 0) + (s.budgetHours || 0);
       cur.teachingSim = (cur.teachingSim == null && s.teachingSim == null) ? null : (cur.teachingSim || 0) + (s.teachingSim || 0);
       cur.expensesOther = (cur.expensesOther || 0) + (s.expensesOther || 0);
       cur.incomeOther = (cur.incomeOther || 0) + (s.incomeOther || 0);
