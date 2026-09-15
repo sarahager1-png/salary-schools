@@ -8208,6 +8208,9 @@ function OnboardingView({ code }) {
   const [sig, setSig] = useState(null);
   const [contractSig, setContractSig] = useState(null);
   const [bank, setBank] = useState({});
+  // "עשתה טעות ולא יכולה לתקן" (שרה, 15.9): פרטי בנק שנשמרו ניתנים לעריכה
+  const [editBank, setEditBank] = useState(false);
+  const [bankChanged, setBankChanged] = useState(false);
   const [contractUrl, setContractUrl] = useState(null);
   const [msg, setMsg] = useState('');
 
@@ -8292,6 +8295,9 @@ function OnboardingView({ code }) {
     }
     setMsg('');
     await store.obSave(code, { bank: { ...bank, owner: (bank.owner || me.name) } });
+    // פרטים ששונו אחרי שכבר צורף אישור — האישור הישן כבר לא מתאים להם
+    if (editBank && me.has_bank_doc) setBankChanged(true);
+    setEditBank(false);
     await load();
   };
 
@@ -8544,7 +8550,7 @@ function OnboardingView({ code }) {
         {/* ── שלב 5: פרטי בנק ── */}
         <div className="apple-card" style={{ padding:18 }}>
           <p style={{ fontWeight:800, fontSize:18.4, marginBottom:2 }}>5 · פרטי חשבון בנק</p>
-          {me.bank_saved ? (
+          {me.bank_saved && !editBank ? (
             <>
               <p style={{ color:'var(--ok)', fontWeight:700, fontSize:15.5, marginTop:6 }}>
                 ✓ נשמרו · {me.bank?.bank} סניף {me.bank?.branch} · חשבון {me.bank?.account}
@@ -8554,6 +8560,16 @@ function OnboardingView({ code }) {
                   נותר לצרף אישור ניהול חשבון או צ׳ק מבוטל.
                 </p>
               )}
+              {bankChanged && me.has_bank_doc && (
+                <p style={{ fontSize:13.8, color:'var(--warn)', marginTop:6 }}>
+                  הפרטים עודכנו — {male101 ? 'העלה' : 'העלי'} אישור ניהול חשבון או צ׳ק מבוטל חדש שמתאים להם (בשלב 6).
+                </p>
+              )}
+              <button className="apple-btn apple-btn-ghost"
+                onClick={() => { setBank({ ...(me.bank || {}) }); setMsg(''); setEditBank(true); }}
+                style={{ marginTop:10, minHeight:40, padding:'0 16px', fontSize:15 }}>
+                עריכת פרטי החשבון
+              </button>
             </>
           ) : (<>
             <p style={{ fontSize:14.4, color:'var(--text3)', marginBottom:12 }}>
@@ -8573,10 +8589,18 @@ function OnboardingView({ code }) {
                 <input value={bank.owner || ''} onChange={e => setBank(b => ({ ...b, owner: e.target.value }))}
                   placeholder={me.name} className="apple-input" style={{ width:'100%' }} /></div>
             </div>
-            <button className="apple-btn apple-btn-blue" onClick={saveBank}
-              style={{ marginTop:12, minHeight:42, padding:'0 20px', fontSize:15.5 }}>
-              שמירת פרטי החשבון
-            </button>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:12 }}>
+              <button className="apple-btn apple-btn-blue" onClick={saveBank}
+                style={{ minHeight:42, padding:'0 20px', fontSize:15.5 }}>
+                שמירת פרטי החשבון
+              </button>
+              {editBank && (
+                <button className="apple-btn apple-btn-ghost" onClick={() => { setEditBank(false); setMsg(''); }}
+                  style={{ minHeight:42, padding:'0 16px', fontSize:15.5 }}>
+                  ביטול
+                </button>
+              )}
+            </div>
           </>)}
         </div>
         <ObUpload label="6 · אישור ניהול חשבון או צ׳ק מבוטל" hint="הראיה לפרטי החשבון — בלעדיה לא מעבירים"
