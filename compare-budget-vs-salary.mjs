@@ -35,6 +35,7 @@ const toTeacher = (r) => ({
   scope: r.scope_pct, scopePct: r.scope_pct, role: r.gamul_role, ageGroup: r.age_group,
   gender: r.gender, childrenUnder18: r.children_under_18, travelDays: r.travel_days,
   daycareChildren: r.daycare_children, leaveType: r.leave_type, mmFor: r.mm_for,
+  job: r.job || 'teaching', hourlyRate: r.hourly_rate,
   _officialGross: r.official_gross, _agreedGross: r.agreed_gross,
   _chabadSupp: r.chabad_supp, _actualEmployerCost: r.actual_employer_cost,
 });
@@ -70,7 +71,8 @@ const out = [];
 const notes = [];
 
 for (const s of schools) {
-  const ts = rows.filter(t => t.school_id === s.id).map(toTeacher);
+  // צהרון ומשרות שעתיות — מחוץ להשוואה מול התקציב (15.9)
+  const ts = rows.filter(t => t.school_id === s.id).map(toTeacher).filter(t => !emp.isHourlyRow(t));
   let teaching = 0, principal = 0;
   for (const t of ts) {
     const c = emp.calcEmployer(t).total;
