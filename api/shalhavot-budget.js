@@ -134,16 +134,16 @@ export default async function handler(req, res) {
       if (networkSupport) teachIncomeLines.push({ name: 'השתתפות הרשת', amount: networkSupport });
       // עיגול הרכיבים כך שסכומם שווה בדיוק לשכר השנתי המעוגל
       const payLines = [
-        { name: `שכר ברוטו — ${staff} עובדי הוראה כולל מנהלת`, amount: Math.round(pay.base * 12) },
+        { name: `שכר ברוטו · ${staff} עובדי הוראה ומנהלת`, amount: Math.round(pay.base * 12) },
         { name: 'תוספת בית חב"ד', amount: Math.round(pay.supp * 12) },
-        { name: 'עלויות מעביד — הפרשות סוציאליות, ביטוח לאומי, מס שכר ותוספות', amount: Math.round(pay.social * 12) },
+        { name: 'עלויות מעביד והפרשות סוציאליות', amount: Math.round(pay.social * 12) },
         { name: 'מילוי מקום בתשלום', amount: Math.round(pay.mm * 12) },
       ];
       payLines[0].amount += Math.round(annual) - payLines.reduce((a, x) => a + x.amount, 0);
       const teachExpenseLines = [
         ...payLines.filter(x => x.amount !== 0),
-        { name: 'תוספת ביטחון — 10% מעלות ההוראה', amount: Math.round(bufferCost) },
-        { name: 'מילוי מקום — 5% מעלות ההוראה', amount: Math.round(mmCost) },
+        { name: 'כרית ביטחון 10%', amount: Math.round(bufferCost) },
+        { name: 'מילוי מקום 5%', amount: Math.round(mmCost) },
       ].filter(x => x.amount !== 0);
       // השורה האחרונה סופגת שקל עיגול — סכום השורות שווה תמיד לסה"כ המוצג
       if (teachExpenseLines.length) {
