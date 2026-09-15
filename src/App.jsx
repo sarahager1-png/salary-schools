@@ -19,7 +19,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 35;
+const BUILD = 36;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -201,9 +201,16 @@ const isInclusionRow = t => (t?.gamulRole || t?.role) === 'inclusion';
 // ייעוץ מתומחר בתקציב בנפרד מהשעות לכיתה — מחוץ לתקן (שרה, 15.9, ירושלים)
 const isCounselorRow = t => /^counselor/.test(t?.gamulRole || t?.role || '');
 // שעות צהרון ומשרה שעתית אינן שעות משרד החינוך — מחוץ למכסה (15.9)
+// שעות מחוץ לתקן בשורה: ערך שהוזן גובר; ריק = יועצת כולן, אחרת 0 (שרה, 15.9)
+const nonQuotaOf = t => {
+  const v = t?.nonQuotaHours;
+  if (v !== null && v !== undefined && v !== '') return Number(v) || 0;
+  return isCounselorRow(t) ? (Number(t.frontalHours) || 0) : 0;
+};
+const quotaHoursOf = t => Math.max(0, (Number(t.frontalHours) || 0) - nonQuotaOf(t));
 const schoolHours = ts => ts
-  .filter(t => !isPrincipalRow(t) && !isInclusionRow(t) && !isCounselorRow(t) && !isHourlyRow(t) && !unpaidThisMonth(t))
-  .reduce((a, t) => a + (Number(t.frontalHours) || 0), 0);
+  .filter(t => !isPrincipalRow(t) && !isInclusionRow(t) && !isHourlyRow(t) && !unpaidThisMonth(t))
+  .reduce((a, t) => a + quotaHoursOf(t), 0);
 // null = אין תקן; חיובי = מעל התקן; שלילי/אפס = בתוך התקן
 const hoursOver = (ts, quota) => {
   const q = Number(quota) || 0;
@@ -1757,6 +1764,18 @@ function TeacherModal({ teacher, schools, onSave, onClose, userRole }) {
                 <ExtraRoles t={t} onChange={v => set('extraRoles', v)} />
               </div>
             )}
+            {!isPrincipalRow(t) && !isHourlyRow(t) && (
+              <div style={{ marginTop:8 }}>
+                <p className="apple-label">שעות מחוץ לתקן (ייעוץ / שילוב)</p>
+                <input type="number" min="0" dir="ltr" className="apple-input" style={{ maxWidth:140 }}
+                  value={t.nonQuotaHours ?? ''}
+                  placeholder={isCounselorRow(t) ? `כולן (${Number(t.frontalHours) || 0})` : '0'}
+                  onChange={e => set('nonQuotaHours', e.target.value === '' ? null : Number(e.target.value))} />
+                <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:3 }}>
+                  השעות האלה לא נספרות בתקן השעות של בית הספר. השאר נספרות.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* דרגת ניהול — ברירת המחדל א, ניתנת לשינוי ידני */}
@@ -2762,7 +2781,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
   // המכסה נספרת לפי מה שהעובדת מלמדת בפועל. שלוש שעות גמול החינוך של
   // מחנכת בעולם ישן הן מעל המכסה — היא מלמדת 21 ומשולמת על 24.
   // שעות צהרון אינן במכסה
-  const usedHours  = ts.filter(t => !isHourlyRow(t)).reduce((s, t) => s + (Number(t.frontalHours) || 0), 0);
+  const usedHours  = schoolHours(ts);   // אותו כלל כמו התקן בשרת: בלי צהרון, שילוב, ייעוץ ומנהלת
   const freeHours  = hoursQuota ? hoursQuota - usedHours : null;
   // כמה שעות מותר להקצות לרשומה מסוימת בלי לחרוג — כולל השעות שכבר רשומות לה
   const hoursCeiling = (rec) => {

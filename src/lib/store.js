@@ -16,6 +16,7 @@ const TEACHER_FIELDS = [
   ['school_id',            'schoolId'],
   ['job',                  'job'],
   ['extra_roles',          'extraRoles'],
+  ['non_quota_hours',      'nonQuotaHours'],
   ['hourly_rate',          'hourlyRate'],
   ['name',                 'name'],
   ['tz_id',                'tzId'],
