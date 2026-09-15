@@ -89,6 +89,22 @@ export function mapHubSchools(data) {
           networkSupport: s.networkSupport ?? null,
         };
       }
+      /*
+        "שכר המנהלת נספר פעמיים" (שרה, 15.9): במערכת התקציב שכר המנהלת
+        רשום כהוצאה בקטגוריית שכר, ובעלות ההוראה (כאן ובשכר בפועל) הוא
+        נכלל שוב. לכן הוא יורד מהקטגוריה שלו ומההוצאות האחרות — נספר רק
+        בעלות ההוראה.
+      */
+      const catName = new Map((s.raw?.categories || []).map(c => [c.id, c.name]));
+      const principalByCat = new Map();
+      for (const e of (s.raw?.expenses || []).filter(e => /^שכר מנהלת/.test(String(e.name || '').trim()))) {
+        const annual = Number(e.amount || 0) * (e.period === 'monthly' ? 12 : 1);
+        const cat = catName.get(e.category_id);
+        principalByCat.set(cat, (principalByCat.get(cat) || 0) + annual);
+      }
+      const principalInOther = [...principalByCat.values()].reduce((a, v) => a + v, 0);
+      const byCategory = Object.entries(s.expenses?.byCategory || {})
+        .map(([name, amount]) => ({ name, amount: Number(amount || 0) - (principalByCat.get(name) || 0) }));
       return {
         name: s.name,
         ministry,
@@ -125,12 +141,12 @@ export function mapHubSchools(data) {
           expenses: [
             { name: 'הוצאות פר תלמיד', amount: s.expenses?.studentExp || 0 },
             { name: 'התמקצעות', amount: s.expenses?.profDev || 0 },
-            ...Object.entries(s.expenses?.byCategory || {}).map(([name, amount]) => ({ name, amount: Number(amount || 0) })),
+            ...byCategory,
             // חוגים — הוצאה שוטפת, אחרי הסעיפים השוטפים ("משולמים בנפרד", שרה 10.9)
             { name: 'חוגים (הוצאה שוטפת)', amount: s.expenses?.clubsExpense || 0 },
           ].filter(x => x.amount > 0),
         },
-        expensesOther: Math.max(0, (s.expenses?.total || 0) - (s.expenses?.teaching || 0) - (s.expenses?.counselingCost || 0)),
+        expensesOther: Math.max(0, (s.expenses?.total || 0) - (s.expenses?.teaching || 0) - (s.expenses?.counselingCost || 0) - principalInOther),
         // הסימולציה של שרה במערכת התקציב: עלות ההוראה המתוכננת, שנתית.
         // "עלות הוראה חייב לכלול מנהלת" (שרה, 3.9) — שכר המנהלת מהתקציב
         // מצורף, כך שההשוואה מול הבפועל (שגם הוא כולל מנהלת) היא אחד-לאחד.
