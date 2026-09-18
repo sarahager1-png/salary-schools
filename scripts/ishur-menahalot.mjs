@@ -270,7 +270,6 @@ ${(gaps || noGender) ? `<div class="fixes">
   <div class="lines"><div>שם המנהלת</div><div>חתימה</div><div>תאריך</div></div>
 </div>
 
-<footer>בנוי ופיתוח: שרה הגר · 0503339770 · יעוץ ארגוני | פתרונות דיגיטליים · מהבנת הארגון לפתרון שעובד.</footer>
 </body></html>`;
 
   const safe = school.replace(/["'/\\?*:|<>]/g, '').replace(/\s+/g, '-');
