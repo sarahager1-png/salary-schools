@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
+import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import {
   Briefcase, Calculator, School, Check, ArrowLeft, ArrowRight,
@@ -19,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 37;
+const BUILD = 38;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -8733,6 +8734,28 @@ function ReleaseDoc({ v, sigUrl, signedAt, lawyer }) {
   );
 }
 
+// ספרת ביקורת של ת"ז — המסמך נחתם פעם אחת, וטעות הקלדה אינה ניתנת לתיקון אחר כך
+const tzValid = raw => {
+  const t = String(raw).replace(/\D/g, '').padStart(9, '0');
+  if (t.length !== 9 || /^0+$/.test(t)) return false;
+  return [...t].reduce((sum, ch, i) => { const x = Number(ch) * ((i % 2) + 1); return sum + (x > 9 ? x - 9 : x); }, 0) % 10 === 0;
+};
+
+// מסך ביניים (טעינה / שגיאה) — גם הוא נושא ב"ה, ומבדיל בין קישור לא תקף לתקלת רשת
+const RlNote = ({ children, onRetry }) => (
+  <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, padding:24, textAlign:'center', position:'relative' }} dir="rtl">
+    <p style={{ position:'absolute', top:12, right:16, fontSize:12.6, color:'var(--text3)' }}>ב"ה</p>
+    <p style={{ fontWeight:700, lineHeight:1.6 }}>{children}</p>
+    {onRetry && <button className="apple-btn apple-btn-blue" onClick={onRetry} style={{ minHeight:46, padding:'0 22px' }}>ניסיון נוסף</button>}
+  </div>
+);
+
+// העתקה עם גיבוי: בדפדפן הפנימי של וואטסאפ ובדפדפנים ישנים clipboard אינו זמין
+const rlCopy = async text => {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch { window.prompt('העתיקו את הקישור:', text); return false; }
+};
+
 // הערכים שמוצגים במסמך: מה שהצוות קבע גובר, ומה שחסר — מה שהעובד מילא
 const rlValues = (me, form) => {
   const d = me.doc || {};
@@ -8740,8 +8763,9 @@ const rlValues = (me, form) => {
     name: me.name, tz: form.tz ?? me.tz_id ?? '',
     employerName: d.employer_name || form.employerName || '',
     employerNum: d.employer_num || form.employerNum || '',
-    from: form.from ?? d.from_date ?? '', to: form.to ?? d.to_date ?? '',
-    role: form.role ?? d.role ?? '',
+    // ערך שהצוות קבע נעול — השרת (rl_sign) אוכף את אותו כלל, כך שהמסך והמסמך החתום זהים
+    from: d.from_date || form.from || '', to: d.to_date || form.to || '',
+    role: d.role || form.role || '',
     workplace: d.workplace || me.school_name, place: d.place || '',
   };
 };
@@ -8755,18 +8779,21 @@ function ReleaseView({ code }) {
   const [sig, setSig] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [askNa, setAskNa] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const d = await store.rlWhoami(code);
       if (!d) { setState('bad'); return; }
       setMe(d); setState('ok');
-    } catch { setState('bad'); }
+      // תקלת רשת רגעית אינה "קישור לא תקף" — ומי שכבר בתוך העמוד נשאר בו
+    } catch { setState(prev => (prev === 'ok' ? 'ok' : 'error')); }
   }, [code]);
   useEffect(() => { Promise.resolve().then(load); }, [load]);
 
-  if (state === 'loading') return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center' }} dir="rtl"><p style={{ color:'var(--text3)' }}>טוען…</p></div>;
-  if (state === 'bad') return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:24, textAlign:'center' }} dir="rtl"><p style={{ fontWeight:700 }}>הקישור אינו תקף. יש לפנות להנהלת בית הספר.</p></div>;
+  if (state === 'loading') return <RlNote>טוען…</RlNote>;
+  if (state === 'error') return <RlNote onRetry={() => { setState('loading'); load(); }}>בעיית תקשורת — לא הצלחנו לטעון את הדף. בדקו את החיבור לאינטרנט ונסו שוב.</RlNote>;
+  if (state === 'bad') return <RlNote>הקישור אינו תקף. יש לפנות להנהלת בית הספר.</RlNote>;
 
   const v = rlValues(me, form);
   const d = me.doc || {};
@@ -8778,15 +8805,20 @@ function ReleaseView({ code }) {
     finally { setBusy(false); }
   };
 
+  // הודעת החסר מביאה את השדה עצמו למרכז המסך — בנייד ההודעה בתחתית והשדה למעלה
+  const miss = (id, m) => { setMsg(m); const el = document.getElementById(id); el?.scrollIntoView({ block:'center', behavior:'smooth' }); el?.focus?.({ preventScroll:true }); };
   const sign = () => {
+    if (busy) return;
     const tz = String(v.tz).replace(/\D/g, '');
-    if (tz.length < 8) { setMsg('יש למלא מספר זהות מלא'); return; }
-    for (const [val, l] of [[v.employerName, 'שם העמותה'], [v.from, 'תאריך תחילת העבודה'], [v.to, 'תאריך סיום העבודה'], [v.role, 'תפקיד']]) {
-      if (!String(val ?? '').trim()) { setMsg(`יש למלא ${l}`); return; }
+    if (tz.length < 8) return miss('rl-tz', 'יש למלא מספר זהות מלא');
+    if (!tzValid(tz)) return miss('rl-tz', 'מספר הזהות אינו תקין — כדאי לבדוק שוב את הספרות');
+    for (const [val, l, id] of [[v.role, 'תפקיד', 'rl-role'], [v.from, 'תאריך תחילת העבודה', 'rl-from'], [v.to, 'תאריך סיום העבודה', 'rl-to'], [v.employerName, 'שם העמותה', 'rl-employerName']]) {
+      if (!String(val ?? '').trim()) return miss(id, `יש למלא ${l}`);
     }
-    if (v.from > v.to) { setMsg('תאריך הסיום קודם לתאריך ההתחלה'); return; }
-    if (!agree) { setMsg('יש לאשר שקראת והבנת את המסמך'); return; }
-    if (!sig) { setMsg('יש לחתום במסגרת החתימה'); return; }
+    if (v.from > v.to) return miss('rl-from', 'תאריך הסיום קודם לתאריך ההתחלה');
+    if (v.from > new Date().toISOString().slice(0, 10)) return miss('rl-from', 'תאריך תחילת העבודה הוא בעתיד');
+    if (!agree) return miss('rl-agree', 'יש לאשר שקראת והבנת את המסמך');
+    if (!sig) return miss('rl-sigpad', 'יש לחתום במסגרת החתימה');
     run(async () => {
       const path = await store.rlUploadFile(code, 'signature', dataUrlToFile(sig, 'signature.png'));
       // נשמר המסמך כפי שנחתם — כל הערכים, גם אלה שהצוות קבע
@@ -8803,10 +8835,12 @@ function ReleaseView({ code }) {
 
   const finished = me.signed || me.uploaded;
   const lawyerUrl = `${window.location.origin}/?rl=${me.lawyer_code || ''}`;
-  const field = (k, label, type = 'text', val) => (
-    <div style={{ flex:'1 1 150px' }}><p className="apple-label">{label}</p>
-      <input type={type} value={val ?? ''} onChange={e => setF(k, e.target.value)}
-        className="apple-input" style={{ width:'100%' }} dir={type === 'date' ? 'ltr' : undefined} /></div>
+  const field = (k, label, type = 'text', val, locked = false) => (
+    <div style={{ flex:'1 1 150px' }}><label htmlFor={'rl-' + k} className="apple-label" style={{ display:'block' }}>{label}</label>
+      {locked
+        ? <p id={'rl-' + k} dir={type === 'date' ? 'ltr' : undefined} style={{ fontWeight:700, fontSize:16.1, padding:'10px 2px', textAlign:'right' }}>{type === 'date' ? rlDay(val) : val}</p>
+        : <input id={'rl-' + k} type={type} value={val ?? ''} onChange={e => setF(k, e.target.value)} aria-required="true"
+            className="apple-input" style={{ width:'100%' }} dir={type === 'date' ? 'ltr' : undefined} />}</div>
   );
 
   return (
@@ -8821,12 +8855,15 @@ function ReleaseView({ code }) {
       <div style={{ maxWidth:680, margin:'0 auto', padding:'14px 16px', display:'flex', flexDirection:'column', gap:14 }}>
         {finished ? (
           <div className="apple-card" style={{ padding:22, textAlign:'center' }}>
-            <div style={{ width:54, height:54, borderRadius:'50%', background:'var(--ok-bg)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px' }}>
-              <Check size={28} strokeWidth={2.6} color="var(--ok)" />
+            {/* V ירוק רק כשבאמת נגמר: חתימה בלי אישור עו"ד היא חצי דרך, והמסך אומר זאת */}
+            <div style={{ width:54, height:54, borderRadius:'50%', background: me.signed && !me.lawyer_signed ? 'var(--warn-bg)' : 'var(--ok-bg)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px' }}>
+              {me.signed && !me.lawyer_signed
+                ? <AlertTriangle size={26} strokeWidth={2.4} color="#B4650A" />
+                : <Check size={28} strokeWidth={2.6} color="var(--ok)" />}
             </div>
-            <p style={{ fontWeight:800, fontSize:19.5 }}>{me.signed ? 'המסמך נחתם והתקבל' : 'הטופס החתום התקבל'}</p>
+            <p style={{ fontWeight:800, fontSize:19.5 }}>{!me.signed ? 'הטופס החתום התקבל' : me.lawyer_signed ? 'המסמך נחתם ואושר' : 'חתמת — נשאר אישור עורך דין'}</p>
             <p style={{ fontSize:14.9, color:'var(--text3)', marginTop:4 }}>
-              <span dir="ltr">{new Date(me.signed_at || me.uploaded_at).toLocaleString('he-IL')}</span>{(!me.signed || me.lawyer_signed) && ' · תודה רבה, אין צורך בפעולה נוספת.'}
+              <span dir="ltr">{new Date(me.signed_at || me.uploaded_at).toLocaleString('he-IL')}</span>{me.signed && me.lawyer_signed && ' · תודה רבה, אין צורך בפעולה נוספת.'}{!me.signed && ' · הטופס ייבדק בהנהלה.'}
             </p>
             {me.signed && (me.lawyer_signed ? (
               <p style={{ fontSize:15.5, fontWeight:700, color:'var(--ok)', marginTop:12 }}>
@@ -8844,11 +8881,11 @@ function ReleaseView({ code }) {
                     <MessageCircle size={16} strokeWidth={2.2} />שליחת הקישור לעורך הדין בוואטסאפ
                   </a>
                   <button className="apple-btn apple-btn-ghost" style={{ minHeight:44 }}
-                    onClick={() => { navigator.clipboard.writeText(lawyerUrl); setMsg('הקישור הועתק'); }}>
+                    onClick={async () => { if (await rlCopy(lawyerUrl)) setMsg('הקישור הועתק'); }}>
                     העתקת הקישור
                   </button>
                   <a className="apple-btn apple-btn-ghost" style={{ minHeight:44, textDecoration:'none' }} href={lawyerUrl}>
-                    עורך הדין לידי — אישור כאן
+                    עורך הדין נמצא לידי — יחתום בטלפון הזה
                   </a>
                 </div>
                 {msg && <p style={{ fontSize:13.8, fontWeight:700, color:'#8A4B00', marginTop:8 }}>{msg}</p>}
@@ -8857,6 +8894,7 @@ function ReleaseView({ code }) {
             {!me.signed && (
               <div style={{ marginTop:14 }}>
                 <ObUpload label="החלפת הקובץ" hint="אם הצילום לא יצא ברור — אפשר להעלות שוב" done onFile={upload} />
+                {msg && <p role="alert" style={{ color:'var(--danger)', fontWeight:700, fontSize:14.9, marginTop:8 }}>{msg}</p>}
               </div>
             )}
           </div>
@@ -8866,7 +8904,7 @@ function ReleaseView({ code }) {
               <Check size={28} strokeWidth={2.6} color="var(--ok)" />
             </div>
             <p style={{ fontWeight:800, fontSize:19.5 }}>ההצהרה התקבלה</p>
-            <p style={{ fontSize:14.9, color:'var(--text2)', marginTop:4 }}>סימנת: לא עבדתי במוסד בשנים קודמות. אין צורך בחתימה על המסמך.</p>
+            <p style={{ fontSize:14.9, color:'var(--text2)', marginTop:4 }}>סימנת: לא עבדתי ב{me.school_name} בשנים קודמות. אין צורך בחתימה על המסמך.</p>
             <button className="apple-btn apple-btn-ghost" disabled={busy} style={{ marginTop:14 }}
               onClick={() => run(() => store.rlNotEmployed(code, false))}>סימנתי בטעות — כן עבדתי במוסד</button>
           </div>
@@ -8879,14 +8917,33 @@ function ReleaseView({ code }) {
           </div>
 
           {/* "אם לא מועסק שיעשה וי" (שרה, 20.9) — עובד חדש מצהיר ופטור מהחתימה */}
-          <label className="apple-card" style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', cursor:'pointer' }}>
-            <input type="checkbox" checked={false} disabled={busy} style={{ width:22, height:22, flexShrink:0 }}
-              onChange={() => { if (window.confirm('לאשר: לא עבדתי במוסד בשנים קודמות?')) run(() => store.rlNotEmployed(code, true)); }} />
-            <div>
-              <p style={{ fontWeight:700, fontSize:16.1 }}>לא עבדתי במוסד בשנים קודמות</p>
-              <p style={{ fontSize:13.8, color:'var(--text3)' }}>מי שהתחיל/ה לעבוד השנה מסמן/ת כאן — בלי חתימה על המסמך</p>
-            </div>
-          </label>
+          {/* האישור בתוך הדף ולא ב-window.confirm: בדפדפן הפנימי של וואטסאפ ובאפליקציה מותקנת החלון הזה לא תמיד נפתח */}
+          <div className="apple-card" style={{ padding:'14px 16px' }}>
+            <label style={{ display:'flex', alignItems:'center', gap:12, cursor:'pointer' }}>
+              <input type="checkbox" checked={askNa} disabled={busy} onChange={e => setAskNa(e.target.checked)} style={{ width:22, height:22, flexShrink:0 }} />
+              <div>
+                <p style={{ fontWeight:700, fontSize:16.1 }}>לא עבדתי ב{me.school_name} בשנים קודמות</p>
+                <p style={{ fontSize:13.8, color:'var(--text2)' }}>מי שהתחיל/ה לעבוד השנה מסמן/ת כאן — בלי חתימה על המסמך</p>
+              </div>
+            </label>
+            {askNa && (
+              <div style={{ display:'flex', gap:8, marginTop:12, flexWrap:'wrap' }}>
+                <button className="apple-btn apple-btn-blue" disabled={busy} style={{ minHeight:46, flex:'1 1 180px' }}
+                  onClick={() => run(() => store.rlNotEmployed(code, true))}>{busy ? 'שומר…' : 'כן — לא עבדתי כאן קודם'}</button>
+                <button className="apple-btn apple-btn-ghost" disabled={busy} style={{ minHeight:46, flex:'1 1 120px' }} onClick={() => setAskNa(false)}>ביטול</button>
+              </div>
+            )}
+            {askNa && msg && <p role="alert" style={{ color:'var(--danger)', fontWeight:700, fontSize:14.9, marginTop:8 }}>{msg}</p>}
+          </div>
+
+          {/* העובד יודע על עורך הדין לפני שהוא חותם, לא אחרי — והאישור הוא "חתם בפניי" */}
+          <div style={{ background:'var(--fill)', border:'1px solid var(--line)', borderRadius:12, padding:'12px 14px' }}>
+            <p style={{ fontWeight:800, fontSize:15.5, color:'var(--purple)' }}>שימו לב: החתימה נעשית מול עורך דין</p>
+            <p style={{ fontSize:14.4, color:'var(--text2)', lineHeight:1.6, marginTop:2 }}>
+              על המסמך חותמים בנוכחות עורך דין לבחירתכם. מיד אחרי החתימה שלכם עורך הדין ממלא שם, מספר רישיון, חתימה וחותמת —
+              בטלפון הזה, או בקישור שתשלחו לו. בלי אישור עורך דין המסמך אינו שלם.
+            </p>
+          </div>
 
           <div className="apple-seg" style={{ width:'100%' }}>
             <button onClick={() => { setMode('digital'); setMsg(''); }} className={['apple-seg-item', mode === 'digital' ? 'active' : ''].join(' ')} style={{ flex:1 }}>
@@ -8901,12 +8958,12 @@ function ReleaseView({ code }) {
             <div className="apple-card" style={{ padding:18 }}>
               <p style={{ fontWeight:800, fontSize:18.4, marginBottom:10 }}>1 · הפרטים שלך</p>
               <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
-                <div style={{ flex:'1 1 150px' }}><p className="apple-label">מספר זהות</p>
-                  <input value={v.tz} onChange={e => setF('tz', e.target.value.replace(/\D/g, '').slice(0, 9))}
+                <div style={{ flex:'1 1 150px' }}><label htmlFor="rl-tz" className="apple-label" style={{ display:'block' }}>מספר זהות</label>
+                  <input id="rl-tz" value={v.tz} onChange={e => setF('tz', e.target.value.replace(/\D/g, '').slice(0, 9))} aria-required="true"
                     className="apple-input" dir="ltr" inputMode="numeric" style={{ width:'100%' }} /></div>
-                {field('role', 'התפקיד במוסד', 'text', v.role)}
-                {field('from', 'תחילת העבודה במוסד', 'date', v.from)}
-                {field('to', 'סיום תקופת העבודה', 'date', v.to)}
+                {field('role', 'התפקיד במוסד', 'text', v.role, !!d.role)}
+                {field('from', 'תחילת העבודה במוסד', 'date', v.from, !!d.from_date)}
+                {field('to', 'סיום תקופת העבודה', 'date', v.to, !!d.to_date)}
                 {!d.employer_name && field('employerName', 'שם העמותה שהעסיקה אותך', 'text', form.employerName)}
                 {!d.employer_num && field('employerNum', 'מספר העמותה — אם ידוע', 'text', form.employerNum)}
               </div>
@@ -8916,12 +8973,12 @@ function ReleaseView({ code }) {
 
               <p style={{ fontWeight:800, fontSize:18.4, margin:'18px 0 8px' }}>3 · אישור וחתימה</p>
               <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', marginBottom:12 }}>
-                <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} style={{ width:20, height:20, marginTop:2, flexShrink:0 }} />
+                <input id="rl-agree" type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} style={{ width:20, height:20, marginTop:2, flexShrink:0 }} />
                 <span style={{ fontSize:14.9, lineHeight:1.6 }}>קראתי את כתב הקבלה והסילוק, הבנתי את תוכנו ואני חותם/ת עליו מרצוני החופשי.</span>
               </label>
               <p className="apple-label">חתימה — באצבע או בעכבר</p>
-              <SignaturePad onChange={setSig} />
-              {msg && <p role="alert" style={{ color:'var(--err)', fontWeight:700, fontSize:14.9, marginTop:10 }}>{msg}</p>}
+              <div id="rl-sigpad" tabIndex={-1} role="group" aria-label="מסגרת החתימה — חותמים באצבע או בעכבר"><SignaturePad onChange={setSig} /></div>
+              {msg && <p role="alert" style={{ color:'var(--danger)', fontWeight:700, fontSize:14.9, marginTop:10 }}>{msg}</p>}
               <button className="apple-btn apple-btn-blue" onClick={sign} disabled={busy} style={{ width:'100%', marginTop:14, minHeight:48, fontSize:16.1 }}>
                 {busy ? 'שומר…' : 'חתימה ושליחה'}
               </button>
@@ -8937,7 +8994,7 @@ function ReleaseView({ code }) {
                 <Download size={16} strokeWidth={2.2} />הורדת הטופס להדפסה
               </a>
               <ObUpload label="העלאת הטופס החתום" hint="צילום ברור או קובץ PDF" done={false} onFile={upload} />
-              {msg && <p role="alert" style={{ color:'var(--err)', fontWeight:700, fontSize:14.9 }}>{msg}</p>}
+              {msg && <p role="alert" style={{ color:'var(--danger)', fontWeight:700, fontSize:14.9 }}>{msg}</p>}
             </div>
           )}
         </>)}
@@ -8983,20 +9040,23 @@ function LawyerView({ code }) {
 
   const load = useCallback(async () => {
     try { const d = await store.rlLawyerView(code); if (!d) { setState('bad'); return; } setDoc(d); setState('ok'); }
-    catch { setState('bad'); }
+    catch { setState(prev => (prev === 'ok' ? 'ok' : 'error')); }
   }, [code]);
   useEffect(() => { Promise.resolve().then(load); }, [load]);
 
-  if (state === 'loading') return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center' }} dir="rtl"><p style={{ color:'var(--text3)' }}>טוען…</p></div>;
-  if (state === 'bad') return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:24, textAlign:'center' }} dir="rtl"><p style={{ fontWeight:700 }}>הקישור אינו תקף, או שהעובד/ת טרם חתם/ה על המסמך.</p></div>;
+  if (state === 'loading') return <RlNote>טוען…</RlNote>;
+  if (state === 'error') return <RlNote onRetry={() => { setState('loading'); load(); }}>בעיית תקשורת — לא הצלחנו לטעון את הדף. בדקו את החיבור לאינטרנט ונסו שוב.</RlNote>;
+  if (state === 'bad') return <RlNote>העובד/ת עדיין לא חתם/ה על המסמך, או שהקישור אינו תקף. אפשר לחזור לקישור הזה אחרי החתימה.</RlNote>;
 
   const done = !!doc.lawyer_signed_at;
+  const miss = (id, m) => { setMsg(m); const el = document.getElementById(id); el?.scrollIntoView({ block:'center', behavior:'smooth' }); el?.focus?.({ preventScroll:true }); };
   const submit = async () => {
-    if (name.trim().length < 3) { setMsg('יש למלא שם מלא'); return; }
-    if (license.replace(/\D/g, '').length < 3) { setMsg('יש למלא מספר רישיון'); return; }
-    if (!stamp) { setMsg('יש לצרף צילום של חותמת עורך הדין'); return; }
-    if (!agree) { setMsg('יש לאשר את ההצהרה'); return; }
-    if (!sig) { setMsg('יש לחתום במסגרת החתימה'); return; }
+    if (busy) return;
+    if (name.trim().length < 3) return miss('rl-lname', 'יש למלא שם מלא');
+    if (license.replace(/\D/g, '').length < 3) return miss('rl-llic', 'יש למלא מספר רישיון');
+    if (!stamp) return miss('rl-stamp', 'יש לצרף צילום של חותמת עורך הדין');
+    if (!agree) return miss('rl-lagree', 'יש לאשר את ההצהרה');
+    if (!sig) return miss('rl-lsigpad', 'יש לחתום במסגרת החתימה');
     setBusy(true); setMsg('');
     try { await store.rlLawyerSign(code, name.trim(), license.trim(), sig, stamp); await load(); }
     catch (e) { setMsg(e.message || 'משהו השתבש, נסו שוב'); }
@@ -9029,24 +9089,25 @@ function LawyerView({ code }) {
           <div className="apple-card" style={{ padding:18 }}>
             <p style={{ fontWeight:800, fontSize:18.4, marginBottom:10 }}>פרטי עורך הדין</p>
             <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
-              <div style={{ flex:'1 1 200px' }}><p className="apple-label">שם מלא</p>
-                <input value={name} onChange={e => setName(e.target.value)} className="apple-input" style={{ width:'100%' }} /></div>
-              <div style={{ flex:'1 1 140px' }}><p className="apple-label">מספר רישיון (מ.ר.)</p>
-                <input value={license} onChange={e => setLicense(e.target.value.replace(/[^\d/-]/g, '').slice(0, 12))} className="apple-input" dir="ltr" inputMode="numeric" style={{ width:'100%' }} /></div>
+              <div style={{ flex:'1 1 200px' }}><label htmlFor="rl-lname" className="apple-label" style={{ display:'block' }}>שם מלא</label>
+                <input id="rl-lname" aria-required="true" value={name} onChange={e => setName(e.target.value)} className="apple-input" style={{ width:'100%' }} /></div>
+              <div style={{ flex:'1 1 140px' }}><label htmlFor="rl-llic" className="apple-label" style={{ display:'block' }}>מספר רישיון (מ.ר.)</label>
+                <input id="rl-llic" aria-required="true" value={license} onChange={e => setLicense(e.target.value.replace(/[^\d/-]/g, '').slice(0, 12))} className="apple-input" dir="ltr" inputMode="numeric" style={{ width:'100%' }} /></div>
             </div>
 
             <p className="apple-label" style={{ marginTop:14 }}>חותמת עורך הדין — חובה</p>
-            <ObUpload label={stamp ? 'החותמת צורפה' : 'צילום החותמת'} hint="מחתימים על דף לבן, מצלמים מקרוב ומעלים" done={!!stamp}
+            <div id="rl-stamp" tabIndex={-1} />
+            <ObUpload label={stamp ? 'החותמת צורפה' : 'צילום החותמת'} hint="מטביעים את החותמת על דף לבן, מצלמים מקרוב ומעלים את הצילום" done={!!stamp}
               onFile={async f => { try { setStamp(await shrinkImage(f)); setMsg(''); } catch (e) { setMsg(e.message); } }} />
             {stamp && <img src={stamp} alt="החותמת שצורפה" style={{ maxHeight:90, marginTop:8, border:'1px solid var(--line)', borderRadius:8 }} />}
 
             <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', margin:'16px 0 12px' }}>
-              <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} style={{ width:20, height:20, marginTop:2, flexShrink:0 }} />
+              <input id="rl-lagree" type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} style={{ width:20, height:20, marginTop:2, flexShrink:0 }} />
               <span style={{ fontSize:14.9, lineHeight:1.6 }}>אני מאשר/ת כי העובד/ת חתם/ה בפניי על המסמך לאחר שקרא/ה והבין/ה את תוכנו, מרצונו/ה החופשי.</span>
             </label>
             <p className="apple-label">חתימת עורך הדין — באצבע או בעכבר</p>
-            <SignaturePad onChange={setSig} />
-            {msg && <p role="alert" style={{ color:'var(--err)', fontWeight:700, fontSize:14.9, marginTop:10 }}>{msg}</p>}
+            <div id="rl-lsigpad" tabIndex={-1} role="group" aria-label="מסגרת החתימה של עורך הדין"><SignaturePad onChange={setSig} /></div>
+            {msg && <p role="alert" style={{ color:'var(--danger)', fontWeight:700, fontSize:14.9, marginTop:10 }}>{msg}</p>}
             <button className="apple-btn apple-btn-blue" onClick={submit} disabled={busy} style={{ width:'100%', marginTop:14, minHeight:48, fontSize:16.1 }}>
               {busy ? 'שומר…' : 'אישור וחתימה'}
             </button>
@@ -9069,8 +9130,10 @@ function ReleasePrint({ row, onClose }) {
     })();
     return () => { alive = false; };
   }, [row.signature_path, row.signature_data]);
+  // בהדפסה נשאר המכתב לבדו: בלי זה נדפסים גם מסך המעקב והדשבורד שמאחוריו
+  useEffect(() => { document.body.classList.add('rl-printing'); return () => document.body.classList.remove('rl-printing'); }, []);
   const v = row.fields || {};
-  return (
+  return createPortal(
     <div className="print-sheet release-print modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.45)', zIndex:80, overflowY:'auto' }} dir="rtl">
       <div className="modal-card" style={{ maxWidth:760, margin:'20px auto', background:'#fff', padding:'22px 26px', borderRadius:8 }}>
         <div className="no-print modal-head" style={{ display:'flex', justifyContent:'space-between', marginBottom:14, gap:8, flexWrap:'wrap', background:'#fff' }}>
@@ -9081,11 +9144,12 @@ function ReleasePrint({ row, onClose }) {
         </div>
         <ReleaseDoc v={{ ...v, name: v.name || row.name }} sigUrl={sig} signedAt={row.signed_at} lawyer={rlLawyerOf(row)} />
         <p style={{ fontSize:11.5, color:'#666', marginTop:8 }}>
-          אימות חתימת העובד: כתובת IP <span dir="ltr">{row.sign_meta?.ip || '—'}</span>
-          {row.lawyer_meta && <> · אימות עורך הדין: IP <span dir="ltr">{row.lawyer_meta.ip || '—'}</span></>}
+          חתימת העובד נרשמה מכתובת IP <span dir="ltr">{row.sign_meta?.ip || '—'}</span>
+          {row.lawyer_meta && <> · אישור עורך הדין ניתן מקוון, מכתובת IP <span dir="ltr">{row.lawyer_meta.ip || '—'}</span></>}
         </p>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -9097,14 +9161,17 @@ function ReleaseAdmin({ schools, activeMonth, onClose, readOnly = false }) {
   // טופס ההקמה: בית ספר → עובדים לבחירה → פרטי המסמך הקבועים
   const [setup, setSetup] = useState(null);
 
-  const load = useCallback(async () => setRows(await store.listReleaseLetters()), []);
+  const load = useCallback(async () => { try { setRows(await store.listReleaseLetters()); } catch (e) { setRows([]); alert(e.message); } }, []);
   useEffect(() => { Promise.resolve().then(load); }, [load]);
 
-  const statusOf = r => r.signed_at ? (r.lawyer_signed_at ? 'signed' : 'lawyer') : r.upload_path ? 'uploaded' : r.not_employed_at ? 'na' : 'wait';
-  const LBL = { signed:'הושלם — נחתם ואושר ע"י עו"ד', lawyer:'נחתם — ממתין לאישור עו"ד', uploaded:'הועלה טופס חתום', na:'לא עבד/ה בשנים קודמות', wait:'ממתין' };
-  const CLR = { signed:'var(--ok)', lawyer:'#B4650A', uploaded:'var(--ok)', na:'var(--text2)', wait:'#B4650A' };
+  // טופס שהועלה אינו "הושלם" עד ששרה בדקה אותו: הוא צילום, ואיש לא וידא שיש בו חתימה, עו"ד וחותמת
+  const statusOf = r => r.signed_at ? (r.lawyer_signed_at ? 'signed' : 'lawyer') : r.upload_path ? (r.upload_verified_at ? 'verified' : 'uploaded') : r.not_employed_at ? 'na' : 'wait';
+  const isDone = r => ['signed', 'verified', 'na'].includes(statusOf(r));
+  const LBL = { signed:'הושלם — נחתם ואושר ע"י עו"ד', lawyer:'נחתם — ממתין לאישור עו"ד', uploaded:'הועלה טופס — ממתין לבדיקה שלך', verified:'הושלם — הטופס נבדק ואושר', na:'לא עבד/ה בשנים קודמות', wait:'ממתין' };
+  const CLR = { signed:'var(--ok)', lawyer:'#B4650A', uploaded:'#B4650A', verified:'var(--ok)', na:'var(--text2)', wait:'#B4650A' };
 
   const openSetup = async schoolId => {
+    if (busy) return;
     const s = schools.find(x => x.id === schoolId);
     setBusy('טוען עובדים…');
     try {
@@ -9116,6 +9183,7 @@ function ReleaseAdmin({ schools, activeMonth, onClose, readOnly = false }) {
     setBusy('');
   };
   const create = async () => {
+    if (busy) return;
     const people = setup.people.filter(p => setup.picked.has(p.tz_id || p.name));
     if (!people.length) { alert('לא נבחרו עובדים'); return; }
     setBusy('יוצר קישורים…');
@@ -9127,8 +9195,14 @@ function ReleaseAdmin({ schools, activeMonth, onClose, readOnly = false }) {
     setBusy('');
   };
   const send = async (list, reminder) => {
-    const waiting = list.filter(r => statusOf(r) === 'wait');
-    if (!waiting.length) { alert('אין למי לשלוח — כולם השלימו'); return; }
+    if (busy) return;
+    // תזכורת הולכת גם למי שחתם ועדיין מחכה לעורך דין — הוא לא "השלים"
+    const lawyerWait = list.filter(r => statusOf(r) === 'lawyer');
+    const waiting = list.filter(r => statusOf(r) === 'wait').concat(reminder ? lawyerWait : []);
+    if (!waiting.length) {
+      alert(lawyerWait.length ? `אין ממתינים לחתימה. ${lawyerWait.length} חתמו ומחכים לאישור עו"ד — "תזכורת לממתינים" תזכיר להם.` : 'אין למי לשלוח — כולם השלימו');
+      return;
+    }
     if (!window.confirm(`${reminder ? 'תזכורת' : 'שליחת הקישור'} בוואטסאפ ל-${waiting.length} עובדים. לשלוח?`)) return;
     setBusy('מכניס לתור השליחה…');
     try {
@@ -9137,9 +9211,14 @@ function ReleaseAdmin({ schools, activeMonth, onClose, readOnly = false }) {
     } catch (e) { alert(e.message); }
     setBusy('');
   };
-  const copy = r => {
-    navigator.clipboard.writeText(`${window.location.origin}/?r=${r.code}`);
-    setCopied(r.id); setTimeout(() => setCopied(''), 1500);
+  const copy = async r => {
+    if (await rlCopy(`${window.location.origin}/?r=${r.code}`)) { setCopied(r.id); setTimeout(() => setCopied(''), 1500); }
+  };
+  const verifyUpload = async (r, on) => {
+    if (busy) return;
+    setBusy('שומר…');
+    try { await store.rlVerifyUpload(r.id, on); await load(); } catch (e) { alert(e.message); }
+    setBusy('');
   };
   const openFile = async path => {
     try { window.open(await store.releaseFileUrl(path), '_blank', 'noopener'); } catch (e) { alert(e.message); }
@@ -9166,7 +9245,7 @@ function ReleaseAdmin({ schools, activeMonth, onClose, readOnly = false }) {
           <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', margin:'12px 0' }}>
             <span style={{ fontSize:14.4, fontWeight:700 }}>הוספת עובדים מבית ספר:</span>
             {schools.map(s => (
-              <button key={s.id} className="apple-btn apple-btn-ghost" onClick={() => openSetup(s.id)} style={{ minHeight:32, padding:'0 12px', fontSize:13.8 }}>{s.name}</button>
+              <button key={s.id} className="apple-btn apple-btn-ghost" disabled={!!busy} onClick={() => openSetup(s.id)} style={{ minHeight:32, padding:'0 12px', fontSize:13.8 }}>{s.name}</button>
             ))}
           </div>
         )}
@@ -9201,7 +9280,7 @@ function ReleaseAdmin({ schools, activeMonth, onClose, readOnly = false }) {
               </div>
             </>)}
             <div style={{ display:'flex', gap:8, marginTop:14 }}>
-              {!!setup.people.length && <button className="apple-btn apple-btn-blue" onClick={create} style={{ minHeight:38 }}>יצירת קישורים ל-{setup.picked.size} עובדים</button>}
+              {!!setup.people.length && <button className="apple-btn apple-btn-blue" disabled={!!busy} onClick={create} style={{ minHeight:38 }}>יצירת קישורים ל-{setup.picked.size} עובדים</button>}
               <button className="apple-btn apple-btn-ghost" onClick={() => setSetup(null)} style={{ minHeight:38 }}>ביטול</button>
             </div>
           </div>
@@ -9213,12 +9292,12 @@ function ReleaseAdmin({ schools, activeMonth, onClose, readOnly = false }) {
           <div key={sn} style={{ marginTop:16 }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               <p style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)' }}>
-                {sn} · {list.filter(r => !['wait','lawyer'].includes(statusOf(r))).length}/{list.length} הושלמו</p>
+                {sn} · {list.filter(isDone).length}/{list.length} הושלמו</p>
               {!readOnly && (
                 <div style={{ display:'flex', gap:6 }}>
-                  <button className="apple-btn apple-btn-blue" onClick={() => send(list, false)} style={{ minHeight:32, padding:'0 12px', fontSize:13.8 }}>
+                  <button className="apple-btn apple-btn-blue" disabled={!!busy} onClick={() => send(list, false)} style={{ minHeight:32, padding:'0 12px', fontSize:13.8 }}>
                     <Send size={13} strokeWidth={2.2} />שליחה בוואטסאפ</button>
-                  <button className="apple-btn apple-btn-ghost" onClick={() => send(list, true)} style={{ minHeight:32, padding:'0 12px', fontSize:13.8 }}>תזכורת לממתינים</button>
+                  <button className="apple-btn apple-btn-ghost" disabled={!!busy} onClick={() => send(list, true)} style={{ minHeight:32, padding:'0 12px', fontSize:13.8 }}>תזכורת לממתינים</button>
                 </div>
               )}
             </div>
@@ -9226,20 +9305,32 @@ function ReleaseAdmin({ schools, activeMonth, onClose, readOnly = false }) {
               <table className="apple-table sticky-first" style={{ fontSize:13.8 }}>
                 <thead><tr><th>עובד/ת</th><th>מצב</th><th>מתי</th><th style={{ textAlign:'center' }}>מסמך</th><th style={{ textAlign:'center' }}>קישור</th></tr></thead>
                 <tbody>
-                  {list.map(r => { const st = statusOf(r); const when = r.lawyer_signed_at || r.signed_at || r.uploaded_at || r.not_employed_at; return (
+                  {list.map(r => { const st = statusOf(r); const when = r.lawyer_signed_at || r.signed_at || r.upload_verified_at || r.uploaded_at || r.not_employed_at; return (
                     <tr key={r.id}>
                       <td style={{ fontWeight:600 }}>{r.name}<span style={{ color:'var(--text3)', fontWeight:400 }}>{r.phone ? ` · ${r.phone}` : ' · אין טלפון'}</span></td>
-                      <td style={{ fontWeight:700, color: CLR[st], whiteSpace:'nowrap' }}>{LBL[st]}</td>
+                      <td style={{ fontWeight:700, color: CLR[st] }}>{LBL[st]}
+                        {/* אישור עו"ד מקוון אינו מאומת; אותה כתובת כמו העובד שווה מבט נוסף */}
+                        {st === 'signed' && r.sign_meta?.ip && r.sign_meta.ip === r.lawyer_meta?.ip && (
+                          <span style={{ display:'block', fontWeight:400, fontSize:12.6, color:'var(--text3)' }}>אישור העו"ד ניתן מאותה רשת כמו העובד</span>
+                        )}
+                      </td>
                       <td dir="ltr" style={{ textAlign:'right', color:'var(--text3)', whiteSpace:'nowrap' }}>{when ? new Date(when).toLocaleDateString('he-IL') : ''}</td>
                       <td style={{ textAlign:'center', whiteSpace:'nowrap' }}>
                         {r.signed_at && <button className="apple-btn apple-btn-ghost" onClick={() => setPrintRow(r)} style={{ minHeight:28, padding:'0 10px', fontSize:13.2 }}>צפייה והדפסה</button>}
                         {r.upload_path && <button className="apple-btn apple-btn-ghost" onClick={() => openFile(r.upload_path)} style={{ minHeight:28, padding:'0 10px', fontSize:13.2, marginInlineStart:4 }}>
                           <Paperclip size={13} strokeWidth={2.2} />הקובץ שהועלה</button>}
+                        {!readOnly && st === 'uploaded' && <button className="apple-btn apple-btn-blue" disabled={!!busy} onClick={() => verifyUpload(r, true)}
+                          title="בדקתי: חתימת העובד, אישור עורך דין וחותמת" style={{ minHeight:28, padding:'0 10px', fontSize:13.2, marginInlineStart:4 }}>בדקתי — תקין</button>}
+                        {!readOnly && st === 'verified' && <button className="apple-btn apple-btn-ghost" disabled={!!busy} onClick={() => verifyUpload(r, false)}
+                          style={{ minHeight:28, padding:'0 10px', fontSize:13.2, marginInlineStart:4 }}>ביטול האישור</button>}
                         {!r.signed_at && !r.upload_path && <span style={{ color:'var(--text3)' }}>—</span>}
                       </td>
                       <td style={{ textAlign:'center' }}>
-                        <button className="apple-btn apple-btn-ghost" onClick={() => copy(r)} style={{ minHeight:28, padding:'0 10px', fontSize:13.2 }}>
-                          {copied === r.id ? 'הועתק ✓' : 'העתקה'}</button>
+                        {/* הקישור הוא מפתח החתימה — רק מי שמנהלת את התהליך מעתיקה אותו */}
+                        {readOnly ? <span style={{ color:'var(--text3)' }}>—</span> : (
+                          <button className="apple-btn apple-btn-ghost" onClick={() => copy(r)} style={{ minHeight:28, padding:'0 10px', fontSize:13.2 }}>
+                            {copied === r.id ? 'הועתק ✓' : 'העתקה'}</button>
+                        )}
                       </td>
                     </tr>
                   ); })}

@@ -800,6 +800,7 @@ export async function createReleaseLetters(schoolId, people, doc) {
     const { error: e2 } = await supabase.from('release_letters').insert({
       school_id: schoolId, name: p.name, tz_id: p.tz_id, phone: p.phone, code: obCode(), doc,
     });
+    if (e2 && /duplicate key/i.test(e2.message || '')) continue;   // לחיצה כפולה / חלון שני — כבר קיים
     raise(e2, 'יצירת קישור נכשלה');
     made++;
   }
@@ -814,31 +815,49 @@ export async function createReleaseLetters(schoolId, people, doc) {
 export async function sendReleaseLetters(ids, { reminder = false } = {}) {
   const site = window.location.origin;
   const { data: rows, error } = await supabase.from('release_letters')
-    .select('id, name, phone, code, signed_at, upload_path, not_employed_at, schools(name)')
+    .select('id, name, phone, code, signed_at, lawyer_signed_at, upload_path, not_employed_at, schools(name)')
     .in('id', ids).eq('revoked', false);
   raise(error, 'טעינת הנמענים נכשלה');
   const kind = reminder ? 'release_letter_reminder' : 'release_letter';
-  const { data: already } = await supabase.from('notifications')
-    .select('body').eq('kind', kind);
+  // נבדק רק מול הנמענים עצמם (גם עוקף את תקרת 1000 השורות), ורק מה שממתין או יצא —
+  // הודעה שנכשלה אינה "כבר נשלח". תזכורת: פעם ביום לכל היותר.
+  const phones = [...new Set((rows || []).map(r => r.phone).filter(Boolean))];
+  let q = supabase.from('notifications').select('body')
+    .in('kind', reminder ? ['release_letter_reminder', 'release_letter_lawyer_reminder'] : [kind])
+    .in('status', ['pending', 'sent']).in('to_phone', phones.length ? phones : ['-']);
+  if (reminder) q = q.gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString());
+  const { data: already, error: eA } = await q;
+  raise(eA, 'בדיקת השליחות הקודמות נכשלה');
   const sentCodes = new Set((already || []).map(n => (n.body.match(/\?r=([a-z0-9]+)/) || [])[1]));
 
   const queue = []; let done = 0, noPhone = 0, dup = 0;
   for (const r of rows || []) {
-    if (r.signed_at || r.upload_path || r.not_employed_at) { done++; continue; }
+    const lawyerWait = r.signed_at && !r.lawyer_signed_at;
+    if ((r.signed_at && r.lawyer_signed_at) || r.upload_path || r.not_employed_at || (lawyerWait && !reminder)) { done++; continue; }
     if (!r.phone) { noPhone++; continue; }
-    if (!reminder && sentCodes.has(r.code)) { dup++; continue; }
+    if (sentCodes.has(r.code)) { dup++; continue; }
+    if (lawyerWait) {
+      // חתם ועדיין בלי עורך דין — תזכורת משלו, שמחזירה אותו לקישור שבו מחכה הקישור לעו"ד
+      queue.push({
+        kind: 'release_letter_lawyer_reminder', to_phone: r.phone, to_name: r.name,
+        body: `${r.name}, שלום. תזכורת —\n` +
+          `חתמת על כתב הקבלה והסילוק, ונשאר שלב אחד: אישור עורך דין לבחירתך (שם, מס' רישיון, חתימה וחותמת).\n` +
+          `הקישור להעברה לעורך הדין מחכה לך כאן:\n${site}/?r=${r.code}\n\n` +
+          `בלי אישור עורך הדין המסמך אינו שלם.`,
+      });
+      continue;
+    }
     queue.push({
       kind, to_phone: r.phone, to_name: r.name,
       body: (reminder ? `${r.name}, שלום. תזכורת —\n` : `${r.name}, שלום.\n`) +
         `לקראת הקליטה למצבת העובדים של ${r.schools?.name || 'בית הספר'} יש לחתום על כתב קבלה וסילוק בגין תקופת ההעסקה הקודמת במוסד.\n` +
         `החתימה דיגיטלית, בקישור אישי, כמה דקות:\n${site}/?r=${r.code}\n\n` +
-        `אפשר גם להדפיס, לחתום ידנית ולהעלות צילום באותו קישור.\n` +
+        `למסמך נדרש אישור עורך דין — לבחירתך. אחרי החתימה יופיע קישור להעברה לעורך הדין, והוא מאשר, חותם ומצרף חותמת מהטלפון שלו.\n` +
+        `אפשר גם להדפיס, לחתום ידנית בפני עורך דין ולהעלות צילום באותו קישור.\n` +
         `מי שלא עבד/ה במוסד בשנים קודמות — מסמן/ת זאת בקישור, בלי חתימה.\n\n` +
-        `*ללא הסכם חתום זה, לצערנו לא נוכל לקבל אתכם למצבת העובדים.*
-
-` +
-        // "תוסיף בסוף גמר חתימה טובה" (שרה, 20.9 — ערב יום כיפור)
-        `גמר חתימה טובה.`,
+        `*ללא הסכם חתום זה, לצערנו לא נוכל לקבל אתכם למצבת העובדים.*` +
+        // "תוסיף בסוף גמר חתימה טובה" (שרה, 20.9 — ערב יום כיפור); בתזכורות מאוחרות הברכה כבר אינה בעונתה
+        (reminder ? '' : `\n\nגמר חתימה טובה.`),
     });
   }
   if (queue.length) {
@@ -846,6 +865,12 @@ export async function sendReleaseLetters(ids, { reminder = false } = {}) {
     raise(e3, 'הכנסת ההודעות לתור נכשלה');
   }
   return { queued: queue.length, done, noPhone, dup };
+}
+
+// שרה מאשרת שבדקה את הטופס שהועלה — רק אז הוא נספר "הושלם"
+export async function rlVerifyUpload(id, on) {
+  const { error } = await supabase.rpc('rl_verify_upload', { p_id: id, p_on: on });
+  raise(error, 'השמירה נכשלה');
 }
 
 /* ── התראות ────────────────────────────────────────────────────
