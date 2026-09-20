@@ -586,6 +586,9 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* הדוחות של המערכת הם טבלאות רחבות (15 עמודות בדוח השכר), ולכן A4 לרוחב.
    לאורך הן נחתכות או נשפכות לעמוד שני חלקי. */
 @page { size: A4 landscape; margin: 8mm; }
+/* כתב הסילוק הוא מכתב, לא טבלה — לאורך */
+@page letter-portrait { size: A4 portrait; margin: 16mm; }
+.release-print { page: letter-portrait; }
 
 @media print {
   .no-print { display: none !important; }

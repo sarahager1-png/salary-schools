@@ -1,0 +1,62 @@
+# קבצים מקומיים שאין להעלות לפריסה.
+# הפריסה היא של עץ העבודה כפי שהוא (vercel --prod מהמחשב), ולכן כל קובץ
+# עבודה שיושב כאן נשלח יחד עם הקוד. שניים מהם אסור שייצאו מהמחשב:
+# מסמכי האישור למנהלות (ת"ז וטלפונים של מורות) וקובצי הסיסמאות.
+
+# מסמכים ופלטים עם נתונים אישיים
+approval-docs/
+ishur/
+shots/
+print-report.pdf
+תלושים-*.csv
+תלושים-*.html
+
+# סודות וסמנים מקומיים
+.qa-credentials
+.env.local
+.env.test
+.onboarding-*
+users-created.txt
+
+# סקריפטים וכלים מקומיים (רצים מהמחשב, לא בשרת)
+_*.mjs
+smoke-*.mjs
+compare-*.mjs
+gap-breakdown.mjs
+make-approval-docs.mjs
+check-angel-state.mjs
+set-angel-scope-80.mjs
+sim-watcher*.mjs
+sim-form.mjs
+run-sim.mjs
+recompute.mjs
+explain-gaps.mjs
+verify-sim.mjs
+progress.mjs
+slip-data.mjs
+capture-lines.mjs
+compute-*.mjs
+send-onboarding-all.mjs
+wait-and-send-sari.mjs
+set-phone.mjs
+link.mjs
+start-sim-watcher.bat
+
+# לוגים ותוצרי ריצה
+*.log
+*.err
+computed-sims.json
+recomputed.json
+slip-data.json
+verify-sim-diffs.json
+unexplained-gaps.json
+"c:tmpsalary-dist"/
+
+# תיקיית עבודה זמנית, גיבויי נתונים וגיבויי סביבה — נתונים אישיים וסודות
+_tmp/
+.env*
+*-backup-*.json
+*-before-*.json
+check-ofek-*.json
+_quota.json
+*.py

@@ -710,6 +710,144 @@ export async function uploadContract(file) {
   raise(error, 'העלאת החוזה נכשלה');
 }
 
+/* ═══ כתב קבלה וסילוק — חתימה דיגיטלית או העלאת טופס חתום (שרה, 20.9) ═══ */
+
+const RL_BUCKET = 'release-letters';
+
+export async function rlWhoami(code) {
+  const { data, error } = await supabase.rpc('rl_whoami', { p_code: code });
+  raise(error, 'טעינת הקישור נכשלה');
+  return data?.[0] || null;
+}
+
+// לעובד מותר רק להוסיף קובץ (לא לדרוס) — ולכן שם ייחודי ו-upsert כבוי
+export async function rlUploadFile(code, slot, file) {
+  const ext = (file.name?.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+  const path = `${code}/${slot}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from(RL_BUCKET).upload(path, file, { upsert: false });
+  raise(error, 'העלאת הקובץ נכשלה');
+  return path;
+}
+
+// החתימה נשמרת פעמיים: כקובץ בדלי (ארכיון) וכ-data URL בשורה — עורך
+// הדין רואה אותה דרך הפונקציה, כי הדלי סגור לקריאה מבחוץ
+export async function rlSign(code, fields, signaturePath, signatureData) {
+  const { error } = await supabase.rpc('rl_sign', {
+    p_code: code, p_fields: fields, p_signature_path: signaturePath,
+    p_signature_data: signatureData, p_user_agent: navigator.userAgent,
+  });
+  raise(error, 'החתימה לא נשמרה');
+}
+
+// ─── אישור עורך הדין — קישור נפרד שהעובד מעביר לעו"ד שבחר (שרה, 20.9) ───
+export async function rlLawyerView(lcode) {
+  const { data, error } = await supabase.rpc('rl_lawyer_view', { p_lcode: lcode });
+  raise(error, 'טעינת המסמך נכשלה');
+  return data?.[0] || null;
+}
+
+export async function rlLawyerSign(lcode, name, license, signatureData, stampData) {
+  const { error } = await supabase.rpc('rl_lawyer_sign', {
+    p_lcode: lcode, p_name: name, p_license: license,
+    p_signature_data: signatureData, p_stamp_data: stampData, p_user_agent: navigator.userAgent,
+  });
+  raise(error, 'האישור לא נשמר');
+}
+
+export async function rlRegisterUpload(code, path) {
+  const { error } = await supabase.rpc('rl_upload', { p_code: code, p_path: path });
+  raise(error, 'רישום הקובץ נכשל');
+}
+
+export async function rlNotEmployed(code, on) {
+  const { error } = await supabase.rpc('rl_not_employed', { p_code: code, p_on: on });
+  raise(error, 'השמירה נכשלה');
+}
+
+// ─── צד הצוות ───
+export async function listReleaseLetters() {
+  const { data, error } = await supabase.from('release_letters')
+    .select('*, schools(name)').eq('revoked', false).order('name');
+  raise(error, 'טעינת כתבי הסילוק נכשלה');
+  return data || [];
+}
+
+export async function releaseFileUrl(path) {
+  const { data, error } = await supabase.storage.from(RL_BUCKET).createSignedUrl(path, 600);
+  raise(error, 'פתיחת הקובץ נכשלה');
+  return data.signedUrl;
+}
+
+// עובדי בית הספר בחודש הפעיל — הרשימה שממנה שרה בוחרת למי המסמך מיועד
+export async function releaseCandidates(schoolId, monthKey) {
+  const { data, error } = await supabase.from('teacher_months')
+    .select('name, tz_id, phone').eq('school_id', schoolId).eq('month_key', monthKey).order('name');
+  raise(error, 'טעינת העובדים נכשלה');
+  return (data || []).filter(r => r.name);
+}
+
+// קישור אישי לכל מי שנבחר ועדיין אין לו; doc — הפרטים הקבועים של המסמך
+export async function createReleaseLetters(schoolId, people, doc) {
+  const { data: existing, error } = await supabase.from('release_letters')
+    .select('tz_id, name').eq('school_id', schoolId).eq('revoked', false);
+  raise(error, 'טעינת הקישורים הקיימים נכשלה');
+  const seen = new Set((existing || []).map(x => x.tz_id || x.name));
+  let made = 0;
+  for (const p of people) {
+    const key = p.tz_id || p.name;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const { error: e2 } = await supabase.from('release_letters').insert({
+      school_id: schoolId, name: p.name, tz_id: p.tz_id, phone: p.phone, code: obCode(), doc,
+    });
+    raise(e2, 'יצירת קישור נכשלה');
+    made++;
+  }
+  return made;
+}
+
+/*
+  שליחת הקישורים בוואטסאפ — דרך התור, כמו כל שליחה במערכת. נשלח רק למי
+  שעוד לא השלים (חתם / העלה / הצהיר שלא עבד), ורק פעם אחת לכל קישור אלא
+  אם זו תזכורת מפורשת.
+*/
+export async function sendReleaseLetters(ids, { reminder = false } = {}) {
+  const site = window.location.origin;
+  const { data: rows, error } = await supabase.from('release_letters')
+    .select('id, name, phone, code, signed_at, upload_path, not_employed_at, schools(name)')
+    .in('id', ids).eq('revoked', false);
+  raise(error, 'טעינת הנמענים נכשלה');
+  const kind = reminder ? 'release_letter_reminder' : 'release_letter';
+  const { data: already } = await supabase.from('notifications')
+    .select('body').eq('kind', kind);
+  const sentCodes = new Set((already || []).map(n => (n.body.match(/\?r=([a-z0-9]+)/) || [])[1]));
+
+  const queue = []; let done = 0, noPhone = 0, dup = 0;
+  for (const r of rows || []) {
+    if (r.signed_at || r.upload_path || r.not_employed_at) { done++; continue; }
+    if (!r.phone) { noPhone++; continue; }
+    if (!reminder && sentCodes.has(r.code)) { dup++; continue; }
+    queue.push({
+      kind, to_phone: r.phone, to_name: r.name,
+      body: (reminder ? `${r.name}, שלום. תזכורת —\n` : `${r.name}, שלום.\n`) +
+        `לקראת הקליטה למצבת העובדים של ${r.schools?.name || 'בית הספר'} יש לחתום על כתב קבלה וסילוק בגין תקופת ההעסקה הקודמת במוסד.\n` +
+        `החתימה דיגיטלית, בקישור אישי, כמה דקות:\n${site}/?r=${r.code}\n\n` +
+        `אפשר גם להדפיס, לחתום ידנית ולהעלות צילום באותו קישור.\n` +
+        `מי שלא עבד/ה במוסד בשנים קודמות — מסמן/ת זאת בקישור, בלי חתימה.\n\n` +
+        `*ללא הסכם חתום זה, לצערנו לא נוכל לקבל אתכם למצבת העובדים.*
+
+` +
+        // "תוסיף בסוף גמר חתימה טובה" (שרה, 20.9 — ערב יום כיפור)
+        `גמר חתימה טובה.`,
+    });
+  }
+  if (queue.length) {
+    const { error: e3 } = await supabase.from('notifications').insert(queue);
+    raise(e3, 'הכנסת ההודעות לתור נכשלה');
+  }
+  return { queued: queue.length, done, noPhone, dup };
+}
+
 /* ── התראות ────────────────────────────────────────────────────
    הקו ששולח רשום על הנייד של שרה, ולכן התראה אליה לא תגיע בוואטסאפ
    לעולם — היא נשמרת עם channel='inapp' ומוצגת כאן. השאר יוצאות בתור.
