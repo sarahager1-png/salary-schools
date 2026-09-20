@@ -3058,7 +3058,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
       {/* ══ Stat cards ══ */}
       {tsOfficial.length > 0 && (
         <div style={{ maxWidth:1400, margin:'0 auto', padding:'20px 20px 0' }}>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(155px, 1fr))', gap:12 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(155px, 1fr))', gridAutoRows:'1fr', gap:12 }}>
             {[
               { label:'עובדי הוראה',    val: ts.length.toLocaleString('he-IL'), sub: `${tsOfficial.length} עם סימולציה מלאה` },
               { label:'ברוטו / חודש',   val: totGross.toLocaleString('he-IL') + ' ₪' },
@@ -5272,7 +5272,7 @@ function ReportView({ schools, teachers, onSaveTeacher, onApprove, simState, onC
       </div>
 
       {/* Stat cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(155px, 1fr))', gap:12, marginBottom:20 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(155px, 1fr))', gridAutoRows:'1fr', gap:12, marginBottom:20 }}>
         {[
           { label:'סה״כ עובדי הוראה',           val: totCount.toLocaleString('he-IL') },
           { label:'בתי ספר פעילים',       val: rows.filter(r=>r.count>0).length.toLocaleString('he-IL') },
@@ -6738,7 +6738,8 @@ function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveSco
           : 'אחוזי משרה, הזנת שכר, עלות מעביד בפועל, ומסמכי החודש.'}
       />
       <SlipsHandoff monthKey={activeMonth} role={userRole} />
-      <div className="apple-seg" style={{ marginBottom:14, flexWrap:'wrap' }}>
+      {/* לשוניות באותו גודל גם כשהן נשברות לשתי שורות */}
+      <div className="apple-seg even-grid" style={{ marginBottom:14, gap:2 }}>
         {canSetScope && (
           <button onClick={() => setTab('scope')} className={['apple-seg-item', tab === 'scope' ? 'active' : ''].join(' ')}
             style={{ padding:'6px 13px', fontSize:14.9 }}>
@@ -9244,9 +9245,11 @@ function ReleaseAdmin({ schools, activeMonth, onClose, readOnly = false }) {
         {!readOnly && !setup && (
           <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', margin:'12px 0' }}>
             <span style={{ fontSize:14.4, fontWeight:700 }}>הוספת עובדים מבית ספר:</span>
+            <div className="even-grid" style={{ flex:'1 1 100%', minWidth:0 }}>
             {schools.map(s => (
-              <button key={s.id} className="apple-btn apple-btn-ghost" disabled={!!busy} onClick={() => openSetup(s.id)} style={{ minHeight:32, padding:'0 12px', fontSize:13.8 }}>{s.name}</button>
+              <button key={s.id} className="apple-btn apple-btn-ghost" disabled={!!busy} onClick={() => openSetup(s.id)} style={{ minHeight:32, padding:'4px 12px', fontSize:13.8, lineHeight:1.25 }}>{s.name}</button>
             ))}
+            </div>
           </div>
         )}
 
@@ -9258,7 +9261,7 @@ function ReleaseAdmin({ schools, activeMonth, onClose, readOnly = false }) {
                 onClick={() => setSetup(s => ({ ...s, picked: new Set(s.picked.size === s.people.length ? [] : s.people.map(p => p.tz_id || p.name)) }))}>
                 {setup.picked.size === setup.people.length ? 'ניקוי הבחירה' : 'בחירת כולם'}
               </button>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(210px, 1fr))', gap:6 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(210px, 1fr))', gridAutoRows:'1fr', gap:6 }}>
                 {setup.people.map(p => { const key = p.tz_id || p.name; return (
                   <label key={key} style={{ display:'flex', alignItems:'center', gap:8, background:'#fff', borderRadius:10, padding:'8px 10px', cursor:'pointer', fontSize:14.4 }}>
                     <input type="checkbox" checked={setup.picked.has(key)} onChange={() => toggle(key)} style={{ width:18, height:18 }} />
@@ -10367,7 +10370,7 @@ export default function App() {
                 <p style={{ fontSize:16.1, color:'var(--apple-text2)' }}>לחצי על "הוסף בית ספר" להתחלה</p>
               </div>
             ) : (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:16 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gridAutoRows:'1fr', gap:16 }}>
                 {schools.map(s => {
                   const ts      = teachers.filter(t => t.schoolId === s.id);
                   const empTot  = ts.reduce((sum, t) => sum + calcEmployer(t).total, 0);

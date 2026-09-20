@@ -846,3 +846,19 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   .toolbar-stack > span[aria-hidden] { display: none; }     /* מפריד אנכי מיותר בפריסת רשת */
   .page-actions .apple-btn { flex: 1 1 auto; }
 }
+
+/* כרטיסיות תמיד באותו גודל (שרה 20.9.2026): קבוצת כרטיסיות / בועות מספרים / כפתורי סינון
+   יושבת ברשת של עמודות ושורות שוות — לא flex-wrap, שנותן לכל אחת רוחב לפי אורך הטקסט. */
+.even-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--even-min, 150px)), 1fr));
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+  gap: 8px;
+}
+.even-grid.sm { --even-min: 104px; }
+.even-grid.lg { --even-min: 220px; }
+.even-grid > * { width: 100%; height: 100%; min-width: 0; }
+/* בתוך רשת שווה מותר לתווית לרדת לשורה שנייה — לא נחתכת ולא גולשת מהתא */
+.even-grid > .apple-seg-item,
+.even-grid > .apple-btn { white-space: normal; line-height: 1.25; }
