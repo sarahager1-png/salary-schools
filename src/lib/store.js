@@ -81,6 +81,10 @@ const rowToTeacher = (r) => {
   const t = { id: r.id, monthKey: r.month_key, scope: r.scope_pct, _files: [], sickFiles: [] };
   for (const [col, key] of TEACHER_FIELDS) t[key] = r[col];
   if (!Array.isArray(t.extraRoles)) t.extraRoles = [];
+  // דיווח מנהלת שממתין לאישור שרה (21.9.26). נקרא בלבד — אינו ב-TEACHER_FIELDS,
+  // כדי ששמירת שורה שלמה עם ערך ישן לא תנקה אותו בלי אישור.
+  t._reportPending   = Boolean(r.report_pending);
+  t._reportPendingAt = r.report_pending_at ?? null;
   return t;
 };
 
@@ -425,6 +429,15 @@ export async function importSlip(items) {
 export async function approve(ids) {
   const { error } = await supabase.from('teacher_months').update({ approved: true }).in('id', ids);
   raise(error, 'האישור נכשל');
+}
+
+/* אישור דיווח של מנהלת — "אם לא אאשר לא עובר לסימולציה" (שרה, 21.9.26).
+   השרת מתיר את זה לרכזת בלבד. */
+export async function approveReport(ids) {
+  const { data, error } = await supabase.from('teacher_months')
+    .update({ report_pending: false }).in('id', ids).select();
+  raise(error, 'אישור הדיווח נכשל');
+  return (data || []).map(rowToTeacher);
 }
 
 export async function netApprove(ids) {

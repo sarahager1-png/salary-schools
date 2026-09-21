@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   }
 
   const { data: rows } = await sb.from('teacher_months')
-    .select('id, name, tz_id, official_gross, agreed_gross, approved, payroll_ready, leave_type, schools!inner(name)')
+    .select('id, name, tz_id, official_gross, agreed_gross, approved, report_pending, payroll_ready, leave_type, schools!inner(name)')
     .eq('month_key', key);
   const all = (rows ?? []).filter(r => r.leave_type !== 'unpaid');
 
@@ -33,7 +33,8 @@ export default async function handler(req, res) {
   const signed = new Set((onboarding ?? []).filter(o => o.form101_signed_at).map(o => o.tz_id));
 
   const ready = all.filter(r =>
-    (r.official_gross != null || r.agreed_gross != null) && r.approved && signed.has(r.tz_id));
+    (r.official_gross != null || r.agreed_gross != null) && r.approved && !r.report_pending
+    && signed.has(r.tz_id));   // דיווח מנהלת שלא אושר אינו עובר לשכר (שרה, 21.9.26)
   const blocked = all.filter(r => !ready.includes(r));
 
   if (ready.length) {
@@ -47,7 +48,8 @@ export default async function handler(req, res) {
     const { data: dup } = await sb.from('notifications')
       .select('id').eq('kind', KIND).eq('month_key', key).limit(1);
     if (!dup?.length) {
-      const why = r => !r.official_gross && !r.agreed_gross ? 'בלי ברוטו'
+      const why = r => r.report_pending ? 'דיווח המנהלת ממתין לאישורך'
+        : !r.official_gross && !r.agreed_gross ? 'בלי ברוטו'
         : !r.approved ? 'בלי אישור'
         : 'בלי טופס 101';
       const list = blocked.slice(0, 10).map(r => `· ${r.name} (${r.schools?.name ?? ''}) — ${why(r)}`).join('\n');

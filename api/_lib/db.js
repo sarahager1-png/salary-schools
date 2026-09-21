@@ -72,6 +72,7 @@ export function dueDatesFor(monthKey) {
   const [y, m] = monthKey.split('-').map(Number);
   const d = new Date(Date.UTC(y, m, 1));            // החודש הבא
   const k = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-  // lock: מה-10 המנהלות אינן משנות עוד ("תנעל ב-10 לחודש לשינויים תמיד", שרה 10.9)
-  return { report: `${k}-05`, submit: `${k}-06`, lock: `${k}-10` };
+  // lock: מה-21 המנהלות אינן משנות עוד — "ניתן לדווח מה-1 עד ה-20" (שרה, 21.9.26;
+  // קודם ה-10). בשרת private.link_locked סוגר גם כל יום 21 ואילך בכל חודש.
+  return { report: `${k}-05`, submit: `${k}-06`, lock: `${k}-21` };
 }

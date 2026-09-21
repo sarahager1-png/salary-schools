@@ -191,7 +191,10 @@ const simComplete = t => {
 // needs_sim: מנהלת שמרה שינויים, ממתין לסימולציה אצל חשבת שכר
 // needs_approval: הנתונים הושלמו, ממתין לאישור שרה
 // approved: שרה אישרה
-const needsSim      = t => Boolean(!unpaidThisMonth(t) && t._changedAt && !t._approved && !simComplete(t));
+// report_pending: מנהלת דיווחה, ממתין לאישור שרה — לפני סימולציה ולפני שכר.
+// "אם לא אאשר לא עובר לסימולציה ... רק רשומה מאושרת עוברת לשכר" (שרה, 21.9.26)
+const reportPending = t => Boolean(t._reportPending);
+const needsSim      = t => Boolean(!unpaidThisMonth(t) && !reportPending(t) && t._changedAt && !t._approved && !simComplete(t));
 
 // שעות בית הספר מול תקן השעות — כלל אחד לכל המסכים, זהה ל-p_hours_of
 // בשרת: שעות פרונטליות של עובדות ההוראה, בלי מנהלת, בלי מי שבחל"ד/חל"ת
@@ -223,7 +226,7 @@ const OverHours = ({ over, size = 15.5 }) => (
   : over > 0   ? <span className="num" style={{ color:'var(--danger)', fontWeight:800, fontSize:size }}>+{over} שעות</span>
   :              <span style={{ color:'var(--ok, #2e7d32)', fontWeight:600, fontSize:size }}>בתקן</span>
 );
-const needsApproval = t => Boolean(t._changedAt && !t._approved && simComplete(t));
+const needsApproval = t => Boolean(!reportPending(t) && t._changedAt && !t._approved && simComplete(t));
 
 // כפתור "חישוב": למורה התוצאה נכנסת לברוטו; למנהלת הברוטו קבוע (אופק
 // ניהול / שכר מוסכם) והחישוב הוא התלוש בעולם ישן — "תחשב את תלושי
@@ -818,7 +821,10 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
 /* ═══════════════════════════════════════════════════════════════
    APPROVAL VIEW (coordinator only)
 ═══════════════════════════════════════════════════════════════ */
-function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
+function ApprovalView({ teachers, schools, onApprove, onApproveAll, onApproveReport, onClose }) {
+  // דיווחי מנהלות — השלב הראשון: בלי אישורה אין סימולציה ואין שכר (21.9.26)
+  const reports = onApproveReport ? teachers.filter(reportPending) : [];
+  const schoolName = id => schools.find(s => s.id === id)?.name || '';
   // רק מורים שהנתונים הושלמו (יש שכר רשמי) → ממתינים לאישור שרה
   const readyToApprove = teachers.filter(needsApproval);
   // מורים עדיין ממתינים לסימולציה אצל חשבת שכר
@@ -848,6 +854,53 @@ function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
           </div>
         </div>
 
+        {/* דיווחי מנהלות שממתינים לאישור — לפני סימולציה */}
+        {reports.length > 0 && (
+          <div className="apple-card" style={{ padding:16, marginBottom:16, borderRight:'3px solid var(--purple)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:4 }}>
+              <p style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-text)' }}>
+                {reports.length} דיווחי מנהלות ממתינים לאישורך
+              </p>
+              {reports.length > 1 && (
+                <button className="apple-btn apple-btn-green" style={{ fontSize:14.9, padding:'7px 16px' }}
+                  onClick={() => onApproveReport(reports)}>
+                  אשרי את כל הדיווחים ({reports.length})
+                </button>
+              )}
+            </div>
+            <p style={{ fontSize:13.8, color:'var(--apple-text2)', marginBottom:12 }}>
+              עד שתאשרי, הדיווח לא נשלח לסימולציה ולא עובר לשכר. אחרי האישור הסימולציה נשלחת מעצמה.
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {reports.map(t => (
+                <div key={t.id} style={{ border:'1px solid var(--line, #e5e5ea)', borderRadius:12, padding:12, background:'var(--surface, #fff)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, marginBottom:8 }}>
+                    <div style={{ minWidth:0 }}>
+                      <p style={{ fontWeight:600, fontSize:16.1, color:'var(--apple-text)' }}>{t.name}</p>
+                      <p style={{ fontSize:13.8, color:'var(--apple-text2)' }}>
+                        {schoolName(t.schoolId)}
+                        {t._reportPendingAt ? ` · דווח ${new Date(t._reportPendingAt).toLocaleDateString('he-IL')}` : ''}
+                      </p>
+                    </div>
+                    <button className="apple-btn apple-btn-green" onClick={() => onApproveReport([t])}
+                      style={{ fontSize:14.9, padding:'7px 16px', flexShrink:0 }}>
+                      אשרי דיווח
+                    </button>
+                  </div>
+                  <TeacherDiff t={t} />
+                  {(Number(t.absenceDays) > 0 || Number(t.mmHours) > 0 || onLeave(t)) && (
+                    <p style={{ fontSize:13.8, color:'var(--apple-text2)', marginTop:6 }}>
+                      {[Number(t.absenceDays) > 0 ? `${t.absenceDays} ימי היעדרות` : '',
+                        Number(t.mmHours) > 0 ? `${t.mmHours} שעות מילוי מקום${t.mmFor ? ` במקום ${t.mmFor}` : ''}` : '',
+                        onLeave(t) ? leaveText(t) : ''].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ממתינים לסימולציה */}
         {waitingSim.length > 0 && (
           <div className="apple-card" style={{ padding:16, marginBottom:16, borderRight:'3px solid var(--apple-orange)' }}>
@@ -873,7 +926,7 @@ function ApprovalView({ teachers, schools, onApprove, onApproveAll, onClose }) {
                 : <Check size={27} strokeWidth={2.2} color="var(--ok)" />}
             </div>
             <p style={{ fontWeight:600, color:'var(--apple-text2)' }}>
-              {waitingSim.length > 0 ? 'ממתין לסימולציה אצל חשבת שכר' : 'אין שינויים ממתינים לאישור'}
+              {waitingSim.length > 0 ? 'ממתין לסימולציה אצל חשבת שכר' : reports.length > 0 ? 'אין שכר ממתין לאישור' : 'אין שינויים ממתינים לאישור'}
             </p>
           </div>
         ) : (
@@ -3347,6 +3400,7 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                     : 'var(--surface)' }}>
                     <td>
                       <div style={{ display:'flex', alignItems:'center', gap:6, fontWeight:600, color:'var(--text)' }}>
+                        {reportPending(t) && <span className="apple-badge badge-purple" style={{ fontSize:12.6, padding:'1px 8px' }} title="המנהלת דיווחה — ממתין לאישור שרה לפני סימולציה">דיווח לאישור</span>}
                         {isSim  && <Calculator size={13} strokeWidth={2.4} color="var(--warn)" aria-label="נדרשת סימולציה" />}
                         {isAppr && <ClipboardCheck size={13} strokeWidth={2.4} color="var(--teal-700)" aria-label="ממתין לאישור" />}
                         <span style={{ color: t.name === PRINCIPAL_PLACEHOLDER ? 'var(--text3)' : undefined }}>{t.name}</span>
@@ -3683,7 +3737,8 @@ function SchoolView({ school, teachers, userRole, onBack, onSaveTeacher, onDelet
                       {t._agreedGross && <span className="apple-badge badge-teal" style={{ fontSize:12.6, padding:'1px 8px' }}>שכר מוסכם</span>}
                     </div>
                   </div>
-                  {isSim ? <span className="apple-badge badge-orange" style={{ flexShrink:0 }}>חסר ברוטו</span>
+                  {reportPending(t) ? <span className="apple-badge badge-purple" style={{ flexShrink:0 }}>דיווח לאישור</span>
+                    : isSim ? <span className="apple-badge badge-orange" style={{ flexShrink:0 }}>חסר ברוטו</span>
                     : isAppr ? <span className="apple-badge badge-teal" style={{ flexShrink:0 }}><ClipboardCheck size={12} strokeWidth={2.4} />לאישור</span>
                     : fullyApproved(t) ? <span className="apple-badge badge-green" style={{ flexShrink:0 }}><Check size={11} strokeWidth={3} />מאושר</span>
                     : null}
@@ -3848,6 +3903,7 @@ function SchoolPositions({ school, onSaveTeacher, onApprove, simState, onCompute
   const ts = [...(school.ts || [])].sort((a, b) => calcEmployer(b).total - calcEmployer(a).total);
   const nis = v => (v > 0 ? Math.round(v).toLocaleString('he-IL') + ' ₪' : '—');
   const status = t => {
+    if (reportPending(t)) return { label: 'דיווח ממתין לאישור שרה', cls: 'badge-purple' };
     if (needsSim(t))      return { label: 'ממתין לסימולציה', cls: 'badge-orange' };
     if (needsApproval(t)) return { label: 'ממתין לאישור שרה', cls: 'badge-orange' };
     return { label: 'מאושר', cls: 'badge-green' };
@@ -7217,7 +7273,7 @@ function LinkCard({ teacher, locked, onSave }) {
           onClick={save} style={{ minHeight:40, paddingInline:20, opacity: (!dirty || locked) ? .45 : 1 }}>
           {state === 'saving' ? 'שומר…' : 'שמירה'}
         </button>
-        {state === 'saved' && <span style={{ fontSize:14.4, color:'var(--ok)', fontWeight:600 }}>✓ נשמר</span>}
+        {state === 'saved' && <span style={{ fontSize:14.4, color:'var(--ok)', fontWeight:600 }}>✓ נשמר ונשלח לאישור הרשת</span>}
         {state && state !== 'saving' && state !== 'saved' &&
           <span style={{ fontSize:13.8, color:'var(--danger)' }}>{state}</span>}
         {!dirty && !state && <span style={{ fontSize:13.2, color:'var(--text3)' }}>אין שינוי</span>}
@@ -9631,7 +9687,7 @@ function LinkView({ code }) {
         {locked ? (
           <div style={{ background:'var(--warn-bg)', border:'1px solid var(--warn)', borderRadius:12, padding:'11px 14px', marginBottom:14 }}>
             <p style={{ fontSize:14.9, fontWeight:600, color:'var(--warn)' }}>
-              החודש נעול לשינויים{lockDue ? ` מ-${fmtDay(lockDue)}` : ''}. הנתונים הועברו לשכר.
+              הדיווח פתוח מה-1 עד ה-20 בכל חודש. עכשיו אי אפשר לשנות — אפשר לחזור ב-1 לחודש.
             </p>
             <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:4, lineHeight:1.6 }}>
               אפשר לצפות בכל הנתונים. תיקון יתקבל בחודש הבא, או בפנייה לרשת.
@@ -9639,7 +9695,7 @@ function LinkView({ code }) {
           </div>
         ) : lockDue ? (
           <p style={{ fontSize:13.8, color:'var(--text3)', marginBottom:12, lineHeight:1.6 }}>
-            אפשר לעדכן עד {dayBefore(lockDue)}. ב-{fmtDay(lockDue)} החודש ננעל לשינויים.
+            אפשר לדווח עד ה-20 לחודש. כל דיווח עובר לאישור הרשת לפני שהוא נכנס לשכר.
           </p>
         ) : null}
 
@@ -9854,6 +9910,7 @@ export default function App() {
   */
   const [simState, setSimState] = useState({});
   const onCompute = async (t) => {
+    if (reportPending(t)) { setError('הדיווח של המנהלת ממתין לאישורך. אחרי האישור הסימולציה תישלח מעצמה.'); return; }
     try {
       await store.requestSim(t.id);
       setSimState(m => ({ ...m, [t.id]: 'pending' }));
@@ -10011,7 +10068,7 @@ export default function App() {
           נשלח רק כשיש מה להריץ: לא בחופשה, ויש שעות — או מנהלת, שאצלה
           השעות אינן קלט (100% תמיד) והחישוב הוא התלוש בעולם ישן.
         */
-        if (user?.role === 'coordinator' && t.id && (next.leaveType ?? 'none') === 'none'
+        if (user?.role === 'coordinator' && t.id && !reportPending(old) && (next.leaveType ?? 'none') === 'none'
             && canCompute(next)
             && (isPrincipalRow(next) || Number(next.frontalHours) > 0)) {
           store.requestSim(t.id)
@@ -10045,6 +10102,23 @@ export default function App() {
     // האישור סוגר את מחזור השינוי: אין עוד "ממתין", ואין diff להציג
     await store.saveTeacher({ id, _snapshot: null, _changedAt: null }, activeMonth);
   });
+  /*
+    אישור דיווח של מנהלת (שרה, 21.9.26). אחרי האישור, שורה שחסר בה ברוטו
+    נשלחת לסימולציה באותו כלל של עריכה אצל הרכזת; השכר עצמו עדיין עובר
+    את האישור הרגיל אחרי שיש מספר.
+  */
+  const onApproveReport = (rows) => run(async () => {
+    const done = await store.approveReport(rows.map(t => t.id));
+    for (const t of done) {
+      if (!simComplete(t) && !t._approved && (t.leaveType ?? 'none') === 'none' && canCompute(t)
+          && (isPrincipalRow(t) || Number(t.frontalHours) > 0)) {
+        try {
+          await store.requestSim(t.id);
+          setSimState(m => ({ ...m, [t.id]: 'pending' }));
+        } catch { /* התור לא זמין — הכפתור הידני עדיין שם */ }
+      }
+    }
+  });
   const onApproveAll = () => {
     const ids = teachers.filter(needsApproval).map(t => t.id);
     if (!ids.length) { setShowApproval(false); return; }
@@ -10060,7 +10134,8 @@ export default function App() {
   // החודש הראשון מסומן בבורר החודשים — זה כל תפקידו מעכשיו
   const firstMonthKey = Object.keys(months).sort()[0] || activeMonth;
   const needsSimCount      = teachers.filter(needsSim).length;
-  const needsApprovalCount = teachers.filter(needsApproval).length;
+  const needsApprovalCount = teachers.filter(needsApproval).length
+    + (user.role === 'coordinator' ? teachers.filter(reportPending).length : 0);
   const sortedMonthKeys    = Object.keys(months).sort();
 
   // Principal goes directly to their school
@@ -10472,6 +10547,7 @@ export default function App() {
           schools={schools}
           onApprove={onApproveTeacher}
           onApproveAll={onApproveAll}
+          onApproveReport={user.role === 'coordinator' ? onApproveReport : null}
           onClose={() => setShowApproval(false)}
         />
       )}
