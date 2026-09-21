@@ -67,12 +67,12 @@ export function workMonth(req) {
   return /^\d{4}-\d{2}$/.test(q || '') ? q : monthKeyNow(-1);
 }
 
-/** ה-5 וה-6 של החודש שאחרי חודש העבודה */
+/** דיווח עד ה-20 באותו חודש (שרה, 21.9.26; קודם ה-5 בחודש שאחרי); ה-6 בחודש שאחרי — מעבר לשכר */
 export function dueDatesFor(monthKey) {
   const [y, m] = monthKey.split('-').map(Number);
   const d = new Date(Date.UTC(y, m, 1));            // החודש הבא
   const k = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
   // lock: מה-21 המנהלות אינן משנות עוד — "ניתן לדווח מה-1 עד ה-20" (שרה, 21.9.26;
   // קודם ה-10). בשרת private.link_locked סוגר גם כל יום 21 ואילך בכל חודש.
-  return { report: `${k}-05`, submit: `${k}-06`, lock: `${k}-21` };
+  return { report: `${monthKey}-20`, submit: `${k}-06`, lock: `${k}-21` };
 }

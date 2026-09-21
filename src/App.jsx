@@ -6355,7 +6355,7 @@ function NotificationsView() {
   const unread = mine.filter(n => !n.readAt).length;
 
   const KIND_LABEL = {
-    report_due_summary: 'סיכום ה-5 בחודש',
+    report_due_summary: 'סיכום ה-20 בחודש',
     payroll_cutoff:     'סגירת ה-6 — מי לא עברה לשכר',
     maternity_alert:    'חופשת לידה',
     report_reminder:    'תזכורת דיווח',

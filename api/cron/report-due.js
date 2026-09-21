@@ -1,5 +1,5 @@
 /*
-  מועד הדיווח — ב-5 בחודש.
+  מועד הדיווח — ה-20 בחודש (שרה, 21.9.26; קודם ה-5). רץ בתחילת ה-21 לפי שעון ישראל.
 
   "נסגר אבל מסומן" (הכרעת שרה): המנהלת עדיין יכולה לדווח, אבל השורה
   מסומנת late_report ואינה עוברת לתשלום בלי אישור מפורש. אחת ההחלטות
@@ -7,7 +7,7 @@
 
   בסוף היום שרה מקבלת הודעה אחת עם מה שקפץ לבדיקה.
 */
-import { db, guard, monthKeyNow, workMonth, cycleStarted } from '../_lib/db.js';
+import { db, guard, monthKeyNow, monthOf, cycleStarted } from '../_lib/db.js';
 
 const KIND = 'report_due_summary';
 
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (bad) return res.status(403).json({ error: bad });
 
   const sb = db();
-  const key = workMonth(req);   // חודש העבודה שהסתיים
+  const key = monthOf(req);   // החודש הנוכחי — הדיווח עליו נסגר ב-20
   if (!cycleStarted()) {
     return res.status(200).json({ ok: true, month: key, skipped: 'המחזור עוד לא התחיל בחודש הזה' });
   }
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     if (!dup?.length) {
       const lateNames = (late ?? []).slice(0, 8).map(r => `· ${r.name} (${r.schools?.name ?? ''})`).join('\n');
       const body = [
-        `סיכום ה-5 בחודש — ${key}`,
+        `סיכום ה-20 בחודש — ${key}`,
         `${all.length} שורות בחודש.`,
         (late ?? []).length ? `${late.length} לא דווחו במועד:\n${lateNames}` : 'כל בתי הספר דיווחו במועד.',
         noGross ? `${noGross} עדיין בלי ברוטו מחשבת השכר.` : 'לכולן יש ברוטו.',
