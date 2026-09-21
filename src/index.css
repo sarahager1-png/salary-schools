@@ -862,3 +862,9 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* בתוך רשת שווה מותר לתווית לרדת לשורה שנייה — לא נחתכת ולא גולשת מהתא */
 .even-grid > .apple-seg-item,
 .even-grid > .apple-btn { white-space: normal; line-height: 1.25; }
+
+/* יעד מגע נוח במסך מגע (כלל של שרה: לתכנן למשתמשות מאותגרות טכנולוגית):
+   כפתור / לשונית / צ'יפ בתוך קבוצה שווה — לפחות 44px גובה. במחשב עם עכבר אין שינוי. */
+@media (pointer: coarse) {
+  .even-grid > :is(button, a, label, [role="tab"], [role="radio"]) { min-height: 44px; }
+}
