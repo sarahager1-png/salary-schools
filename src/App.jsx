@@ -4507,7 +4507,12 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
     const remains  = (cover != null && needed != null) ? needed - cover : null;
     return { sc, f, monthly, hourlyMonthly, annual, mmCost, bufferCost, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left: leftAll, needed, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer,
       cover, coverPct, remains };
-  });
+  })
+    // "תוריד אותם למטה בטבלה, גם את קרית ביאליק" (שרה, 22.9): בתי ספר בלי
+    // מחזור שכר — לא לתשלום שכר, או שאין בהם עדיין עובדות — בסוף הטבלה
+    .map((r, i) => ({ r, i, low: r.sc.paysSalary === false || !r.monthly }))
+    .sort((a, b) => (a.low - b.low) || (a.i - b.i))
+    .map(x => x.r);
   // תצוגת "תחשיב · בפועל" לשעה — אותו רכיב בטבלה ובכרטיס
   const PerHour = ({ sim, actual }) => (
     <span style={{ fontSize:15.5, whiteSpace:'nowrap' }}>
