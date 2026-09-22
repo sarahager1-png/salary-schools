@@ -825,7 +825,7 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
 /* ═══════════════════════════════════════════════════════════════
    APPROVAL VIEW (coordinator only)
 ═══════════════════════════════════════════════════════════════ */
-function ApprovalView({ teachers, schools, onApprove, onApproveAll, onApproveReport, onClose }) {
+function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose }) {
   // דיווחי מנהלות — השלב הראשון: בלי אישורה אין סימולציה ואין שכר (21.9.26)
   const reports = onApproveReport ? teachers.filter(reportPending) : [];
   const schoolName = id => schools.find(s => s.id === id)?.name || '';
@@ -959,7 +959,15 @@ function ApprovalView({ teachers, schools, onApprove, onApproveAll, onApproveRep
                           </div>
                         </div>
                         <div style={{ marginBottom:12 }}><TeacherDiff t={t} /></div>
-                        <div style={{ display:'flex', justifyContent:'flex-end' }}>
+                        <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+                          {/* "ואני גם צריכה לא לאשר" (שרה, 22.9) — מחזיר את הערכים שלפני השינוי */}
+                          {onReject && t._snapshot && (
+                            <button className="apple-btn apple-btn-ghost" onClick={() => onReject(t)}
+                              title="השינוי מבוטל והשורה חוזרת לערכים שלפניו"
+                              style={{ fontSize:14.9, padding:'7px 16px', color:'var(--danger)' }}>
+                              לא לאשר
+                            </button>
+                          )}
                           <button className="apple-btn apple-btn-green" onClick={() => onApprove(t.id)} style={{ fontSize:14.9, padding:'7px 16px' }}>
                             אשר
                           </button>
@@ -10200,7 +10208,8 @@ export default function App() {
         next._changedAt   = now;
         next._approved    = false;
         next._netApproved = false;
-        if (!old._snapshot) next._snapshot = snapT(old);
+        // __approved: האם השורה הייתה מאושרת לפני השינוי — בשביל "לא לאשר"
+        if (!old._snapshot) next._snapshot = { ...snapT(old), __approved: Boolean(old._approved) };
         /*
           "חושב לא נכון — מייד עלה לאישור וחושב מחדש" (שרה, 3.9):
           שינוי נתון שכר לא רק מפיל את האישור — הוא שולח מעצמו בקשת
@@ -10247,6 +10256,15 @@ export default function App() {
     נשלחת לסימולציה באותו כלל של עריכה אצל הרכזת; השכר עצמו עדיין עובר
     את האישור הרגיל אחרי שיש מספר.
   */
+  // "לא לאשר" (שרה, 22.9): השדות חוזרים לתמונה שלפני השינוי (_snapshot),
+  // והשורה חוזרת למצב המאושר שהיה לה. נשמר ישירות — לא דרך onSaveTeacher,
+  // שהיה מסמן את החזרה עצמה כשינוי חדש.
+  const onRejectTeacher = (t) => run(async () => {
+    if (!t._snapshot) return;
+    const { __approved, ...prev } = t._snapshot;
+    await store.saveTeacher({ ...t, ...prev, _snapshot: null, _changedAt: null }, activeMonth);
+    if (__approved !== false) await store.approve([t.id]);
+  });
   const onApproveReport = (rows) => run(async () => {
     const done = await store.approveReport(rows.map(t => t.id));
     for (const t of done) {
@@ -10686,6 +10704,7 @@ export default function App() {
           teachers={teachers}
           schools={schools}
           onApprove={onApproveTeacher}
+          onReject={user.role === 'coordinator' ? onRejectTeacher : null}
           onApproveAll={onApproveAll}
           onApproveReport={user.role === 'coordinator' ? onApproveReport : null}
           onClose={() => setShowApproval(false)}
