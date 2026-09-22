@@ -4665,7 +4665,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
               <TH>הכנסות משרד החינוך</TH>
               <TH>הכנסות נוספות</TH>
               <TH>סה"כ הכנסות</TH>
-              <TH>עלות הוראה</TH>
+              <TH>עלות שכר כוללת</TH>
               <TH>תוספת 10% + מ"מ 5%</TH>
               <TH>הוצאות נוספות</TH>
               <TH>סה"כ הוצאות</TH>
@@ -4698,7 +4698,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{f.ministryBudget == null ? '—' : num(per(incomeAll))}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:600, whiteSpace:'nowrap' }}>{num(period === 'month' ? monthly : annual)}{costFromBudget && <span className="fin-budget-tag" title="אין עדיין עובדות במערכת — עלות ההוראה מתקציב בית הספר">לפי התקציב</span>}{hourlyMonthly > 0 && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }} title="צהרון ומשרות שעתיות — לא נכללים בהשוואה מול משרד החינוך">+ צהרון {num(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }}
-                  title="כרית ביטחון 10% ומילוי מקום 5%, שניהם על עלות השכר השנתית">{num(per(reserve))}</td>
+                  title="כרית ביטחון 10% ומילוי מקום 5%, שניהם על עלות השכר הכוללת השנתית">{num(per(reserve))}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }} title="הוצאות שאינן שכר הוראה — מתקציב מבט-רשת">{otherExp ? num(per(otherExp)) : '—'}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(per(expenseAll))}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700, color: gapColor(gap) }}
@@ -4775,7 +4775,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
             </CardRow>
             <CardRow label="הכנסות נוספות" color="var(--text2)">{otherInc ? money(per(otherInc)) : '—'}</CardRow>
             <CardRow label='סה"כ הכנסות' strong>{f.ministryBudget == null ? '—' : money(per(incomeAll))}</CardRow>
-            <CardRow label={costFromBudget ? 'עלות הוראה (לפי התקציב)' : 'עלות הוראה'}>{money(period === 'month' ? monthly : annual)}</CardRow>
+            <CardRow label={costFromBudget ? 'עלות שכר כוללת (לפי התקציב)' : 'עלות שכר כוללת'}>{money(period === 'month' ? monthly : annual)}</CardRow>
             {hourlyMonthly > 0 && (
               <CardRow label="צהרון ומשרות שעתיות (מחוץ להשוואה)" color="var(--text3)">
                 {money(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}
@@ -4833,7 +4833,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
             <CardRow label="הכנסות משרד החינוך">{money(per(tot.budget))}</CardRow>
             <CardRow label="הכנסות נוספות" color="var(--text2)">{money(per(tot.otherInc))}</CardRow>
             <CardRow label='סה"כ הכנסות' strong>{money(per(tot.incomeAll))}</CardRow>
-            <CardRow label="עלות הוראה">{money(period === 'month' ? tot.monthly : tot.annual)}</CardRow>
+            <CardRow label="עלות שכר כוללת">{money(period === 'month' ? tot.monthly : tot.annual)}</CardRow>
             <CardRow label='תוספת 10% + מ"מ 5%' color="var(--text2)">{money(per(tot.mm))}</CardRow>
             <CardRow label="הוצאות נוספות" color="var(--text2)">{money(per(tot.otherExp))}</CardRow>
             <CardRow label='סה"כ הוצאות' strong>{money(per(tot.expenseAll))}</CardRow>
@@ -4854,8 +4854,9 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         )}
       </div>
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
-        <b>סה"כ הכנסות</b> — הכנסות משרד החינוך ועוד ההכנסות הנוספות מתקציב מבט-רשת.
-        {' '}<b>סה"כ הוצאות</b> — עלות ההוראה, תוספת ביטחון 10% ומילוי מקום 5% (על עלות ההוראה השנתית), ועוד ההוצאות הנוספות מתקציב מבט-רשת.
+        <b>עלות שכר כוללת</b> — כל עובדי ההוראה של בית הספר: מורות, מנהלת, ייעוץ ושילוב. צהרון ומשרות שעתיות מוצגים בנפרד.
+        {' '}<b>סה"כ הכנסות</b> — הכנסות משרד החינוך ועוד ההכנסות הנוספות מתקציב מבט-רשת.
+        {' '}<b>סה"כ הוצאות</b> — עלות השכר הכוללת, תוספת ביטחון 10% ומילוי מקום 5% (על עלות השכר השנתית), ועוד ההוצאות הנוספות מתקציב מבט-רשת.
         {' '}<b>פער הכנסות מול הוצאות</b> — סה"כ הכנסות פחות סה"כ הוצאות.
         {' '}<b>יתרה להשלמת הסניף</b> — הפער אחרי מענק הרשת: מה שהסניף צריך להשלים.
         {' '}התקציב שנתי ומוקלד כאן; עלות ההוראה נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
