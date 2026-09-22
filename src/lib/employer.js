@@ -22,6 +22,18 @@ const AGE_RED = {
 };
 
 const CHABAD_SUPP = new Map();
+/*
+  כיול האומדן לפי התלושים בפועל ("לכל מוסד בנפרד", שרה 22.9.26).
+  המודל מנפח את עלות המעביד בכ-7%: פנסיה 14.83% וקה"ש 8.4% על כולן,
+  בעוד שבתלוש ההפרשות נמוכות יותר. CALIB מחזיק מקדם לכל בית ספר,
+  מחושב מהתלושים של אותו חודש (App ממלא בכל רענון), ו-CALIB_ALL הוא
+  מקדם הרשת — לבית ספר שאין בו עדיין תלושים. חל על האומדן בלבד:
+  שורה שיש לה עלות מתלוש נספרת לפי המספר האמיתי, בלי כיול.
+*/
+const CALIB = new Map();
+let CALIB_ALL = 1;
+const setCalib = (bySchool, all) => { CALIB.clear(); for (const [k, v] of bySchool) CALIB.set(k, v); CALIB_ALL = all || 1; };
+const calibOf = t => CALIB.get(t.schoolId) ?? CALIB_ALL;
 // מי שכבר שובצה לה ממ"מ: מפתחות "חודש|בית ספר|שם" של הנשות שמופיעות
 // בשדה "במקום מי" של שורה אחרת. מתעדכן בכל טעינת נתונים.
 const MM_REPLACED = new Set();
@@ -696,7 +708,7 @@ function calcEmployer(t) {
   const employerSupp = supplementCost(base, supplement, extras.biguud, extras.havraah);
   const employerBase = estimate - employerSupp;
   const actual   = Number(t._actualEmployerCost) || 0;
-  const social   = actual || estimate;
+  const social   = actual || Math.round(estimate * calibOf(t));
   return {
     gross, base, mom, supplement, employerBase, employerSupp, social,
     estimate, isEstimate: !actual, mmPay,
@@ -710,6 +722,10 @@ function calcEmployer(t) {
 }
 
 export {
+  CALIB,
+  CALIB_ALL,
+  setCalib,
+  calibOf,
   MM_HOUR_RATE,
   MATERNITY_LEAVES,
   LEVELS,

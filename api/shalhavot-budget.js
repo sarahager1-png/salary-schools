@@ -44,6 +44,24 @@ const mergeLines = (lines) => {
   return [...m.entries()].map(([name, amount]) => ({ name, amount }));
 };
 
+
+/* כיול עלות המעביד לפי התלושים בפועל, לכל בית ספר (שרה, 22.9) — כמו באפליקציה */
+function applyCalib(rows, toTeacher) {
+  const agg = new Map(); let slipAll = 0, modelAll = 0;
+  for (const r of rows || []) {
+    const t = toTeacher(r);
+    if (emp.isPrincipalRow(t) || emp.unpaidThisMonth(t) || !Number(t._actualEmployerCost)) continue;
+    const slip = emp.calcEmployer(t).total;
+    const model = emp.calcEmployer({ ...t, _actualEmployerCost: null }).total;
+    if (!slip || !model) continue;
+    slipAll += slip; modelAll += model;
+    const a = agg.get(t.schoolId) || { slip: 0, model: 0, n: 0 };
+    agg.set(t.schoolId, { slip: a.slip + slip, model: a.model + model, n: a.n + 1 });
+  }
+  emp.setCalib([...agg.entries()].filter(([, v]) => v.n >= 3 && v.model > 0).map(([k, v]) => [k, v.slip / v.model]),
+    modelAll > 0 ? slipAll / modelAll : 1);
+}
+
 export default async function handler(req, res) {
   try {
     const expected = process.env.SHALHAVOT_BUDGET_CODE;
@@ -93,6 +111,7 @@ export default async function handler(req, res) {
     const shalhavot = (schools || [])
       .filter(s => String(s.name || '').trim().startsWith('שלהבות'));
 
+    applyCalib(rows, toTeacher);
     const out = shalhavot.map(s => {
       // עלות שכר שנתית — אותו סכום כמו monthlyCost * 12 בכרטיסים (כולל מנהלת)
       // הוראה בלבד: צהרון ומשרות שעתיות ממומנים בנפרד ואינם מול תקציב המשרד (15.9)

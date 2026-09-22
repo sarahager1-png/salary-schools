@@ -30,6 +30,7 @@ import {
   AGE_RED,
   CHABAD_SUPP,
   MM_REPLACED,
+  setCalib,
   mmKey,
   hasSubstitute,
   schoolPaysSupp,
@@ -10114,6 +10115,27 @@ export default function App() {
         if (String(r2.mmFor || '').trim()) MM_REPLACED.add(mmKey(mk, r2.schoolId, r2.mmFor));
         if (r2.leaveType === 'maternity') MATERNITY_LEAVES.add(mmKey(mk, r2.schoolId, r2.name));
       }
+    /*
+      כיול עלות המעביד לפי התלושים של החודש האחרון, לכל בית ספר בנפרד
+      (שרה, 22.9): המודל מנפח בכ-7%. בית ספר עם פחות משלושה תלושים
+      מקבל את מקדם הרשת, כדי שלא יכויל על סמך עובדת אחת.
+    */
+    (() => {
+      const last = Object.keys(data.months || {}).sort().pop();
+      const rowsL = (data.months?.[last] || []).filter(t => !isPrincipalRow(t) && !unpaidThisMonth(t) && Number(t._actualEmployerCost));
+      const agg = new Map(); let slipAll = 0, modelAll = 0;
+      for (const t of rowsL) {
+        const slip = calcEmployer(t).total;
+        const model = calcEmployer({ ...t, _actualEmployerCost: null }).total;
+        if (!slip || !model) continue;
+        slipAll += slip; modelAll += model;
+        const a = agg.get(t.schoolId) || { slip: 0, model: 0, n: 0 };
+        agg.set(t.schoolId, { slip: a.slip + slip, model: a.model + model, n: a.n + 1 });
+      }
+      const all = modelAll > 0 ? slipAll / modelAll : 1;
+      const bySchool = [...agg.entries()].filter(([, v]) => v.n >= 3 && v.model > 0).map(([k, v]) => [k, v.slip / v.model]);
+      setCalib(bySchool, all);
+    })();
     setActiveMonth(prev => {
       const keys = Object.keys(data.months).sort();
       if (keys.includes(prev)) return prev;
