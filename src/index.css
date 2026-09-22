@@ -870,15 +870,16 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 }
 
 /* ── הכנסות מול הוצאות: קבוצות צבע (שרה, 22.9) ── */
-.fin-table td, .fin-table th { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.fin-table td { padding: 9px 8px; }
+.fin-table td { white-space: nowrap; font-variant-numeric: tabular-nums; padding: 7px 4px; }
+.fin-table th { font-variant-numeric: tabular-nums; }
+.fin-table td:first-child { white-space: normal; min-width: 92px; padding-inline: 8px 6px !important; font-size: 14.4px !important; line-height: 1.3; }
 .fin-table col.fg-inc { background: #F3FBF6; }
 .fin-table col.fg-exp { background: #FDF6F6; }
 .fin-table col.fg-res { background: #F7F4FC; }
 .fin-table col.fg-inc.fg-sum { background: #E6F6EC; }
 .fin-table col.fg-exp.fg-sum { background: #FBEBEB; }
 .fin-table col.fg-res.fg-sum { background: #EFE9FA; }
-.fin-table .fg-h { padding: 9px 8px 6px; font-size: 13.8px; font-weight: 800; letter-spacing: .02em; text-align: center; }
+.fin-table .fg-h { padding: 7px 4px 5px; font-size: 13.2px; font-weight: 800; letter-spacing: .02em; text-align: center; }
 .fin-table .fg-h-inc { color: #15803D; background: #E6F6EC; border-bottom: 2px solid #86CFA0; }
 .fin-table .fg-h-exp { color: #B42318; background: #FBEBEB; border-bottom: 2px solid #F0A8A8; }
 .fin-table .fg-h-res { color: var(--purple); background: #EFE9FA; border-bottom: 2px solid #C9B8EC; }
@@ -889,4 +890,15 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   :root:not([data-theme="light"]) .fin-table col.fg-exp { background: rgba(239,68,68,.06); }
   :root:not([data-theme="light"]) .fin-table col.fg-res { background: rgba(139,92,246,.07); }
   :root:not([data-theme="light"]) .fin-table col.fg-sum { background: rgba(255,255,255,.06); }
+}
+.fin-input { width: 84px; font-size: 14px; padding: 4px 3px !important; min-height: 32px; }
+.fin-hours { display: block; margin-top: 2px; font-size: 12px; font-weight: 700; color: var(--danger); white-space: nowrap; }
+/* חלון צר (כמו 1000px): מכווצים עוד כדי שלא תהיה גלילת רוחב */
+@media (max-width: 1240px) {
+  .fin-table td { font-size: 13.2px !important; padding: 6px 2px; }
+  .fin-table td span { font-size: inherit !important; }
+  .fin-table td .fin-hours { font-size: 11.5px !important; }
+  .fin-table th { font-size: 12px !important; padding: 6px 3px !important; }
+  .fin-input { width: 64px; font-size: 13px; padding: 4px 1px !important; }
+  .fin-table td:first-child { min-width: 80px; padding-inline: 6px 4px !important; }
 }

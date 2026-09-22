@@ -4227,6 +4227,8 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
   };
 
   const money = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
+  // בטבלה — בלי ₪ בכל תא, כדי שתיכנס ברוחב המסך בלי גלילה ("ניתן לראות ללא גלילת רוחב", שרה 22.9)
+  const num = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL'));
 
   const rows = schools.map(sc => {
     const f = fin?.[sc.id] || {};
@@ -4345,29 +4347,29 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
   // פער ויתרה: שלילי = חסר (אדום), אפס/חיובי = מכוסה (ירוק) — הפוך מ-coverColor
   const gapColor = v => (v == null ? 'var(--text3)' : v < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)');
   // יתרה להשלמת הסניף: כמה הסניף צריך להשלים אחרי מענק הרשת, או עודף
-  const ToComplete = ({ left }) => (
+  const ToComplete = ({ left, fmt = money }) => (
     left == null
       ? <span style={{ fontSize:16.1, color:'var(--text3)' }}>—</span>
       : left < 0
-        ? <span className="num" style={{ fontSize:16.7, fontWeight:800, color:'var(--danger)' }}>{money(per(-left))}</span>
-        : <span style={{ fontSize:14.4, fontWeight:700, color:'var(--ok, #2e7d32)', whiteSpace:'nowrap' }}>עודף {money(per(left))}</span>
+        ? <span className="num" style={{ fontSize:16.7, fontWeight:800, color:'var(--danger)' }}>{fmt(per(-left))}</span>
+        : <span style={{ fontSize:14.4, fontWeight:700, color:'var(--ok, #2e7d32)', whiteSpace:'nowrap' }}>עודף {fmt(per(left))}</span>
   );
   // חריגה: מה שהסניף צריך להשלים פחות התקציב שאושר. חיובי = חריגה (אדום)
-  const Remains = ({ cover, coverPct, remains, needed }) => (
+  const Remains = ({ cover, coverPct, remains, needed, fmt = money }) => (
     cover == null
       ? <span style={{ fontSize:13.8, color:'var(--text3)' }}>{needed == null ? '—' : needed > 0 ? 'טרם אושר' : 'אין צורך'}</span>
       : <span style={{ whiteSpace:'nowrap' }}>
-          <span className="num" style={{ fontSize:16.1, fontWeight:700, color: coverColor(remains) }}>{remains > 0 ? money(per(remains)) : 'אין חריגה'}</span>
+          <span className="num" style={{ fontSize:16.1, fontWeight:700, color: coverColor(remains) }}>{remains > 0 ? fmt(per(remains)) : 'אין חריגה'}</span>
           {coverPct != null && <span style={{ fontSize:13.2, color:'var(--text3)', marginInlineStart:5 }}>אושר {coverPct}%</span>}
         </span>
   );
 
   const TH = ({ children }) => (
-    <th style={{ padding:'10px 8px', fontSize:13.8, fontWeight:700, color:'var(--text2)',
-      textAlign:'center', whiteSpace:'nowrap' }}>{children}</th>
+    <th style={{ padding:'8px 4px', fontSize:12.8, fontWeight:700, color:'var(--text2)',
+      textAlign:'center', whiteSpace:'normal', lineHeight:1.25, verticalAlign:'bottom' }}>{children}</th>
   );
   const moneyInput = (sid, field, val) => (
-    <input type="number" min="0" dir="ltr" className="apple-input"
+    <input type="number" min="0" dir="ltr" className="apple-input fin-input"
       inputMode="decimal" key={`fin-${sid}-${field}-${val ?? ''}`}
       defaultValue={val ?? ''}
       placeholder="—"
@@ -4377,7 +4379,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
         // הקלדה ידנית מסמנת בעלות: המשיכה לא תדרוס אותה יותר
         if (v !== (val ?? null)) save(sid, { [field]: v, src: { ...((fin?.[sid] || {}).src || {}), [field]: 'manual' } });
       }}
-      style={{ width:104, textAlign:'center', fontSize:15, fontWeight:600, padding:'5px 6px', background:'var(--surface)' }} />
+      style={{ textAlign:'center', fontWeight:600, background:'var(--surface)' }} />
   );
 
   return (
@@ -4415,6 +4417,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
             color: showSim ? '#fff' : 'var(--text3)' }}>
           {showSim ? 'הסתרת התחשיב מהתקציב' : 'הצגת התחשיב מהתקציב'}
         </button>
+        <span className="only-desktop" style={{ fontSize:13.2, color:'var(--text3)' }}>הסכומים בש"ח</span>
         {flash > 0 && Date.now() - flash < 4000 && (
           <span style={{ fontSize:13.8, color:'var(--ok)', fontWeight:700, marginInlineStart:'auto' }}>נשמר ✓</span>
         )}
@@ -4442,7 +4445,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
               <th colSpan={3} className="fg-h fg-h-inc">הכנסות</th>
               <th colSpan={4} className="fg-h fg-h-exp">הוצאות</th>
               <th colSpan={5} className="fg-h fg-h-res">תוצאה</th>
-              <th colSpan={showSim ? 6 : 1} />
+              {showSim && <th colSpan={5} />}
             </tr>
             <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
               <TH>בית ספר</TH>
@@ -4458,7 +4461,6 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
               <TH>יתרה להשלמת הסניף</TH>
               <TH>תקציב שאושר (למילוי)</TH>
               <TH>חריגה</TH>
-              <TH>חריגה מתקן השעות</TH>
               {showSim && <TH>עלות הוראה מהתקציב</TH>}
               {showSim && <TH>הפרש מול השכר בפועל</TH>}
               {showSim && <TH>עלות שכר לשעה שבועית</TH>}
@@ -4468,68 +4470,69 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={showSim ? 18 : 13} style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</td></tr>
+              <tr><td colSpan={showSim ? 17 : 12} style={{ padding:22, textAlign:'center', fontSize:14.6, color:'var(--text3)' }}>טוען…</td></tr>
             ) : rows.map(({ sc, f, monthly, hourlyMonthly, annual, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, needed, cover, coverPct, remains }) => (
               <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                <td style={{ padding:'10px 12px', fontSize:15.5, fontWeight:700, whiteSpace:'nowrap' }}>{sc.name}</td>
+                <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:700 }}>{sc.name}
+                  {/* חריגה מתקן השעות — תגית ליד השם במקום עמודה, כדי שהטבלה תיכנס ברוחב */}
+                  {hoursOverQ > 0 && <span className="fin-hours" title="חריגה מתקן השעות">+{hoursOverQ} ש׳ מעל התקן</span>}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
                   ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
-                  : <span style={{ fontSize:16.1 }}>{money(per(f.ministryBudget))}</span>}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }} title="מתקציב מבט-רשת">{otherInc ? money(per(otherInc)) : '—'}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800 }}>{f.ministryBudget == null ? '—' : money(per(incomeAll))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600, whiteSpace:'nowrap' }}>{money(period === 'month' ? monthly : annual)}{hourlyMonthly > 0 && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }} title="צהרון ומשרות שעתיות — לא נכללים בהשוואה מול משרד החינוך">+ צהרון {money(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}</span>}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}
-                  title="כרית ביטחון 10% ומילוי מקום 5%, שניהם על עלות השכר השנתית">{money(per(reserve))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }} title="הוצאות שאינן שכר הוראה — מתקציב מבט-רשת">{otherExp ? money(per(otherExp)) : '—'}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800 }}>{money(per(expenseAll))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color: gapColor(gap) }}
-                  title='סה"כ הכנסות פחות סה"כ הוצאות'>{gap == null ? '—' : money(per(gap))}</td>
+                  : <span style={{ fontSize:14.6 }}>{num(per(f.ministryBudget))}</span>}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }} title="מתקציב מבט-רשת">{otherInc ? num(per(otherInc)) : '—'}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{f.ministryBudget == null ? '—' : num(per(incomeAll))}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:600, whiteSpace:'nowrap' }}>{num(period === 'month' ? monthly : annual)}{hourlyMonthly > 0 && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }} title="צהרון ומשרות שעתיות — לא נכללים בהשוואה מול משרד החינוך">+ צהרון {num(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}</span>}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }}
+                  title="כרית ביטחון 10% ומילוי מקום 5%, שניהם על עלות השכר השנתית">{num(per(reserve))}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }} title="הוצאות שאינן שכר הוראה — מתקציב מבט-רשת">{otherExp ? num(per(otherExp)) : '—'}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(per(expenseAll))}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700, color: gapColor(gap) }}
+                  title='סה"כ הכנסות פחות סה"כ הוצאות'>{gap == null ? '—' : num(per(gap))}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
                   ? moneyInput(sc.id, 'networkSupport', f.networkSupport)
-                  : <span style={{ fontSize:16.1 }}>{money(per(f.networkSupport))}</span>}</td>
-                <td style={{ textAlign:'center' }}><ToComplete left={left} /></td>
+                  : <span style={{ fontSize:14.6 }}>{num(per(f.networkSupport))}</span>}</td>
+                <td style={{ textAlign:'center' }}><ToComplete left={left} fmt={num} /></td>
                 <td style={{ textAlign:'center', whiteSpace:'nowrap' }}>
                   {period === 'year'
                     ? moneyInput(sc.id, 'networkCover', f.networkCover)
-                    : <span style={{ fontSize:16.1 }}>{money(per(f.networkCover))}</span>}
+                    : <span style={{ fontSize:14.6 }}>{num(per(f.networkCover))}</span>}
                 </td>
-                <td style={{ textAlign:'center' }}><Remains cover={cover} coverPct={coverPct} remains={remains} needed={needed} /></td>
-                <td style={{ textAlign:'center' }}><OverHours over={hoursOverQ} size={16.1} /></td>
-                {showSim && <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}>{f.teachingSim == null ? '—' : money(per(f.teachingSim))}</td>}
-                {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
+                <td style={{ textAlign:'center' }}><Remains cover={cover} coverPct={coverPct} remains={remains} needed={needed} fmt={num} /></td>
+                {showSim && <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }}>{f.teachingSim == null ? '—' : num(per(f.teachingSim))}</td>}
+                {showSim && <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700,
                   color: simGap == null ? 'var(--text3)' : simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
-                  {simGap == null ? '—' : money(per(simGap))}</td>}
+                  {simGap == null ? '—' : num(per(simGap))}</td>}
                 {showSim && <td style={{ textAlign:'center' }}><PerHour sim={perHourSim} actual={perHourActual} /></td>}
-                {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
+                {showSim && <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700,
                   color: chabadTransfer == null ? 'var(--text3)' : chabadTransfer > 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
-                  {chabadTransfer == null ? '—' : money(per(chabadTransfer))}</td>}
+                  {chabadTransfer == null ? '—' : num(per(chabadTransfer))}</td>}
                 {/* עמודה ריקה להקלדה — "דיוק השתתפות הרשת" (שרה, 10.9); לא נכנסת לשום חישוב */}
                 {showSim && <td style={{ textAlign:'center' }}>{period === 'year'
                   ? moneyInput(sc.id, 'networkSupportAdj', f.networkSupportAdj)
-                  : <span style={{ fontSize:16.1 }}>{money(per(f.networkSupportAdj))}</span>}</td>}
+                  : <span style={{ fontSize:14.6 }}>{num(per(f.networkSupportAdj))}</span>}</td>}
               </tr>
             ))}
           </tbody>
           {fin !== null && rows.length > 1 && (
             <tfoot>
               <tr style={{ borderTop:'2px solid var(--line)', background:'var(--apple-fill)' }}>
-                <td style={{ padding:'11px 12px', fontSize:16.1, fontWeight:800 }}>סה"כ הרשת</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.budget))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.otherInc))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800 }}>{money(per(tot.incomeAll))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(period === 'month' ? tot.monthly : tot.annual)}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.mm))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.otherExp))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800 }}>{money(per(tot.expenseAll))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color: gapColor(tot.gap) }}>{money(per(tot.gap))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.support))}</td>
-                <td style={{ textAlign:'center' }}><ToComplete left={tot.left} /></td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.cover))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color: coverColor(tot.remains) }}>{money(per(tot.remains))}</td>
-                <td style={{ textAlign:'center' }}><OverHours over={totOverHours} size={16.1} /></td>
-                {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.sim))}</td>}
-                {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
-                  color: tot.simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(per(tot.simGap))}</td>}
+                <td style={{ padding:'11px 12px', fontSize:14.6, fontWeight:800 }}>סה"כ הרשת
+                  {totOverHours > 0 && <span className="fin-hours" title="חריגה מתקן השעות — סה״כ">+{totOverHours} ש׳ מעל התקן</span>}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700 }}>{num(per(tot.budget))}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700 }}>{num(per(tot.otherInc))}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(per(tot.incomeAll))}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700 }}>{num(period === 'month' ? tot.monthly : tot.annual)}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700 }}>{num(per(tot.mm))}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700 }}>{num(per(tot.otherExp))}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(per(tot.expenseAll))}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700, color: gapColor(tot.gap) }}>{num(per(tot.gap))}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700 }}>{num(per(tot.support))}</td>
+                <td style={{ textAlign:'center' }}><ToComplete left={tot.left} fmt={num} /></td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700 }}>{num(per(tot.cover))}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700, color: coverColor(tot.remains) }}>{num(per(tot.remains))}</td>
+                {showSim && <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700 }}>{num(per(tot.sim))}</td>}
+                {showSim && <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700,
+                  color: tot.simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{num(per(tot.simGap))}</td>}
                 {/* לשעה, העברה ודיוק — פר בית ספר, בלי סיכום */}
                 {showSim && <td /> }
                 {showSim && <td /> }
