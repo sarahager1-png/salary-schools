@@ -106,7 +106,7 @@ export function formFields(t) {
 
 /*
   "למנהלים תעשה חישוב תלוש לפי עולם ישן עם תוספת בית חב"ד" (שרה, 3.9):
-  מנהל/ת בעולם הישן = בסיס לפי דרגה+ותק ב-100% + גמול ניהול (תפקיד
+  מנהל/ת בעולם הישן = בסיס לפי דרגה+ותק ב-133% (אם 143%) + גמול ניהול (תפקיד
   "מנהל", ותק ניהול = ותק בהוראה — הכרעת שרה, מספר כיתות מהתקציב).
   התוספת = הברוטו בפועל פחות התוצאה כאן — כמו אצל המורות.
 */
@@ -121,9 +121,15 @@ export function principalPlanFor(t, schoolName) {
   const darga = dargaFor(t);
   if (!darga) return { skip: `דרגה לא ממופה (${t.degree})` };
   const vetek = String(Math.max(1, Math.min(40, Number(t.seniority) || 1)));
-  return { calc: 'old', darga, vetek, pct: '100', kita: null,
+  return { calc: 'old', darga, vetek, pct: String(principalPct(t)), kita: null,
     nihul: { vetek, classes: String(classes) }, field: targetField() };
 }
+/*
+  "למנהלות זה 133 אחוז משרה ולאם 143 אחוז" (שרה, 22.9): 40 שעות ÷ 30
+  בעולם ישן = 133%, ולמנהלת שהיא אם עוד 10. עד 22.9 נשלח 100%.
+*/
+export const principalPct = (t) =>
+  (t.gender === 'f' && (Number(t.children_under_18 ?? t.childrenUnder18) || 0) > 0 ? 143 : 133);
 
 /** התכנון המלא של המרַיץ — כולל מי מדולגת ולמה. */
 export function planFor(t) {

@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 38;
+const BUILD = 39;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4901,7 +4901,9 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
       const sl = lines[t.id];
       if (sl?.gross) {
         const supp = Math.max(0, bd.gross - sl.gross);
-        return { darga: '—', vetek: t.seniority ?? '—', pct: 100, hours: 40,
+        // 133% בעולם ישן, 143% לאם (שרה, 22.9)
+        const pct = isMother(t) ? 143 : 133;
+        return { darga: '—', vetek: t.seniority ?? '—', pct, hours: 40,
           kita: false, base: sl.gross, supp, gross: bd.gross,
           paysSupp: supp > 0, principal: true, principalCalc: true };
       }
@@ -9948,8 +9950,8 @@ export default function App() {
             if (r.result_gross != null && row && isPrincipalRow(row)) {
               const gross = Number(row._agreedGross) || Number(row._officialGross) || 0;
               const supp = gross ? Math.max(0, Math.round(gross - r.result_gross)) : null;
-              // אפס מפורש = "הכול בסיס" (חני אסולין, שרה 9.9) — חישוב חוזר לא דורס אותו
-              if (supp != null && row._chabadSupp !== 0 && supp !== (row._chabadSupp ?? null)) {
+              // אסולין כמו כל המנהלות (שרה, 22.9) — החריג "אפס מפורש = הכול בסיס" מ-9.9 בוטל
+              if (supp != null && supp !== (row._chabadSupp ?? null)) {
                 await store.saveTeacher({ id: row.id, _chabadSupp: supp }, rowMonth);
               }
             } else if (r.result_gross != null && row && row._officialGross !== r.result_gross) {
