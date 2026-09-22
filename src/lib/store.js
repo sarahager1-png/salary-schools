@@ -107,6 +107,7 @@ const schoolToRow = (s) => ({
   hours_quota: s.hoursQuota ?? null,
   murkavut: s.murkavut ?? 1,
   chabad_supp: s.chabadSupp !== false,
+  pays_salary: s.paysSalary !== false,
   extra_hours: s.extraHours ?? 0,
   extra_hours_note: s.extraHoursNote ?? null,
   principal_email: s.principalEmail ?? null,
@@ -122,6 +123,7 @@ const rowToSchool = (r) => ({
   hoursQuota: r.hours_quota,
   murkavut: r.murkavut ?? 1,
   chabadSupp: r.chabad_supp !== false,
+  paysSalary: r.pays_salary !== false,   // false = הרשת אינה משלמת שכר (באר שבע, חיפה — 22.9)
   extraHours: r.extra_hours ?? 0,
   extraHoursNote: r.extra_hours_note,
   principalEmail: r.principal_email,

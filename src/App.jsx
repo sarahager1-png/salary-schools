@@ -4672,8 +4672,10 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
             {fin === null ? (
               <tr><td colSpan={showSim ? 17 : 12} style={{ padding:22, textAlign:'center', fontSize:14.6, color:'var(--text3)' }}>טוען…</td></tr>
             ) : rows.map(({ sc, f, monthly, hourlyMonthly, annual, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, needed, cover, coverPct, remains }) => (
-              <tr key={sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
+              <tr key={sc.id} className={sc.paysSalary === false ? 'fin-nopay' : undefined} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:700 }}>{sc.name}
+                  {/* "באר שבע וחיפה תצבע ותרשום לא לתשלום שכר" (שרה, 22.9) */}
+                  {sc.paysSalary === false && <span className="fin-nopay-tag">לא לתשלום שכר</span>}
                   {/* חריגה מתקן השעות — תגית ליד השם במקום עמודה, כדי שהטבלה תיכנס ברוחב */}
                   {hoursOverQ > 0 && <span className="fin-hours" title="חריגה מתקן השעות">+{hoursOverQ} ש׳ מעל התקן</span>}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
@@ -4750,8 +4752,9 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         {fin === null ? (
           <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
         ) : rows.map(({ sc, f, monthly, hourlyMonthly, annual, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, needed, cover, coverPct, remains }) => (
-          <div key={'m-' + sc.id} className="apple-card mcard">
-            <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
+          <div key={'m-' + sc.id} className={`apple-card mcard${sc.paysSalary === false ? ' fin-nopay-card' : ''}`}>
+            <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}
+              {sc.paysSalary === false && <span className="fin-nopay-tag" style={{ display:'inline-block', marginInlineStart:8 }}>לא לתשלום שכר</span>}</p>
             <CardRow label="הכנסות משרד החינוך">
               {period === 'year'
                 ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
