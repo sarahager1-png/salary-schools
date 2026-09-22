@@ -4200,7 +4200,9 @@ function MaternityPanel({ schools, teachers, onSaveTeacher }) {
   const [err, setErr] = useState('');
   const schoolName = id => schools.find(s => s.id === id)?.name || '';
   const same = (a, b) => String(a || '').trim() === String(b || '').trim();
-  const leaves = teachers.filter(t => t.leaveType === 'maternity');
+  // מי שכבר חזרה מהחופשה (תאריך החזרה עבר) אינה צריכה מחליפה — "חני בלוי חזרה ב-15.9" (שרה, 22.9)
+  const today = new Date().toISOString().slice(0, 10);
+  const leaves = teachers.filter(t => t.leaveType === 'maternity' && !(t.leaveTo && String(t.leaveTo).slice(0, 10) <= today));
   const onMat = (t) => leaves.some(l => l.schoolId === t.schoolId && same(l.name, t.mmFor));
   const noSub = leaves.filter(l => !teachers.some(x => x.schoolId === l.schoolId && x.id !== l.id && same(x.mmFor, l.name)));
   const casual = teachers.filter(t => Number(t.mmHours) > 0 && !onMat(t));

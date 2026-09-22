@@ -36,8 +36,20 @@ export default async function handler(req, res) {
   if (mErr) return res.status(500).json({ error: mErr.message });
 
   const { data: rows } = await sb.from('teacher_months').select('*').eq('month_key', prev);
+  /*
+    חל"ד שנגמרה (תאריך החזרה עד תחילת החודש החדש) — העובדת חוזרת לסטטוס
+    רגיל. ומחליפת חל"ד שומרת את "במקום מי" כל עוד הנעדרת עדיין בחופשה:
+    בלי זה, ב-1 בחודש כל מחליפה נמחקה והנעדרת חזרה להיספר בשכר מלא
+    ("חני בלוי חזרה ב-15.9", שרה 22.9.26). מילוי מקום שוטף (שעות) מתאפס.
+  */
+  const firstDay = `${key}-01`;
+  const ended = r => r.leave_type === 'maternity' && r.leave_to && String(r.leave_to).slice(0, 10) <= firstDay;
+  const stillOnLeave = new Set((rows ?? [])
+    .filter(r => r.leave_type === 'maternity' && !ended(r))
+    .map(r => `${r.school_id}|${String(r.name || '').trim()}`));
   const copied = (rows ?? []).map(r => {
     const { id, created_at, updated_at, ...rest } = r;
+    const coversLeave = r.mm_for && stillOnLeave.has(`${r.school_id}|${String(r.mm_for).trim()}`);
     return {
       ...rest,
       month_key: key,
@@ -47,7 +59,8 @@ export default async function handler(req, res) {
       payroll_ready: false,
       absence_days: 0,
       mm_hours: 0,
-      mm_for: null,
+      mm_for: coversLeave ? r.mm_for : null,
+      ...(ended(r) ? { leave_type: 'none', leave_from: null, leave_to: null } : {}),
     };
   });
   if (copied.length) {
