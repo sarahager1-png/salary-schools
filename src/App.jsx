@@ -4180,6 +4180,9 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
           ? { ...(h.detail || {}), teach: h.teach || null,
               basis: (h.hourRate || h.weeklyHours) ? { hourRate: h.hourRate ?? null, weeklyHours: h.weeklyHours ?? null } : null }
           : null;
+        // הכנסות נוספות שהוזנו ידנית (ירושלים, מהגיליון של רינה — שרה 22.9) —
+        // המשיכה לא מחליפה את שורות הפירוט שלהן, רק את שאר הפירוט.
+        if (wantDetail && src.incomeTotal === 'manual' && cur.detail?.income) wantDetail.income = cur.detail.income;
         if (wantDetail && JSON.stringify(wantDetail) !== JSON.stringify(cur.detail)) {
           patch.detail = wantDetail;
         }
