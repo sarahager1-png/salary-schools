@@ -44,7 +44,13 @@ function stripSchoolTag(name, schoolNames = []) {
   }
   return s.replace(/[״"'’]/g, '').replace(/\s+/g, ' ').trim();
 }
-const words = s => stripSchoolTag(s).split(' ').filter(w => w.length > 1);
+/*
+  שם קודם בתוכנת השכר ← השם במערכת. עובדת שהתחתנה נשארת בתלוש בשם
+  הנעורים: "אורנשטיין יעל" היא יעל ליפשיץ, אשקלון (שרה, 22.9). ההחלפה
+  על השם המלא בלבד, כדי שרחל אורנשטיין (מזכרת בתיה) לא תיגרר.
+*/
+const ALIASES = { 'אורנשטיין יעל': 'ליפשיץ יעל' };
+const words = s => { const n = stripSchoolTag(s); return (ALIASES[n] || n).split(' ').filter(w => w.length > 1); };
 
 /*
   מילה תואמת מילה גם בהבדל של אות אחת: "ויינטרוב"/"וינטרוב", "נסים"/"ניסים",
