@@ -5142,9 +5142,30 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
           </button>
         }
       />
-      {bySchool.map(({ sc, ts }) => {
+      {bySchool.map(({ sc, ts: tsAll }) => {
         const paysSupp = sc.chabadSupp !== false;
-        const rows = ts.map(t => ({ t, r: rowFor(t, paysSupp) }));
+        /*
+          "חסי בירנהאק פעמיים תלושים" (שרה, 22.9): עובדת עם משרת הוראה וגם
+          משרה שעתית (צהרון) היא תלוש אחד. השורה השעתית מתקפלת לשורת ההוראה
+          של אותה עובדת (לפי ת.ז., ובהיעדרה לפי שם) ומופיעה בה כתוספת.
+        */
+        const who = t => String(t.tzId || '').trim() || String(t.name || '').trim();
+        const mainOf = new Map(tsAll.filter(t => !isHourlyRow(t)).map(t => [who(t), t]));
+        const folded = new Map();   // id של שורת ההוראה → שורות שעתיות שלה
+        const ts = tsAll.filter(t => {
+          const main = isHourlyRow(t) ? mainOf.get(who(t)) : null;
+          if (!main) return true;
+          folded.set(main.id, [...(folded.get(main.id) || []), t]);
+          return false;
+        });
+        const extraOf = t => (folded.get(t.id) || []).map(h => ({ h, gross: Number(h._agreedGross) || Number(h._officialGross) || 0 }));
+        const rows = ts.map(t => {
+          const r = rowFor(t, paysSupp);
+          const ex = extraOf(t);
+          if (r.skip || !ex.length) return { t, r };
+          const add = ex.reduce((a, x) => a + x.gross, 0);
+          return { t, r: { ...r, gross: r.gross + add, base: r.base + add, extra: ex } };
+        });
         const live = rows.filter(x => !x.r.skip);
         const tot = live.reduce((a, x) => ({ base: a.base + x.r.base, supp: a.supp + x.r.supp, gross: a.gross + x.r.gross }),
           { base: 0, supp: 0, gross: 0 });
@@ -5221,7 +5242,12 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                       <td style={{ textAlign:'center' }}>{r.kita ? '✓' : ''}</td>
                       <td style={{ textAlign:'center' }}>{money(r.base)}</td>
                       <td style={{ textAlign:'center' }}>{r.paysSupp ? money(r.supp) : '—'}</td>
-                      <td style={{ textAlign:'center', fontWeight:800 }}>{money(r.gross)}</td>
+                      <td style={{ textAlign:'center', fontWeight:800 }}>{money(r.gross)}
+                        {r.extra?.map(({ h, gross }) => (
+                          <span key={h.id} style={{ display:'block', fontSize:12.6, fontWeight:600, color:'var(--text3)' }}>
+                            כולל {jobLabel(h.job)} {money(gross)}
+                          </span>
+                        ))}</td>
                       <td style={{ textAlign:'center' }} onClick={e => e.stopPropagation()}>
                         {onSaveSlipGross ? (
                           <input type="number" min="0" dir="ltr" className="apple-input" inputMode="numeric"
