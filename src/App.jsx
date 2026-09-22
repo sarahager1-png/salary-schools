@@ -4226,7 +4226,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
     catch (e) { setErr(e.message); }
   };
 
-  const money = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
+  const money = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
 
   const rows = schools.map(sc => {
     const f = fin?.[sc.id] || {};
@@ -4377,7 +4377,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
         // הקלדה ידנית מסמנת בעלות: המשיכה לא תדרוס אותה יותר
         if (v !== (val ?? null)) save(sid, { [field]: v, src: { ...((fin?.[sid] || {}).src || {}), [field]: 'manual' } });
       }}
-      style={{ width:112, textAlign:'center', fontSize:15.5, fontWeight:600, padding:'6px 7px' }} />
+      style={{ width:104, textAlign:'center', fontSize:15, fontWeight:600, padding:'5px 6px', background:'var(--surface)' }} />
   );
 
   return (
@@ -4428,8 +4428,22 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
           תוספת 5% ו-10% ← סה"כ ← פער עלות הוראה ← מענק רשת ← יתרה להשלמת
           הסניף ← תקציב שאושר (למילוי) ← חריגה. ובסוף עמודות התחשיב. */}
       <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
-        <table className="sticky-first" style={{ width:'100%', borderCollapse:'collapse' }}>
+        <table className="sticky-first fin-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+          {/* רקע לפי קבוצה: הכנסות ירקרק, הוצאות ורדרד, תוצאה סגלגל (שרה: "תעצב", 22.9) */}
+          <colgroup>
+            <col />
+            <col className="fg-inc" /><col className="fg-inc" /><col className="fg-inc fg-sum" />
+            <col className="fg-exp" /><col className="fg-exp" /><col className="fg-exp" /><col className="fg-exp fg-sum" />
+            <col className="fg-res" /><col className="fg-res" /><col className="fg-res fg-sum" /><col className="fg-res" /><col className="fg-res" />
+          </colgroup>
           <thead>
+            <tr className="fin-groups">
+              <th />
+              <th colSpan={3} className="fg-h fg-h-inc">הכנסות</th>
+              <th colSpan={4} className="fg-h fg-h-exp">הוצאות</th>
+              <th colSpan={5} className="fg-h fg-h-res">תוצאה</th>
+              <th colSpan={showSim ? 6 : 1} />
+            </tr>
             <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
               <TH>בית ספר</TH>
               <TH>הכנסות משרד החינוך</TH>
@@ -4462,12 +4476,12 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
                   ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
                   : <span style={{ fontSize:16.1 }}>{money(per(f.ministryBudget))}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }} title="מתקציב מבט-רשת">{otherInc ? money(per(otherInc)) : '—'}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color:'var(--ok, #2e7d32)' }}>{f.ministryBudget == null ? '—' : money(per(incomeAll))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(period === 'month' ? monthly : annual)}{hourlyMonthly > 0 && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }} title="צהרון ומשרות שעתיות — לא נכללים בהשוואה מול משרד החינוך">+ צהרון {money(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}</span>}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800 }}>{f.ministryBudget == null ? '—' : money(per(incomeAll))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600, whiteSpace:'nowrap' }}>{money(period === 'month' ? monthly : annual)}{hourlyMonthly > 0 && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }} title="צהרון ומשרות שעתיות — לא נכללים בהשוואה מול משרד החינוך">+ צהרון {money(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}
                   title="כרית ביטחון 10% ומילוי מקום 5%, שניהם על עלות השכר השנתית">{money(per(reserve))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }} title="הוצאות שאינן שכר הוראה — מתקציב מבט-רשת">{otherExp ? money(per(otherExp)) : '—'}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color:'var(--danger)' }}>{money(per(expenseAll))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800 }}>{money(per(expenseAll))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color: gapColor(gap) }}
                   title='סה"כ הכנסות פחות סה"כ הוצאות'>{gap == null ? '—' : money(per(gap))}</td>
                 <td style={{ textAlign:'center' }}>{period === 'year'
@@ -4502,11 +4516,11 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
                 <td style={{ padding:'11px 12px', fontSize:16.1, fontWeight:800 }}>סה"כ הרשת</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.budget))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.otherInc))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800, color:'var(--ok, #2e7d32)' }}>{money(per(tot.incomeAll))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800 }}>{money(per(tot.incomeAll))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(period === 'month' ? tot.monthly : tot.annual)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.mm))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.otherExp))}</td>
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800, color:'var(--danger)' }}>{money(per(tot.expenseAll))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:800 }}>{money(per(tot.expenseAll))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color: gapColor(tot.gap) }}>{money(per(tot.gap))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.support))}</td>
                 <td style={{ textAlign:'center' }}><ToComplete left={tot.left} /></td>
@@ -4541,7 +4555,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
                 : money(per(f.ministryBudget))}
             </CardRow>
             <CardRow label="הכנסות נוספות" color="var(--text2)">{otherInc ? money(per(otherInc)) : '—'}</CardRow>
-            <CardRow label='סה"כ הכנסות' strong color="var(--ok, #2e7d32)">{f.ministryBudget == null ? '—' : money(per(incomeAll))}</CardRow>
+            <CardRow label='סה"כ הכנסות' strong>{f.ministryBudget == null ? '—' : money(per(incomeAll))}</CardRow>
             <CardRow label="עלות הוראה">{money(period === 'month' ? monthly : annual)}</CardRow>
             {hourlyMonthly > 0 && (
               <CardRow label="צהרון ומשרות שעתיות (מחוץ להשוואה)" color="var(--text3)">
@@ -4550,7 +4564,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
             )}
             <CardRow label='תוספת 10% + מ"מ 5%' color="var(--text2)">{money(per(reserve))}</CardRow>
             <CardRow label="הוצאות נוספות" color="var(--text2)">{otherExp ? money(per(otherExp)) : '—'}</CardRow>
-            <CardRow label='סה"כ הוצאות' strong color="var(--danger)">{money(per(expenseAll))}</CardRow>
+            <CardRow label='סה"כ הוצאות' strong>{money(per(expenseAll))}</CardRow>
             <CardRow label="פער הכנסות מול הוצאות" color={gapColor(gap)}>{gap == null ? '—' : money(per(gap))}</CardRow>
             <CardRow label="מענק רשת">
               {period === 'year'
@@ -4599,11 +4613,11 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
             <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ הרשת</p>
             <CardRow label="הכנסות משרד החינוך">{money(per(tot.budget))}</CardRow>
             <CardRow label="הכנסות נוספות" color="var(--text2)">{money(per(tot.otherInc))}</CardRow>
-            <CardRow label='סה"כ הכנסות' strong color="var(--ok, #2e7d32)">{money(per(tot.incomeAll))}</CardRow>
+            <CardRow label='סה"כ הכנסות' strong>{money(per(tot.incomeAll))}</CardRow>
             <CardRow label="עלות הוראה">{money(period === 'month' ? tot.monthly : tot.annual)}</CardRow>
             <CardRow label='תוספת 10% + מ"מ 5%' color="var(--text2)">{money(per(tot.mm))}</CardRow>
             <CardRow label="הוצאות נוספות" color="var(--text2)">{money(per(tot.otherExp))}</CardRow>
-            <CardRow label='סה"כ הוצאות' strong color="var(--danger)">{money(per(tot.expenseAll))}</CardRow>
+            <CardRow label='סה"כ הוצאות' strong>{money(per(tot.expenseAll))}</CardRow>
             <CardRow label="פער הכנסות מול הוצאות" color={gapColor(tot.gap)}>{money(per(tot.gap))}</CardRow>
             <CardRow label="מענק רשת">{money(per(tot.support))}</CardRow>
             <CardRow label="יתרה להשלמת הסניף" strong><ToComplete left={tot.left} /></CardRow>

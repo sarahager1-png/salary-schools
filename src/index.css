@@ -868,3 +868,25 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 @media (pointer: coarse) {
   .even-grid > :is(button, a, label, [role="tab"], [role="radio"]) { min-height: 44px; }
 }
+
+/* ── הכנסות מול הוצאות: קבוצות צבע (שרה, 22.9) ── */
+.fin-table td, .fin-table th { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fin-table td { padding: 9px 8px; }
+.fin-table col.fg-inc { background: #F3FBF6; }
+.fin-table col.fg-exp { background: #FDF6F6; }
+.fin-table col.fg-res { background: #F7F4FC; }
+.fin-table col.fg-inc.fg-sum { background: #E6F6EC; }
+.fin-table col.fg-exp.fg-sum { background: #FBEBEB; }
+.fin-table col.fg-res.fg-sum { background: #EFE9FA; }
+.fin-table .fg-h { padding: 9px 8px 6px; font-size: 13.8px; font-weight: 800; letter-spacing: .02em; text-align: center; }
+.fin-table .fg-h-inc { color: #15803D; background: #E6F6EC; border-bottom: 2px solid #86CFA0; }
+.fin-table .fg-h-exp { color: #B42318; background: #FBEBEB; border-bottom: 2px solid #F0A8A8; }
+.fin-table .fg-h-res { color: var(--purple); background: #EFE9FA; border-bottom: 2px solid #C9B8EC; }
+.fin-table .fin-groups th:first-child { background: var(--surface); }
+.fin-table tbody tr:hover td { background: rgba(0,0,0,.025); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .fin-table col.fg-inc { background: rgba(34,197,94,.06); }
+  :root:not([data-theme="light"]) .fin-table col.fg-exp { background: rgba(239,68,68,.06); }
+  :root:not([data-theme="light"]) .fin-table col.fg-res { background: rgba(139,92,246,.07); }
+  :root:not([data-theme="light"]) .fin-table col.fg-sum { background: rgba(255,255,255,.06); }
+}
