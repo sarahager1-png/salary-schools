@@ -620,6 +620,21 @@ function payBreakdown(t) {
 
 // ברוטו למעסיק = בסיס + 40% · תוספת + 30%.
 // זהו אומדן. כשהנהלת החשבונות מזינה את עלות המעביד בפועל, היא גוברת.
+/*
+  חזרה מחל"ד באמצע החודש — נספרת רק מהיום שאחרי החזרה ("שיחשב רק מה-16",
+  שרה 22.9 על חני בלוי, שחזרה ב-15/9). היחס לפי ימים מתוך החודש; שורה שיש
+  לה עלות מתלוש בפועל אינה מוכפלת — התלוש כבר חלקי.
+*/
+function midMonthFactor(t) {
+  if (t?.leaveType !== 'maternity' || !t?.leaveTo || !t?.monthKey) return 1;
+  const [y, m] = String(t.monthKey).split('-').map(Number);
+  const d = new Date(String(t.leaveTo).slice(0, 10));
+  if (!y || !m || Number.isNaN(d.getTime())) return 1;
+  if (d.getFullYear() !== y || d.getMonth() + 1 !== m) return 1;
+  const days = new Date(y, m, 0).getDate();
+  return Math.min(1, Math.max(0, (days - d.getDate()) / days));
+}
+
 function calcEmployer(t) {
   // חל"ת: איפוס מלא — אין שכר ואין חובת הפרשות.
   if (t.leaveType === 'unpaid') {
@@ -632,7 +647,7 @@ function calcEmployer(t) {
   // על הבסיס הרגיל. יורדים: השכר, מס שכר, ביטוח לאומי, הבראה וביגוד.
   // כל עוד לא שובצה מחליפה, השכר נשאר מלא בתקציב — הוראת שרה 28.8.
   // ברגע ששורה אחרת נושאת את שמה ב"במקום מי", עוברים למצב ההפרשות.
-  if (t.leaveType === 'maternity' && hasSubstitute(t)) {
+  if (t.leaveType === 'maternity' && hasSubstitute(t) && midMonthFactor(t) === 1) {
     const bd = payBreakdown(t);
     const parts = [
       { key:'pension', label:'פנסיה ופיצויים (חל"ד)', rate:PENSION_RATE, on:bd.base, amount: Math.round(bd.base * PENSION_RATE) },
@@ -708,11 +723,14 @@ function calcEmployer(t) {
   const employerSupp = supplementCost(base, supplement, extras.biguud, extras.havraah);
   const employerBase = estimate - employerSupp;
   const actual   = Number(t._actualEmployerCost) || 0;
-  const social   = actual || Math.round(estimate * calibOf(t));
+  const part     = actual ? 1 : midMonthFactor(t);   // חזרה מחל"ד באמצע החודש
+  const social   = actual || Math.round(estimate * calibOf(t) * part);
+  const grossPart = Math.round(gross * part);
   return {
-    gross, base, mom, supplement, employerBase, employerSupp, social,
-    estimate, isEstimate: !actual, mmPay,
-    total: gross + social + mmPay,
+    gross: grossPart, base: Math.round(base * part), mom, supplement: Math.round(supplement * part),
+    employerBase, employerSupp, social,
+    estimate, isEstimate: !actual, mmPay, partOfMonth: part,
+    total: grossPart + social + mmPay,
     parts,                                    // הפירוט המלא, שורה לכל רכיב
     // השיעור בפועל, מעל הברוטו לעובדת. עם רצפת ה-140% הוא לא יורד מ-40%,
     // ועולה מעליה במורה שרוב שכרה בסיס (פנסיה וקרן חלות על הבסיס בלבד).
@@ -722,6 +740,7 @@ function calcEmployer(t) {
 }
 
 export {
+  midMonthFactor,
   CALIB,
   CALIB_ALL,
   setCalib,
