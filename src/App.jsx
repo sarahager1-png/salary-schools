@@ -4432,7 +4432,14 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
 
   const rows = schools.map(sc => {
     const f = fin?.[sc.id] || {};
-    const monthly = monthlyCost(sc.id);
+    /*
+      "לא הגיוני עם קרית ביאליק" (שרה, 22.9): בית ספר שהרשת משלמת בו שכר
+      ועדיין אין בו עובדות — עלות ההוראה מהתקציב (teachingSim), מסומנת
+      "לפי התקציב", עד שיוזנו העובדות. לא לתשלום שכר (באר שבע, חיפה) — 0.
+    */
+    const realMonthly = monthlyCost(sc.id);
+    const costFromBudget = !realMonthly && sc.paysSalary !== false && f.teachingSim > 0;
+    const monthly = costFromBudget ? f.teachingSim / 12 : realMonthly;
     const annual  = monthly * 12;
     const hourlyMonthly = hourlyCost(sc.id);   // צהרון — מחוץ להשוואה מול המשרד
     const mmCost  = annual * MM_PCT;   // 5% מסך עלות ההוראה השנתית
@@ -4505,12 +4512,12 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
     const cover = f.networkCover;
     const coverPct = (cover != null && needed > 0) ? Math.round(cover / needed * 100) : null;
     const remains  = (cover != null && needed != null) ? needed - cover : null;
-    return { sc, f, monthly, hourlyMonthly, annual, mmCost, bufferCost, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left: leftAll, needed, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer,
+    return { sc, f, monthly, costFromBudget, hourlyMonthly, annual, mmCost, bufferCost, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left: leftAll, needed, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer,
       cover, coverPct, remains };
   })
     // "תוריד אותם למטה בטבלה, גם את קרית ביאליק" (שרה, 22.9): בתי ספר בלי
     // מחזור שכר — לא לתשלום שכר, או שאין בהם עדיין עובדות — בסוף הטבלה
-    .map((r, i) => ({ r, i, low: r.sc.paysSalary === false || !r.monthly }))
+    .map((r, i) => ({ r, i, low: r.sc.paysSalary === false || !r.monthly || r.costFromBudget }))
     .sort((a, b) => (a.low - b.low) || (a.i - b.i))
     .map(x => x.r);
   // תצוגת "תחשיב · בפועל" לשעה — אותו רכיב בטבלה ובכרטיס
@@ -4676,7 +4683,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
           <tbody>
             {fin === null ? (
               <tr><td colSpan={showSim ? 17 : 12} style={{ padding:22, textAlign:'center', fontSize:14.6, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : rows.map(({ sc, f, monthly, hourlyMonthly, annual, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, needed, cover, coverPct, remains }) => (
+            ) : rows.map(({ sc, f, monthly, costFromBudget, hourlyMonthly, annual, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, needed, cover, coverPct, remains }) => (
               <tr key={sc.id} className={sc.paysSalary === false ? 'fin-nopay' : undefined} style={{ borderBottom:'1px solid var(--line)' }}>
                 <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:700 }}>{sc.name}
                   {/* "באר שבע וחיפה תצבע ותרשום לא לתשלום שכר" (שרה, 22.9) */}
@@ -4688,7 +4695,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                   : <span style={{ fontSize:14.6 }}>{num(per(f.ministryBudget))}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }} title="מתקציב מבט-רשת">{otherInc ? num(per(otherInc)) : '—'}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{f.ministryBudget == null ? '—' : num(per(incomeAll))}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:600, whiteSpace:'nowrap' }}>{num(period === 'month' ? monthly : annual)}{hourlyMonthly > 0 && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }} title="צהרון ומשרות שעתיות — לא נכללים בהשוואה מול משרד החינוך">+ צהרון {num(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}</span>}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:600, whiteSpace:'nowrap' }}>{num(period === 'month' ? monthly : annual)}{costFromBudget && <span className="fin-budget-tag" title="אין עדיין עובדות במערכת — עלות ההוראה מתקציב בית הספר">לפי התקציב</span>}{hourlyMonthly > 0 && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }} title="צהרון ומשרות שעתיות — לא נכללים בהשוואה מול משרד החינוך">+ צהרון {num(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }}
                   title="כרית ביטחון 10% ומילוי מקום 5%, שניהם על עלות השכר השנתית">{num(per(reserve))}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }} title="הוצאות שאינן שכר הוראה — מתקציב מבט-רשת">{otherExp ? num(per(otherExp)) : '—'}</td>
@@ -4756,7 +4763,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
       <div className="only-mobile">
         {fin === null ? (
           <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
-        ) : rows.map(({ sc, f, monthly, hourlyMonthly, annual, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, needed, cover, coverPct, remains }) => (
+        ) : rows.map(({ sc, f, monthly, costFromBudget, hourlyMonthly, annual, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, needed, cover, coverPct, remains }) => (
           <div key={'m-' + sc.id} className={`apple-card mcard${sc.paysSalary === false ? ' fin-nopay-card' : ''}`}>
             <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}
               {sc.paysSalary === false && <span className="fin-nopay-tag" style={{ display:'inline-block', marginInlineStart:8 }}>לא לתשלום שכר</span>}</p>
@@ -4767,7 +4774,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
             </CardRow>
             <CardRow label="הכנסות נוספות" color="var(--text2)">{otherInc ? money(per(otherInc)) : '—'}</CardRow>
             <CardRow label='סה"כ הכנסות' strong>{f.ministryBudget == null ? '—' : money(per(incomeAll))}</CardRow>
-            <CardRow label="עלות הוראה">{money(period === 'month' ? monthly : annual)}</CardRow>
+            <CardRow label={costFromBudget ? 'עלות הוראה (לפי התקציב)' : 'עלות הוראה'}>{money(period === 'month' ? monthly : annual)}</CardRow>
             {hourlyMonthly > 0 && (
               <CardRow label="צהרון ומשרות שעתיות (מחוץ להשוואה)" color="var(--text3)">
                 {money(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}
