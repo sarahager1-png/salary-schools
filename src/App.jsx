@@ -4665,7 +4665,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
               <TH>הכנסות משרד החינוך</TH>
               <TH>הכנסות נוספות</TH>
               <TH>סה"כ הכנסות</TH>
-              <TH>עלות שכר כוללת</TH>
+              <TH>עלות כוללת</TH>
               <TH>תוספת 10% + מ"מ 5%</TH>
               <TH>הוצאות נוספות</TH>
               <TH>סה"כ הוצאות</TH>
@@ -4775,7 +4775,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
             </CardRow>
             <CardRow label="הכנסות נוספות" color="var(--text2)">{otherInc ? money(per(otherInc)) : '—'}</CardRow>
             <CardRow label='סה"כ הכנסות' strong>{f.ministryBudget == null ? '—' : money(per(incomeAll))}</CardRow>
-            <CardRow label={costFromBudget ? 'עלות שכר כוללת (לפי התקציב)' : 'עלות שכר כוללת'}>{money(period === 'month' ? monthly : annual)}</CardRow>
+            <CardRow label={costFromBudget ? 'עלות כוללת (לפי התקציב)' : 'עלות כוללת'}>{money(period === 'month' ? monthly : annual)}</CardRow>
             {hourlyMonthly > 0 && (
               <CardRow label="צהרון ומשרות שעתיות (מחוץ להשוואה)" color="var(--text3)">
                 {money(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}
@@ -4833,7 +4833,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
             <CardRow label="הכנסות משרד החינוך">{money(per(tot.budget))}</CardRow>
             <CardRow label="הכנסות נוספות" color="var(--text2)">{money(per(tot.otherInc))}</CardRow>
             <CardRow label='סה"כ הכנסות' strong>{money(per(tot.incomeAll))}</CardRow>
-            <CardRow label="עלות שכר כוללת">{money(period === 'month' ? tot.monthly : tot.annual)}</CardRow>
+            <CardRow label="עלות כוללת">{money(period === 'month' ? tot.monthly : tot.annual)}</CardRow>
             <CardRow label='תוספת 10% + מ"מ 5%' color="var(--text2)">{money(per(tot.mm))}</CardRow>
             <CardRow label="הוצאות נוספות" color="var(--text2)">{money(per(tot.otherExp))}</CardRow>
             <CardRow label='סה"כ הוצאות' strong>{money(per(tot.expenseAll))}</CardRow>
@@ -4854,7 +4854,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         )}
       </div>
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
-        <b>עלות שכר כוללת</b> — כל עובדי ההוראה של בית הספר: מורות, מנהלת, ייעוץ ושילוב. צהרון ומשרות שעתיות מוצגים בנפרד.
+        <b>עלות כוללת</b> — כל עובדי ההוראה של בית הספר: מורות, מנהלת, ייעוץ ושילוב. צהרון ומשרות שעתיות מוצגים בנפרד.
         {' '}<b>סה"כ הכנסות</b> — הכנסות משרד החינוך ועוד ההכנסות הנוספות מתקציב מבט-רשת.
         {' '}<b>סה"כ הוצאות</b> — עלות השכר הכוללת, תוספת ביטחון 10% ומילוי מקום 5% (על עלות השכר השנתית), ועוד ההוצאות הנוספות מתקציב מבט-רשת.
         {' '}<b>פער הכנסות מול הוצאות</b> — סה"כ הכנסות פחות סה"כ הוצאות.
