@@ -893,7 +893,7 @@ function RejectDialog({ t, schoolName, onCancel, onConfirm }) {
   );
 }
 
-function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose }) {
+function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose, fixes = [], onDecideFix }) {
   // דיווחי מנהלות — השלב הראשון: בלי אישורה אין סימולציה ואין שכר (21.9.26)
   const reports = onApproveReport ? teachers.filter(reportPending) : [];
   const [rejecting, setRejecting] = useState(null);
@@ -926,6 +926,48 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
             <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ fontSize:14.9 }}>סגור</button>
           </div>
         </div>
+
+        {/* תיקונים שהוצעו מהשרת — "תמלא, אני מאשרת" (שרה, 22.9) */}
+        {fixes.length > 0 && (
+          <div className="apple-card" style={{ padding:16, marginBottom:16, borderRight:'3px solid var(--apple-blue)' }}>
+            <p style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-text)', marginBottom:4 }}>
+              {fixes.length} תיקונים ממתינים לאישורך
+            </p>
+            <p style={{ fontSize:13.8, color:'var(--apple-text2)', marginBottom:12 }}>
+              הוכנו לפי תשובות המנהלות. "אשרי" שומר את התיקון בשורת העובדת.
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {fixes.map(f => {
+                const t = teachers.find(x => x.id === f.teacherId);
+                if (!t) return null;
+                return (
+                  <div key={f.id} style={{ border:'1px solid var(--line, #e5e5ea)', borderRadius:12, padding:12, background:'var(--surface, #fff)' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, flexWrap:'wrap' }}>
+                      <div style={{ minWidth:0 }}>
+                        <p style={{ fontWeight:600, fontSize:16.1, color:'var(--apple-text)' }}>{t.name}</p>
+                        <p style={{ fontSize:13.8, color:'var(--apple-text2)' }}>{schoolName(t.schoolId)}{f.source ? ` · ${f.source}` : ''}</p>
+                        {Object.entries(f.patch).map(([k, v]) => (
+                          <div key={k} style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', fontSize:13.8, marginTop:4 }}>
+                            <span style={{ color:'var(--apple-text2)' }}>{FIELD_LBL[k] || (k === 'tzId' ? 'ת.ז.' : k)}:</span>
+                            <span style={{ textDecoration:'line-through', color:'var(--apple-red)' }}>{readableVal(k, t[k]) || '—'}</span>
+                            <span style={{ color:'var(--apple-text3)' }}>→</span>
+                            <span style={{ fontWeight:600, color:'var(--apple-green)' }}>{readableVal(k, v)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                        <button className="apple-btn apple-btn-ghost" onClick={() => onDecideFix(f, false)}
+                          style={{ fontSize:14.9, padding:'7px 14px', color:'var(--danger)' }}>לא לאשר</button>
+                        <button className="apple-btn apple-btn-green" onClick={() => onDecideFix(f, true)}
+                          style={{ fontSize:14.9, padding:'7px 16px' }}>אשרי</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* דיווחי מנהלות שממתינים לאישור — לפני סימולציה */}
         {reports.length > 0 && (
@@ -10010,6 +10052,7 @@ export default function App() {
   const [user,    setUser]    = useState(null);   // הפרופיל: תפקיד, שם, בית ספר
   const [schools, setSchools] = useState([]);
   const [months,  setMonths]  = useState({});
+  const [fixes,   setFixes]   = useState([]);   // תיקונים שהוצעו מהשרת (22.9)
   // מועדי הדיווח לכל חודש — מסך הדיווח של המנהלת סופר לפיהם
   const [due,     setDue]     = useState({});
   const [activeMonth, setActiveMonth] = useState(nowMonthKey());
@@ -10044,6 +10087,7 @@ export default function App() {
   // כל שינוי נשמר בשרת ואז נטען מחדש. פשוט, ותמיד מסונכרן עם מה שבאמת נשמר.
   const refresh = useCallback(async () => {
     const data = await store.loadAll();
+    store.listFixes().then(setFixes).catch(() => setFixes([]));
     setSchools(data.schools);
     for (const sc of (data.schools || [])) CHABAD_SUPP.set(sc.id, sc.chabadSupp !== false);
     setMonths(data.months);
@@ -10343,6 +10387,15 @@ export default function App() {
     await store.saveTeacher({ ...t, ...prev, _snapshot: null, _changedAt: null }, activeMonth);
     if (__approved !== false) await store.approve([t.id]);
   });
+  // תיקון שהשרת הציע: "אשר" מחיל אותו על השורה (כמו עריכה של שרה), "לא לאשר" רק מסמן
+  const onDecideFix = (f, ok) => run(async () => {
+    if (ok) {
+      const t = teachers.find(x => x.id === f.teacherId);
+      if (!t) throw new Error('העובדת לא נמצאה בחודש הזה');
+      await onSaveTeacher({ ...t, ...f.patch });
+    }
+    await store.decideFix(f.id, ok ? 'applied' : 'rejected');
+  });
   const onApproveReport = (rows) => run(async () => {
     const done = await store.approveReport(rows.map(t => t.id));
     for (const t of done) {
@@ -10370,8 +10423,9 @@ export default function App() {
   // החודש הראשון מסומן בבורר החודשים — זה כל תפקידו מעכשיו
   const firstMonthKey = Object.keys(months).sort()[0] || activeMonth;
   const needsSimCount      = teachers.filter(needsSim).length;
+  const liveFixes = fixes.filter(f => teachers.some(t => t.id === f.teacherId));
   const needsApprovalCount = teachers.filter(needsApproval).length
-    + (user.role === 'coordinator' ? teachers.filter(reportPending).length : 0);
+    + (user.role === 'coordinator' ? teachers.filter(reportPending).length + liveFixes.length : 0);
   const sortedMonthKeys    = Object.keys(months).sort();
 
   // Principal goes directly to their school
@@ -10783,6 +10837,8 @@ export default function App() {
           schools={schools}
           onApprove={onApproveTeacher}
           onReject={user.role === 'coordinator' ? onRejectTeacher : null}
+          fixes={user.role === 'coordinator' ? liveFixes : []}
+          onDecideFix={onDecideFix}
           onApproveAll={onApproveAll}
           onApproveReport={user.role === 'coordinator' ? onApproveReport : null}
           onClose={() => setShowApproval(false)}

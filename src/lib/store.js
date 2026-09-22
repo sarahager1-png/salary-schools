@@ -634,6 +634,21 @@ export async function documentUrl(doc) {
    השליח מנפיק קישור למנהלת קיימת בלי טרמינל. יצירת פרופיל חדש עדיין
    דורשת את מפתח השרת (scripts/make-link.mjs) — הדפדפן אינו רשאי.
 */
+/* ── תיקונים ממתינים לאישור (22.9.26) ──────────────────────────
+   השרת מציע, שרה מאשרת. האישור מוחל מהמסך (saveTeacher בהרשאות שלה). */
+export async function listFixes() {
+  const { data, error } = await supabase.from('proposed_fixes')
+    .select('id, teacher_month_id, patch, source, created_at').eq('status', 'pending').order('created_at');
+  if (error) return [];   // לא רכזת / הטבלה חסרה — פשוט אין תיקונים
+  return (data || []).map(f => ({ id: f.id, teacherId: f.teacher_month_id, patch: f.patch || {}, source: f.source, createdAt: f.created_at }));
+}
+export async function decideFix(id, status) {
+  const { data: u } = await supabase.auth.getUser();
+  const { error } = await supabase.from('proposed_fixes')
+    .update({ status, decided_at: new Date().toISOString(), decided_by: u?.user?.id ?? null }).eq('id', id);
+  raise(error, 'שמירת ההחלטה נכשלה');
+}
+
 // הודעה בודדת לתור — יוצאת מהקו של שרה ב-queue-drain ("לא לאשר", 22.9)
 export async function queueMessage({ kind, to_phone, to_name, body }) {
   const { error } = await supabase.from('notifications').insert({ kind, to_phone, to_name, body });
