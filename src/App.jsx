@@ -143,6 +143,10 @@ const FIELDS = [
   { key:'leaveType',       label:'סטטוס',          base:true,  tracked:true,  fmt: v => leaveLabel(v) },
   { key:'leaveFrom',       label:'יציאה לחופשה',   base:true,  tracked:true,  fmt: v => fmtDay(v) },
   { key:'leaveTo',         label:'חזרה מחופשה',    base:true,  tracked:true,  fmt: v => fmtDay(v) },
+  // "רק אני מאשרת — אם לא אישרתי לא נכנס" (שרה, 22.9): מילוי מקום מפיל את
+  // האישור כמו כל נתון שכר, והתשלום עליו נספר רק בשורה מאושרת (employer.js)
+  { key:'mmHours',         label:'שעות ממ"מ',      base:true,  tracked:true },
+  { key:'mmFor',           label:'במקום מי',       base:true,  tracked:true,  fmt: v => v || '—' },
   { key:'isTemp',          label:'שיבוץ זמני',     base:false, tracked:true,  fmt: v => v ? 'כן' : 'לא' },
   { key:'startDate',       label:'מתאריך',         base:false, tracked:true,  fmt: v => v.split('-').reverse().join('/') },
   { key:'endDate',         label:'עד תאריך',       base:false, tracked:true,  fmt: v => v.split('-').reverse().join('/') },
@@ -4101,7 +4105,96 @@ function CardRow({ label, strong, color, children }) {
   );
 }
 
-function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
+/*
+  "לכל חופשת לידה יש מחליפה?" / "תשמור את ירושלים" (שרה, 22.9).
+  השרת אינו רשאי לשנות שדות שכר (טריגר) — לכן הפאנל כאן, והשמירה
+  עוברת ב-onSaveTeacher עם ההרשאות של שרה, כמו עריכה בפירוט המשרות.
+  א. חל"ד בלי מחליפה: לוחצים על שם המחליפה → "במקום מי" = שם הנעדרת,
+     שעות מילוי מקום 0 (מחליפת חל"ד מקבלת את שכרה הרגיל — היא המשרה).
+  ב. מילוי מקום שוטף (שעות, לא לחל"ד): מחיקה בלחיצה, שורה אחר שורה.
+*/
+function MaternityPanel({ schools, teachers, onSaveTeacher }) {
+  const [busy, setBusy] = useState('');
+  const [done, setDone] = useState({});
+  const [err, setErr] = useState('');
+  const schoolName = id => schools.find(s => s.id === id)?.name || '';
+  const same = (a, b) => String(a || '').trim() === String(b || '').trim();
+  const leaves = teachers.filter(t => t.leaveType === 'maternity');
+  const onMat = (t) => leaves.some(l => l.schoolId === t.schoolId && same(l.name, t.mmFor));
+  const noSub = leaves.filter(l => !teachers.some(x => x.schoolId === l.schoolId && x.id !== l.id && same(x.mmFor, l.name)));
+  const casual = teachers.filter(t => Number(t.mmHours) > 0 && !onMat(t));
+  if (!noSub.length && !casual.length) return null;
+  const run = async (key, t, patch) => {
+    setBusy(key); setErr('');
+    try { await onSaveTeacher({ ...t, ...patch }); setDone(d => ({ ...d, [key]: true })); }
+    catch (e) { setErr(e.message || 'השמירה נכשלה'); }
+    finally { setBusy(''); }
+  };
+  const chip = { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(min(100%,150px),1fr))', gridAutoRows:'1fr', gap:8, marginTop:10 };
+  return (
+    <div className="apple-card" style={{ padding:'16px 18px', marginTop:16 }}>
+      <p style={{ fontSize:17.2, fontWeight:800, marginBottom:4 }}>חופשות לידה ומילוי מקום</p>
+      <p style={{ fontSize:13.8, color:'var(--text3)', marginBottom:10, lineHeight:1.6 }}>
+        כל עוד לא סומנה מחליפה, המורה בחל"ד נספרת בשכר מלא. לחיצה על שם המחליפה שומרת אצלה "במקום מי".
+      </p>
+      {err && <p style={{ color:'var(--danger)', fontWeight:700, fontSize:14.4, marginBottom:8 }}>{err}</p>}
+      {noSub.map(l => {
+        const cands = teachers.filter(x => x.schoolId === l.schoolId && x.id !== l.id && x.leaveType !== 'maternity'
+          && x.leaveType !== 'unpaid' && !isPrincipalRow(x) && !isHourlyRow(x) && !onMat(x));
+        return (
+          <div key={l.id} style={{ borderTop:'1px solid var(--line)', padding:'12px 0' }}>
+            <p style={{ fontSize:15.5, fontWeight:700 }}>
+              {l.name} <span style={{ fontWeight:500, color:'var(--text3)', fontSize:14.4 }}>· {schoolName(l.schoolId)} · {leaveText(l) || 'חל"ד'}</span>
+            </p>
+            <p style={{ fontSize:13.8, color:'var(--text2)', marginTop:2 }}>מי מחליפה אותה?</p>
+            <div style={chip}>
+              {cands.map(x => {
+                const key = `sub-${l.id}-${x.id}`;
+                return (
+                  <button key={x.id} className="apple-btn apple-btn-ghost" disabled={!!busy || done[key]}
+                    onClick={() => run(key, x, { mmFor: l.name, mmHours: 0 })}
+                    style={{ minHeight:44, height:'100%', fontSize:14.4, whiteSpace:'normal', lineHeight:1.3,
+                      flexDirection:'column', justifyContent:'center', gap:2,
+                      ...(done[key] ? { background:'var(--ok-bg)', color:'var(--ok)', borderColor:'var(--ok-line)' } : {}) }}>
+                    {done[key] ? '✓ ' : ''}{x.name}
+                    <span style={{ display:'block', fontSize:12.6, color:'var(--text3)', fontWeight:500 }}>
+                      {x.frontalHours || 0} ש׳{String(x.mmFor || '').trim() ? ` · כעת מ"מ ל${x.mmFor}` : ''}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+      {casual.length > 0 && (
+        <div style={{ borderTop:'1px solid var(--line)', padding:'12px 0 2px' }}>
+          <p style={{ fontSize:15.5, fontWeight:700 }}>מילוי מקום שוטף (שעות, לא לחל"ד)</p>
+          <div style={{ display:'grid', gap:6, marginTop:8 }}>
+            {casual.map(t => {
+              const key = `mm-${t.id}`;
+              return (
+                <div key={t.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap',
+                  padding:'8px 10px', borderRadius:10, background:'var(--fill)' }}>
+                  <span style={{ fontSize:14.9 }}>
+                    <b>{t.name}</b> · {schoolName(t.schoolId)} · {t.mmHours} ש׳{String(t.mmFor || '').trim() ? ` במקום ${t.mmFor}` : ''}
+                  </span>
+                  <button className="apple-btn apple-btn-ghost" disabled={!!busy || done[key]}
+                    onClick={() => run(key, t, { mmHours: 0, mmFor: '' })}
+                    style={{ minHeight:34, fontSize:13.8, ...(done[key] ? { color:'var(--ok)' } : { color:'var(--danger)' }) }}>
+                    {done[key] ? '✓ נמחק' : 'מחיקת השעות'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTeacher }) {
   const [fin, setFin]     = useState(null);   // null: עוד נטען
   const [err, setErr]     = useState('');
   const [flash, setFlash] = useState(0);
@@ -4652,6 +4745,8 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
         {' '}חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
         {' '}<b>תקציב שאושר (למילוי)</b> — הסכום השנתי שאושר להשלמת הסניף. <b>חריגה</b> — היתרה להשלמה פחות התקציב שאושר.
       </p>
+
+      {onSaveTeacher && <MaternityPanel schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} />}
 
       {/* "לכל בית ספר תעשה הכנסות מול הוצאות ללא עלות הוראה" (שרה, 3.9) —
           התמונה התפעולית מהתקציב במבט-רשת: כל ההכנסות מול כל ההוצאות
@@ -10434,7 +10529,7 @@ export default function App() {
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} onApprove={onApproveTeacher} simState={simState} onCompute={onCompute} onDelete={onDeleteTeacher} />
         ) : view === 'finance' && (user.role === 'coordinator' || user.role === 'clerk') ? (
-          <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} onSaveSchool={onSaveSchool} />
+          <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} onSaveSchool={onSaveSchool} onSaveTeacher={onSaveTeacher} />
         ) : view === 'calibration' && (user.role === 'coordinator' || user.role === 'clerk') ? (
           <CalibrationView schools={schools} teachers={teachers} monthKey={activeMonth} />
         ) : view === 'mm' && (user.role === 'coordinator' || user.role === 'clerk') ? (
