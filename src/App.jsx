@@ -4414,17 +4414,24 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
       <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
         <table className="sticky-first" style={{ width:'100%', borderCollapse:'collapse' }}>
           <thead>
+            {/* קבוצות: הכנסות ← הוצאות ← תוצאה ("אני רוצה לסדר הכנסות ואז הוצאות", שרה 22.9) */}
+            <tr>
+              <th />
+              <th colSpan={showSim ? 4 : 2} style={{ padding:'8px 8px 4px', fontSize:13.8, fontWeight:800, color:'var(--ok, #2e7d32)', borderBottom:'2px solid var(--ok, #2e7d32)' }}>הכנסות</th>
+              <th colSpan={showSim ? 5 : 2} style={{ padding:'8px 8px 4px', fontSize:13.8, fontWeight:800, color:'var(--danger)', borderBottom:'2px solid var(--danger)' }}>הוצאות</th>
+              <th colSpan={5} style={{ padding:'8px 8px 4px', fontSize:13.8, fontWeight:800, color:'var(--purple)', borderBottom:'2px solid var(--purple)' }}>תוצאה</th>
+            </tr>
             <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
               <TH>בית ספר</TH>
-              <TH>הכנסות משרד החינוך + מענק</TH>
+              <TH>הכנסות משרד החינוך</TH>
+              <TH>השתתפות הרשת</TH>
+              {showSim && <TH>דיוק השתתפות הרשת</TH>}
+              {showSim && <TH>העברה מבית חב"ד לפי התחשיב</TH>}
               <TH>עלות שכר</TH>
               <TH>תוספת 10% + מ"מ 5%</TH>
               {showSim && <TH>עלות הוראה מהתקציב</TH>}
               {showSim && <TH>הפרש מול השכר בפועל</TH>}
               {showSim && <TH>עלות שכר לשעה שבועית</TH>}
-              {showSim && <TH>העברה מבית חב"ד לפי התחשיב</TH>}
-              {showSim && <TH>דיוק השתתפות הרשת</TH>}
-              <TH>השתתפות הרשת</TH>
               <TH>יתרה לאחר שכר</TH>
               <TH>בלי הרשת · בפועל +10% +5%</TH>
               <TH>הרשת מכסה</TH>
@@ -4441,6 +4448,16 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
                 <td style={{ textAlign:'center' }}>{period === 'year'
                   ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
                   : <span style={{ fontSize:16.1 }}>{money(per(f.ministryBudget))}</span>}</td>
+                <td style={{ textAlign:'center' }}>{period === 'year'
+                  ? moneyInput(sc.id, 'networkSupport', f.networkSupport)
+                  : <span style={{ fontSize:16.1 }}>{money(per(f.networkSupport))}</span>}</td>
+                {/* עמודה ריקה להקלדה — "דיוק השתתפות הרשת" (שרה, 10.9); לא נכנסת לשום חישוב */}
+                {showSim && <td style={{ textAlign:'center' }}>{period === 'year'
+                  ? moneyInput(sc.id, 'networkSupportAdj', f.networkSupportAdj)
+                  : <span style={{ fontSize:16.1 }}>{money(per(f.networkSupportAdj))}</span>}</td>}
+                {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
+                  color: chabadTransfer == null ? 'var(--text3)' : chabadTransfer > 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
+                  {chabadTransfer == null ? '—' : money(per(chabadTransfer))}</td>}
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:600 }}>{money(period === 'month' ? monthly : annual)}{hourlyMonthly > 0 && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }} title="צהרון ומשרות שעתיות — לא נכללים בהשוואה מול משרד החינוך">+ צהרון {money(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, color:'var(--text2)' }}
                   title="כרית ביטחון 10% ומילוי מקום 5%, שניהם על עלות השכר השנתית">{money(per(reserve))}</td>
@@ -4449,16 +4466,6 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
                   color: simGap == null ? 'var(--text3)' : simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
                   {simGap == null ? '—' : money(per(simGap))}</td>}
                 {showSim && <td style={{ textAlign:'center' }}><PerHour sim={perHourSim} actual={perHourActual} /></td>}
-                {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
-                  color: chabadTransfer == null ? 'var(--text3)' : chabadTransfer > 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
-                  {chabadTransfer == null ? '—' : money(per(chabadTransfer))}</td>}
-                {/* עמודה ריקה להקלדה — "דיוק השתתפות הרשת" (שרה, 10.9); לא נכנסת לשום חישוב */}
-                {showSim && <td style={{ textAlign:'center' }}>{period === 'year'
-                  ? moneyInput(sc.id, 'networkSupportAdj', f.networkSupportAdj)
-                  : <span style={{ fontSize:16.1 }}>{money(per(f.networkSupportAdj))}</span>}</td>}
-                <td style={{ textAlign:'center' }}>{period === 'year'
-                  ? moneyInput(sc.id, 'networkSupport', f.networkSupport)
-                  : <span style={{ fontSize:16.1 }}>{money(per(f.networkSupport))}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
                   {left == null ? '—' : money(per(left))}
@@ -4482,17 +4489,16 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
               <tr style={{ borderTop:'2px solid var(--line)', background:'var(--apple-fill)' }}>
                 <td style={{ padding:'11px 12px', fontSize:16.1, fontWeight:800 }}>סה"כ הרשת</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.budget))}</td>
+                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.support))}</td>
+                {/* דיוק והעברה מבית חב"ד — פר בית ספר, בלי סיכום */}
+                {showSim && <td /> }
+                {showSim && <td /> }
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(period === 'month' ? tot.monthly : tot.annual)}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.mm))}</td>
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.sim))}</td>}
                 {showSim && <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700,
                   color: tot.simGap < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(per(tot.simGap))}</td>}
-                {/* שלוש עמודות התחשיב בלי סיכום — לשעה, העברה ודיוק הן פר בית ספר.
-                    בלי התאים האלה שורת הסיכום נדדה שלוש עמודות ימינה. */}
                 {showSim && <td /> }
-                {showSim && <td /> }
-                {showSim && <td /> }
-                <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700 }}>{money(per(tot.support))}</td>
                 <td style={{ textAlign:'center', fontSize:16.7, fontWeight:800,
                   color: tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>{money(per(tot.left))}</td>
                 <td style={{ textAlign:'center', fontSize:16.1, fontWeight:700, color: coverColor(tot.noNetwork) }}>{money(per(tot.noNetwork))}</td>
@@ -4515,11 +4521,29 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
         ) : rows.map(({ sc, f, monthly, hourlyMonthly, annual, reserve, left, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer, noNetwork, cover, coverPct, remains }) => (
           <div key={'m-' + sc.id} className="apple-card mcard">
             <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
-            <CardRow label="הכנסות משרד החינוך + מענק">
+            <CardRow label="הכנסות משרד החינוך">
               {period === 'year'
                 ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
                 : money(per(f.ministryBudget))}
             </CardRow>
+            <CardRow label="השתתפות הרשת">
+              {period === 'year'
+                ? moneyInput(sc.id, 'networkSupport', f.networkSupport)
+                : money(per(f.networkSupport))}
+            </CardRow>
+            {showSim && (
+              <CardRow label="דיוק השתתפות הרשת">
+                {period === 'year'
+                  ? moneyInput(sc.id, 'networkSupportAdj', f.networkSupportAdj)
+                  : money(per(f.networkSupportAdj))}
+              </CardRow>
+            )}
+            {showSim && (
+              <CardRow label='העברה מבית חב"ד לפי התחשיב'
+                color={chabadTransfer == null ? 'var(--text3)' : chabadTransfer > 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
+                {chabadTransfer == null ? '—' : money(per(chabadTransfer))}
+              </CardRow>
+            )}
             <CardRow label="עלות שכר">{money(period === 'month' ? monthly : annual)}</CardRow>
             {hourlyMonthly > 0 && (
               <CardRow label="צהרון ומשרות שעתיות (מחוץ להשוואה)" color="var(--text3)">
@@ -4541,24 +4565,6 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
             {showSim && (
               <CardRow label="עלות שכר לשעה שבועית"><PerHour sim={perHourSim} actual={perHourActual} /></CardRow>
             )}
-            {showSim && (
-              <CardRow label='העברה מבית חב"ד לפי התחשיב'
-                color={chabadTransfer == null ? 'var(--text3)' : chabadTransfer > 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
-                {chabadTransfer == null ? '—' : money(per(chabadTransfer))}
-              </CardRow>
-            )}
-            {showSim && (
-              <CardRow label="דיוק השתתפות הרשת">
-                {period === 'year'
-                  ? moneyInput(sc.id, 'networkSupportAdj', f.networkSupportAdj)
-                  : money(per(f.networkSupportAdj))}
-              </CardRow>
-            )}
-            <CardRow label="השתתפות הרשת">
-              {period === 'year'
-                ? moneyInput(sc.id, 'networkSupport', f.networkSupport)
-                : money(per(f.networkSupport))}
-            </CardRow>
             <CardRow label="יתרה לאחר שכר" strong
               color={left == null ? 'var(--text3)' : left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
               {left == null ? '—' : money(per(left))}
@@ -4580,7 +4586,8 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
         {fin !== null && rows.length > 1 && (
           <div className="apple-card mcard" style={{ background:'var(--fill)' }}>
             <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ הרשת</p>
-            <CardRow label="הכנסות משרד החינוך + מענק">{money(per(tot.budget))}</CardRow>
+            <CardRow label="הכנסות משרד החינוך">{money(per(tot.budget))}</CardRow>
+            <CardRow label="השתתפות הרשת">{money(per(tot.support))}</CardRow>
             <CardRow label="עלות שכר">{money(period === 'month' ? tot.monthly : tot.annual)}</CardRow>
             <CardRow label='תוספת 10% + מ"מ 5%' color="var(--text2)">{money(per(tot.mm))}</CardRow>
             {showSim && <CardRow label="עלות הוראה מהתקציב" color="var(--text2)">{money(per(tot.sim))}</CardRow>}
@@ -4590,7 +4597,6 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
                 {money(per(tot.simGap))}
               </CardRow>
             )}
-            <CardRow label="השתתפות הרשת">{money(per(tot.support))}</CardRow>
             <CardRow label="יתרה לאחר שכר" strong
               color={tot.left < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)'}>
               {money(per(tot.left))}
@@ -4656,7 +4662,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
                   {/* "הכנסות משרד החינוך 2 שורות" (שרה, 3.9) — משרד ומענק בנפרד */}
                   {f.detail?.teach?.income?.length
                     ? f.detail.teach.income.map((x, i) => <div key={'ti' + i}>{dline(x.name, per(x.amount))}</div>)
-                    : dline('הכנסות משרד החינוך + מענק', per(f.ministryBudget || 0))}
+                    : dline('הכנסות משרד החינוך', per(f.ministryBudget || 0))}
                   {f.networkSupport ? dline('השתתפות הרשת', per(f.networkSupport)) : null}
                   {dline('סה"כ הכנסות הוראה', per(teachIncome), true)}
                   <div style={{ height:8 }} />
