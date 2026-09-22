@@ -678,9 +678,11 @@ function calcEmployer(t) {
   // מקבלת את שכרה הרגיל — היא המשרה. 100 ₪ לשעה רק למילוי שוטף.
   const coversMaternity = t.mmFor &&
     MATERNITY_LEAVES.has(mmKey(t.monthKey, t.schoolId, String(t.mmFor).trim()));
-  // "רק אני מאשרת — אם לא אישרתי לא נכנס" (שרה, 22.9): שעות מ"מ נספרות
-  // רק בשורה ששרה אישרה. שינוי בהן מפיל את האישור (FIELD_DEFS ב-App).
-  const mmPay = (coversMaternity || !t._approved) ? 0 : (Number(t.mmHours) || 0) * MM_HOUR_RATE;
+  // "אין מ"מ שוטף" (שרה, 22.9): מילוי מקום לפי שעות אינו משולם ברשת —
+  // ה-5% מילוי מקום לבית ספר (MM_PCT) מכסים אותו. נשארת רק מחליפת חל"ד,
+  // שמקבלת את שכרה הרגיל. השורה נשארת לתיעוד בלבד.
+  void coversMaternity;
+  const mmPay = 0;
   if (mmPay > 0) parts.push({ key: 'mm',
     label: `מילוי מקום (${t.mmHours} שעות × ${MM_HOUR_RATE} ₪)`,
     rate: null, on: null, amount: mmPay });
