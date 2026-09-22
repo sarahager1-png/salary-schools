@@ -4183,6 +4183,9 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool }) {
         // הכנסות נוספות שהוזנו ידנית (ירושלים, מהגיליון של רינה — שרה 22.9) —
         // המשיכה לא מחליפה את שורות הפירוט שלהן, רק את שאר הפירוט.
         if (wantDetail && src.incomeTotal === 'manual' && cur.detail?.income) wantDetail.income = cur.detail.income;
+        // וכך גם שורות הכנסות משרד החינוך בכרטיס, כשהסכום הוקלד ידנית
+        if (wantDetail && src.ministryBudget === 'manual' && cur.detail?.teach?.income && wantDetail.teach)
+          wantDetail.teach = { ...wantDetail.teach, income: cur.detail.teach.income };
         if (wantDetail && JSON.stringify(wantDetail) !== JSON.stringify(cur.detail)) {
           patch.detail = wantDetail;
         }
