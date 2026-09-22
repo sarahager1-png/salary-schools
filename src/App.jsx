@@ -825,9 +825,78 @@ function EmploymentDetails({ teacher: x, school, monthLabel, onClose }) {
 /* ═══════════════════════════════════════════════════════════════
    APPROVAL VIEW (coordinator only)
 ═══════════════════════════════════════════════════════════════ */
+/*
+  "לא לאשר" עם הודעה למנהלת (שרה, 22.9: "הודעה למנהלת לא אושר, למשל ללא
+  אישור העדרות"). בוחרים סיבה, רואים את הנוסח, ובוחרים אם לשלוח. ההודעה
+  נכנסת לתור notifications ויוצאת מהקו של שרה (queue-drain), כמו כל שליחה.
+*/
+const REJECT_REASONS = ['אין אישור היעדרות', 'אין אישור מחלה', 'מילוי המקום לא אושר מראש', 'חסר מסמך', 'השעות חורגות מהתקן'];
+function RejectDialog({ t, schoolName, onCancel, onConfirm }) {
+  const [reason, setReason] = useState('');
+  const [other, setOther] = useState('');
+  const [principal, setPrincipal] = useState(undefined);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    store.principalsOfSchool(t.schoolId).then(ps => { if (alive) setPrincipal(ps.find(p => p.phone) || null); })
+      .catch(() => { if (alive) setPrincipal(null); });
+    return () => { alive = false; };
+  }, [t.schoolId]);
+  const why = (reason === 'אחר' ? other : reason).trim();
+  const changes = diffT(t).map(k => `${FIELD_LBL[k]}: ${readableVal(k, t[k])}`).join('\n');
+  const body = principal ? `${principal.fullName}, שלום.\n` +
+    `השינוי שדווח עבור ${t.name} (${schoolName}) לא אושר` + (why ? ` — ${why}.` : '.') +
+    (changes ? `\n\nמה שדווח:\n${changes}` : '') +
+    `\n\nהנתונים נשארים כפי שהיו לפני הדיווח. אם יש אישור — אפשר לשלוח אותו ולדווח שוב.` : '';
+  const go = async (send) => {
+    setBusy(true);
+    try { await onConfirm(t, send && principal ? { phone: principal.phone, name: principal.fullName, body } : null); }
+    finally { setBusy(false); }
+  };
+  const grid = { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(min(100%,150px),1fr))', gridAutoRows:'1fr', gap:8 };
+  return (
+    <div style={{ border:'1px solid var(--danger-line)', background:'var(--danger-bg)', borderRadius:12, padding:14, marginTop:10 }}>
+      <p style={{ fontWeight:700, fontSize:15.5, marginBottom:8 }}>למה לא לאשר?</p>
+      <div style={grid}>
+        {[...REJECT_REASONS, 'אחר'].map(r => (
+          <button key={r} type="button" className="apple-btn apple-btn-ghost" onClick={() => setReason(r)}
+            style={{ minHeight:42, height:'100%', fontSize:14.4, whiteSpace:'normal', lineHeight:1.3,
+              ...(reason === r ? { background:'var(--danger)', color:'#fff', borderColor:'var(--danger)' } : { background:'var(--surface)' }) }}>
+            {r}
+          </button>
+        ))}
+      </div>
+      {reason === 'אחר' && (
+        <input className="apple-input" value={other} onChange={e => setOther(e.target.value)} placeholder="הסיבה"
+          style={{ marginTop:8, width:'100%' }} />
+      )}
+      {principal === undefined ? (
+        <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10 }}>טוען את פרטי המנהלת…</p>
+      ) : principal ? (
+        <>
+          <p style={{ fontSize:13.8, color:'var(--text2)', marginTop:12, marginBottom:4 }}>ההודעה למנהלת ({principal.fullName}):</p>
+          <div style={{ whiteSpace:'pre-wrap', fontSize:14.4, lineHeight:1.6, background:'var(--surface)', borderRadius:10, padding:'10px 12px', border:'1px solid var(--line)' }}>{body}</div>
+        </>
+      ) : (
+        <p style={{ fontSize:13.8, color:'var(--danger)', marginTop:10 }}>אין טלפון של המנהלת במערכת — אפשר לבטל את השינוי בלי הודעה.</p>
+      )}
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'flex-end', marginTop:12 }}>
+        <button className="apple-btn apple-btn-ghost" onClick={onCancel} disabled={busy} style={{ fontSize:14.4 }}>ביטול</button>
+        <button className="apple-btn apple-btn-ghost" onClick={() => go(false)} disabled={busy || !reason || (reason === 'אחר' && !other.trim())}
+          style={{ fontSize:14.4, color:'var(--danger)' }}>לא לאשר, בלי הודעה</button>
+        {principal && (
+          <button className="apple-btn" onClick={() => go(true)} disabled={busy || !reason || (reason === 'אחר' && !other.trim())}
+            style={{ fontSize:14.4, background:'var(--danger)', color:'#fff' }}>לא לאשר ולשלוח למנהלת</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose }) {
   // דיווחי מנהלות — השלב הראשון: בלי אישורה אין סימולציה ואין שכר (21.9.26)
   const reports = onApproveReport ? teachers.filter(reportPending) : [];
+  const [rejecting, setRejecting] = useState(null);
   const schoolName = id => schools.find(s => s.id === id)?.name || '';
   // רק מורים שהנתונים הושלמו (יש שכר רשמי) → ממתינים לאישור שרה
   const readyToApprove = teachers.filter(needsApproval);
@@ -962,7 +1031,7 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
                         <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
                           {/* "ואני גם צריכה לא לאשר" (שרה, 22.9) — מחזיר את הערכים שלפני השינוי */}
                           {onReject && t._snapshot && (
-                            <button className="apple-btn apple-btn-ghost" onClick={() => onReject(t)}
+                            <button className="apple-btn apple-btn-ghost" onClick={() => setRejecting(rejecting === t.id ? null : t.id)}
                               title="השינוי מבוטל והשורה חוזרת לערכים שלפניו"
                               style={{ fontSize:14.9, padding:'7px 16px', color:'var(--danger)' }}>
                               לא לאשר
@@ -972,6 +1041,10 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
                             אשר
                           </button>
                         </div>
+                        {rejecting === t.id && onReject && (
+                          <RejectDialog t={t} schoolName={school.name} onCancel={() => setRejecting(null)}
+                            onConfirm={async (row, msg) => { await onReject(row, msg); setRejecting(null); }} />
+                        )}
                       </div>
                     );
                   })}
@@ -10259,8 +10332,9 @@ export default function App() {
   // "לא לאשר" (שרה, 22.9): השדות חוזרים לתמונה שלפני השינוי (_snapshot),
   // והשורה חוזרת למצב המאושר שהיה לה. נשמר ישירות — לא דרך onSaveTeacher,
   // שהיה מסמן את החזרה עצמה כשינוי חדש.
-  const onRejectTeacher = (t) => run(async () => {
+  const onRejectTeacher = (t, msg) => run(async () => {
     if (!t._snapshot) return;
+    if (msg) await store.queueMessage({ kind: 'change_rejected', to_phone: msg.phone, to_name: msg.name, body: msg.body });
     const { __approved, ...prev } = t._snapshot;
     await store.saveTeacher({ ...t, ...prev, _snapshot: null, _changedAt: null }, activeMonth);
     if (__approved !== false) await store.approve([t.id]);

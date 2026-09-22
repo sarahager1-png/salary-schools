@@ -634,6 +634,12 @@ export async function documentUrl(doc) {
    השליח מנפיק קישור למנהלת קיימת בלי טרמינל. יצירת פרופיל חדש עדיין
    דורשת את מפתח השרת (scripts/make-link.mjs) — הדפדפן אינו רשאי.
 */
+// הודעה בודדת לתור — יוצאת מהקו של שרה ב-queue-drain ("לא לאשר", 22.9)
+export async function queueMessage({ kind, to_phone, to_name, body }) {
+  const { error } = await supabase.from('notifications').insert({ kind, to_phone, to_name, body });
+  raise(error, 'הכנסת ההודעה לתור נכשלה');
+}
+
 export async function principalsOfSchool(schoolId) {
   const { data, error } = await supabase.from('profiles')
     .select('id, full_name, phone').eq('role', 'principal').eq('school_id', schoolId);
