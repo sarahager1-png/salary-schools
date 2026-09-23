@@ -193,6 +193,7 @@ try {
   check('ה-PDF נבנה', !!html && html.length > 500, html ? `${html.length} תווים` : 'ריק');
   if (html) {
     check('לוגו הרשת במסמך', html.includes('logo-chabad.png'));
+    check('המסמך מוגדר להדפסה לרוחב', /@page\s*\{\s*size:\s*A4 landscape/.test(html));
     check('כיוון ימין-לשמאל', html.includes('dir="rtl"'));
     check('הסניף המשלם בטבלת ה-PDF', html.includes(S_PAY));
     check('הסניף שלא משלמים בו אינו ב-PDF', !html.includes(S_NOPAY));

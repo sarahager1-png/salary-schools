@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 43;
+const BUILD = 44;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4446,7 +4446,8 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth }) {
     const html = `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8">
 <title>תקבולים ותשלומים ${esc(stampPeriod)}</title>
 <style>
-  @page { size: A4 portrait; margin: 14mm; }
+  /* "אפשר שיודפס לרוחב?" (שרה, 23.9) — לרוחב, כמו טבלת ההעברות */
+  @page { size: A4 landscape; margin: 12mm; }
   * { box-sizing: border-box; }
   body { font-family: "Segoe UI", Rubik, Arial, sans-serif; color:#1c1c1e; margin:0; direction:rtl; }
   header { display:flex; align-items:center; gap:14px; border-bottom:2px solid #5B3E96; padding-bottom:10px; margin-bottom:14px; }

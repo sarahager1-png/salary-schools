@@ -165,6 +165,7 @@ try {
   check('ה-PDF נבנה', !!html && html.length > 500, html ? `${html.length} תווים` : 'ריק');
   if (html) {
     check('לוגו הרשת ב-PDF', html.includes('logo-chabad.png'));
+    check('המסמך מוגדר להדפסה לרוחב', /@page\s*\{\s*size:\s*A4 landscape/.test(html));
     check('הסניף ב-PDF', html.includes(SCHOOL));
     check('התקופה בכותרת ה-PDF', /2 חודשים/.test(html), (html.match(/class="sub">([^<]*)/) || [])[1] || '');
     fs.writeFileSync('_ledger-preview.html', html.replace(/src="[^"]*logo-chabad/, 'src="http://localhost:5190/logo-chabad'));
