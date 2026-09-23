@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 41;
+const BUILD = 42;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4313,6 +4313,9 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
   // כרית ביטחון של 10% על עלות ההוראה השנתית, בנוסף ל-5% מילוי מקום.
   // שתיהן יחד = הרזרבה שיורדת מהיתרה. זהה ל-BUFFER_PCT ב-api/shalhavot-budget.
   const BUFFER_PCT = 0.10;
+  // "עלות ההוראה לשנה פלוס 20 אחוז" (שרה, 23.9) — טבלת ההעברות לסניפים
+  // עובדת בתוספת אחת של 20%, שמחליפה שם את 10%+5%. שאר המסך לא משתנה.
+  const TRANSFER_PCT = 0.20;
   // מדד בכותרת כרטיס: תווית קטנה מעל מספר, רוחב קבוע — הכרטיסים מיושרים
   const Metric = ({ label, val, big }) => (
     <div style={{ minWidth:150, flexShrink:0 }}>
@@ -4513,8 +4516,19 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
     const cover = f.networkCover;
     const coverPct = (cover != null && needed > 0) ? Math.round(cover / needed * 100) : null;
     const remains  = (cover != null && needed != null) ? needed - cover : null;
+    /*
+      טבלת ההעברות לסניפים (שרה, 23.9): עלות ההוראה השנתית ועוד 20%,
+      פחות הכנסות משרד החינוך ופחות מענק הרשת. מה שנשאר הוא הפער שהסניף
+      מעביר לרשת; חלקי 12 — מה שהוא מעביר בכל חודש. שלילי = עודף, אין
+      מה להעביר. בלי תקציב משרד החינוך אין פער לחשב — התא נשאר ריק.
+    */
+    const add20      = annual * TRANSFER_PCT;
+    const costWith20 = annual + add20;
+    const transfer   = f.ministryBudget != null
+      ? costWith20 - (f.ministryBudget || 0) - (f.networkSupport || 0)
+      : null;
     return { sc, f, monthly, costFromBudget, hourlyMonthly, annual, mmCost, bufferCost, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left: leftAll, needed, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer,
-      cover, coverPct, remains };
+      cover, coverPct, remains, add20, costWith20, transfer };
   })
     // "תוריד אותם למטה בטבלה, גם את קרית ביאליק" (שרה, 22.9): בתי ספר בלי
     // מחזור שכר — לא לתשלום שכר, או שאין בהם עדיין עובדות — בסוף הטבלה
@@ -4576,6 +4590,133 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
           {coverPct != null && <span style={{ fontSize:13.2, color:'var(--text3)', marginInlineStart:5 }}>אושר {coverPct}%</span>}
         </span>
   );
+
+  /* ── טבלת ההעברות לסניפים (שרה, 23.9) ──────────────────────────────
+     "לכל סניף שרשת חב"ד משלמים": בתי הספר שהרשת מעבירה בהם שכר, ובהם
+     יש עלות הוראה לחשב. בית ספר שסומן "לא לתשלום שכר" אינו נכלל.
+     הקובץ תמיד שנתי וגם חודשי — שתי עמודות זו לצד זו, ולא מתג — כדי
+     שמי שמקבל אותו לא יצטרך לחשב.                                     */
+  const transferRows = rows.filter(r => r.sc.paysSalary !== false && r.annual > 0);
+  const totT = transferRows.reduce((a, r) => ({
+    annual:     a.annual     + r.annual,
+    add20:      a.add20      + r.add20,
+    costWith20: a.costWith20 + r.costWith20,
+    ministry:   a.ministry   + (r.f.ministryBudget || 0),
+    support:    a.support    + (r.f.networkSupport || 0),
+    transfer:   a.transfer   + (r.transfer || 0),
+  }), { annual: 0, add20: 0, costWith20: 0, ministry: 0, support: 0, transfer: 0 });
+
+  const transferHeaders = [
+    { key: 'name',       label: 'סניף' },
+    { key: 'annual',     label: 'עלות הוראה לשנה' },
+    { key: 'add20',      label: 'תוספת 20%' },
+    { key: 'costWith20', label: 'סה"כ עלות לשנה' },
+    { key: 'ministry',   label: 'הכנסות משרד החינוך' },
+    { key: 'support',    label: 'מענק רשת' },
+    { key: 'transfer',   label: 'פער להעברה · לשנה' },
+    { key: 'perMonth',   label: 'פער להעברה · לחודש' },
+  ];
+  // באקסל המספרים נשארים מספרים (לא טקסט מעוצב) — כדי שאפשר יהיה לסכם
+  const r0 = v => (v == null ? '' : Math.round(v));
+  const transferData = transferRows.map(r => ({
+    name: r.sc.name, annual: r0(r.annual), add20: r0(r.add20), costWith20: r0(r.costWith20),
+    ministry: r0(r.f.ministryBudget), support: r0(r.f.networkSupport),
+    transfer: r0(r.transfer), perMonth: r.transfer == null ? '' : Math.round(r.transfer / 12),
+  }));
+  const transferFooter = {
+    name: 'סה"כ', annual: r0(totT.annual), add20: r0(totT.add20), costWith20: r0(totT.costWith20),
+    ministry: r0(totT.ministry), support: r0(totT.support),
+    transfer: r0(totT.transfer), perMonth: Math.round(totT.transfer / 12),
+  };
+
+  const exportTransfersXLSX = () =>
+    downloadXLSX(transferHeaders, transferData,
+      `העברות_לסניפים_${stampToday()}.xlsx`, transferFooter, 'העברות לסניפים');
+
+  /*
+    PDF מעוצב עם לוגו הרשת. נדפס מתוך iframe נסתר ולא מחלון קופץ —
+    חוסם החלונות של הדפדפן בולע חלון שנפתח בלחיצה על כפתור, וההורדה
+    נכשלת בשקט. ההדפסה מופעלת ב-onload של החלון הפנימי, כך שהלוגו כבר
+    טעון; בלי זה העמוד יוצא בלי הלוגו.
+  */
+  const downloadTransfersPdf = () => {
+    const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[c]));
+    const n   = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL'));
+    const today = new Date().toLocaleDateString('he-IL', { day:'numeric', month:'long', year:'numeric' });
+    const title = `העברות לסניפים ${stampToday()}`;
+    const body = transferRows.map(r => `
+      <tr>
+        <td class="nm">${esc(r.sc.name)}</td>
+        <td>${n(r.annual)}</td>
+        <td class="soft">${n(r.add20)}</td>
+        <td class="b">${n(r.costWith20)}</td>
+        <td>${n(r.f.ministryBudget)}</td>
+        <td>${n(r.f.networkSupport)}</td>
+        <td class="b ${r.transfer == null ? '' : r.transfer > 0 ? 'neg' : 'pos'}">${r.transfer == null ? '—' : r.transfer > 0 ? n(r.transfer) : 'עודף ' + n(-r.transfer)}</td>
+        <td class="b">${r.transfer == null || r.transfer <= 0 ? '—' : n(r.transfer / 12)}</td>
+      </tr>`).join('');
+    const html = `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8">
+<title>${esc(title)}</title>
+<style>
+  @page { size: A4 landscape; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Rubik, Arial, sans-serif; color:#1c1c1e; margin:0; direction:rtl; }
+  header { display:flex; align-items:center; gap:14px; border-bottom:2px solid #5B3E96; padding-bottom:10px; margin-bottom:14px; }
+  header img { height:52px; width:auto; }
+  h1 { font-size:20px; margin:0 0 2px; letter-spacing:-0.02em; }
+  .sub { font-size:12px; color:#6b6b70; margin:0; }
+  table { width:100%; border-collapse:collapse; font-size:11.5px; }
+  thead th { background:#F3EFFA; color:#4a3480; font-weight:700; font-size:11px;
+             padding:7px 5px; border-bottom:1.5px solid #C9BCE6; text-align:center; }
+  td { padding:6px 5px; text-align:center; border-bottom:1px solid #e6e6ea; }
+  td.nm { text-align:right; font-weight:700; }
+  td.b { font-weight:800; }
+  td.soft { color:#6b6b70; }
+  td.neg { color:#b3261e; }
+  td.pos { color:#2e7d32; }
+  tfoot td { background:#FAF8FE; font-weight:800; border-top:2px solid #C9BCE6; border-bottom:none; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  .note { margin-top:12px; font-size:10.5px; color:#6b6b70; line-height:1.7; }
+</style></head><body>
+<header>
+  <img src="${location.origin}/logo-chabad.png" alt="רשת חינוך חב״ד">
+  <div>
+    <h1>העברות לסניפים — עלות הוראה שנתית</h1>
+    <p class="sub">רשת חינוך חב״ד · נכון ל־${esc(today)}${monthKey ? ` · עלות ההוראה לפי חודש ${esc(monthKey)}` : ''}</p>
+  </div>
+</header>
+<table>
+  <thead><tr>
+    <th>סניף</th><th>עלות הוראה לשנה</th><th>תוספת 20%</th><th>סה״כ עלות לשנה</th>
+    <th>הכנסות משרד החינוך</th><th>מענק רשת</th><th>פער להעברה · לשנה</th><th>פער להעברה · לחודש</th>
+  </tr></thead>
+  <tbody>${body}</tbody>
+  <tfoot><tr>
+    <td class="nm">סה״כ</td><td>${n(totT.annual)}</td><td>${n(totT.add20)}</td><td>${n(totT.costWith20)}</td>
+    <td>${n(totT.ministry)}</td><td>${n(totT.support)}</td>
+    <td class="${totT.transfer > 0 ? 'neg' : 'pos'}">${totT.transfer > 0 ? n(totT.transfer) : 'עודף ' + n(-totT.transfer)}</td>
+    <td>${totT.transfer <= 0 ? '—' : n(totT.transfer / 12)}</td>
+  </tr></tfoot>
+</table>
+<p class="note">
+  <b>עלות הוראה לשנה</b> — עלות המעביד המלאה של עובדי ההוראה בבית הספר, כולל מנהלת, ייעוץ ושילוב, כפול 12.
+  <b>תוספת 20%</b> — מילוי מקום וכרית ביטחון.
+  <b>פער להעברה</b> — סה״כ העלות פחות הכנסות משרד החינוך ופחות מענק הרשת: מה שעל הסניף להעביר לרשת.
+  <b>לחודש</b> — הפער השנתי בחלוקה ל־12. עודף פירושו שאין מה להעביר.
+  כל הסכומים בשקלים חדשים.
+</p>
+</body></html>`;
+    const frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;inset:0;width:0;height:0;border:0;opacity:0;';
+    frame.onload = () => {
+      // ההדפסה חוסמת עד סגירת הדיאלוג — הסרת ה-iframe אחריה בטוחה
+      try { frame.contentWindow.focus(); frame.contentWindow.print(); }
+      finally { setTimeout(() => frame.remove(), 500); }
+    };
+    document.body.appendChild(frame);
+    frame.srcdoc = html;
+  };
 
   const TH = ({ children }) => (
     <th style={{ padding:'8px 4px', fontSize:12.8, fontWeight:700, color:'var(--text2)',
@@ -4862,6 +5003,108 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         {' '}התקציב שנתי ומוקלד כאן; עלות ההוראה נמשכת מחודש {monthKey || ''} — בפועל כשהוזנה, אחרת האומדן — ומוכפלת ב-12.
         {' '}חל"ת אינו נספר בעלות. שינוי נשמר ביציאה מהשדה.
         {' '}<b>תקציב שאושר (למילוי)</b> — הסכום השנתי שאושר להשלמת הסניף. <b>חריגה</b> — היתרה להשלמה פחות התקציב שאושר.
+      </p>
+
+      {/* ── העברות לסניפים ──────────────────────────────────────────────
+          "עלות ההוראה לשנה פלוס 20 אחוז, מענק רשת, פער להעברה עם אפשרות
+          לחלוקה לחודשים, לכל סניף שרשת חב"ד משלמים" (שרה, 23.9).
+          טבלה עצמאית: תוספת אחת של 20% במקום 10%+5%, ושתי עמודות פער —
+          שנתי וחודשי — כדי שלא יידרש חישוב אצל מי שמקבל את הקובץ. */}
+      <h2 className="section-head">העברות לסניפים</h2>
+      <p className="section-sub">
+        עלות ההוראה השנתית ועוד 20%, פחות הכנסות משרד החינוך ומענק הרשת — מה שעל כל סניף להעביר, לשנה ולחודש.
+        רק סניפים שהרשת משלמת בהם שכר.
+      </p>
+
+      <div className="page-toolbar">
+        <button className="apple-btn apple-btn-blue" onClick={downloadTransfersPdf} disabled={!transferRows.length}
+          title="מסמך מעוצב עם לוגו הרשת — להדפסה או לשמירה כ-PDF" style={{ minHeight:36, fontSize:14.4 }}>
+          <Printer size={14} strokeWidth={2.2} />
+          הורדת PDF מעוצב
+        </button>
+        <button className="apple-btn apple-btn-ghost" onClick={exportTransfersXLSX} disabled={!transferRows.length}
+          title="גיליון .xlsx לעבודה עם המספרים" style={{ minHeight:36, fontSize:14.4 }}>
+          <FileSpreadsheet size={14} strokeWidth={2.2} />
+          הורדה לאקסל
+        </button>
+      </div>
+
+      <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto', marginTop:10 }}>
+        <table className="sticky-first fin-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
+              <TH>סניף</TH>
+              <TH>עלות הוראה לשנה</TH>
+              <TH>תוספת 20%</TH>
+              <TH>סה"כ עלות לשנה</TH>
+              <TH>הכנסות משרד החינוך</TH>
+              <TH>מענק רשת</TH>
+              <TH>פער להעברה · לשנה</TH>
+              <TH>פער להעברה · לחודש</TH>
+            </tr>
+          </thead>
+          <tbody>
+            {fin === null ? (
+              <tr><td colSpan={8} style={{ padding:22, textAlign:'center', fontSize:14.6, color:'var(--text3)' }}>טוען…</td></tr>
+            ) : transferRows.map(({ sc, f, annual, add20, costWith20, transfer }) => (
+              <tr key={'tr-' + sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
+                <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:700 }}>{sc.name}</td>
+                <td style={{ textAlign:'center', fontSize:14.6 }}>{num(annual)}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }}>{num(add20)}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(costWith20)}</td>
+                <td style={{ textAlign:'center', fontSize:14.6 }}>{num(f.ministryBudget)}</td>
+                <td style={{ textAlign:'center', fontSize:14.6 }}>{num(f.networkSupport)}</td>
+                <td style={{ textAlign:'center' }}><ToComplete left={transfer == null ? null : -transfer} fmt={num} /></td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>
+                  {transfer == null || transfer <= 0 ? '—' : num(transfer / 12)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          {fin !== null && transferRows.length > 0 && (
+            <tfoot>
+              <tr style={{ borderTop:'2px solid var(--line)', background:'var(--fill)' }}>
+                <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:800 }}>סה"כ</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(totT.annual)}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(totT.add20)}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(totT.costWith20)}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(totT.ministry)}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(totT.support)}</td>
+                {/* אותה שפה כמו בשורות: עודף נקרא "עודף", לא מספר שלילי */}
+                <td style={{ textAlign:'center' }}><ToComplete left={-totT.transfer} fmt={num} /></td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>
+                  {totT.transfer <= 0 ? '—' : num(totT.transfer / 12)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+
+      {/* מובייל: אותם נתונים ואותו סדר, כרטיס לכל סניף */}
+      <div className="only-mobile">
+        {fin !== null && transferRows.map(({ sc, f, annual, add20, costWith20, transfer }) => (
+          <div key={'trm-' + sc.id} className="apple-card mcard">
+            <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
+            <CardRow label="עלות הוראה לשנה">{money(annual)}</CardRow>
+            <CardRow label="תוספת 20%" color="var(--text2)">{money(add20)}</CardRow>
+            <CardRow label='סה"כ עלות לשנה' strong>{money(costWith20)}</CardRow>
+            <CardRow label="הכנסות משרד החינוך">{money(f.ministryBudget)}</CardRow>
+            <CardRow label="מענק רשת">{money(f.networkSupport)}</CardRow>
+            <CardRow label="פער להעברה · לשנה" strong>
+              <ToComplete left={transfer == null ? null : -transfer} />
+            </CardRow>
+            <CardRow label="פער להעברה · לחודש" strong>
+              {transfer == null || transfer <= 0 ? '—' : money(transfer / 12)}
+            </CardRow>
+          </div>
+        ))}
+      </div>
+
+      <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
+        <b>תוספת 20%</b> — מילוי מקום וכרית ביטחון, תוספת אחת לטבלה הזאת (בטבלה שלמעלה הן מופיעות בנפרד, 10% ו-5%).
+        {' '}<b>פער להעברה</b> — סה"כ העלות פחות הכנסות משרד החינוך ופחות מענק הרשת. <b>עודף</b> — אין מה להעביר.
+        {' '}<b>לחודש</b> — הפער השנתי בחלוקה ל-12. הטבלה אינה מושפעת ממתג חודשי/שנתי שלמעלה: היא תמיד מציגה את שניהם.
       </p>
 
       {onSaveTeacher && <MaternityPanel schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} />}

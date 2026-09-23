@@ -32,3 +32,9 @@ sim-watcher.log
 sim-watcher.err
 slip-data.json
 תלושים-*.csv
+
+# תוצרי בדיקת ההעברות לסניפים
+_transfers_*.png
+_transfers.pdf
+_transfers.xlsx
+_transfers-preview.html
