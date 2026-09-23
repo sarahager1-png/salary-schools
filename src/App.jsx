@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 42;
+const BUILD = 43;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4581,6 +4581,19 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         ? <span className="num" style={{ fontSize:16.7, fontWeight:800, color:'var(--danger)' }}>{fmt(per(-left))}</span>
         : <span style={{ fontSize:14.4, fontWeight:700, color:'var(--ok, #2e7d32)', whiteSpace:'nowrap' }}>עודף {fmt(per(left))}</span>
   );
+  /*
+    הפער בטבלת ההעברות — רכיב נפרד מ-ToComplete בכוונה. ToComplete מריץ
+    per(), ולכן הוא מתחלק ב-12 כשהמתג שלמעלה על "חודשי"; בטבלת ההעברות
+    העמודה הזאת חייבת להישאר שנתית תמיד, כי לצדה יש עמודת "לחודש" משלה.
+    כאן הערך מתקבל כפי שהוא: חיובי = להעברה, אפס/שלילי = עודף.
+  */
+  const TransferGap = ({ v, fmt = money }) => (
+    v == null
+      ? <span style={{ fontSize:16.1, color:'var(--text3)' }}>—</span>
+      : v > 0
+        ? <span className="num" style={{ fontSize:16.7, fontWeight:800, color:'var(--danger)' }}>{fmt(v)}</span>
+        : <span style={{ fontSize:14.4, fontWeight:700, color:'var(--ok, #2e7d32)', whiteSpace:'nowrap' }}>עודף {fmt(-v)}</span>
+  );
   // חריגה: מה שהסניף צריך להשלים פחות התקציב שאושר. חיובי = חריגה (אדום)
   const Remains = ({ cover, coverPct, remains, needed, fmt = money }) => (
     cover == null
@@ -4597,7 +4610,19 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
      הקובץ תמיד שנתי וגם חודשי — שתי עמודות זו לצד זו, ולא מתג — כדי
      שמי שמקבל אותו לא יצטרך לחשב.                                     */
   const transferRows = rows.filter(r => r.sc.paysSalary !== false && r.annual > 0);
-  const totT = transferRows.reduce((a, r) => ({
+  /*
+    שורת הסיכום חייבת להסתדר בחיסור: סה"כ עלות פחות משרד פחות מענק =
+    סה"כ הפער. סניף שטרם הוזן לו תקציב משרד החינוך אין לו פער לחשב, ואם
+    העלות שלו נספרת בסיכום בלי שהפער שלו נספר — החיסור אינו מסתדר, והמספר
+    בקובץ נראה שגוי למי שבודק אותו. לכן הוא מוצג בטבלה עם "—" ואינו נכנס
+    לסיכום, והערה מתחת לטבלה אומרת כמה סניפים הושמטו וממה.
+  */
+  const summedRows  = transferRows.filter(r => r.transfer != null);
+  const skippedRows = transferRows.filter(r => r.transfer == null);
+  // "1 סניפים" אינו עברית — ספירה בלשון יחיד כשמדובר באחד
+  const nBranches = n => (n === 1 ? 'סניף אחד' : `${n} סניפים`);
+  const nSkipped  = n => (n === 1 ? 'סניף אחד לא נכלל' : `${n} סניפים לא נכללו`);
+  const totT = summedRows.reduce((a, r) => ({
     annual:     a.annual     + r.annual,
     add20:      a.add20      + r.add20,
     costWith20: a.costWith20 + r.costWith20,
@@ -4615,18 +4640,34 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
     { key: 'support',    label: 'מענק רשת' },
     { key: 'transfer',   label: 'פער להעברה · לשנה' },
     { key: 'perMonth',   label: 'פער להעברה · לחודש' },
+    { key: 'note',       label: 'הערה' },
   ];
+  /*
+    ההערה לשורה. שני מצבים שמי שמקבל את הקובץ חייב לדעת עליהם, אחרת
+    מספר שנראה מדויק מטעה אותו:
+    א. עלות ההוראה היא אומדן מהתקציב ולא עלות בפועל — סניף שהרשת משלמת
+       בו שכר אך טרם הוזנו בו עובדות (קרית ביאליק).
+    ב. טרם הוזן תקציב משרד החינוך, ולכן אין פער לחשב והשורה מחוץ לסיכום.
+  */
+  const rowNote = r => [
+    r.costFromBudget ? 'עלות ההוראה לפי התקציב — טרם הוזנו עובדות' : '',
+    r.transfer == null ? 'טרם הוזן תקציב משרד החינוך — מחוץ לסיכום' : '',
+  ].filter(Boolean).join(' · ');
   // באקסל המספרים נשארים מספרים (לא טקסט מעוצב) — כדי שאפשר יהיה לסכם
   const r0 = v => (v == null ? '' : Math.round(v));
   const transferData = transferRows.map(r => ({
     name: r.sc.name, annual: r0(r.annual), add20: r0(r.add20), costWith20: r0(r.costWith20),
     ministry: r0(r.f.ministryBudget), support: r0(r.f.networkSupport),
     transfer: r0(r.transfer), perMonth: r.transfer == null ? '' : Math.round(r.transfer / 12),
+    note: rowNote(r),
   }));
   const transferFooter = {
-    name: 'סה"כ', annual: r0(totT.annual), add20: r0(totT.add20), costWith20: r0(totT.costWith20),
+    // כשיש שורות מחוץ לסיכום — הכותרת אומרת על כמה סניפים הסיכום מדבר
+    name: skippedRows.length ? `סה"כ (${nBranches(summedRows.length)})` : 'סה"כ',
+    annual: r0(totT.annual), add20: r0(totT.add20), costWith20: r0(totT.costWith20),
     ministry: r0(totT.ministry), support: r0(totT.support),
     transfer: r0(totT.transfer), perMonth: Math.round(totT.transfer / 12),
+    note: skippedRows.length ? `${nSkipped(skippedRows.length)} — טרם הוזן להם תקציב משרד החינוך` : '',
   };
 
   const exportTransfersXLSX = () =>
@@ -4646,7 +4687,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
     const title = `העברות לסניפים ${stampToday()}`;
     const body = transferRows.map(r => `
       <tr>
-        <td class="nm">${esc(r.sc.name)}</td>
+        <td class="nm">${esc(r.sc.name)}${rowNote(r) ? `<span class="tag">${esc(rowNote(r))}</span>` : ''}</td>
         <td>${n(r.annual)}</td>
         <td class="soft">${n(r.add20)}</td>
         <td class="b">${n(r.costWith20)}</td>
@@ -4670,6 +4711,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
              padding:7px 5px; border-bottom:1.5px solid #C9BCE6; text-align:center; }
   td { padding:6px 5px; text-align:center; border-bottom:1px solid #e6e6ea; }
   td.nm { text-align:right; font-weight:700; }
+  td.nm .tag { display:block; font-size:9.5px; font-weight:600; color:#8a6d1f; }
   td.b { font-weight:800; }
   td.soft { color:#6b6b70; }
   td.neg { color:#b3261e; }
@@ -4693,7 +4735,8 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
   </tr></thead>
   <tbody>${body}</tbody>
   <tfoot><tr>
-    <td class="nm">סה״כ</td><td>${n(totT.annual)}</td><td>${n(totT.add20)}</td><td>${n(totT.costWith20)}</td>
+    <td class="nm">סה״כ${skippedRows.length ? `<span class="tag">${nBranches(summedRows.length)} · ${nSkipped(skippedRows.length)}</span>` : ''}</td>
+    <td>${n(totT.annual)}</td><td>${n(totT.add20)}</td><td>${n(totT.costWith20)}</td>
     <td>${n(totT.ministry)}</td><td>${n(totT.support)}</td>
     <td class="${totT.transfer > 0 ? 'neg' : 'pos'}">${totT.transfer > 0 ? n(totT.transfer) : 'עודף ' + n(-totT.transfer)}</td>
     <td>${totT.transfer <= 0 ? '—' : n(totT.transfer / 12)}</td>
@@ -4704,18 +4747,27 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
   <b>תוספת 20%</b> — מילוי מקום וכרית ביטחון.
   <b>פער להעברה</b> — סה״כ העלות פחות הכנסות משרד החינוך ופחות מענק הרשת: מה שעל הסניף להעביר לרשת.
   <b>לחודש</b> — הפער השנתי בחלוקה ל־12. עודף פירושו שאין מה להעביר.
-  כל הסכומים בשקלים חדשים.
+  כל הסכומים בשקלים חדשים.${skippedRows.length ? `
+  <br><b>שורת הסה״כ אינה כוללת ${skippedRows.length === 1 ? "סניף אחד" : skippedRows.length + " סניפים"}</b> שטרם הוזן להם תקציב משרד החינוך — אין להם פער לחשב. העלות שלהם אינה נספרת בסיכום, כדי שהחיסור בשורה יסתדר.` : ''}
 </p>
 </body></html>`;
     const frame = document.createElement('iframe');
     frame.style.cssText = 'position:fixed;inset:0;width:0;height:0;border:0;opacity:0;';
+    /*
+      סדר הפעולות כאן אינו שרירותי. iframe שנוסף ל-DOM בלי src טוען
+      about:blank ויורה onload מיד — לפני שה-srcdoc נטען. הצבת srcdoc
+      לפני ההוספה ל-DOM משאירה טעינה אחת בלבד, ושם הטבלה כבר קיימת.
+      הבדיקה הנוספת בפנים היא רשת ביטחון: בלעדיה דפדפן שמתנהג אחרת היה
+      פותח דיאלוג הדפסה על עמוד ריק, וזה נראה כמו הצלחה.
+    */
     frame.onload = () => {
+      if (!frame.contentDocument?.querySelector('table')) return;
       // ההדפסה חוסמת עד סגירת הדיאלוג — הסרת ה-iframe אחריה בטוחה
       try { frame.contentWindow.focus(); frame.contentWindow.print(); }
       finally { setTimeout(() => frame.remove(), 500); }
     };
-    document.body.appendChild(frame);
     frame.srcdoc = html;
+    document.body.appendChild(frame);
   };
 
   const TH = ({ children }) => (
@@ -5017,13 +5069,16 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
       </p>
 
       <div className="page-toolbar">
-        <button className="apple-btn apple-btn-blue" onClick={downloadTransfersPdf} disabled={!transferRows.length}
-          title="מסמך מעוצב עם לוגו הרשת — להדפסה או לשמירה כ-PDF" style={{ minHeight:36, fontSize:14.4 }}>
+        {/* בזמן הטעינה transferRows ריק — בלי fin === null הכפתורים נראים
+            כבויים כאילו אין נתונים, והמשתמשת חושבת שאין מה להוריד */}
+        <button className="apple-btn apple-btn-blue" onClick={downloadTransfersPdf} disabled={fin === null || !transferRows.length}
+          title={fin === null ? 'טוען נתונים…' : 'מסמך מעוצב עם לוגו הרשת — להדפסה או לשמירה כ-PDF'}
+          style={{ minHeight:36, fontSize:14.4 }}>
           <Printer size={14} strokeWidth={2.2} />
           הורדת PDF מעוצב
         </button>
-        <button className="apple-btn apple-btn-ghost" onClick={exportTransfersXLSX} disabled={!transferRows.length}
-          title="גיליון .xlsx לעבודה עם המספרים" style={{ minHeight:36, fontSize:14.4 }}>
+        <button className="apple-btn apple-btn-ghost" onClick={exportTransfersXLSX} disabled={fin === null || !transferRows.length}
+          title={fin === null ? 'טוען נתונים…' : 'גיליון .xlsx לעבודה עם המספרים'} style={{ minHeight:36, fontSize:14.4 }}>
           <FileSpreadsheet size={14} strokeWidth={2.2} />
           הורדה לאקסל
         </button>
@@ -5046,32 +5101,43 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
           <tbody>
             {fin === null ? (
               <tr><td colSpan={8} style={{ padding:22, textAlign:'center', fontSize:14.6, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : transferRows.map(({ sc, f, annual, add20, costWith20, transfer }) => (
+            ) : transferRows.map((r) => {
+              const { sc, f, annual, add20, costWith20, transfer, costFromBudget } = r;
+              return (
               <tr key={'tr-' + sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:700 }}>{sc.name}</td>
+                <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:700 }}>{sc.name}
+                  {/* אותו סימון כמו בטבלה הראשית: העלות כאן אומדן ולא בפועל */}
+                  {costFromBudget && <span className="fin-budget-tag" title="אין עדיין עובדות במערכת — עלות ההוראה מתקציב בית הספר">לפי התקציב</span>}
+                  {transfer == null && <span className="fin-budget-tag" title="בלי תקציב משרד החינוך אין פער לחשב — השורה מחוץ לסיכום">טרם הוזן תקציב משרד</span>}</td>
                 <td style={{ textAlign:'center', fontSize:14.6 }}>{num(annual)}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }}>{num(add20)}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(costWith20)}</td>
                 <td style={{ textAlign:'center', fontSize:14.6 }}>{num(f.ministryBudget)}</td>
                 <td style={{ textAlign:'center', fontSize:14.6 }}>{num(f.networkSupport)}</td>
-                <td style={{ textAlign:'center' }}><ToComplete left={transfer == null ? null : -transfer} fmt={num} /></td>
+                <td style={{ textAlign:'center' }}><TransferGap v={transfer} fmt={num} /></td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>
                   {transfer == null || transfer <= 0 ? '—' : num(transfer / 12)}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
           {fin !== null && transferRows.length > 0 && (
             <tfoot>
               <tr style={{ borderTop:'2px solid var(--line)', background:'var(--fill)' }}>
-                <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:800 }}>סה"כ</td>
+                <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:800 }}>סה"כ
+                  {skippedRows.length > 0 && (
+                    <span style={{ display:'block', fontSize:12.6, fontWeight:600, color:'var(--text3)' }}>
+                      {nBranches(summedRows.length)} · {nSkipped(skippedRows.length)}
+                    </span>
+                  )}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(totT.annual)}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(totT.add20)}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(totT.costWith20)}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(totT.ministry)}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(totT.support)}</td>
                 {/* אותה שפה כמו בשורות: עודף נקרא "עודף", לא מספר שלילי */}
-                <td style={{ textAlign:'center' }}><ToComplete left={-totT.transfer} fmt={num} /></td>
+                <td style={{ textAlign:'center' }}><TransferGap v={totT.transfer} fmt={num} /></td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>
                   {totT.transfer <= 0 ? '—' : num(totT.transfer / 12)}
                 </td>
@@ -5081,30 +5147,61 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         </table>
       </div>
 
-      {/* מובייל: אותם נתונים ואותו סדר, כרטיס לכל סניף */}
+      {/* מובייל: אותם נתונים, אותו סדר ואותה שורת סיכום — כרטיס לכל סניף */}
       <div className="only-mobile">
-        {fin !== null && transferRows.map(({ sc, f, annual, add20, costWith20, transfer }) => (
-          <div key={'trm-' + sc.id} className="apple-card mcard">
-            <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
-            <CardRow label="עלות הוראה לשנה">{money(annual)}</CardRow>
-            <CardRow label="תוספת 20%" color="var(--text2)">{money(add20)}</CardRow>
-            <CardRow label='סה"כ עלות לשנה' strong>{money(costWith20)}</CardRow>
-            <CardRow label="הכנסות משרד החינוך">{money(f.ministryBudget)}</CardRow>
-            <CardRow label="מענק רשת">{money(f.networkSupport)}</CardRow>
-            <CardRow label="פער להעברה · לשנה" strong>
-              <ToComplete left={transfer == null ? null : -transfer} />
-            </CardRow>
-            <CardRow label="פער להעברה · לחודש" strong>
-              {transfer == null || transfer <= 0 ? '—' : money(transfer / 12)}
-            </CardRow>
-          </div>
-        ))}
+        {fin === null ? (
+          <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
+        ) : (
+          <>
+            {transferRows.map(({ sc, f, annual, add20, costWith20, transfer, costFromBudget }) => (
+              <div key={'trm-' + sc.id} className="apple-card mcard">
+                <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}
+                  {costFromBudget && <span className="fin-budget-tag" style={{ display:'inline-block', marginInlineStart:8 }}>לפי התקציב</span>}
+                  {transfer == null && <span className="fin-budget-tag" style={{ display:'inline-block', marginInlineStart:8 }}>טרם הוזן תקציב משרד</span>}</p>
+                <CardRow label="עלות הוראה לשנה">{money(annual)}</CardRow>
+                <CardRow label="תוספת 20%" color="var(--text2)">{money(add20)}</CardRow>
+                <CardRow label='סה"כ עלות לשנה' strong>{money(costWith20)}</CardRow>
+                <CardRow label="הכנסות משרד החינוך">{money(f.ministryBudget)}</CardRow>
+                <CardRow label="מענק רשת">{money(f.networkSupport)}</CardRow>
+                <CardRow label="פער להעברה · לשנה" strong><TransferGap v={transfer} /></CardRow>
+                <CardRow label="פער להעברה · לחודש" strong>
+                  {transfer == null || transfer <= 0 ? '—' : money(transfer / 12)}
+                </CardRow>
+              </div>
+            ))}
+            {transferRows.length > 1 && (
+              <div className="apple-card mcard" style={{ background:'var(--fill)' }}>
+                <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ
+                  {skippedRows.length > 0 && (
+                    <span style={{ display:'block', fontSize:12.6, fontWeight:600, color:'var(--text3)' }}>
+                      {nBranches(summedRows.length)} · {nSkipped(skippedRows.length)}
+                    </span>
+                  )}</p>
+                <CardRow label="עלות הוראה לשנה">{money(totT.annual)}</CardRow>
+                <CardRow label="תוספת 20%" color="var(--text2)">{money(totT.add20)}</CardRow>
+                <CardRow label='סה"כ עלות לשנה' strong>{money(totT.costWith20)}</CardRow>
+                <CardRow label="הכנסות משרד החינוך">{money(totT.ministry)}</CardRow>
+                <CardRow label="מענק רשת">{money(totT.support)}</CardRow>
+                <CardRow label="פער להעברה · לשנה" strong><TransferGap v={totT.transfer} /></CardRow>
+                <CardRow label="פער להעברה · לחודש" strong>
+                  {totT.transfer <= 0 ? '—' : money(totT.transfer / 12)}
+                </CardRow>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
         <b>תוספת 20%</b> — מילוי מקום וכרית ביטחון, תוספת אחת לטבלה הזאת (בטבלה שלמעלה הן מופיעות בנפרד, 10% ו-5%).
         {' '}<b>פער להעברה</b> — סה"כ העלות פחות הכנסות משרד החינוך ופחות מענק הרשת. <b>עודף</b> — אין מה להעביר.
         {' '}<b>לחודש</b> — הפער השנתי בחלוקה ל-12. הטבלה אינה מושפעת ממתג חודשי/שנתי שלמעלה: היא תמיד מציגה את שניהם.
+        {skippedRows.length > 0 && (
+          <>
+            {' '}<b>שורת הסה"כ אינה כוללת {skippedRows.length === 1 ? 'סניף אחד' : `${skippedRows.length} סניפים`}</b> שטרם הוזן להם תקציב משרד החינוך — אין להם פער לחשב,
+            והעלות שלהם אינה נספרת בסיכום כדי שהחיסור בשורה יסתדר. הזנת התקציב בטבלה שלמעלה מכניסה אותם.
+          </>
+        )}
       </p>
 
       {onSaveTeacher && <MaternityPanel schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} />}
