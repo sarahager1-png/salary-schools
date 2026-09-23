@@ -1025,7 +1025,7 @@ export async function slipsHandoff(key, action) {
    והמסך כלל אינו מוצג לו. תקציב וייעול שנתיים, בהקלדה ידנית. */
 export async function loadFinance() {
   const { data, error } = await supabase.from('school_finance')
-    .select('school_id, ministry_budget, yieul, teaching_sim, network_support, network_support_adj, network_cover, income_total, expenses_other, detail, note, src, updated_at');
+    .select('school_id, ministry_budget, yieul, teaching_sim, network_support, network_support_adj, network_cover, monthly_transfer, income_total, expenses_other, detail, note, src, updated_at');
   raise(error, 'טעינת נתוני התקציב נכשלה');
   return (data || []).map(r => ({
     schoolId: r.school_id,
@@ -1037,6 +1037,8 @@ export async function loadFinance() {
     networkSupportAdj: r.network_support_adj == null ? null : Number(r.network_support_adj),
     // "הרשת מכסה" — ההחלטה מול "בלי הרשת · בפועל +10%" (שרה, 14.9)
     networkCover: r.network_cover == null ? null : Number(r.network_cover),
+    // "תן לי מקום לעגל סכומים" (שרה, 23.9) — הסכום החודשי שסוכם בפועל
+    monthlyTransfer: r.monthly_transfer == null ? null : Number(r.monthly_transfer),
     incomeTotal: r.income_total == null ? null : Number(r.income_total),
     expensesOther: r.expenses_other == null ? null : Number(r.expenses_other),
     detail: r.detail || null,
@@ -1055,6 +1057,7 @@ export async function saveFinance(schoolId, f) {
     network_support: f.networkSupport ?? null,
     network_support_adj: f.networkSupportAdj ?? null,
     network_cover: f.networkCover ?? null,
+    monthly_transfer: f.monthlyTransfer ?? null,
     income_total: f.incomeTotal ?? null,
     expenses_other: f.expensesOther ?? null,
     detail: f.detail ?? null,
@@ -1063,6 +1066,37 @@ export async function saveFinance(schoolId, f) {
     updated_at: new Date().toISOString(),
   });
   raise(error, 'שמירת נתוני התקציב נכשלה');
+}
+
+/* ── תקבולים ותשלומים בפועל, לכל סניף בכל חודש ────────────────
+   "תן אפשרות לרשום בטבלה כל חודש מה התקבל ממשרד החינוך, מה שולם
+   מבית חב"ד והפער לתשלום הרשת" (שרה, 23.9). שני סכומים נשמרים;
+   הפער מחושב בתצוגה מול עלות החודש ולכן אינו יכול לסתור אותם.
+   אותו RLS של דף עלות ההוראה — coordinator בלבד. */
+export async function loadLedger() {
+  const { data, error } = await supabase.from('school_payment_ledger')
+    .select('school_id, month_key, ministry_received, chabad_paid, note, updated_at');
+  raise(error, 'טעינת התקבולים והתשלומים נכשלה');
+  return (data || []).map(r => ({
+    schoolId: r.school_id,
+    monthKey: r.month_key,
+    ministryReceived: r.ministry_received == null ? null : Number(r.ministry_received),
+    chabadPaid: r.chabad_paid == null ? null : Number(r.chabad_paid),
+    note: r.note,
+    updatedAt: r.updated_at,
+  }));
+}
+
+export async function saveLedger(schoolId, monthKey, v) {
+  const { error } = await supabase.from('school_payment_ledger').upsert({
+    school_id: schoolId,
+    month_key: monthKey,
+    ministry_received: v.ministryReceived ?? null,
+    chabad_paid: v.chabadPaid ?? null,
+    note: v.note ?? null,
+    updated_at: new Date().toISOString(),
+  });
+  raise(error, 'שמירת התקבולים והתשלומים נכשלה');
 }
 
 /* משיכת תקציב וייעול ממבט-רשת — דרך שרת הביניים של המערכת, שמחזיק

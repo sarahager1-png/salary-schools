@@ -105,16 +105,17 @@ try {
   }, { noPay: S_NOPAY, noBud: S_NOBUD });
   if (t.err) throw new Error(t.err);
 
-  check('הטבלה קיימת עם 8 עמודות', t.heads.length === 8, t.heads.join(' | '));
+  check('הטבלה קיימת עם 9 עמודות', t.heads.length === 9, t.heads.join(' | '));
   check('סניף בלי עלות הוראה אינו מופיע', !t.hasNoPay);
   // הסינון על "לא לתשלום שכר" אינו ניתן לבדיקה במסד הבדיקות — נבדק בקוד
-  check('הסינון כולל גם "לא לתשלום שכר"',
+  check('הסינון: לא לתשלום שכר, ולא עלות לפי תקציב',
     fs.readFileSync('src/App.jsx', 'utf8')
-      .includes("rows.filter(r => r.sc.paysSalary !== false && r.annual > 0)"));
+      .includes("rows.filter(r => r.sc.paysSalary !== false && r.annual > 0 && !r.costFromBudget)"));
   const r = t.rows.find(x => x[0] === S_PAY);
   check('הסניף המשלם מופיע בטבלה', !!r, r ? r.join(' | ') : 'לא נמצא');
   if (r) {
-    const [, annual, add20, withAdd, ministry, support, yearly, monthly] = r.map(numOf);
+    const [, annual, add20, withAdd, ministry, support, yearly, , dueYear] = r.map(numOf);
+    const monthly = Math.round(dueYear / 12);
     check('תוספת 20% = 20% מעלות ההוראה', Math.abs(add20 - annual * 0.2) <= 1, `${add20} מול ${Math.round(annual * 0.2)}`);
     check('סה"כ עלות = עלות + תוספת', Math.abs(withAdd - (annual + add20)) <= 1, `${withAdd} מול ${annual + add20}`);
     check('הכנסות משרד החינוך נקראו', ministry === 200000, String(ministry));
@@ -140,7 +141,7 @@ try {
   check('סניף בלי תקציב משרד מופיע בטבלה', !!t.noBudRow, t.noBudRow ? t.noBudRow.join(' | ') : 'לא נמצא');
   if (t.noBudRow) {
     check('הוא מסומן "טרם הוזן תקציב משרד"', t.noBudRow[0].includes('טרם הוזן תקציב משרד'), t.noBudRow[0]);
-    check('הפער שלו ריק', t.noBudRow[6] === '—' && t.noBudRow[7] === '—', `${t.noBudRow[6]} / ${t.noBudRow[7]}`);
+    check('הפער שלו ריק', t.noBudRow[6] === '—' && t.noBudRow[8] === '—', `${t.noBudRow[6]} / ${t.noBudRow[8]}`);
     const his = numOf(t.noBudRow[3]);
     check('העלות שלו אינה נספרת בשורת הסיכום', Math.abs(fo[3] - (numOf(r[3]) )) <= 2,
       `סיכום ${fo[3]} · הסניף המשלם ${numOf(r[3])} · הסניף בלי תקציב ${his}`);
@@ -213,8 +214,11 @@ try {
   check('הגיליון מימין לשמאל', wb.Workbook?.Views?.[0]?.RTL === true);
   // האקסל נושא עמודת "הערה" נוספת שאין בטבלה — שם נרשם "לפי התקציב"
   // ו"טרם הוזן תקציב משרד החינוך", שבמסך מוצגים כתגית ליד שם הסניף.
+  // הכותרת "להעברה · לחודש" נושאת במסך שורת משנה ("מעוגל — למילוי") שאין באקסל
+  const heads = t.heads.map(h => h.split(/\r?\n/)[0]);
   check('כותרות האקסל = כותרות הטבלה + "הערה"',
-    JSON.stringify(aoa[0]) === JSON.stringify([...t.heads, 'הערה']), (aoa[0] || []).join(' | '));
+    JSON.stringify(aoa[0]) === JSON.stringify([...heads, 'הערה']),
+    `${(aoa[0] || []).join(' | ')}   מול   ${heads.join(' | ')}`);
   const xr = aoa.find(x => x[0] === S_PAY);
   check('שורת הסניף באקסל', !!xr, xr ? xr.join(' | ') : 'לא נמצאה');
   check('המספרים באקסל הם מספרים (ניתן לסכם)', !!xr && xr.slice(1, 8).every(v => typeof v === 'number'),
@@ -236,7 +240,7 @@ try {
   // הטבלה בנייד מוחלפת בכרטיסים — אותם נתונים
   const mob = await p.evaluate(() => {
     const cards = [...document.querySelectorAll('.only-mobile .mcard')];
-    const c = cards.find(x => x.innerText.includes('פער להעברה'));
+    const c = cards.find(x => x.innerText.includes('להעברה · לשנה'));
     return c ? c.innerText.split('\n').filter(Boolean) : null;
   });
   check('בנייד יש כרטיס העברות', !!mob, mob ? mob.join(' · ') : 'אין');
