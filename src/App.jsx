@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 45;
+const BUILD = 46;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4310,21 +4310,22 @@ function MaternityPanel({ schools, teachers, onSaveTeacher }) {
   שורה כזאת יוצאת משני המסכים עד שיוזנו בה עובדות.
 */
 /*
-  "הכנסות כוללות תשלומי הורים? — תוריד" (שרה, 23.9). שכר לימוד, תל"ן
-  וכל גבייה מההורים אינם הכנסה שהרשת סופרת מול עלות ההוראה: זה כסף של
-  ההורים לייעודו, ולא מקור שמכסה שכר. השורות נשארות מוצגות בכרטיס בית
-  הספר ומסומנות "לא נספר", כדי שהמידע לא ייעלם — הן רק אינן נכנסות
-  לסיכומים ולפערים.
+  מול עלות ההוראה נספרות הכנסות משרד החינוך בלבד — התקציב והמענק
+  לתלמיד. כל שאר ההכנסות אינן נספרות.
 
-  הזיהוי לפי שם השורה, כי המקורות מגיעים ממבט-רשת בשמות חופשיים. נכון
-  ל-23.9 הוא תופס את כל חמש השורות הקיימות ("שכר לימוד ותל\"ן (גבייה
-  80%)", "שכר לימוד", "שכר לימוד ותל\"ן (תשלומי הורים)", "תל\"ן —
-  תשלומי הורים", "תשלומי הורים הסעות") ואינו תופס את "רווח על צהרון"
-  ואת "חוק נהרי", שאינם מההורים. מקור חדש בשם אחר ייספר כהכנסה — אם
-  יתווסף כזה, להוסיפו כאן.
+  "הכנסות כוללות תשלומי הורים? — תוריד" (שרה, 23.9): שכר לימוד, תל"ן
+  וגבייה מההורים הם כסף של ההורים לייעודו. ואז, על רווח הצהרון וחוק
+  נהרי — "זה הכנסות לחשבונות אחרים" (שרה, 23.9): כסף שאינו נכנס
+  לחשבון שממנו משולם השכר אינו מכסה שכר, יהיה מקורו אשר יהיה.
+
+  לכן הכלל הוא לפי המקור ולא לפי שם השורה. זיהוי לפי שם היה שביר —
+  מקור חדש בשם לא מוכר היה נספר בשקט כהכנסה ומקטין את היתרה להשלמה.
+  כאן ההפך: מקור חדש אינו נספר עד שיוחלט אחרת, וזו טעות לכיוון הבטוח.
+  זו גם בדיוק הנוסחה של טבלת ההעברות לסניפים, כך ששני המסכים מסכימים.
+
+  השורות אינן נמחקות: הן מוצגות בטבלה ובכרטיס בית הספר ומסומנות
+  "לא נספר", כי מספר שנעלם בלי להיראות מעורר יותר ספק ממספר שמוצג.
 */
-const PARENT_PAY_RE = /שכר לימוד|תל["״'׳]?ן|תלן|תשלומי הורים/;
-const isParentPay = name => PARENT_PAY_RE.test(String(name || ''));
 
 const TRANSFER_PCT = 0.20;
 function teachingCostOf(teachers, sc, f) {
@@ -4893,15 +4894,13 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
       בכרטיסי בתי הספר למטה (פירוט השורות, ואם אין — הסכום שנמשך).
     */
     /*
-      תשלומי ההורים יורדים מההכנסות (שרה, 23.9) — ראו isParentPay.
-      בלי שורות פירוט אין מה לסנן, ואז נשאר הסכום שנמשך כפי שהוא;
-      parentInc מוצג בנפרד כדי שיהיה ברור כמה הוסר ולמה.
+      הכנסות שאינן ממשרד החינוך אינן נספרות (שרה, 23.9). otherInc נשאר
+      אפס בכוונה — הוא עדיין זורם לסיכומים, וכך השינוי נשמר במקום אחד;
+      parentInc הוא סך מה שלא נספר, ומוצג כדי שיהיה ברור כמה ומה.
     */
     const incLinesAll = mergeLines(f.detail?.income);
-    const parentInc   = incLinesAll.filter(x =>  isParentPay(x.name)).reduce((a, x) => a + x.amount, 0);
-    const otherInc    = incLinesAll.length
-      ? incLinesAll.filter(x => !isParentPay(x.name)).reduce((a, x) => a + x.amount, 0)
-      : (f.incomeTotal || 0);
+    const parentInc   = incLinesAll.reduce((a, x) => a + x.amount, 0) || (f.incomeTotal || 0);
+    const otherInc    = 0;
     const otherExp = mergeLines(f.detail?.expenses).reduce((a, x) => a + x.amount, 0) || (f.expensesOther || 0);
     const incomeAll  = (f.ministryBudget || 0) + otherInc;
     const expenseAll = total + otherExp;
@@ -5276,7 +5275,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
             <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
               <TH>בית ספר</TH>
               <TH>הכנסות משרד החינוך</TH>
-              <TH>הכנסות נוספות</TH>
+              <TH>הכנסות נוספות<span style={{ display:'block', fontSize:11.5, fontWeight:600, color:'var(--text3)' }}>לא נספר</span></TH>
               <TH>סה"כ הכנסות</TH>
               <TH>עלות כוללת</TH>
               <TH>תוספת 10% + מ"מ 5%</TH>
@@ -5307,12 +5306,9 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                 <td style={{ textAlign:'center' }}>{period === 'year'
                   ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
                   : <span style={{ fontSize:14.6 }}>{num(per(f.ministryBudget))}</span>}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }} title="מתקציב מבט-רשת, בלי תשלומי הורים">{otherInc ? num(per(otherInc)) : '—'}
-                  {parentInc > 0 && (
-                    <span style={{ display:'block', fontSize:12, color:'var(--text3)' }} title="שכר לימוד, תל״ן וגבייה מההורים — אינם נספרים כהכנסה">
-                      הורים {num(per(parentInc))} · לא נספר
-                    </span>
-                  )}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text3)' }}
+                  title="תשלומי הורים והכנסות לחשבונות אחרים — מוצגים ואינם נספרים מול עלות ההוראה">
+                  {parentInc > 0 ? <>{num(per(parentInc))}<span style={{ display:'block', fontSize:12 }}>לא נספר</span></> : '—'}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{f.ministryBudget == null ? '—' : num(per(incomeAll))}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:600, whiteSpace:'nowrap' }}>{num(period === 'month' ? monthly : annual)}{costFromBudget && <span className="fin-budget-tag" title="אין עדיין עובדות במערכת — עלות ההוראה מתקציב בית הספר">לפי התקציב</span>}{hourlyMonthly > 0 && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }} title="צהרון ומשרות שעתיות — לא נכללים בהשוואה מול משרד החינוך">+ צהרון {num(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }}
@@ -5352,12 +5348,8 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                 <td style={{ padding:'11px 12px', fontSize:14.6, fontWeight:800 }}>סה"כ הרשת
                   {totOverHours > 0 && <span className="fin-hours" title="חריגה מתקן השעות — סה״כ">+{totOverHours} ש׳ מעל התקן</span>}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700 }}>{num(per(tot.budget))}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700 }}>{num(per(tot.otherInc))}
-                  {tot.parentInc > 0 && (
-                    <span style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--text3)' }}>
-                      הורים {num(per(tot.parentInc))} · לא נספר
-                    </span>
-                  )}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700, color:'var(--text3)' }}>
+                  {tot.parentInc > 0 ? <>{num(per(tot.parentInc))}<span style={{ display:'block', fontSize:12, fontWeight:600 }}>לא נספר</span></> : '—'}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(per(tot.incomeAll))}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700 }}>{num(period === 'month' ? tot.monthly : tot.annual)}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:700 }}>{num(per(tot.mm))}</td>
@@ -5396,10 +5388,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                 ? moneyInput(sc.id, 'ministryBudget', f.ministryBudget)
                 : money(per(f.ministryBudget))}
             </CardRow>
-            <CardRow label="הכנסות נוספות" color="var(--text2)">{otherInc ? money(per(otherInc)) : '—'}</CardRow>
-            {parentInc > 0 && (
-              <CardRow label="תשלומי הורים (לא נספר)" color="var(--text3)">{money(per(parentInc))}</CardRow>
-            )}
+            <CardRow label="הכנסות נוספות (לא נספר)" color="var(--text3)">{parentInc > 0 ? money(per(parentInc)) : '—'}</CardRow>
             <CardRow label='סה"כ הכנסות' strong>{f.ministryBudget == null ? '—' : money(per(incomeAll))}</CardRow>
             <CardRow label={costFromBudget ? 'עלות כוללת (לפי התקציב)' : 'עלות כוללת'}>{money(period === 'month' ? monthly : annual)}</CardRow>
             {hourlyMonthly > 0 && (
@@ -5457,10 +5446,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
           <div className="apple-card mcard" style={{ background:'var(--fill)' }}>
             <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ הרשת</p>
             <CardRow label="הכנסות משרד החינוך">{money(per(tot.budget))}</CardRow>
-            <CardRow label="הכנסות נוספות" color="var(--text2)">{money(per(tot.otherInc))}</CardRow>
-            {tot.parentInc > 0 && (
-              <CardRow label="תשלומי הורים (לא נספר)" color="var(--text3)">{money(per(tot.parentInc))}</CardRow>
-            )}
+            <CardRow label="הכנסות נוספות (לא נספר)" color="var(--text3)">{money(per(tot.parentInc))}</CardRow>
             <CardRow label='סה"כ הכנסות' strong>{money(per(tot.incomeAll))}</CardRow>
             <CardRow label="עלות כוללת">{money(period === 'month' ? tot.monthly : tot.annual)}</CardRow>
             <CardRow label='תוספת 10% + מ"מ 5%' color="var(--text2)">{money(per(tot.mm))}</CardRow>
@@ -5485,7 +5471,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
       <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
         <b>עלות כוללת</b> — כל עובדי ההוראה של בית הספר: מורות, מנהלת, ייעוץ ושילוב. צהרון ומשרות שעתיות מוצגים בנפרד.
         {' '}<b>סה"כ הכנסות</b> — הכנסות משרד החינוך ועוד ההכנסות הנוספות מתקציב מבט-רשת.
-        {' '}<b>תשלומי הורים אינם נספרים כהכנסה</b> — שכר לימוד, תל"ן וכל גבייה מההורים. הם מוצגים תחת ההכנסות הנוספות ובכרטיס בית הספר, מסומנים "לא נספר", ואינם נכנסים לסיכומים ולפערים.
+        {' '}<b>מול עלות ההוראה נספרות הכנסות משרד החינוך בלבד</b> — התקציב והמענק לתלמיד. תשלומי הורים (שכר לימוד, תל"ן) והכנסות לחשבונות אחרים (רווח על צהרון, חוק נהרי) מוצגים בעמודה "הכנסות נוספות" ובכרטיס בית הספר, מסומנים "לא נספר", ואינם נכנסים לסיכומים ולפערים.
         {' '}<b>סה"כ הוצאות</b> — עלות השכר הכוללת, תוספת ביטחון 10% ומילוי מקום 5% (על עלות השכר השנתית), ועוד ההוצאות הנוספות מתקציב מבט-רשת.
         {' '}<b>פער הכנסות מול הוצאות</b> — סה"כ הכנסות פחות סה"כ הוצאות.
         {' '}<b>יתרה להשלמת הסניף</b> — הפער אחרי מענק הרשת: מה שהסניף צריך להשלים.
@@ -5673,10 +5659,15 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         const teachCost = annual + reserve;
         const teachDiff = (f.ministryBudget != null) ? teachIncome - teachCost : null;
         // צד התפעול
-        const incLines = mergeLines(f.detail?.income).filter(x => !isParentPay(x.name));
-        const parentLines = mergeLines(f.detail?.income).filter(x =>  isParentPay(x.name));
+        const incLines = [];
+        const parentLines = mergeLines(f.detail?.income);
         const expLines = mergeLines(f.detail?.expenses);
-        const incSum = incLines.reduce((a, x) => a + x.amount, 0) || (f.incomeTotal || 0);
+        /*
+          incLines ריק בכוונה מאז 23.9 — אין הכנסה נוספת שנספרת. הנפילה
+          ל-f.incomeTotal דרך || הייתה מחזירה כאן את הסכום המלא שנמשך,
+          בסתירה לטבלה שלמעלה: אפס אינו "אין נתון".
+        */
+        const incSum = incLines.reduce((a, x) => a + x.amount, 0);
         const expSum = expLines.reduce((a, x) => a + x.amount, 0) || (f.expensesOther || 0);
         const opDiff = (f.incomeTotal != null || expLines.length) ? incSum - expSum : null;
         if (teachDiff == null && opDiff == null) return null;
@@ -5743,7 +5734,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                   {parentLines.length > 0 && (
                     <div style={{ marginTop:6, paddingTop:6, borderTop:'1px dashed var(--line)', opacity:.72 }}>
                       <p style={{ fontSize:12.6, fontWeight:700, color:'var(--text3)', marginBottom:2 }}>
-                        תשלומי הורים — אינם נספרים כהכנסה
+                        הכנסות שאינן נספרות מול עלות ההוראה
                       </p>
                       {parentLines.map((x, i) => <div key={'pi' + i}>{dline(x.name, per(x.amount))}</div>)}
                     </div>
@@ -5768,8 +5759,9 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         for (const { f, annual, reserve } of rows) {
           const ti = (f.ministryBudget || 0) + (f.networkSupport || 0);
           const td = f.ministryBudget != null ? ti - (annual + reserve) : null;
-          const il = mergeLines(f.detail?.income).filter(x => !isParentPay(x.name)), el = mergeLines(f.detail?.expenses);
-          const is_ = il.reduce((a, x) => a + x.amount, 0) || (f.incomeTotal || 0);
+          const il = [], el = mergeLines(f.detail?.expenses);
+          // כמו בכרטיס: il ריק בכוונה, ואסור ליפול חזרה ל-incomeTotal
+          const is_ = il.reduce((a, x) => a + x.amount, 0);
           const es = el.reduce((a, x) => a + x.amount, 0) || (f.expensesOther || 0);
           const od = (f.incomeTotal != null || el.length) ? is_ - es : null;
           if (td != null || od != null) { any = true; sumTeach += td || 0; sumOp += od || 0; }
