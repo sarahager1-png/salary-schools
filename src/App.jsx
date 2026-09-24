@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 47;
+const BUILD = 48;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -2300,44 +2300,121 @@ function SchoolModal({ school, onSave, onClose }) {
 /* ═══════════════════════════════════════════════════════════════
    SCHOOL REPORT
 ═══════════════════════════════════════════════════════════════ */
+// תג קטן בשורת הדוח — מנהלת, צהרון, חל"ד, ממלאת מקום
+function ReportTag({ text, c, bg }) {
+  return (
+    <span style={{ fontSize:11.4, fontWeight:600, color:c, background:bg,
+      borderRadius:999, padding:'1px 8px', whiteSpace:'nowrap' }}>{text}</span>
+  );
+}
+
+/*
+  הדוח שהמנהלת והרשת מנפיקות פר בית ספר. הורחב ב-24.9 ("אני רוצה להנפיק
+  לירושלים ממערכת השכר", שרה) כך שיעמוד בפני עצמו: תקן השעות והחריגה מולו,
+  תוספת בית חב"ד בעמודה נפרדת, סימון חל"ד וממלאות מקום, הפרדת המנהלת
+  והמשרות השעתיות מעלות ההוראה, והאם העלות מהתלוש בפועל או מהאומדן.
+*/
 function SchoolReport({ school, teachers, onClose }) {
   const ts = teachers.filter(t => t.schoolId === school.id);
-  const tsOfficial  = ts.filter(simComplete);
-  const totEmpGross = tsOfficial.reduce((s, t) => s + calcEmployer(t).total, 0);
-  const totGross    = tsOfficial.reduce((s, t) => s + calcEmployer(t).gross, 0);
   const pendingCount = ts.filter(isPending).length;
+
+  // סוג השורה — אותה הבחנה שעושים api/school-costs.js ומסך עלות ההוראה
+  const kindOf = t => isPrincipalRow(t) ? 'principal' : isHourlyRow(t) ? 'hourly' : 'teaching';
+  const rowsData = ts.map(t => {
+    const emp     = calcEmployer(t);
+    const derived = deriveHours(t);
+    const kind    = kindOf(t);
+    /*
+      הברוטו מ-calcEmployer ולא מהשדה הגולמי: שם הוא כבר מוכפל בחלק החודש
+      (חזרה מחל"ד באמצע החודש), ובחל"ד ששובצה לה מחליפה הוא אפס — ביטוח
+      לאומי משלם, ונותרות ההפרשות בלבד.
+    */
+    const covered = t.leaveType === 'maternity' && hasSubstitute(t);
+    return {
+      t, emp, derived, kind, covered,
+      frontal: kind === 'hourly' ? 0 : (derived ? derived.frontal : (Number(t.frontalHours) || 0)),
+      individual: kind === 'hourly' ? 0 : Number(t.individualHours ?? derived?.individual ?? 0),
+      presence: kind === 'hourly' ? 0 : Number(t.presenceHours ?? derived?.presence ?? 0),
+      scope: t.reform === 'ofek' ? (derived?.scopePct || t.scopePct || 100) : (t.scope || 100),
+      grade: kind === 'principal'
+        ? 'ניהול ' + (NIHUL_GRADES.find(g => g.v === Number(t.nihulGrade))?.l || 'א')
+        : t.reform === 'ofek' ? (t.grade === 'intern' ? 'מתמחה' : `ד${t.grade}`)
+          : (DEGREE_LABELS[t.degree] || t.degree || ''),
+      fromSlip: Boolean(Number(t._actualEmployerCost)),
+    };
+  });
+
+  const sum = (f, filter = () => true) => rowsData.filter(filter).reduce((s, r) => s + (f(r) || 0), 0);
+  // תקן השעות — אותו כלל שבכל המסכים: עובדות הוראה בלבד, בלי מנהלת,
+  // בלי משרה שעתית, ובלי מי שבחל"ד או בחל"ת החודש
+  const inQuota  = r => r.kind === 'teaching' && !unpaidThisMonth(r.t) && !r.covered;
+  const totFront = sum(r => r.frontal, inQuota);
+  const totInd   = sum(r => r.individual, inQuota);
+  const totPres  = sum(r => r.presence, inQuota);
+  const totGross = sum(r => r.emp.gross);
+  const totSupp  = sum(r => r.emp.supplement);
+  const totEmpGross = sum(r => r.emp.total);
+  const costTeaching  = sum(r => r.emp.total, r => r.kind === 'teaching');
+  const costPrincipal = sum(r => r.emp.total, r => r.kind === 'principal');
+  const costHourly    = sum(r => r.emp.total, r => r.kind === 'hourly');
+  const quota    = Number(school.hoursQuota) || 0;
+  const overQuota = totFront - quota;
+  const nis = n => Math.round(n || 0).toLocaleString('he-IL');
 
   // אותן עמודות שבטבלה, באותו סדר — כדי שהקובץ והנייר יראו אותו דבר
   const exportExcel = () => {
     const headers = [
-      { key:'name', label:'שם' }, { key:'tz', label:'ת.ז.' }, { key:'reform', label:'רפורמה' },
+      { key:'name', label:'שם' }, { key:'tz', label:'ת.ז.' }, { key:'kind', label:'סוג משרה' },
+      { key:'reform', label:'רפורמה' },
       { key:'grade', label:'דרגה' }, { key:'seniority', label:'ותק' }, { key:'scope', label:'% משרה' },
       { key:'frontal', label:'פרונטלי' }, { key:'individual', label:'פרטני' }, { key:'presence', label:'שהייה' },
-      { key:'role', label:'תפקיד' }, { key:'from', label:'מתאריך' }, { key:'to', label:'עד תאריך' },
-      { key:'gross', label:'ברוטו' }, { key:'social', label:'הוצאות מעביד' }, { key:'total', label:'ברוטו למעסיק' },
+      { key:'role', label:'תפקיד' }, { key:'status', label:'סטטוס' }, { key:'mmFor', label:'במקום' },
+      { key:'from', label:'מתאריך' }, { key:'to', label:'עד תאריך' },
+      { key:'gross', label:'ברוטו' }, { key:'supp', label:'מתוכו תוספת חב"ד' },
+      { key:'social', label:'הוצאות מעביד' }, { key:'total', label:'ברוטו למעסיק' },
+      { key:'src', label:'מקור העלות' },
     ];
-    const rows = ts.map(t => {
-      const emp = calcEmployer(t);
-      const derived = deriveHours(t);
-      return {
-        name: t.name,
-        tz: t.tzId || '',
-        reform: reformLabel(t.reform),
-        grade: t.reform === 'ofek' ? (t.grade === 'intern' ? 'מתמחה' : `ד${t.grade}`) : (t.degree === 'intern' ? 'מתמחה' : t.degree),
-        seniority: t.seniority,
-        scope: (t.reform === 'ofek' ? (derived?.scopePct || t.scopePct || 100) : (t.scope || 100)) + '%',
-        frontal: derived ? derived.frontal : (t.frontalHours ?? ''),
-        individual: derived ? derived.individual : '',
-        presence: derived ? derived.presence : '',
-        role: t.role !== 'none' ? (ROLES.find(r => r.id === t.role)?.label.split('(')[0].trim() || '') : '',
-        from: fmt(t.startDate), to: fmt(t.endDate),
-        gross: t._officialGross ? Math.round(Number(t._officialGross)) : '',
-        social: Math.round(emp.social),
-        total: Math.round(emp.total),
-      };
-    });
-    const footer = { name: 'סה"כ', gross: Math.round(totGross), total: Math.round(totEmpGross) };
+    const rows = rowsData.map(r => ({
+      name: r.t.name,
+      tz: r.t.tzId || '',
+      kind: r.kind === 'principal' ? 'ניהול' : r.kind === 'hourly' ? jobLabel(r.t.job) : 'הוראה',
+      reform: reformLabel(r.t.reform),
+      grade: r.grade,
+      seniority: r.t.seniority,
+      scope: r.kind === 'hourly' ? '' : r.scope + '%',
+      frontal: r.kind === 'hourly' ? '' : r.frontal,
+      individual: r.kind === 'hourly' ? '' : r.individual,
+      presence: r.kind === 'hourly' ? '' : r.presence,
+      role: rolesText(r.t) || '',
+      status: onLeave(r.t) ? leaveLabel(r.t.leaveType) : '',
+      mmFor: r.t.mmFor || '',
+      from: fmt(r.t.startDate), to: fmt(r.t.endDate),
+      gross: Math.round(r.emp.gross),
+      supp: Math.round(r.emp.supplement),
+      social: Math.round(r.emp.social),
+      total: Math.round(r.emp.total),
+      src: r.fromSlip ? 'תלוש' : 'אומדן',
+    }));
+    const footer = { name: 'סה"כ', frontal: totFront, individual: totInd, presence: totPres,
+      gross: Math.round(totGross), supp: Math.round(totSupp), total: Math.round(totEmpGross) };
     downloadXLSX(headers, rows, `דוח_שכר_${school.name}_${stampToday()}.xlsx`, footer, 'דוח שכר');
+  };
+
+  /*
+    ייצוא PDF: הדפסת הדוח בעמוד לרוחב. הסימון על ה-body מוסר גם אם
+    המשתמשת ביטלה את חלון ההדפסה — afterprint יורה בשני המקרים, ובלעדיו
+    ההדפסה הבאה במערכת (תלוש, מסמך אישור) הייתה יוצאת לרוחב בטעות.
+  */
+  const exportPDF = () => {
+    const done = () => {
+      document.body.classList.remove('print-landscape');
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
+    document.body.classList.add('print-landscape');
+    window.print();
+    // רשת ביטחון לדפדפן שאינו יורה afterprint
+    setTimeout(done, 60000);
   };
 
   return (
@@ -2346,8 +2423,13 @@ function SchoolReport({ school, teachers, onClose }) {
         <div className="no-print modal-head" style={{ display:'flex', justifyContent:'space-between', marginBottom:24, gap:8, flexWrap:'wrap' }}>
           <button className="apple-btn apple-btn-ghost" onClick={onClose}><ArrowRight size={15} strokeWidth={2.4} />חזרה</button>
           <div style={{ display:'flex', gap:8 }}>
-            <button className="apple-btn apple-btn-ghost" onClick={exportExcel}>הורדה לאקסל</button>
-            <button className="apple-btn apple-btn-blue" onClick={() => window.print()}><Printer size={15} strokeWidth={2.2} />הדפסה</button>
+            <button className="apple-btn apple-btn-ghost" onClick={exportExcel}>
+              <FileSpreadsheet size={15} strokeWidth={2.2} />הורדה לאקסל
+            </button>
+            <button className="apple-btn apple-btn-blue" onClick={exportPDF}
+              title="נפתח חלון ההדפסה — בוחרים שם 'שמירה כ-PDF'. העמוד כבר מוגדר לרוחב">
+              <Printer size={15} strokeWidth={2.2} />ייצוא PDF / הדפסה
+            </button>
           </div>
         </div>
 
@@ -2363,16 +2445,27 @@ function SchoolReport({ school, teachers, onClose }) {
           )}
         </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:24 }}>
+        {/* רשת עמודות שוות וגובה שווה — כרטיסיות באותו גודל בכל רוחב מסך */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,138px),1fr))',
+          gridAutoRows:'1fr', gap:10, marginBottom:24 }}>
           {[
-            { label: 'סה"כ עובדי הוראה', val: ts.length },
-            { label: 'אופק חדש',   val: ts.filter(t=>t.reform==='ofek').length },
-            { label: 'עולם ישן', val: ts.filter(t=>t.reform==='pre').length },
-            { label: 'ברוטו למעסיק', val: totEmpGross.toLocaleString()+' ₪' },
+            { label: 'עובדים בדוח', val: ts.length,
+              sub: `${rowsData.filter(r=>r.kind==='teaching').length} הוראה · ${rowsData.filter(r=>r.kind==='principal').length} ניהול · ${rowsData.filter(r=>r.kind==='hourly').length} שעתי` },
+            { label: 'שעות פרונטליות', val: totFront.toLocaleString('he-IL'),
+              sub: quota ? `תקן ${quota.toLocaleString('he-IL')} · ${overQuota >= 0 ? 'חריגה ' : 'מתחת לתקן '}${Math.abs(overQuota).toLocaleString('he-IL')}` : 'אין תקן מוזן' },
+            { label: 'פרטני ושהייה', val: (totInd + totPres).toLocaleString('he-IL'),
+              sub: `${totInd.toLocaleString('he-IL')} פרטני · ${totPres.toLocaleString('he-IL')} שהייה` },
+            { label: 'ברוטו לחודש', val: nis(totGross) + ' ₪',
+              // בעולם ישן אין פער לגשר עליו, ולכן אין תוספת — ולא "בית ספר בלי תוספת"
+              sub: totSupp ? `מתוכו תוספת חב"ד ${nis(totSupp)}` : 'אין תוספת חב"ד החודש' },
+            { label: 'עלות הוראה', val: nis(costTeaching) + ' ₪', sub: 'עובדות הוראה בלבד' },
+            { label: 'סה"כ ברוטו למעסיק', val: nis(totEmpGross) + ' ₪',
+              sub: `ניהול ${nis(costPrincipal)}${costHourly ? ` · שעתי ${nis(costHourly)}` : ''}` },
           ].map(c => (
-            <div key={c.label} className="apple-stat" style={{ textAlign:'center' }}>
-              <p className="apple-stat-label">{c.label}</p>
-              <p className="apple-stat-value" style={{ fontSize:20.7 }}>{c.val}</p>
+            <div key={c.label} className="apple-stat" style={{ textAlign:'center', display:'flex', flexDirection:'column', gap:2 }}>
+              <p className="apple-stat-label" style={{ minHeight:34 }}>{c.label}</p>
+              <p className="apple-stat-value" style={{ fontSize:20.7, marginTop:'auto' }}>{c.val}</p>
+              <p style={{ fontSize:12.4, color:'var(--apple-text3)', minHeight:30, lineHeight:1.35 }}>{c.sub}</p>
             </div>
           ))}
         </div>
@@ -2386,45 +2479,73 @@ function SchoolReport({ school, teachers, onClose }) {
               <th style={{ textAlign:'center' }}>% משרה</th><th style={{ textAlign:'center' }}>פרונטלי</th>
               <th style={{ textAlign:'center' }}>פרטני</th><th style={{ textAlign:'center' }}>שהייה</th>
               <th>תפקיד</th><th style={{ textAlign:'center' }}>מתאריך</th><th style={{ textAlign:'center' }}>עד תאריך</th>
-              <th>ברוטו</th><th>הוצאות מעביד</th><th style={{ color:'var(--purple)' }}>ברוטו למעסיק</th>
+              <th>ברוטו</th><th>מתוכו תוספת חב"ד</th><th>הוצאות מעביד</th>
+              <th style={{ color:'var(--purple)' }}>ברוטו למעסיק</th><th style={{ textAlign:'center' }}>מקור</th>
             </tr>
           </thead>
           <tbody>
-            {ts.map(t => {
-              const emp     = calcEmployer(t);
-              const derived = deriveHours(t);
-              const scope   = t.reform === 'ofek' ? (derived?.scopePct || t.scopePct || 100) : (t.scope || 100);
-              const grade   = t.reform === 'ofek' ? (t.grade === 'intern' ? 'מתמחה' : `ד${t.grade}`) : (t.degree === 'intern' ? 'מתמחה' : t.degree);
+            {rowsData.map(r => {
+              const { t, emp, kind, covered } = r;
               const pending = isPending(t);
+              const bg = pending ? 'rgba(255,159,10,0.08)'
+                : kind === 'principal' ? 'rgba(75,46,131,0.05)'
+                  : kind === 'hourly' ? 'rgba(0,180,204,0.05)' : undefined;
               return (
-                <tr key={t.id} style={pending ? { background:'rgba(255,159,10,0.08)' } : {}}>
-                  <td style={{ fontWeight:600, color:'var(--text)' }}>{pending && <Bell size={12} strokeWidth={2.4} color="var(--warn)" style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:5 }} />}{t.name}</td>
+                <tr key={t.id} style={{ ...(bg ? { background: bg } : {}), ...(covered ? { opacity:.72 } : {}) }}>
+                  <td style={{ fontWeight:600, color:'var(--text)' }}>
+                    {pending && <Bell size={12} strokeWidth={2.4} color="var(--warn)" style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:5 }} />}
+                    {t.name}
+                    <span style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:3 }}>
+                      {kind === 'principal' && <ReportTag text="מנהלת" c="var(--purple)" bg="rgba(75,46,131,0.10)" />}
+                      {kind === 'hourly'    && <ReportTag text={jobLabel(t.job)} c="#0A6274" bg="rgba(0,180,204,0.12)" />}
+                      {onLeave(t)           && <ReportTag text={leaveLabel(t.leaveType) + (covered ? ' · הפרשות בלבד' : '')} c="var(--warn)" bg="rgba(255,159,10,0.14)" />}
+                      {t.mmFor              && <ReportTag text={`ממלאת מקום · ${t.mmFor}`} c="var(--ok)" bg="rgba(18,124,87,0.10)" />}
+                    </span>
+                  </td>
                   <td style={{ fontFamily:'monospace', fontSize:13.2 }}>{t.tzId||'—'}</td>
                   <td style={{ textAlign:'center' }}>{reformLabel(t.reform)}</td>
-                  <td style={{ textAlign:'center', fontWeight:700 }}>{grade}</td>
+                  <td style={{ textAlign:'center', fontWeight:700 }}>{r.grade}</td>
                   <td style={{ textAlign:'center' }}>{t.seniority}</td>
-                  <td style={{ textAlign:'center', fontWeight:600, color:'var(--apple-blue)' }}>{scope}%</td>
-                  <td style={{ textAlign:'center' }}>{derived ? derived.frontal : (t.frontalHours ?? '—')}</td>
-                  <td style={{ textAlign:'center' }}>{derived ? derived.individual : '—'}</td>
-                  <td style={{ textAlign:'center' }}>{derived ? derived.presence : '—'}</td>
-                  <td style={{ fontSize:13.2 }}>{t.role!=='none' ? ROLES.find(r=>r.id===t.role)?.label.split('(')[0].trim() : '—'}</td>
+                  <td style={{ textAlign:'center', fontWeight:600, color:'var(--apple-blue)' }}>{kind === 'hourly' ? '—' : r.scope + '%'}</td>
+                  {kind === 'hourly' ? (
+                    <td colSpan={3} style={{ textAlign:'center', color:'var(--text2)', fontSize:13.2 }}>
+                      {(Number(t.frontalHours) || 0).toLocaleString('he-IL')} ש׳ × {(Number(t.hourlyRate ?? MIN_WAGE_HOUR)).toLocaleString('he-IL')} ₪
+                    </td>
+                  ) : covered ? (
+                    <td colSpan={3} style={{ textAlign:'center', color:'var(--apple-text3)', fontSize:13.2 }}>מכוסה בממלאת מקום</td>
+                  ) : (
+                    <>
+                      <td style={{ textAlign:'center' }}>{r.frontal || '—'}</td>
+                      <td style={{ textAlign:'center' }}>{r.individual || '—'}</td>
+                      <td style={{ textAlign:'center' }}>{r.presence || '—'}</td>
+                    </>
+                  )}
+                  <td style={{ fontSize:13.2 }}>{rolesText(t) || '—'}</td>
                   <td style={{ textAlign:'center' }}>{fmt(t.startDate)}</td>
                   <td style={{ textAlign:'center' }}>{fmt(t.endDate)}</td>
-                  <td style={{ fontWeight: t._officialGross ? 700 : 400, color: t._officialGross ? 'var(--apple-green)' : '#bbb' }}>
-                    {t._officialGross ? Number(t._officialGross).toLocaleString()+' ₪' : '—'}
+                  <td style={{ fontWeight: emp.gross ? 700 : 400, color: emp.gross ? 'var(--apple-green)' : '#bbb' }}>
+                    {emp.gross ? nis(emp.gross)+' ₪' : '—'}
                   </td>
-                  <td style={{ color:'var(--text2)' }}>{emp.social.toLocaleString('he-IL')} ₪</td>
-                  <td style={{ fontWeight:800, color:'var(--apple-purple)' }}>{emp.total.toLocaleString()} ₪</td>
+                  <td style={{ color:'var(--text2)' }}>{emp.supplement ? nis(emp.supplement)+' ₪' : '—'}</td>
+                  <td style={{ color:'var(--text2)' }}>{nis(emp.social)} ₪</td>
+                  <td style={{ fontWeight:800, color:'var(--apple-purple)' }}>{nis(emp.total)} ₪</td>
+                  <td style={{ textAlign:'center', fontSize:12.4, color:'var(--apple-text3)' }}>{r.fromSlip ? 'תלוש' : 'אומדן'}</td>
                 </tr>
               );
             })}
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={12}>סה״כ</td>
-              <td style={{ color:'var(--text)' }}>{totGross.toLocaleString('he-IL')} ₪</td>
+              <td colSpan={6}>סה״כ {ts.length} עובדים</td>
+              <td style={{ textAlign:'center' }}>{totFront.toLocaleString('he-IL')}</td>
+              <td style={{ textAlign:'center' }}>{totInd.toLocaleString('he-IL')}</td>
+              <td style={{ textAlign:'center' }}>{totPres.toLocaleString('he-IL')}</td>
+              <td colSpan={3}></td>
+              <td style={{ color:'var(--text)' }}>{nis(totGross)} ₪</td>
+              <td style={{ color:'var(--text2)' }}>{nis(totSupp)} ₪</td>
               <td></td>
-              <td style={{ color:'var(--apple-purple)' }}>{totEmpGross.toLocaleString()} ₪</td>
+              <td style={{ color:'var(--apple-purple)' }}>{nis(totEmpGross)} ₪</td>
+              <td></td>
             </tr>
           </tfoot>
         </table>
@@ -2463,8 +2584,12 @@ function SchoolReport({ school, teachers, onClose }) {
         <div style={{ marginTop:16, padding:14, background:'var(--apple-fill)', borderRadius:12, fontSize:13.8, color:'var(--apple-text2)', lineHeight:1.8 }}>
           <strong style={{ color:'var(--text)' }}>מבנה התשלום:</strong> התשלומים רצים במערכת של עולם ישן.
           הפער עד שכר האופק משולם כתוספת בית חב"ד.<br/>
-          ברוטו למעסיק = ברוטו לעובדת + פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד<br/>
-          הסכומים לשורות ללא סימולציה מלאה הם הערכה בלבד
+          <strong style={{ color:'var(--text)' }}>ברוטו למעסיק</strong> = ברוטו לעובדת + פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד.
+          בעמודת <strong>מקור</strong>: "תלוש" — העלות נלקחה מהתלוש בפועל; "אומדן" — חושבה מהמודל, מכויל לפי תלושי בית הספר.<br/>
+          <strong style={{ color:'var(--text)' }}>תקן השעות</strong> נספר לעובדות הוראה בלבד — בלי המנהלת, בלי משרות שעתיות
+          ובלי מי שבחופשת לידה או בחל"ת החודש. הברוטו והעלות בשורת הסיכום הם של כל השורות.<br/>
+          <strong style={{ color:'var(--text)' }}>חופשת לידה:</strong> כל עוד לא שובצה ממלאת מקום השכר נשאר מלא;
+          מששובצה — ביטוח לאומי משלם, ונותרות ההפרשות הסוציאליות בלבד.
         </div>
       </div>
     </div>

@@ -611,6 +611,28 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   thead { display: table-header-group; }
   tr, .apple-stat { break-inside: avoid; }
   h1, h2, h3 { break-after: avoid; }
+  /* צבעי הרקע של שורות המנהלת, הצהרון והתגיות — בלעדיהם ה-PDF יוצא אפור */
+  .print-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/*
+  ייצוא PDF של דוח בית הספר ("יצוא מסודר גם לפידיאף", שרה 24.9). הדוח הוא
+  17 עמודות ואינו נכנס לעמוד לאורך — נחתך בדיוק בעמודות הכסף. עמוד לרוחב
+  מוגדר כעמוד בעל שם, והוא חל רק כששכבת הדוח מסמנת את ה-body; כל שאר
+  ההדפסות במערכת (תלושים, מסמכי אישור) נשארות לאורך כשהיו.
+  בדפדפן שאינו תומך בעמודים בעלי שם ההדפסה פשוט יוצאת כשהייתה.
+*/
+@page landscape-report { size: A4 landscape; margin: 10mm; }
+@media print {
+  body.print-landscape { page: landscape-report; }
+  /* 17 עמודות בעמוד אחד: הטקסט קטן יותר, והתגיות ושמות התפקידים נשברים
+     במקום להרחיב את העמודה. בלי זה הטבלה חורגת והעמודות האחרונות
+     — הכסף — נחתכות. */
+  body.print-landscape .apple-table { font-size: 7.6px !important; table-layout: auto; }
+  body.print-landscape .apple-table th,
+  body.print-landscape .apple-table td { padding: 2px !important; white-space: normal !important; }
+  body.print-landscape .apple-table td span { white-space: normal !important; font-size: 6.6px !important; }
+  body.print-landscape .table-scroll { overflow: visible !important; }
 }
 
 /* תצוגה מצומצמת של טבלת בית הספר: מסתירה עמודות משניות לפי מיקום,
