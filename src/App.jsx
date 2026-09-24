@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 48;
+const BUILD = 49;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -2341,14 +2341,28 @@ function SchoolReport({ school, teachers, onClose }) {
         : t.reform === 'ofek' ? (t.grade === 'intern' ? 'מתמחה' : `ד${t.grade}`)
           : (DEGREE_LABELS[t.degree] || t.degree || ''),
       fromSlip: Boolean(Number(t._actualEmployerCost)),
+      // שעות השורה שאינן נספרות מול תקן בית הספר: מורה לשילוב — כולן;
+      // יועצת — שעות הייעוץ (ערך שהוזן גובר, ריק = כל השעות)
+      outHours: kind !== 'teaching' || unpaidThisMonth(t) ? 0
+        : isInclusionRow(t) ? (Number(t.frontalHours) || 0) : nonQuotaOf(t),
     };
   });
 
   const sum = (f, filter = () => true) => rowsData.filter(filter).reduce((s, r) => s + (f(r) || 0), 0);
-  // תקן השעות — אותו כלל שבכל המסכים: עובדות הוראה בלבד, בלי מנהלת,
-  // בלי משרה שעתית, ובלי מי שבחל"ד או בחל"ת החודש
+  /*
+    תקן השעות — לא כלל משלו אלא schoolHours, אותה פונקציה שמזינה את כל
+    שאר המסכים ואת p_hours_of בשרת: בלי מנהלת, בלי משרה שעתית, בלי מי
+    שבחל"ד או בחל"ת החודש, בלי מורה לשילוב, ובלי שעות ייעוץ. ספירה
+    נפרדת כאן הראתה לירושלים חריגה 15 שכולה 8 שעות ייעוץ ו-7 שילוב
+    (שרה, 24.9) — בפועל בית הספר בדיוק בתקן.
+  */
   const inQuota  = r => r.kind === 'teaching' && !unpaidThisMonth(r.t) && !r.covered;
-  const totFront = sum(r => r.frontal, inQuota);
+  // כל השעות שמלמדים בפועל — הן נשארות בדוח ("תכניס אותם אבל עם דגש")
+  const totFront  = sum(r => r.frontal, inQuota);
+  // ומתוכן, אלה שאינן נספרות מול התקן — כל אחת בנפרד, כדי שההפרש יהיה מוסבר
+  const hCounsel  = sum(r => nonQuotaOf(r.t), r => inQuota(r) && !isInclusionRow(r.t));
+  const hInclusion = sum(r => r.frontal, r => inQuota(r) && isInclusionRow(r.t));
+  const quotaUsed = schoolHours(ts);          // השעות שנספרות מול התקן
   const totInd   = sum(r => r.individual, inQuota);
   const totPres  = sum(r => r.presence, inQuota);
   const totGross = sum(r => r.emp.gross);
@@ -2358,8 +2372,10 @@ function SchoolReport({ school, teachers, onClose }) {
   const costPrincipal = sum(r => r.emp.total, r => r.kind === 'principal');
   const costHourly    = sum(r => r.emp.total, r => r.kind === 'hourly');
   const quota    = Number(school.hoursQuota) || 0;
-  const overQuota = totFront - quota;
+  const overQuota = quotaUsed - quota;        // החריגה נמדדת מול השעות שבתקן
+  const outOfQuota = hCounsel + hInclusion;
   const nis = n => Math.round(n || 0).toLocaleString('he-IL');
+  const num = n => Math.round(n || 0).toLocaleString('he-IL');
 
   // אותן עמודות שבטבלה, באותו סדר — כדי שהקובץ והנייר יראו אותו דבר
   const exportExcel = () => {
@@ -2368,7 +2384,8 @@ function SchoolReport({ school, teachers, onClose }) {
       { key:'reform', label:'רפורמה' },
       { key:'grade', label:'דרגה' }, { key:'seniority', label:'ותק' }, { key:'scope', label:'% משרה' },
       { key:'frontal', label:'פרונטלי' }, { key:'individual', label:'פרטני' }, { key:'presence', label:'שהייה' },
-      { key:'role', label:'תפקיד' }, { key:'status', label:'סטטוס' }, { key:'mmFor', label:'במקום' },
+      { key:'role', label:'תפקיד' }, { key:'outHours', label:'מתוכן מחוץ לתקן' },
+      { key:'status', label:'סטטוס' }, { key:'mmFor', label:'במקום' },
       { key:'from', label:'מתאריך' }, { key:'to', label:'עד תאריך' },
       { key:'gross', label:'ברוטו' }, { key:'supp', label:'מתוכו תוספת חב"ד' },
       { key:'social', label:'הוצאות מעביד' }, { key:'total', label:'ברוטו למעסיק' },
@@ -2386,6 +2403,7 @@ function SchoolReport({ school, teachers, onClose }) {
       individual: r.kind === 'hourly' ? '' : r.individual,
       presence: r.kind === 'hourly' ? '' : r.presence,
       role: rolesText(r.t) || '',
+      outHours: r.outHours || '',
       status: onLeave(r.t) ? leaveLabel(r.t.leaveType) : '',
       mmFor: r.t.mmFor || '',
       from: fmt(r.t.startDate), to: fmt(r.t.endDate),
@@ -2395,7 +2413,8 @@ function SchoolReport({ school, teachers, onClose }) {
       total: Math.round(r.emp.total),
       src: r.fromSlip ? 'תלוש' : 'אומדן',
     }));
-    const footer = { name: 'סה"כ', frontal: totFront, individual: totInd, presence: totPres,
+    const footer = { name: 'סה"כ', frontal: totFront, outHours: outOfQuota,
+      individual: totInd, presence: totPres,
       gross: Math.round(totGross), supp: Math.round(totSupp), total: Math.round(totEmpGross) };
     downloadXLSX(headers, rows, `דוח_שכר_${school.name}_${stampToday()}.xlsx`, footer, 'דוח שכר');
   };
@@ -2446,13 +2465,18 @@ function SchoolReport({ school, teachers, onClose }) {
         </div>
 
         {/* רשת עמודות שוות וגובה שווה — כרטיסיות באותו גודל בכל רוחב מסך */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,138px),1fr))',
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,120px),1fr))',
           gridAutoRows:'1fr', gap:10, marginBottom:24 }}>
           {[
             { label: 'עובדים בדוח', val: ts.length,
               sub: `${rowsData.filter(r=>r.kind==='teaching').length} הוראה · ${rowsData.filter(r=>r.kind==='principal').length} ניהול · ${rowsData.filter(r=>r.kind==='hourly').length} שעתי` },
-            { label: 'שעות פרונטליות', val: totFront.toLocaleString('he-IL'),
-              sub: quota ? `תקן ${quota.toLocaleString('he-IL')} · ${overQuota >= 0 ? 'חריגה ' : 'מתחת לתקן '}${Math.abs(overQuota).toLocaleString('he-IL')}` : 'אין תקן מוזן' },
+            { label: 'שעות פרונטליות', val: num(totFront),
+              sub: outOfQuota
+                ? `מתוכן מחוץ לתקן: ${hCounsel ? `${num(hCounsel)} ייעוץ` : ''}${hCounsel && hInclusion ? ' · ' : ''}${hInclusion ? `${num(hInclusion)} שילוב` : ''}`
+                : 'כולן נספרות מול התקן' },
+            { label: 'מול תקן השעות', val: num(quotaUsed),
+              sub: quota ? `תקן ${num(quota)} · ${overQuota > 0 ? `חריגה ${num(overQuota)}` : overQuota === 0 ? 'בדיוק בתקן' : `מתחת לתקן ${num(-overQuota)}`}` : 'אין תקן מוזן',
+              tone: quota ? (overQuota > 0 ? 'err' : 'ok') : undefined },
             { label: 'פרטני ושהייה', val: (totInd + totPres).toLocaleString('he-IL'),
               sub: `${totInd.toLocaleString('he-IL')} פרטני · ${totPres.toLocaleString('he-IL')} שהייה` },
             { label: 'ברוטו לחודש', val: nis(totGross) + ' ₪',
@@ -2465,7 +2489,10 @@ function SchoolReport({ school, teachers, onClose }) {
             <div key={c.label} className="apple-stat" style={{ textAlign:'center', display:'flex', flexDirection:'column', gap:2 }}>
               <p className="apple-stat-label" style={{ minHeight:34 }}>{c.label}</p>
               <p className="apple-stat-value" style={{ fontSize:20.7, marginTop:'auto' }}>{c.val}</p>
-              <p style={{ fontSize:12.4, color:'var(--apple-text3)', minHeight:30, lineHeight:1.35 }}>{c.sub}</p>
+              {/* הצבע הוא מצב, לא קישוט: חריגה מהתקן באדום, בתוך התקן בירוק */}
+              <p style={{ fontSize:12.4, minHeight:30, lineHeight:1.35,
+                color: c.tone === 'err' ? 'var(--danger)' : c.tone === 'ok' ? 'var(--ok, #2e7d32)' : 'var(--apple-text3)',
+                fontWeight: c.tone ? 600 : 400 }}>{c.sub}</p>
             </div>
           ))}
         </div>
@@ -2500,6 +2527,9 @@ function SchoolReport({ school, teachers, onClose }) {
                       {kind === 'hourly'    && <ReportTag text={jobLabel(t.job)} c="#0A6274" bg="rgba(0,180,204,0.12)" />}
                       {onLeave(t)           && <ReportTag text={leaveLabel(t.leaveType) + (covered ? ' · הפרשות בלבד' : '')} c="var(--warn)" bg="rgba(255,159,10,0.14)" />}
                       {t.mmFor              && <ReportTag text={`ממלאת מקום · ${t.mmFor}`} c="var(--ok)" bg="rgba(18,124,87,0.10)" />}
+                      {/* הדגש שביקשה שרה (24.9): השעות נשארות בדוח, ומסומן
+                          במפורש שהן אינן נספרות מול תקן בית הספר */}
+                      {r.outHours > 0 && <ReportTag text={`${r.outHours} שעות מחוץ לתקן${isInclusionRow(t) ? ' · שילוב' : ' · ייעוץ'}`} c="#8A5A00" bg="rgba(255,193,7,0.18)" />}
                     </span>
                   </td>
                   <td style={{ fontFamily:'monospace', fontSize:13.2 }}>{t.tzId||'—'}</td>
@@ -2536,8 +2566,15 @@ function SchoolReport({ school, teachers, onClose }) {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={6}>סה״כ {ts.length} עובדים</td>
-              <td style={{ textAlign:'center' }}>{totFront.toLocaleString('he-IL')}</td>
+              <td colSpan={6}>
+                סה״כ {ts.length} עובדים
+                {outOfQuota > 0 && (
+                  <span style={{ fontWeight:500, color:'var(--apple-text3)', fontSize:12.4 }}>
+                    {' '}· מול התקן נספרות {num(quotaUsed)} שעות ({num(outOfQuota)} מחוץ לתקן)
+                  </span>
+                )}
+              </td>
+              <td style={{ textAlign:'center' }}>{num(totFront)}</td>
               <td style={{ textAlign:'center' }}>{totInd.toLocaleString('he-IL')}</td>
               <td style={{ textAlign:'center' }}>{totPres.toLocaleString('he-IL')}</td>
               <td colSpan={3}></td>
@@ -2587,7 +2624,9 @@ function SchoolReport({ school, teachers, onClose }) {
           <strong style={{ color:'var(--text)' }}>ברוטו למעסיק</strong> = ברוטו לעובדת + פנסיה ופיצויים · קרן השתלמות · מס שכר · ביטוח לאומי · הבראה · ביגוד.
           בעמודת <strong>מקור</strong>: "תלוש" — העלות נלקחה מהתלוש בפועל; "אומדן" — חושבה מהמודל, מכויל לפי תלושי בית הספר.<br/>
           <strong style={{ color:'var(--text)' }}>תקן השעות</strong> נספר לעובדות הוראה בלבד — בלי המנהלת, בלי משרות שעתיות
-          ובלי מי שבחופשת לידה או בחל"ת החודש. הברוטו והעלות בשורת הסיכום הם של כל השורות.<br/>
+          ובלי מי שבחופשת לידה או בחל"ת החודש. <strong style={{ color:'var(--text)' }}>שעות ייעוץ ושעות שילוב מופיעות בדוח
+          ומסומנות, אך אינן נספרות מול התקן</strong> — הן מתוקצבות בנפרד מהשעות לכיתה.
+          הברוטו והעלות בשורת הסיכום הם של כל השורות.<br/>
           <strong style={{ color:'var(--text)' }}>חופשת לידה:</strong> כל עוד לא שובצה ממלאת מקום השכר נשאר מלא;
           מששובצה — ביטוח לאומי משלם, ונותרות ההפרשות הסוציאליות בלבד.
         </div>
