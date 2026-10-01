@@ -9,6 +9,7 @@
   ממספר שגוי.
 */
 import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { ENV_FILE } from './test-env.mjs';
 import { createClient } from '@supabase/supabase-js';
 
@@ -18,7 +19,8 @@ const env = Object.fromEntries(
 );
 process.env.VITE_SUPABASE_URL   = env.VITE_SUPABASE_URL;
 process.env.SUPABASE_SECRET_KEY = env.SUPABASE_SECRET_KEY;
-process.env.CRON_SECRET         = 'cycle-test-secret';
+// CRON_SECRET לא מוטמע בקובץ: נקרא מ-.env.test (או מהסביבה); לבדיקה מקומית כל ערך מתאים, לכן ברירת מחדל אקראית לריצה
+process.env.CRON_SECRET         = env.CRON_SECRET || process.env.CRON_SECRET || randomUUID();
 process.env.ADMIN_PHONE         = '+972547703015';   // קרישבסקי — לבדיקות בלבד
 delete process.env.GREEN_API_INSTANCE_ID;
 delete process.env.GREEN_API_TOKEN;
