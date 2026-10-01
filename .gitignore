@@ -43,3 +43,19 @@ _ledger.pdf
 _ledger.xlsx
 _ledger-preview.html
 _income_*.png
+
+# 1.10.2026: הריפו ציבורי. קבצי עבודה מקומיים עם נתוני עובדות, גיבויים וסיסמאות לא נכנסים לגיט לעולם.
+.qa-credentials
+.onboarding-all-sent-*
+*backup*.json
+*-before-*.json
+check-*.json
+_quota.json
+_tmp/
+approval-docs/
+ishur/
+shots/
+*.err
+תלושים-*.html
+fix-base.sql
+retry-failed.sql

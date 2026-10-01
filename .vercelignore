@@ -60,3 +60,13 @@ _tmp/
 check-ofek-*.json
 _quota.json
 *.py
+
+# 1.10.2026: גיבויים ונתונים מקומיים לא יוצאים מהמחשב
+.qa-credentials
+.onboarding-all-sent-*
+*backup*.json
+*-before-*.json
+check-*.json
+_tmp/
+*.err
+תלושים-*.html
