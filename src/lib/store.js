@@ -46,6 +46,7 @@ const TEACHER_FIELDS = [
   ['leave_from',           'leaveFrom'],
   ['leave_to',             'leaveTo'],
   ['absence_days',         'absenceDays'],
+  ['absence_hours',        'absenceHours'],
   ['absence_reason',       'absenceReason'],
   ['sick_form_path',       'sickFormPath'],
   ['mm_hours',             'mmHours'],
@@ -569,7 +570,7 @@ export async function linkUploadSickForm(code, teacherMonthId, file) {
     body: JSON.stringify({ code, teacherMonthId, contentType: file.type, dataBase64 }),
   });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(j.error || 'העלאת טופס המחלה נכשלה');
+  if (!res.ok) throw new Error(j.error || 'העלאת האישור נכשלה');
   return j.path;
 }
 

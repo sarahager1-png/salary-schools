@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 49;
+const BUILD = 50;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -253,10 +253,39 @@ const ABSENCE_REASONS = [
   ['other',      'אחר'],
 ];
 const reasonLabel = id => (ABSENCE_REASONS.find(([k]) => k === id) || [])[1] || '';
-// סיבות שמצריכות צירוף טופס מחלה
-const needsSickForm = r => r === 'sick' || r === 'child_sick';
 // סיבות שהן יציאה לחופשה — נרשמות גם כסטטוס עם תאריכים
 const isLeaveReason = r => r === 'maternity' || r === 'unpaid';
+/*
+  "העדרות חייבת להיות עם אשור … כל עוד אין אישור העדרות ממלאת המקום
+  לא תוכל לקבל שכר והתנועה לא נשלחת" (שרה, 4.10.26). אישור נדרש לכל
+  סיבה, כולל חופשת לידה וחל"ת. בלי אישור מוחזק מילוי המקום בלבד —
+  השכר הרגיל של הנעדרת ושל הממלאת עובר כרגיל.
+  הכלל חל מאוקטובר 2026: דיווחים ישנים יותר נשארים כפי שהוצגו.
+*/
+const DOC_RULE_FROM = '2026-10';
+const docLabel = r => (r === 'sick' || r === 'child_sick') ? 'אישור מחלה'
+  : r === 'miluim' ? 'אישור מילואים' : 'אישור';
+const hasAbsence = t => (t.absenceDays || 0) > 0 || (t.absenceHours || 0) > 0
+  || Boolean(t.absenceReason) || onLeave(t);
+const missingDoc = t => hasAbsence(t) && !t.sickFormPath
+  && String(t.monthKey || '') >= DOC_RULE_FROM;
+const sameName = (a, b) => String(a || '').trim() === String(b || '').trim();
+/*
+  מי שמוחלפת: כל השורות באותו בית ספר ובאותו חודש שנושאות את השם. לעובדת
+  עם שתי משרות (הוראה וצהרון) יש שתי שורות, וההיעדרות רשומה על אחת מהן —
+  לכן סוכמים על כולן, בדיוק כמו השרת (private.enforce_absence_rules).
+*/
+const replacedRows = (t, name, all) => (String(name || '').trim()
+  ? all.filter(x => x.id !== t.id && x.schoolId === t.schoolId && x.monthKey === t.monthKey && sameName(x.name, name))
+  : []);
+const absenceHoursOf = list => list.reduce((s, x) => s + (Number(x.absenceHours) || 0), 0);
+// מילוי מקום מוחזק: לנעדרת יש היעדרות בלי אישור. מחזיר את שורת הנעדרת, או null
+const mmHeldBy = (t, all) => replacedRows(t, t.mmFor, all).find(missingDoc) || null;
+// שעות מילוי מקום שכבר דווחו במקום אותו שם, בלי השורה שנערכת עכשיו
+const mmReportedFor = (name, like, all, exceptId) => all
+  .filter(x => x.id !== exceptId && x.schoolId === like.schoolId
+    && x.monthKey === like.monthKey && sameName(x.mmFor, name))
+  .reduce((s, x) => s + (Number(x.mmHours) || 0), 0);
 const fmtD = v => (v ? new Date(v).toLocaleDateString('he-IL') : '');
 
 // "אסתר צריכה לראות מי ממלאת מקום ובאיזה תקופה ואת מי מחליפה" (שרה, 3.9):
@@ -1004,11 +1033,15 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
                     </button>
                   </div>
                   <TeacherDiff t={t} />
-                  {(Number(t.absenceDays) > 0 || Number(t.mmHours) > 0 || onLeave(t)) && (
+                  {(Number(t.absenceDays) > 0 || Number(t.absenceHours) > 0 || Number(t.mmHours) > 0 || onLeave(t)) && (
                     <p style={{ fontSize:13.8, color:'var(--apple-text2)', marginTop:6 }}>
                       {[Number(t.absenceDays) > 0 ? `${t.absenceDays} ימי היעדרות` : '',
+                        Number(t.absenceHours) > 0 ? `${t.absenceHours} שעות היעדרות` : '',
                         Number(t.mmHours) > 0 ? `${t.mmHours} שעות מילוי מקום${t.mmFor ? ` במקום ${t.mmFor}` : ''}` : '',
-                        onLeave(t) ? leaveText(t) : ''].filter(Boolean).join(' · ')}
+                        onLeave(t) ? leaveText(t) : '',
+                        missingDoc(t) ? 'חסר אישור היעדרות' : '',
+                        mmHeldBy(t, teachers) ? `מילוי המקום מוחזק — חסר אישור של ${mmHeldBy(t, teachers).name}` : '',
+                      ].filter(Boolean).join(' · ')}
                     </p>
                   )}
                 </div>
@@ -5917,22 +5950,31 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
    אצל המנהלת, לא כאן. */
 function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
   const [onlyReported, setOnlyReported] = useState(true);
-  const has = t => (t.absenceDays || 0) > 0 || (t.mmHours || 0) > 0 || t.mmFor
+  const has = t => (t.absenceDays || 0) > 0 || (t.absenceHours || 0) > 0 || (t.mmHours || 0) > 0 || t.mmFor
     || onLeave(t) || t.isTemp || t.absenceReason || t.sickFormPath;
   const shown = teachers.filter(t => !onlyReported || has(t));
+  /*
+    "כל עוד אין אישור העדרות … התנועה לא נשלחת" (שרה, 4.10.26): מילוי מקום
+    שלנעדרת שלו אין אישור מוחזק. הוא מוצג כאן מסומן, ואינו נספר בשעות
+    הממ"מ שעוברות לחשבת.
+  */
+  const held = t => mmHeldBy(t, teachers);
+  const noDocN = shown.filter(missingDoc).length;
   const bySchool = schools
     .map(sc => ({ sc, list: shown.filter(t => t.schoolId === sc.id) }))
     .filter(g => g.list.length);
   const totAbs = shown.reduce((s, t) => s + (t.absenceDays || 0), 0);
-  const totMM  = shown.reduce((s, t) => s + (t.mmHours || 0), 0);
+  const totMM  = shown.reduce((s, t) => s + (held(t) ? 0 : (t.mmHours || 0)), 0);
+  const heldMM = shown.reduce((s, t) => s + (held(t) ? (t.mmHours || 0) : 0), 0);
 
   const exportCSV = () => {
     const headers = [
       { key:'school', label:'בית ספר' }, { key:'name', label:'שם' },
-      { key:'absence', label:'ימי היעדרות' }, { key:'reason', label:'סיבה' },
-      { key:'form', label:'טופס מחלה' }, { key:'status', label:'סטטוס' },
+      { key:'absence', label:'ימי היעדרות' }, { key:'absenceHours', label:'שעות היעדרות' },
+      { key:'reason', label:'סיבה' },
+      { key:'form', label:'אישור היעדרות' }, { key:'status', label:'סטטוס' },
       { key:'mmHours', label:'שעות ממ"מ' }, { key:'mmFor', label:'במקום מי' },
-      { key:'period', label:'תקופת ממ"מ' },
+      { key:'period', label:'תקופת ממ"מ' }, { key:'mmState', label:'מצב מילוי המקום' },
     ];
     const body = bySchool.flatMap(({ sc, list }) => list.map(t => {
       const replaced = t.mmFor ? teachers.find(x => x.name === t.mmFor) : null;
@@ -5940,23 +5982,27 @@ function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
         (replaced.leaveType === 'maternity' || replaced.absenceReason === 'maternity'));
       return {
         school: sc.name, name: t.name, absence: t.absenceDays || 0,
-        reason: reasonLabel(t.absenceReason) || '', form: t.sickFormPath ? 'כן' : '',
+        absenceHours: t.absenceHours || 0,
+        reason: reasonLabel(t.absenceReason) || '',
+        form: t.sickFormPath ? 'כן' : missingDoc(t) ? 'חסר' : '',
         status: onLeave(t) ? leaveText(t) : '', mmHours: t.mmHours || 0,
         mmFor: t.mmFor || '',
+        mmState: held(t) ? `מוחזק — חסר אישור היעדרות של ${held(t).name}` : '',
         period: weekly ? 'שבועי — חל"ד'
           : t.mmFrom ? (!t.mmTo || t.mmTo === t.mmFrom ? fmtD(t.mmFrom) : `${fmtD(t.mmFrom)} - ${fmtD(t.mmTo)}`)
           : t.isTemp ? subInfo(t) : '',
       };
     }));
     downloadCSV(headers, body, `היעדרויות_וממ"מ_${monthKey}.csv`,
-      { school:'סה"כ', absence: totAbs, mmHours: totMM });
+      { school:'סה"כ', absence: totAbs, mmHours: totMM,
+        mmState: heldMM ? `לא כולל ${heldMM} שעות מוחזקות` : '' });
   };
 
   return (
     <div className="page-wrap" style={{ maxWidth:1100 }}>
       <PageHead
         title={`היעדרויות וממ"מ · ${fmtMonthFn ? fmtMonthFn(monthKey) : monthKey}`}
-        subtitle={`מה שהמנהלות דיווחו החודש: ${totAbs} ימי היעדרות · ${totMM} שעות ממ"מ. התיקון נעשה אצל המנהלת בקישור שלה.`}
+        subtitle={`מה שהמנהלות דיווחו החודש: ${totAbs} ימי היעדרות · ${totMM} שעות ממ"מ${heldMM ? ` · ${heldMM} שעות ממ"מ מוחזקות` : ''}${noDocN ? ` · ${noDocN} היעדרויות בלי אישור` : ''}. התיקון נעשה אצל המנהלת בקישור שלה.`}
         actions={
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
             <div className="apple-seg">
@@ -5981,12 +6027,13 @@ function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
         <div key={sc.id} className="apple-card" style={{ padding:'14px 16px', marginBottom:16 }}>
           <p style={{ fontSize:16.7, fontWeight:800, marginBottom:8 }}>{sc.name} · {list.length}</p>
           <div className="table-scroll">
-            <table className="apple-table sticky-first" style={{ fontSize:14.9, minWidth:680 }}>
+            <table className="apple-table sticky-first" style={{ fontSize:14.9, minWidth:760 }}>
               <thead><tr>
                 <th>שם</th>
                 <th style={{ textAlign:'center' }}>ימי היעדרות</th>
+                <th style={{ textAlign:'center' }}>שעות היעדרות</th>
                 <th style={{ textAlign:'center' }}>סיבה</th>
-                <th style={{ textAlign:'center' }}>טופס</th>
+                <th style={{ textAlign:'center' }}>אישור</th>
                 <th style={{ textAlign:'center' }}>סטטוס</th>
                 <th style={{ textAlign:'center' }}>שעות ממ"מ</th>
                 <th>במקום מי</th>
@@ -6004,13 +6051,18 @@ function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
                       color:(t.absenceDays||0)>0 ? 'var(--danger)' : 'var(--text3)' }}>
                       {(t.absenceDays||0) > 0 ? t.absenceDays : '—'}
                     </td>
+                    <td style={{ textAlign:'center', color:(t.absenceHours||0)>0 ? 'var(--text)' : 'var(--text3)' }}>
+                      {(t.absenceHours||0) > 0 ? t.absenceHours : '—'}
+                    </td>
                     <td style={{ textAlign:'center' }}>{reasonLabel(t.absenceReason) || '—'}</td>
                     <td style={{ textAlign:'center' }}>
                       {t.sickFormPath ? (
-                        <button className="apple-btn apple-btn-ghost" title="פתיחת טופס המחלה"
+                        <button className="apple-btn apple-btn-ghost" title="פתיחת אישור ההיעדרות"
                           onClick={async () => { try { window.open(await store.sickFormUrl(t.sickFormPath), '_blank'); } catch (e) { alert(e.message); } }}
                           style={{ minHeight:28, padding:'0 9px', fontSize:13.8 }}>📎</button>
-                      ) : '—'}
+                      ) : missingDoc(t)
+                        ? <span className="apple-badge badge-red" title="להיעדרות לא צורף אישור">חסר</span>
+                        : '—'}
                     </td>
                     <td style={{ textAlign:'center' }}>
                       {onLeave(t)
@@ -6021,7 +6073,13 @@ function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
                       color:(t.mmHours||0)>0 ? 'var(--purple)' : 'var(--text3)' }}>
                       {(t.mmHours||0) > 0 ? `${t.mmHours}${weekly ? ' שבועי' : ''}` : '—'}
                     </td>
-                    <td>{t.mmFor || '—'}</td>
+                    <td>
+                      {t.mmFor || '—'}
+                      {held(t) && (
+                        <span className="apple-badge badge-orange" style={{ marginInlineStart:6 }}
+                          title={`להיעדרות של ${held(t).name} לא צורף אישור — מילוי המקום אינו עובר לשכר`}>מוחזק</span>
+                      )}
+                    </td>
                     <td style={{ fontSize:13.8, color:'var(--apple-orange)' }}>
                       {weekly ? 'שבועי — כל תקופת החל"ד'
                         : t.mmFrom ? (!t.mmTo || t.mmTo === t.mmFrom ? fmtD(t.mmFrom) : `${fmtD(t.mmFrom)} – ${fmtD(t.mmTo)}`)
@@ -8737,6 +8795,16 @@ function LinkMonthlyReport({ rows, locked, onSave, code }) {
     if (isLeaveReason(reason) && !(absDraft.leaveFrom ?? absT.leaveFrom)) {
       setAbsState('יש למלא מאיזה תאריך'); return;
     }
+    // שעות ההיעדרות הן הבסיס להתאמת מילוי המקום (שרה, 4.10.26)
+    const absHours = Number(absDraft.absenceHours ?? absT.absenceHours) || 0;
+    if (!isLeaveReason(reason) && absHours <= 0) {
+      setAbsState('כמה שעות נמשכה ההיעדרות?'); return;
+    }
+    const already = mmReportedFor(absT.name, absT, rows, absT.id);
+    const othersAbs = absenceHoursOf(replacedRows(absT, absT.name, rows));
+    if (!isLeaveReason(reason) && absHours + othersAbs < already) {
+      setAbsState(`כבר דווחו ${already} שעות מילוי מקום במקום ${absT.name}. יש לעדכן קודם את מילוי המקום.`); return;
+    }
     setAbsState('saving');
     try {
       /*
@@ -8764,6 +8832,28 @@ function LinkMonthlyReport({ rows, locked, onSave, code }) {
       if (!subFrom) { setSubState(subMode === 'day' ? 'באיזה תאריך?' : 'מאיזה תאריך?'); return; }
       if (subMode === 'period' && !subTo) { setSubState('עד איזה תאריך?'); return; }
     }
+    /*
+      "מילוי המקום חייב להיות תואם לשעות ההעדרות" (שרה, 4.10.26): נרשם רק
+      מול היעדרות שדווחה, וסך השעות במקום אותה עובדת אינו עולה על שעות
+      ההיעדרות. חופשת לידה וחל"ת נמדדות בתאריכים — שם אין מול מה להשוות.
+      אותו כלל נאכף בשרת (private.enforce_absence_rules).
+    */
+    const absName2 = String(subFor).trim();
+    const absentees = replacedRows(subT, absName2, rows);
+    if (!absentees.length) { setSubState('אי אפשר למלא מקום במקום עצמה'); return; }
+    if (!absentees.some(onLeave)) {
+      const absH = absenceHoursOf(absentees);
+      if (absH <= 0) {
+        setSubState(`קודם מדווחים את ההיעדרות של ${absName2}, כולל שעות ההיעדרות.`); return;
+      }
+      const left = absH - mmReportedFor(absName2, subT, rows, subT.id);
+      if (h > left) {
+        setSubState(left > 0
+          ? `ההיעדרות של ${absName2} היא ${absH} שעות, ונותרו ${left} שעות למילוי מקום.`
+          : `כל ${absH} שעות ההיעדרות של ${absName2} כבר מולאו.`);
+        return;
+      }
+    }
     setSubState('saving');
     try {
       // ממ"מ לחל"ד: שעות שבועיות בלי תאריכים (שרה, 6.9)
@@ -8779,9 +8869,11 @@ function LinkMonthlyReport({ rows, locked, onSave, code }) {
 
   // עריכת דיווח קיים — מחזירה אותו לטפסים למעלה עם הערכים הנוכחיים
   const editReport = (t) => {
-    if ((t.absenceDays || 0) > 0 || onLeave(t) || t.absenceReason) {
+    if ((t.absenceDays || 0) > 0 || (t.absenceHours || 0) > 0 || onLeave(t) || t.absenceReason) {
       setAbsName(t.name);
-      setAbsDraft({ absenceDays: t.absenceDays, absenceReason: t.absenceReason || '',
+      setAbsDraft({ absenceDays: t.absenceDays, absenceHours: t.absenceHours,
+        // חופשה שנרשמה בלי סיבה (לפני הכלל) — הסיבה נגזרת מהסטטוס
+        absenceReason: t.absenceReason || (t.leaveType === 'maternity' ? 'maternity' : t.leaveType === 'unpaid' ? 'unpaid' : ''),
         leaveFrom: t.leaveFrom, leaveTo: t.leaveTo, sickFormPath: t.sickFormPath });
     }
     if ((t.mmHours || 0) > 0 || t.mmFor) {
@@ -8795,28 +8887,37 @@ function LinkMonthlyReport({ rows, locked, onSave, code }) {
   // "מחיקת דיווח" — ממצא הבדיקה: לא הייתה דרך לבטל דיווח שגוי מהטופס
   const deleteReport = async (t) => {
     if (!window.confirm(`למחוק את הדיווח של ${t.name} לחודש הזה?`)) return;
-    await onSave({ ...t,
-      absenceDays: 0, absenceReason: null, sickFormPath: null,
-      leaveType: 'none', leaveFrom: null, leaveTo: null,
-      mmHours: 0, mmFor: '', mmFrom: null, mmTo: null,
-      _snapshot: t._snapshot || snapT(t) });
+    try {
+      await onSave({ ...t,
+        absenceDays: 0, absenceHours: 0, absenceReason: null, sickFormPath: null,
+        leaveType: 'none', leaveFrom: null, leaveTo: null,
+        mmHours: 0, mmFor: '', mmFrom: null, mmTo: null,
+        _snapshot: t._snapshot || snapT(t) });
+    } catch (e) {
+      // למשל: היעדרות שכבר דווח מולה מילוי מקום — השרת דוחה ומסביר
+      window.alert(e.message);
+    }
   };
 
   const reported = rows.filter(t =>
-    (t.absenceDays || 0) > 0 || (t.mmHours || 0) > 0 || t.mmFor || onLeave(t) || t.absenceReason);
+    (t.absenceDays || 0) > 0 || (t.absenceHours || 0) > 0 || (t.mmHours || 0) > 0 || t.mmFor || onLeave(t) || t.absenceReason);
   const totAbs = rows.reduce((s, t) => s + (t.absenceDays || 0), 0);
   const totMM  = rows.reduce((s, t) => s + (t.mmHours || 0), 0);
+  const noDoc  = rows.filter(missingDoc).length;
 
   const inputStyle = { minHeight:42, fontSize:16.1 };
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-      {/* הסיכום למעלה — מה שכבר דווח החודש, במבט אחד */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8 }}>
+      {/* הסיכום למעלה — מה שכבר דווח החודש, במבט אחד.
+          ארבע כרטיסיות שוות: שתיים בשורה בנייד, ארבע במסך רחב. */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 150px), 1fr))',
+        gridAutoRows:'1fr', gap:8 }}>
         {[
           { label:'ימי היעדרות', val: totAbs,           color:'var(--danger)' },
           { label:'שעות ממ"מ',   val: totMM,            color:'var(--purple)' },
           { label:'בחופשה',      val: rows.filter(onLeave).length, color:'var(--warn)' },
+          { label:'חסר אישור',   val: noDoc,            color:'var(--danger)' },
         ].map(x => (
           <div key={x.label} className="apple-card" style={{ padding:'10px 8px', textAlign:'center' }}>
             <p className="num" style={{ fontWeight:800, fontSize:23, color: x.val ? x.color : 'var(--text3)' }}>{x.val}</p>
@@ -8844,8 +8945,12 @@ function LinkMonthlyReport({ rows, locked, onSave, code }) {
                 options={[['', 'בחרי סיבה…'], ...ABSENCE_REASONS.map(([k, l]) => [k, l])]} />
               {/* חל"ד/חל"ת נמדדות בתאריכים; שאר הסיבות — בימים */}
               {!isLeaveReason(reason) && (
-                <LinkField label="ימי היעדרות" value={absDraft.absenceDays ?? absT.absenceDays}
-                  onChange={v => setAbsDraft(m => ({ ...m, absenceDays: v }))} />
+                <>
+                  <LinkField label="ימי היעדרות" value={absDraft.absenceDays ?? absT.absenceDays}
+                    onChange={v => setAbsDraft(m => ({ ...m, absenceDays: v }))} />
+                  <LinkField label="שעות היעדרות" value={absDraft.absenceHours ?? absT.absenceHours}
+                    onChange={v => setAbsDraft(m => ({ ...m, absenceHours: v }))} />
+                </>
               )}
               {isLeaveReason(reason) && (
                 <>
@@ -8856,16 +8961,24 @@ function LinkMonthlyReport({ rows, locked, onSave, code }) {
                 </>
               )}
             </div>
-            {/* טופס מחלה — למחלה ולמחלת ילד */}
-            {needsSickForm(reason) && (
-              <div style={{ marginTop:9, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-                <label className="apple-btn apple-btn-ghost" style={{ minHeight:40, paddingInline:14, cursor:'pointer' }}>
-                  📎 {uploading ? 'מעלה…' : (absDraft.sickFormPath || absT.sickFormPath) ? 'החלפת טופס המחלה' : 'צירוף טופס מחלה'}
-                  <input type="file" accept="image/*,application/pdf" hidden
-                    onChange={e => { attachFile(e.target.files?.[0]); e.target.value = ''; }} />
-                </label>
-                {(absDraft.sickFormPath || absT.sickFormPath) && !uploading &&
-                  <span style={{ fontSize:14.4, color:'var(--ok)', fontWeight:600 }}>✓ טופס מצורף</span>}
+            {/* אישור ההיעדרות — לכל סיבה (שרה, 4.10.26) */}
+            {reason && (
+              <div style={{ marginTop:9 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                  <label className="apple-btn apple-btn-ghost" style={{ minHeight:40, paddingInline:14, cursor:'pointer' }}>
+                    📎 {uploading ? 'מעלה…' : (absDraft.sickFormPath || absT.sickFormPath) ? 'החלפת האישור' : `צירוף ${docLabel(reason)}`}
+                    <input type="file" accept="image/*,application/pdf" hidden
+                      onChange={e => { attachFile(e.target.files?.[0]); e.target.value = ''; }} />
+                  </label>
+                  {(absDraft.sickFormPath || absT.sickFormPath) && !uploading &&
+                    <span style={{ fontSize:14.4, color:'var(--ok)', fontWeight:600 }}>✓ האישור מצורף</span>}
+                </div>
+                {!(absDraft.sickFormPath || absT.sickFormPath) && !uploading && (
+                  <p style={{ fontSize:13.8, color:'var(--warn)', marginTop:7, lineHeight:1.6 }}>
+                    אפשר לשמור גם בלי אישור, אבל כל עוד הוא חסר מילוי המקום שמול ההיעדרות מוחזק
+                    ואינו עובר לשכר, ו{absT.name} תקבל הודעה לשלוח אישור.
+                  </p>
+                )}
               </div>
             )}
           </>
@@ -8901,6 +9014,27 @@ function LinkMonthlyReport({ rows, locked, onSave, code }) {
               <input list="school-teachers" className="apple-input" style={{ ...inputStyle, width:'100%' }}
                 placeholder="במקום מי…" value={subFor}
                 onChange={e => { setSubFor(e.target.value); setSubState(''); }} />
+              {/* מול מה ממלאים: שעות ההיעדרות ומה שנותר מהן, והאם יש אישור */}
+              {replaced && (() => {
+                const group = rows.filter(x => x.id !== subT?.id && sameName(x.name, replaced.name));
+                if (!group.length || group.some(onLeave)) return null;
+                const absH = absenceHoursOf(group);
+                const left = absH - mmReportedFor(replaced.name, replaced, rows, subT?.id);
+                return (
+                  <p style={{ fontSize:13.8, fontWeight:600, lineHeight:1.6,
+                    color: absH > 0 ? 'var(--text2)' : 'var(--danger)' }}>
+                    {absH > 0
+                      ? `ההיעדרות של ${replaced.name}: ${absH} שעות · נותרו ${Math.max(0, left)} למילוי מקום`
+                      : `עוד לא דווחה היעדרות של ${replaced.name}. קודם מדווחים את ההיעדרות, כולל השעות.`}
+                  </p>
+                );
+              })()}
+              {replaced && rows.some(x => sameName(x.name, replaced.name) && missingDoc(x)) && (
+                <p style={{ fontSize:13.8, color:'var(--warn)', lineHeight:1.6 }}>
+                  להיעדרות של {replaced.name} עוד לא צורף אישור. מילוי המקום יישמר, אבל יוחזק
+                  ולא יעבור לשכר עד שהאישור יצורף.
+                </p>
+              )}
               {maternitySub ? (
                 <>
                   <LinkField label="שעות שבועיות" value={subHours} onChange={v => setSubHours(v)} />
@@ -8957,8 +9091,9 @@ function LinkMonthlyReport({ rows, locked, onSave, code }) {
                   (replaced.leaveType === 'maternity' || replaced.absenceReason === 'maternity'));
                 return [
                   (t.absenceDays || 0) > 0 ? `${t.absenceDays} ימי היעדרות` : '',
+                  (t.absenceHours || 0) > 0 ? `${t.absenceHours} שעות היעדרות` : '',
                   t.absenceReason ? reasonLabel(t.absenceReason) : '',
-                  t.sickFormPath ? '📎 טופס מצורף' : '',
+                  t.sickFormPath ? '📎 האישור מצורף' : '',
                   onLeave(t) ? leaveText(t) : '',
                   (t.mmHours || 0) > 0 ? `${t.mmHours} שעות ממ"מ${weekly ? ' שבועיות' : ''}` : '',
                   t.mmFor ? `במקום ${t.mmFor}${weekly ? ' (חל"ד)' : ''}` : '',
@@ -8966,6 +9101,17 @@ function LinkMonthlyReport({ rows, locked, onSave, code }) {
                 ].filter(Boolean).join(' · ');
               })()}
             </p>
+            {/* מה חסר כדי שהדיווח יעבור — בשורה משלה, כדי שלא ייבלע בפירוט */}
+            {missingDoc(t) && (
+              <p style={{ fontSize:13.2, fontWeight:700, color:'var(--danger)', marginTop:3 }}>
+                חסר אישור היעדרות — לחצי "עדכון" וצרפי אותו
+              </p>
+            )}
+            {mmHeldBy(t, rows) && (
+              <p style={{ fontSize:13.2, fontWeight:700, color:'var(--warn)', marginTop:3 }}>
+                מילוי המקום מוחזק עד שיצורף אישור ההיעדרות של {mmHeldBy(t, rows).name}
+              </p>
+            )}
           </div>
           {!locked && (
             <div style={{ display:'flex', gap:6 }}>
@@ -10886,7 +11032,7 @@ function LinkView({ code }) {
         {locked ? (
           <div style={{ background:'var(--warn-bg)', border:'1px solid var(--warn)', borderRadius:12, padding:'11px 14px', marginBottom:14 }}>
             <p style={{ fontSize:14.9, fontWeight:600, color:'var(--warn)' }}>
-              הדיווח פתוח מה-1 עד ה-20 בכל חודש. עכשיו אי אפשר לשנות — אפשר לחזור ב-1 לחודש.
+              המערכת סגורה לדיווחים עד ה-1 לחודש הבא. הדיווח פתוח מה-1 עד ה-20 בכל חודש.
             </p>
             <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:4, lineHeight:1.6 }}>
               אפשר לצפות בכל הנתונים. תיקון יתקבל בחודש הבא, או בפנייה לרשת.

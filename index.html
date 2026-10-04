@@ -11,6 +11,18 @@
 
     <!-- התקנה למסך הבית -->
     <link rel="manifest" href="/manifest.webmanifest" />
+    <script>
+      // מנהלת שנכנסה מהקישור האישי (?k=): המניפסט מוחלף באחד שנפתח ישר על
+      // בית הספר שלה, כדי שהאפליקציה המותקנת לא תנחת על מסך הכניסה (4.10.26).
+      (function () {
+        try {
+          var k = new URLSearchParams(window.location.search).get('k');
+          if (k && /^[A-Za-z0-9_-]{4,100}$/.test(k)) {
+            document.querySelector('link[rel="manifest"]').setAttribute('href', '/api/manifest?k=' + k);
+          }
+        } catch (e) { /* נשאר המניפסט הקבוע */ }
+      })();
+    </script>
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

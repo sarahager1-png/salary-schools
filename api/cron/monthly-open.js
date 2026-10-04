@@ -58,8 +58,14 @@ export default async function handler(req, res) {
       late_report: false,
       payroll_ready: false,
       absence_days: 0,
+      absence_hours: 0,
       mm_hours: 0,
       mm_for: coversLeave ? r.mm_for : null,
+      mm_from: null,
+      mm_to: null,
+      // היעדרות של החודש שעבר אינה עוברת הלאה. חופשה שנמשכת שומרת את
+      // הסיבה ואת האישור שצורף — לא מבקשים אותו מחדש בכל חודש (4.10.26).
+      ...(r.leave_type !== 'none' && !ended(r) ? {} : { absence_reason: null, sick_form_path: null }),
       ...(ended(r) ? { leave_type: 'none', leave_from: null, leave_to: null } : {}),
     };
   });
