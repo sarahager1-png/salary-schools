@@ -8,6 +8,7 @@ drop function if exists private.notify_absence_doc();
 drop function if exists private.enforce_absence_rules();
 drop function if exists private.next_send_time(timestamptz);
 drop function if exists private.is_principal_write();
+drop function if exists public.link_attach_doc(text, uuid, text);
 update public.notifications set status = 'cancelled'
  where kind = 'absence_doc_needed' and status = 'pending';
 

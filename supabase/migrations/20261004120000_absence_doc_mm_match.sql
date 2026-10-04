@@ -29,6 +29,7 @@
   5. enforce_column_permissions — חשבת השכר רשאית לתקן גם את שעות
      ההיעדרות, כמו שאר שדות ההיעדרות (clerk_fixes_absence, 6.9). זה השינוי
      היחיד בפונקציה; שאר הגוף הוא ההגדרה החיה כלשונה.
+  6. public.link_attach_doc — צירוף אישור אחרי ה-20, לחופשת לידה בלבד.
 */
 
 
@@ -324,6 +325,71 @@ create trigger trg_notify_absence_doc
   after insert or update on public.teacher_months
   for each row execute function private.notify_absence_doc();
 
+/*
+  צירוף אישור אחרי ה-20 — ליולדת בלבד (שרה, 4.10.26: "צרוף אשור רק ליולדת").
+
+  מה-21 המנהלת אינה משנה דיווחים, ולכן אישור שהגיע באיחור לא היה ניתן
+  לצירוף ומילוי המקום נשאר מוחזק. כאן נפתח פתח אחד וצר: אישור לחופשת
+  לידה. הפונקציה משנה רק את נתיב האישור, רק בשורה של עובדת בחופשת לידה,
+  ורק כשהחודש לא ננעל ביד ולא עבר מועד הנעילה הסופי שלו. הנתיב עצמו
+  נבדק בטריגר (private.enforce_absence_rules) כמו בכל שמירה.
+  אישור הדיווח (report_pending) אינו משתנה: זה מסמך, לא נתון שכר.
+*/
+create or replace function public.link_attach_doc(p_code text, p_row uuid, p_path text)
+returns public.teacher_months
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  pr     public.profiles;
+  target public.teacher_months;
+  result public.teacher_months;
+  v_path text := nullif(btrim(coalesce(p_path, '')), '');
+  v_closed boolean;
+begin
+  select * into pr from private.profile_for_code(p_code);
+  if pr.id is null or pr.role <> 'principal' then
+    raise exception 'הקישור אינו תקף';
+  end if;
+
+  -- השורה ננעלת עד סוף הפעולה: בלי זה שינוי בו-זמני של הסטטוס היה עובר בין הבדיקה לעדכון
+  select * into target from public.teacher_months where id = p_row for update;
+  if target.id is null or target.school_id is distinct from pr.school_id then
+    raise exception 'השורה אינה שייכת לבית הספר שלך';
+  end if;
+  if v_path is null then
+    raise exception 'לא צורף קובץ';
+  end if;
+  if (target.leave_type = 'maternity' or coalesce(target.absence_reason, '') = 'maternity') is not true then
+    raise exception 'אחרי ה-20 בחודש אפשר לצרף אישור רק לחופשת לידה. אישור אחר יצורף בחלון הדיווח הבא, מה-1 עד ה-20.';
+  end if;
+  -- שורת החודש ננעלת לקריאה, כדי שנעילה ביד לא תיכנס באמצע
+  select m.locked or (m.lock_due is not null
+                      and (now() at time zone 'Asia/Jerusalem')::date >= m.lock_due)
+    into v_closed
+    from public.months m
+   where m.key = target.month_key
+     for share;
+  if v_closed is not false then
+    raise exception 'החודש % נעול לשינויים.', target.month_key;
+  end if;
+
+  perform set_config('app.via_link', '1', true);
+  update public.teacher_months
+     set sick_form_path = v_path,
+         updated_at     = now()
+   where id = target.id
+  returning * into result;
+  perform set_config('app.via_link', '', true);
+
+  update public.access_links set last_used_at = now() where code = p_code;
+  return result;
+end;
+$$;
+revoke all on function public.link_attach_doc(text, uuid, text) from public;
+grant execute on function public.link_attach_doc(text, uuid, text) to anon, authenticated;
+
 -- ── שמירה דרך הקישור: ההגדרה מ-21.9 בתוספת שדות ההיעדרות ומילוי המקום ──
 CREATE OR REPLACE FUNCTION public.link_save_row(p_code text, p_row jsonb)
  RETURNS teacher_months
@@ -343,7 +409,7 @@ begin
   end if;
 
   select * into target from public.teacher_months where id = (p_row ->> 'id')::uuid;
-  if target.id is null or target.school_id <> pr.school_id then
+  if target.id is null or target.school_id is distinct from pr.school_id then
     raise exception 'השורה אינה שייכת לבית הספר שלך';
   end if;
   if private.link_locked(target.month_key) then

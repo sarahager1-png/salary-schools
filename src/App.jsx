@@ -8757,8 +8757,19 @@ function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, mal
   );
 }
 
-function LinkMonthlyReport({ rows, locked, onSave, code }) {
+function LinkMonthlyReport({ rows, locked, onSave, code, onAttachDoc }) {
   const byName = (n) => rows.find(t => t.name === String(n || '').trim());
+  // "צרוף אשור רק ליולדת" (שרה, 4.10.26): אחרי ה-20 הדיווח סגור, ורק אישור
+  // לחופשת לידה אפשר עוד לצרף. השרת אוכף (link_attach_doc).
+  const isMaternity = t => t.leaveType === 'maternity' || t.absenceReason === 'maternity';
+  const [lateBusy, setLateBusy] = useState('');
+  const attachLate = async (t, file) => {
+    if (!file || !onAttachDoc) return;
+    setLateBusy(t.id);
+    try { await onAttachDoc(t, file); }
+    catch (e) { window.alert(e.message); }
+    finally { setLateBusy(''); }
+  };
 
   // ── טופס היעדרות ──
   const [absName,  setAbsName]  = useState('');
@@ -9104,7 +9115,9 @@ function LinkMonthlyReport({ rows, locked, onSave, code }) {
             {/* מה חסר כדי שהדיווח יעבור — בשורה משלה, כדי שלא ייבלע בפירוט */}
             {missingDoc(t) && (
               <p style={{ fontSize:13.2, fontWeight:700, color:'var(--danger)', marginTop:3 }}>
-                חסר אישור היעדרות — לחצי "עדכון" וצרפי אותו
+                {locked
+                  ? (isMaternity(t) && onAttachDoc ? 'חסר אישור היעדרות — אפשר לצרף גם עכשיו' : 'חסר אישור היעדרות')
+                  : 'חסר אישור היעדרות — לחצי "עדכון" וצרפי אותו'}
               </p>
             )}
             {mmHeldBy(t, rows) && (
@@ -9113,6 +9126,13 @@ function LinkMonthlyReport({ rows, locked, onSave, code }) {
               </p>
             )}
           </div>
+          {locked && onAttachDoc && missingDoc(t) && isMaternity(t) && (
+            <label className="apple-btn apple-btn-ghost" style={{ minHeight:40, paddingInline:14, cursor:'pointer', fontSize:13.8 }}>
+              📎 {lateBusy === t.id ? 'מעלה…' : 'צירוף אישור'}
+              <input type="file" accept="image/*,application/pdf" hidden disabled={lateBusy === t.id}
+                onChange={e => { attachLate(t, e.target.files?.[0]); e.target.value = ''; }} />
+            </label>
+          )}
           {!locked && (
             <div style={{ display:'flex', gap:6 }}>
               <button className="apple-btn apple-btn-ghost" onClick={() => editReport(t)}
@@ -10983,6 +11003,15 @@ function LinkView({ code }) {
     const saved = await store.linkSaveRow(code, draft);
     if (saved) setRows(rs => rs.map(r => (r.id === saved.id ? saved : r)));
   };
+  // אחרי ה-20 אפשר עוד לצרף אישור ליולדת — עד מועד הנעילה הסופי של החודש
+  // (lock_due). חודש שננעל ביד נדחה בשרת.
+  const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+  const lateDocOpen = Boolean(locked) && (!lockDue || todayIso < String(lockDue).slice(0, 10));
+  const onAttachDoc = async (t, file) => {
+    const path = await store.linkUploadSickForm(code, t.id, file);
+    const saved = await store.linkAttachDoc(code, t.id, path);
+    if (saved) setRows(rs => rs.map(r => (r.id === saved.id ? saved : r)));
+  };
   const onAdd = async (draft) => {
     if (!month) throw new Error('עוד לא נפתח חודש במערכת. פנו לרשת.');
     const added = await store.linkAddRow(code, month, draft);
@@ -11036,6 +11065,7 @@ function LinkView({ code }) {
             </p>
             <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:4, lineHeight:1.6 }}>
               אפשר לצפות בכל הנתונים. תיקון יתקבל בחודש הבא, או בפנייה לרשת.
+              {lateDocOpen ? ' אישור לחופשת לידה אפשר לצרף גם עכשיו, בלשונית הדיווח החודשי.' : ''}
             </p>
           </div>
         ) : lockDue ? (
@@ -11081,7 +11111,8 @@ function LinkView({ code }) {
                 schoolReform={me?.schoolReform} schoolName={me?.schoolName} male={male}
                 quota={me?.hoursQuota} />
             ) : tab === 'report' ? (
-              <LinkMonthlyReport rows={rows} locked={locked} onSave={onSave} code={code} />
+              <LinkMonthlyReport rows={rows} locked={locked} onSave={onSave} code={code}
+                onAttachDoc={lateDocOpen ? onAttachDoc : null} />
             ) : (
               <>
                 <p style={{ fontSize:14.4, color:'var(--text3)', marginBottom:11 }}>

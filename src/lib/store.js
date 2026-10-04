@@ -574,6 +574,14 @@ export async function linkUploadSickForm(code, teacherMonthId, file) {
   return j.path;
 }
 
+// צירוף אישור אחרי ה-20 — לחופשת לידה בלבד (שרה, 4.10.26). השרת אוכף.
+export async function linkAttachDoc(code, teacherMonthId, path) {
+  const { data, error } = await supabase.rpc('link_attach_doc',
+    { p_code: code, p_row: teacherMonthId, p_path: path });
+  raise(error, 'צירוף האישור נכשל');
+  return data ? rowToTeacher(data) : null;
+}
+
 // קישור צפייה לטופס מחלה — לשרה ולחשבת (מדיניות הדלי מגבילה לקריאה שלהן)
 export async function sickFormUrl(path) {
   const { data, error } = await supabase.storage.from('sick-forms').createSignedUrl(path, 600);
