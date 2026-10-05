@@ -69,14 +69,32 @@ try {
     { ...base, name: 'בלי ברוטו',   reform: 'ofek', approved: false, tz_id: '333333334' },
   ]);
   if (seed.error) throw new Error('זריעה: ' + seed.error.message);
+  // תלוש מפורט לשורה אחת — צריך לעבור עם השורה לחודש החדש
+  const { data: withSlip } = await admin.from('teacher_months')
+    .select('id').eq('month_key', PREV).eq('name', 'דיווחה בזמן').single();
+  const slipSeed = await admin.from('slip_lines').insert({
+    teacher_month_id: withSlip.id, gross: 8000,
+    lines: [{ code: '1', label: 'שכר משולב', amount: 8000, qty: 1 }],
+  });
+  if (slipSeed.error) throw new Error('זריעת תלוש: ' + slipSeed.error.message);
 
   // ── 1. פתיחת חודש ──
   const open = await call('monthly-open', { month: MONTH });
   check('החודש נפתח', open.body?.ok && open.body.month === MONTH, JSON.stringify(open.body));
   check('שלוש השורות הועתקו', open.body?.copied === 3, String(open.body?.copied));
+  const { data: newRows } = await admin.from('teacher_months').select('id, name').eq('month_key', MONTH);
+  const { data: newSlips } = await admin.from('slip_lines')
+    .select('teacher_month_id, gross, lines').in('teacher_month_id', newRows.map(r => r.id));
+  const slipOwner = newRows.find(r => r.id === newSlips?.[0]?.teacher_month_id)?.name;
+  check('התלוש המפורט עבר עם השורה', open.body?.slipsCopied === 1 && !open.body?.slipsError
+    && newSlips.length === 1 && slipOwner === 'דיווחה בזמן' && newSlips[0].gross === 8000 && newSlips[0].lines.length === 1,
+    JSON.stringify({ body: open.body, n: newSlips?.length, slipOwner }));
+  const { count: prevSlips } = await admin.from('slip_lines')
+    .select('teacher_month_id', { count: 'exact', head: true }).eq('teacher_month_id', withSlip.id);
+  check('התלוש של החודש הקודם נשאר במקומו', prevSlips === 1, String(prevSlips));
   const { data: m } = await admin.from('months').select('report_due, submit_due').eq('key', MONTH).single();
-  // הדיווח על חודש העבודה מגיע בחודש שאחריו — 2094-12 מדווח ב-05/01/2095
-  check('מועדי הדיווח הם של החודש שאחרי', m.report_due === '2095-01-05' && m.submit_due === '2095-01-06',
+  // הדיווח עד ה-20 בחודש עצמו (מאז 21.9.26); ההגשה ב-6 בחודש שאחריו
+  check('מועדי הדיווח: ה-20 בחודש, וה-6 בחודש שאחרי', m.report_due === '2094-12-20' && m.submit_due === '2095-01-06',
     `${m.report_due} / ${m.submit_due}`);
   const { data: copied } = await admin.from('teacher_months')
     .select('name, approved, official_gross, reported_at').eq('month_key', MONTH).order('name');
@@ -105,7 +123,7 @@ try {
   check('אין תזכורת כפולה', rem2.body?.queued === 0, JSON.stringify(rem2.body));
   const { data: q1 } = await admin.from('notifications').select('body, to_phone').eq('month_key', MONTH).eq('kind', 'report_reminder');
   check('ההודעה נושאת את התאריך והמשמעות',
-    /05\/\d{2}\/\d{4}/.test(q1[0].body) && q1[0].body.includes('לא ייכנס לשכר'), q1[0].body.split('\n').pop());
+    /20\/\d{2}\/\d{4}/.test(q1[0].body) && q1[0].body.includes('לא ייכנס לשכר'), q1[0].body.split('\n').pop());
 
   // ── 3. מועד הדיווח — נסגר אבל מסומן ──
   const ids = await admin.from('teacher_months').select('id, name').eq('month_key', MONTH);

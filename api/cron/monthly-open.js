@@ -5,6 +5,7 @@
   אם לא משתנה, ככה זה" (שרה, 27.8). רק שורה שתשתנה תחזור לאישור, דרך
   מעקב השינויים. מועדי הדיווח נקבעים כאן: ה-20 בחודש, וה-6 בחודש שאחריו.
 */
+import { randomUUID } from 'node:crypto';
 import { db, guard, monthKeyNow, monthOf, cycleStarted, dueDatesFor } from '../_lib/db.js';
 
 export default async function handler(req, res) {
@@ -47,11 +48,17 @@ export default async function handler(req, res) {
   const stillOnLeave = new Set((rows ?? [])
     .filter(r => r.leave_type === 'maternity' && !ended(r))
     .map(r => `${r.school_id}|${String(r.name || '').trim()}`));
+  // המזהה של השורה החדשה נקבע כאן, כדי שהתלוש המפורט יועתק אליה (למטה)
+  const newIdOf = new Map();
   const copied = (rows ?? []).map(r => {
     const { id, created_at, updated_at, ...rest } = r;
     const coversLeave = r.mm_for && stillOnLeave.has(`${r.school_id}|${String(r.mm_for).trim()}`);
+    const newId = randomUUID();
+    // מי שחזרה מחל"ד מחושבת מחדש — התלוש של החודש שעבר אינו שלה עוד
+    if (!ended(r)) newIdOf.set(id, newId);
     return {
       ...rest,
+      id: newId,
       month_key: key,
       // הדיווח החודשי מתחיל מחדש; האישור והמספרים עוברים כמות שהם
       reported_at: null,
@@ -73,5 +80,31 @@ export default async function handler(req, res) {
     const { error: tErr } = await sb.from('teacher_months').insert(copied);
     if (tErr) return res.status(500).json({ error: tErr.message });
   }
-  return res.status(200).json({ ok: true, month: key, copied: copied.length });
+
+  /*
+    התלוש המפורט (slip_lines) יושב בטבלה נפרדת, לפי מזהה השורה — ושורות
+    החודש החדש מקבלות מזהים חדשים. בלי ההעתקה הזו, ב-1 בחודש התלושים
+    נעלמו מהמסך עד חישוב מחדש ("נעלמו תלושי שכר", שרה 5.10.26). המספרים
+    עוברים כמות שהם, ולכן גם התלוש שמסביר אותם. החודש כבר פתוח בשלב
+    הזה, והרצה חוזרת לא תשלים את החסר — לכן תקלה כאן חוזרת כשגיאה,
+    וההשלמה היא ב-scripts/restore-slips.mjs (מוסיף רק מה שחסר).
+  */
+  let slipsCopied = 0, slipsError = null;
+  const prevIds = [...newIdOf.keys()];
+  for (let i = 0; i < prevIds.length && !slipsError; i += 100) {
+    const { data: slips, error: sErr } = await sb.from('slip_lines')
+      .select('teacher_month_id, lines, gross, computed_at')
+      .in('teacher_month_id', prevIds.slice(i, i + 100));
+    if (sErr) { slipsError = sErr.message; break; }
+    if (!slips?.length) continue;
+    const { error: iErr } = await sb.from('slip_lines').insert(
+      slips.map(s => ({ ...s, teacher_month_id: newIdOf.get(s.teacher_month_id) })));
+    if (iErr) slipsError = iErr.message;
+    else slipsCopied += slips.length;
+  }
+  if (slipsError) {
+    return res.status(500).json({ error: `החודש נפתח, אבל התלושים המפורטים לא הועתקו במלואם: ${slipsError}`,
+      month: key, copied: copied.length, slipsCopied });
+  }
+  return res.status(200).json({ ok: true, month: key, copied: copied.length, slipsCopied });
 }
