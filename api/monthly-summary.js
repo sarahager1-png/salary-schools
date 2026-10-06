@@ -38,40 +38,11 @@ export default async function handler(req, res) {
     if (!ALLOWED.has(prof?.role)) return res.status(403).json({ error: 'אין הרשאה לדף הזה' });
     if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'שיטה לא נתמכת' });
     const isPost = req.method === 'POST';
-    let canClose = true;   // false עד שטבלת החודשים הסגורים קיימת במסד
     // סגירה ופתיחה מחדש של חודש — רכזת בלבד; מנהל בצפייה אינו כותב דבר
     if (isPost && prof.role !== 'coordinator') return res.status(403).json({ error: 'רק הרכזת סוגרת חודש' });
 
-    /*
-      קריאה בעמודים: Supabase מחזיר לכל היותר 1,000 שורות בקריאה, בלי
-      שגיאה. שורות השכר גדלות בכ-120 בחודש, ובלי העמודים הסיכום היה
-      מתחיל לחסר בשקט אחרי כמה חודשים.
-    */
-    const all = async (table, cols, order) => {
-      const out = [];
-      for (let from = 0; ; from += 1000) {
-        const { data, error } = await sb.from(table).select(cols).order(order).range(from, from + 999);
-        if (error) throw new Error(`${table}: ${error.message}`);
-        out.push(...(data || []));
-        if (!data || data.length < 1000) return out;
-      }
-    };
-    const [sc, tm, fin, led, mo, snaps, slips, frozen] = await Promise.all([
-      all('schools', '*', 'id'),
-      all('teacher_months', '*', 'id'),
-      all('school_finance', 'school_id, ministry_budget, network_support, monthly_transfer, teaching_sim', 'school_id'),
-      all('school_payment_ledger', 'school_id, month_key, ministry_received, chabad_paid', 'month_key'),
-      all('months', 'key, opened_at, locked, closed_at', 'key'),
-      all('month_sim_snapshot', 'school_id, month_key, sim_cost, source', 'month_key'),
-      // התלושים הם השלמה בלבד — כשל בקריאתם לא מפיל את הדף
-      all('payslip_files', 'id, school_id, month_key, employer_cost', 'id').catch(e => { console.error('monthly-summary payslips', e); return []; }),
-      // חודשים שנסגרו. לפני שהטבלה קיימת — אין חודש סגור, והדף מחושב חי
-      // רק "הטבלה עוד לא קיימת" נחשב כאין חודש סגור; כל כשל אחר מפיל את הבקשה, כדי שחודש סגור לא יוצג בטעות חי
-      all('month_summary', 'month_key, school_id, data, closed_at', 'month_key').catch(e => {
-        if (/does not exist|schema cache|PGRST205|42P01/i.test(String(e?.message))) { canClose = false; return []; }
-        throw e;
-      }),
-    ]);
+    const { args, frozen, canClose } = await readAll(sb);
+    const [sc, tm, fin, led, mo, snaps, slips] = args;
 
     if (isPost) {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
@@ -101,6 +72,42 @@ export default async function handler(req, res) {
     console.error('monthly-summary', e);
     return res.status(500).json({ error: req.method === 'POST' ? 'הפעולה לא נשמרה. נסי שוב בעוד רגע.' : 'הסיכום החודשי לא נטען. נסו שוב בעוד רגע.' });
   }
+}
+
+/* כל הקריאות שהסיכום נשען עליהן — משותף לדף ולסגירה האוטומטית ב-11 בחודש */
+export async function readAll(sb) {
+  let canClose = true;   // false עד שטבלת החודשים הסגורים קיימת במסד
+  /*
+    קריאה בעמודים: Supabase מחזיר לכל היותר 1,000 שורות בקריאה, בלי
+    שגיאה. שורות השכר גדלות בכ-120 בחודש, ובלי העמודים הסיכום היה
+    מתחיל לחסר בשקט אחרי כמה חודשים.
+  */
+  const all = async (table, cols, order) => {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from(table).select(cols).order(order).range(from, from + 999);
+      if (error) throw new Error(`${table}: ${error.message}`);
+      out.push(...(data || []));
+      if (!data || data.length < 1000) return out;
+    }
+  };
+  const [sc, tm, fin, led, mo, snaps, slips, frozen] = await Promise.all([
+    all('schools', '*', 'id'),
+    all('teacher_months', '*', 'id'),
+    all('school_finance', 'school_id, ministry_budget, network_support, monthly_transfer, teaching_sim', 'school_id'),
+    all('school_payment_ledger', 'school_id, month_key, ministry_received, chabad_paid', 'month_key'),
+    all('months', 'key, opened_at, locked, closed_at', 'key'),
+    all('month_sim_snapshot', 'school_id, month_key, sim_cost, source', 'month_key'),
+    // התלושים הם השלמה בלבד — כשל בקריאתם לא מפיל את הדף
+    all('payslip_files', 'id, school_id, month_key, employer_cost', 'id').catch(e => { console.error('monthly-summary payslips', e); return []; }),
+    // חודשים שנסגרו. לפני שהטבלה קיימת — אין חודש סגור, והדף מחושב חי
+    // רק "הטבלה עוד לא קיימת" נחשב כאין חודש סגור; כל כשל אחר מפיל את הבקשה, כדי שחודש סגור לא יוצג בטעות חי
+    all('month_summary', 'month_key, school_id, data, closed_at', 'month_key').catch(e => {
+      if (/does not exist|schema cache|PGRST205|42P01/i.test(String(e?.message))) { canClose = false; return []; }
+      throw e;
+    }),
+  ]);
+  return { args: [sc, tm, fin, led, mo, snaps, slips], frozen, canClose };
 }
 
 /* החישוב עצמו — מיוצא, כדי שסקריפט בדיקה ישווה אותו מול המסך של שרה */

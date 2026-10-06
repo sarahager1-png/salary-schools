@@ -9,6 +9,7 @@
     { "path": "/api/cron/report-reminder", "schedule": "0 6 17 * *" },
     { "path": "/api/cron/report-due",      "schedule": "30 22 20 * *" },
     { "path": "/api/cron/payroll-cutoff",  "schedule": "0 15 6 * *" },
+    { "path": "/api/cron/month-close",     "schedule": "0 4 11 * *" },
     { "path": "/api/cron/maternity-watch", "schedule": "0 * * * *" },
     { "path": "/api/cron/queue-drain",     "schedule": "* * * * *" }
   ],

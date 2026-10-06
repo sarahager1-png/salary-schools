@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 90;
+const BUILD = 91;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5322,7 +5322,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 </>
               ) : (
                 <>
-                  <p style={{ flex:'1 1 260px', fontSize:15, color:'var(--text2)' }}>החודש פתוח: המספרים מחושבים מהנתונים הנוכחיים ועשויים להשתנות.</p>
+                  <p style={{ flex:'1 1 260px', fontSize:15, color:'var(--text2)' }}>החודש פתוח: המספרים מחושבים מהנתונים הנוכחיים ועשויים להשתנות. הוא נסגר אוטומטית ב-11 בחודש שאחריו.</p>
                   <button className="apple-btn apple-btn-blue" onClick={() => setAskClose('close')} style={{ minHeight:42, fontSize:15 }}>סגירת החודש</button>
                 </>
               )}
