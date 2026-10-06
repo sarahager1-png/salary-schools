@@ -168,7 +168,8 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
       const paid = ts.filter(t => !emp.unpaidThisMonth(t));
       const ministry = n(f.ministry_budget) == null ? null : n(f.ministry_budget) / 12;
       const support  = (n(f.network_support) || 0) / 12;
-      const add20 = cost * TRANSFER_PCT;
+      // "כן, 20 אחוז על הכל" (שרה, 7.10.26): הכרית מחושבת גם על המשרות השעתיות (צהרון, מנהלה), לא רק על ההוראה
+      const add20 = (cost + hourly) * TRANSFER_PCT;
       const gap = ministry == null ? null : cost + add20 - ministry - support;
       const agreed = n(f.monthly_transfer);
       const l = ledBy.get(`${key}|${s.id}`) || {};
@@ -242,7 +243,7 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
     const w = waiting.get(`${mo.key}|${b.id}`);
     if (!w || b.plan == null || b.fromSlips) continue;
     b.simOnly = true; b.pendingFixes = w; b.systemCost = b.cost;
-    b.cost = b.plan; b.add20 = Math.round(b.cost * TRANSFER_PCT); b.costWith20 = b.cost + b.add20;
+    b.cost = b.plan; b.add20 = Math.round((b.cost + (b.hourly || 0)) * TRANSFER_PCT); b.costWith20 = b.cost + b.add20;
     if (b.ministry != null) {
       b.gap = Math.round(b.cost + b.add20 - b.ministry - b.support);
       if (b.agreed == null) b.due = b.gap;

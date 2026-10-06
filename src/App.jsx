@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 101;
+const BUILD = 102;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4526,7 +4526,7 @@ function MaternityPanel({ schools, teachers, onSaveTeacher }) {
   שורה כזאת יוצאת משני המסכים עד שיוזנו בה עובדות.
 */
 const TRANSFER_PCT = 0.20;
-function teachingCostOf(teachers, sc, f, slipMonthly = 0) {
+function teachingCostOf(teachers, sc, f, slipMonthly = 0, hourlyMonthly = 0) {
   const rowsMonthly = teachers
     .filter(t => t.schoolId === sc.id && !isHourlyRow(t))
     .reduce((sum, t) => sum + calcEmployer(t).total, 0);
@@ -4536,7 +4536,8 @@ function teachingCostOf(teachers, sc, f, slipMonthly = 0) {
   const costFromBudget = !realMonthly && sc.paysSalary !== false && f?.teachingSim > 0;
   const monthly = costFromBudget ? f.teachingSim / 12 : realMonthly;
   const annual  = monthly * 12;
-  const add20   = annual * TRANSFER_PCT;
+  // "כן, 20 אחוז על הכל" (שרה, 7.10.26): התוספת מחושבת גם על המשרות השעתיות (צהרון, מנהלה)
+  const add20   = (annual + hourlyMonthly * 12) * TRANSFER_PCT;
   return { monthly, annual, add20, costWith20: annual + add20, costFromBudget, fromSlips };
 }
 
@@ -4610,7 +4611,7 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth, tabs = null
   const hourlyOf = sid => teachers.filter(t => t.schoolId === sid && isHourlyRow(t)).reduce((x, t) => x + calcEmployer(t).total, 0);
   const data = schools.map(sc => {
     const f = fin?.[sc.id] || {};
-    const { costWith20, costFromBudget, annual } = teachingCostOf(teachers, sc, f);
+    const { costWith20, costFromBudget, annual } = teachingCostOf(teachers, sc, f, 0, hourlyOf(sc.id));
     const mine = led?.[sc.id] || {};
     const ministry = picked.reduce((x, k) => x + (mine[k]?.ministryReceived || 0), 0);
     const chabad   = picked.reduce((x, k) => x + (mine[k]?.chabadPaid       || 0), 0);
@@ -5386,7 +5387,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <b>לפי המחשבון</b> — העלות שהמערכת חישבה לכל עובדת ממחשבון משרד החינוך (הסימולציה), לפני שהגיעו התלושים. <b>בפועל</b> — עלות המעביד של עובדי ההוראה בחודש, כולל מנהלת; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
               {' '}<b>כרית 20%</b> — תוספת של 20% על העלות בפועל, למילוי מקום וביטחון. <b>משרד החינוך</b> — מה שהתקבל בפועל באותו חודש ("בפועל"); כשהתקבול טרם הוזן במסך "תקבולים", מוצג החלק ה-12 מהתקציב השנתי ("מתוכנן"). <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
               {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו; "טרם סוכם" נספר כאפס. <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
-              {anyTz && <>{' '}<b>שכר צהרון ומנהלה</b> — עלות עובדות הצהרון והמנהלה (משרות שעתיות) שהרשת משלמת; אין מולה הכנסה ממשרד החינוך ואין עליה כרית, והיא כולה על הסניף: הסכום ש"הסניף מעביר" כולל אותה.</>}
+              {anyTz && <>{' '}<b>שכר צהרון ומנהלה</b> — עלות עובדות הצהרון והמנהלה (משרות שעתיות) שהרשת משלמת; אין מולה הכנסה ממשרד החינוך, והיא כולה על הסניף; כרית ה-20% מחושבת גם עליה: הסכום ש"הסניף מעביר" כולל אותה.</>}
               {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
             </p>
           )}
@@ -5640,7 +5641,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
       מעביר לרשת; חלקי 12 — מה שהוא מעביר בכל חודש. שלילי = עודף, אין
       מה להעביר. בלי תקציב משרד החינוך אין פער לחשב — התא נשאר ריק.
     */
-    const { add20, costWith20 } = teachingCostOf(teachers, sc, f, slipCost[sc.id] || 0);
+    const { add20, costWith20 } = teachingCostOf(teachers, sc, f, slipCost[sc.id] || 0, hourlyMonthly || 0);
     const transfer   = f.ministryBudget != null
       ? costWith20 - (f.ministryBudget || 0) - (f.networkSupport || 0)
       : null;
@@ -6305,7 +6306,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         {' '}שאינן שכר אינן נכנסות אליה — הן בטבלה שלמטה, ששומרת על התמונה המלאה.
         {' '}<b>להעברה · לחודש</b> — מקום לעגל: הסכום החודשי שסוכם עם הסניף. כל עוד לא מולא, הפער המחושב חלקי 12 הוא הקובע.
         {' '}<b>להעברה · לשנה</b> — הסכום החודשי כפול 12. <b>מתג חודשי/שנתי</b> מחליף את עמודות החישוב (עלות, משרד החינוך, מענק הרשת, פער) בין הסכום השנתי לחלק ה-12 שלו; שתי עמודות ההעברה מוצגות תמיד.
-        {anyTz && <>{' '}<b>שכר צהרון ומנהלה</b> — עלות עובדות הצהרון והמנהלה (משרות שעתיות) שהרשת משלמת. אין מולה הכנסה ממשרד החינוך ואין עליה תוספת 20%; היא מצטרפת במלואה לסכום ההעברה, מעל הסכום החודשי שסוכם.</>}
+        {anyTz && <>{' '}<b>שכר צהרון ומנהלה</b> — עלות עובדות הצהרון והמנהלה (משרות שעתיות) שהרשת משלמת. אין מולה הכנסה ממשרד החינוך, ותוספת ה-20% מחושבת גם עליה; היא מצטרפת במלואה לסכום ההעברה, מעל הסכום החודשי שסוכם.</>}
         {' '}סניף שטרם הוזנו בו עובדות (עלות ההוראה עדיין אומדן מהתקציב) אינו מופיע כאן, ויתווסף מאליו כשיוזנו.
         {skippedRows.length > 0 && (
           <>
