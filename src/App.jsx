@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 73;
+const BUILD = 74;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4891,7 +4891,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
       if (!alive) return;
       const keys = (d.months || []).filter(m => m.branches.length).map(m => m.key);
       setData(d);
-      setSel(keys.includes(activeMonth) ? activeMonth : (keys[keys.length - 1] || null));
+      /*
+        "והחודש הוא ספטמבר!" (שרה, 6.10). השכר משולם בדיעבד: בתחילת אוקטובר
+        סוגרים את ספטמבר, והחודש שנפתח זה עתה (אוקטובר) עדיין נושא נתונים
+        שהועתקו מקודמו. לכן הדף נפתח על חודש השכר שבעבודה — הלפני-אחרון —
+        ולא על החודש הקלנדרי. כשיש חודש אחד בלבד, נפתחים עליו.
+      */
+      setSel(keys.length > 1 ? keys[keys.length - 2] : (keys[0] || null));
     }).catch(e => { if (alive) setErr(e.message); });
     return () => { alive = false; };
   }, [activeMonth]);
