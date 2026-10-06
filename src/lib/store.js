@@ -1101,6 +1101,18 @@ export async function fetchMonthlySummary() {
   return j;
 }
 
+/* סגירת חודש / פתיחה מחדש — רכזת בלבד; השרת שומר את התמונה כפי שהיא מוצגת */
+export async function closeMonthSummary(month, action = 'close') {
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error('פג תוקף ההתחברות — התחברי מחדש');
+  const r = await fetch('/api/monthly-summary', { method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ month, action }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `סגירת חודש: שגיאה ${r.status}`);
+  return j;
+}
+
 /* ── התלושים בפועל מהגזברות (שרה, 6.10.26) ─────────────────────
    קובץ לכל עובדת ולכל חודש, בדלי פרטי. הרישום והקובץ נקראים רק על ידי
    הרכזת והחשבת (RLS); ההעלאה נעשית מהשרת (scripts/upload-payslips.mjs). */

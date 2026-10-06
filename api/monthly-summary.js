@@ -36,6 +36,11 @@ export default async function handler(req, res) {
     const sb = db();
     const { data: prof } = await sb.from('profiles').select('role').eq('id', userData.user.id).maybeSingle();
     if (!ALLOWED.has(prof?.role)) return res.status(403).json({ error: 'אין הרשאה לדף הזה' });
+    if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'שיטה לא נתמכת' });
+    const isPost = req.method === 'POST';
+    let canClose = true;   // false עד שטבלת החודשים הסגורים קיימת במסד
+    // סגירה ופתיחה מחדש של חודש — רכזת בלבד; מנהל בצפייה אינו כותב דבר
+    if (isPost && prof.role !== 'coordinator') return res.status(403).json({ error: 'רק הרכזת סוגרת חודש' });
 
     /*
       קריאה בעמודים: Supabase מחזיר לכל היותר 1,000 שורות בקריאה, בלי
@@ -51,7 +56,7 @@ export default async function handler(req, res) {
         if (!data || data.length < 1000) return out;
       }
     };
-    const [sc, tm, fin, led, mo, snaps, slips] = await Promise.all([
+    const [sc, tm, fin, led, mo, snaps, slips, frozen] = await Promise.all([
       all('schools', '*', 'id'),
       all('teacher_months', '*', 'id'),
       all('school_finance', 'school_id, ministry_budget, network_support, monthly_transfer, teaching_sim', 'school_id'),
@@ -60,19 +65,46 @@ export default async function handler(req, res) {
       all('month_sim_snapshot', 'school_id, month_key, sim_cost, source', 'month_key'),
       // התלושים הם השלמה בלבד — כשל בקריאתם לא מפיל את הדף
       all('payslip_files', 'id, school_id, month_key, employer_cost', 'id').catch(e => { console.error('monthly-summary payslips', e); return []; }),
+      // חודשים שנסגרו. לפני שהטבלה קיימת — אין חודש סגור, והדף מחושב חי
+      // רק "הטבלה עוד לא קיימת" נחשב כאין חודש סגור; כל כשל אחר מפיל את הבקשה, כדי שחודש סגור לא יוצג בטעות חי
+      all('month_summary', 'month_key, school_id, data, closed_at', 'month_key').catch(e => {
+        if (/does not exist|schema cache|PGRST205|42P01/i.test(String(e?.message))) { canClose = false; return []; }
+        throw e;
+      }),
     ]);
 
+    if (isPost) {
+      const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+      const month = String(body.month || '');
+      if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: 'חודש לא תקין' });
+      if (body.action === 'reopen') {
+        const { error } = await sb.from('month_summary').delete().eq('month_key', month);
+        if (error) throw new Error(`month_summary: ${error.message}`);
+        return res.status(200).json({ ok: true, month, reopened: true });
+      }
+      if (body.action !== 'close') return res.status(400).json({ error: 'פעולה לא מוכרת' });
+      if (frozen.some(f => f.month_key === month)) return res.status(409).json({ error: 'החודש כבר סגור' });
+      // נסגר בדיוק מה שהדף מציג עכשיו — אותו חישוב
+      const live = summarize(sc, tm, fin, led, mo, snaps, slips, []).months.find(m => m.key === month);
+      if (!live || !live.branches.length) return res.status(400).json({ error: 'אין נתונים לחודש הזה' });
+      const { error } = await sb.from('month_summary').insert(live.branches.map(b => ({
+        month_key: month, school_id: b.id, data: b, closed_by: userData.user.id })));
+      if (error?.code === '23505') return res.status(409).json({ error: 'החודש כבר סגור' });
+      if (error) throw new Error(`month_summary: ${error.message}`);
+      return res.status(200).json({ ok: true, month, closed: live.branches.length });
+    }
+
     res.setHeader('cache-control', 'no-store');
-    return res.status(200).json({ ...summarize(sc, tm, fin, led, mo, snaps, slips), fetchedAt: new Date().toISOString() });
+    return res.status(200).json({ ...summarize(sc, tm, fin, led, mo, snaps, slips, frozen), canClose, fetchedAt: new Date().toISOString() });
   } catch (e) {
     // הפרטים ליומן השרת בלבד — מי שנכנס לצפייה מקבל הודעה כללית
     console.error('monthly-summary', e);
-    return res.status(500).json({ error: 'הסיכום החודשי לא נטען. נסו שוב בעוד רגע.' });
+    return res.status(500).json({ error: req.method === 'POST' ? 'הפעולה לא נשמרה. נסי שוב בעוד רגע.' : 'הסיכום החודשי לא נטען. נסו שוב בעוד רגע.' });
   }
 }
 
 /* החישוב עצמו — מיוצא, כדי שסקריפט בדיקה ישווה אותו מול המסך של שרה */
-export function summarize(schools, rows, finance, ledger, monthsRows, snapshots, slips) {
+export function summarize(schools, rows, finance, ledger, monthsRows, snapshots, slips, frozen) {
   schools = schools || []; rows = rows || [];
   // מצב המודול — כמו שהאפליקציה ממלאת אותו אחרי טעינה
   emp.CHABAD_SUPP.clear();
@@ -159,6 +191,24 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
   for (const mo of months) for (const b of mo.branches) {
     const sn = snapBy.get(`${mo.key}|${b.id}`);
     if (sn) { b.plan = Math.round(Number(sn.sim_cost)); b.planSource = sn.source; }
+  }
+  /*
+    חודש סגור: השורות כפי שנשמרו ברגע הסגירה, ולא החישוב החי. מה שנרשם
+    אחר כך בתקבולים (משרד החינוך, העברת הסניף) ושם הסניף — מהנתונים הנוכחיים.
+  */
+  const frBy = new Map();
+  for (const f of (frozen || [])) { if (!frBy.has(f.month_key)) frBy.set(f.month_key, []); frBy.get(f.month_key).push(f); }
+  const scBy = new Map(schools.map(x => [x.id, x]));
+  for (const mo of months) {
+    const fr = frBy.get(mo.key);
+    if (!fr) continue;
+    mo.frozenAt = fr.map(f => f.closed_at).sort()[0];
+    mo.branches = fr.map(f => {
+      const l = ledBy.get(`${mo.key}|${f.school_id}`) || {};
+      return { ...f.data, id: f.school_id, name: scBy.get(f.school_id)?.name || f.data.name,
+        ministryReceived: n(l.ministry_received) ?? f.data.ministryReceived ?? null,
+        chabadPaid: n(l.chabad_paid) ?? f.data.chabadPaid ?? null };
+    });
   }
   return { months };
 }

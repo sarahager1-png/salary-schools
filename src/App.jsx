@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 87;
+const BUILD = 88;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4923,6 +4923,14 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const [sel, setSel]   = useState(null);
   const [showNote, setShowNote] = useState(false);
   const [openB, setOpenB] = useState(null);   // הסניף שפירוטו פתוח בנייד
+  const [askClose, setAskClose] = useState(null);   // 'close' | 'reopen' — אישור בתוך הדף
+  const [closing, setClosing] = useState(false);
+  const doClose = async action => {
+    setClosing(true); setErr('');
+    try { await store.closeMonthSummary(sel, action); setData(await store.fetchMonthlySummary()); setAskClose(null); }
+    catch (e) { setErr(e.message); setAskClose(null); }
+    finally { setClosing(false); }
+  };
   useEffect(() => {
     let alive = true;
     store.fetchMonthlySummary().then(d => {
@@ -5141,6 +5149,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <h2 className="bl-verdict">{net >= 0 ? 'ההעברות מכסות את הפער' : 'ההעברות אינן מכסות את הפער'}</h2>
               )}
               <div className="bl-facts">
+                {cur?.frozenAt && (
+                  <span className="bl-fact" style={{ background:'#E6F6EC', borderColor:'#BBE5C8', color:'#166534', fontWeight:700 }}
+                    title="המספרים של החודש נשמרו ברגע הסגירה ואינם משתנים. תקבולים והעברות שנרשמים אחר כך ממשיכים להתעדכן.">
+                    החודש נסגר ב-{new Date(cur.frozenAt).toLocaleDateString('he-IL')}
+                  </span>
+                )}
                 {upTo.length > 1 && cumPct != null && (
                   <span className="bl-fact">מתחילת השנה <b className="num" style={{ color: cumPct > 100 ? 'var(--danger-text)' : undefined }}>{cumPct}%</b></span>
                 )}
@@ -5284,6 +5298,35 @@ function BottomLineView({ activeMonth, viewer = false }) {
             <p style={{ fontSize:14.6, color:'var(--text2)', marginTop:10, lineHeight:1.6 }}>
               העברות הסניפים בפועל טרם הוזנו. כשיוזנו במסך "תקבולים ותשלומים", יתווספו כאן "הועבר" ו"יתרה מצטברת" (חובה או זכות).
             </p>
+          )}
+
+          {/* סגירת החודש — לשרה בלבד. האישור בתוך הדף, עם מה שייקרה */}
+          {!viewer && cur && data?.canClose && (
+            <div className="apple-card no-print" style={{ marginTop:14, padding:'14px 16px', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+              {askClose ? (
+                <>
+                  <p style={{ flex:'1 1 260px', fontSize:15.5, fontWeight:600, lineHeight:1.5 }}>
+                    {askClose === 'close'
+                      ? `לסגור את ${fmtMonth(cur.key)}? המספרים של ${rows.length} הסניפים יישמרו כפי שהם עכשיו, ולא ישתנו גם אם נתוני השכר יתוקנו.`
+                      : `לפתוח מחדש את ${fmtMonth(cur.key)}? התמונה השמורה תימחק, והדף יחזור לחשב מהנתונים הנוכחיים.`}
+                  </p>
+                  <button className="apple-btn apple-btn-blue" disabled={closing} onClick={() => doClose(askClose)} style={{ minHeight:42, fontSize:15 }}>
+                    {closing ? 'שומר…' : askClose === 'close' ? 'כן, לסגור' : 'כן, לפתוח מחדש'}
+                  </button>
+                  <button className="apple-btn apple-btn-ghost" disabled={closing} onClick={() => setAskClose(null)} style={{ minHeight:42, fontSize:15 }}>ביטול</button>
+                </>
+              ) : cur.frozenAt ? (
+                <>
+                  <p style={{ flex:'1 1 260px', fontSize:15, color:'var(--text2)' }}>החודש סגור: המספרים קפואים. תקבולים והעברות ממשיכים להתעדכן.</p>
+                  <button className="apple-btn apple-btn-ghost" onClick={() => setAskClose('reopen')} style={{ minHeight:42, fontSize:15 }}>פתיחה מחדש</button>
+                </>
+              ) : (
+                <>
+                  <p style={{ flex:'1 1 260px', fontSize:15, color:'var(--text2)' }}>החודש פתוח: המספרים מחושבים מהנתונים הנוכחיים ועשויים להשתנות.</p>
+                  <button className="apple-btn apple-btn-blue" onClick={() => setAskClose('close')} style={{ minHeight:42, fontSize:15 }}>סגירת החודש</button>
+                </>
+              )}
+            </div>
           )}
 
           <button onClick={() => setShowNote(v => !v)} aria-expanded={showNote}
