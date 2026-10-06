@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 100;
+const BUILD = 101;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -7988,6 +7988,8 @@ function FillProgress({ schools, month, onOpenSchool }) {
     // שורות בטבלה גוברות על "מתי נכנסה": מי שהזינה — נכנסה, גם אם אין לכך
     // חותמת. קישור שהונפק מחדש מתחיל בלי היסטוריה, ובלי התנאי הזה בית ספר
     // שכבר סיים קופץ לראש הרשימה כאילו לא נגע.
+    // "מה ממתין לי?" (שרה, 6.10): בית ספר שהרשת לא משלמת בו שכר (חיפה, באר שבע) אינו ממתין לאיש
+    if (schools.find(s => s.id === r.schoolId)?.paysSalary === false) return { k: 6, label: 'לא לתשלום שכר', tone: 'gray' };
     if (!r.hasLink)                return { k: 0, label: 'אין קישור',        tone: 'gray'  };
     if (!r.lastSeen && !r.teachers)return { k: 1, label: 'טרם נכנסה',        tone: 'orange'};
     if (r.teachers === 0)          return { k: 2, label: 'נכנסה, לא הזינה',  tone: 'orange'};
