@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 72;
+const BUILD = 73;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4932,8 +4932,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const recvPlan = recv.reduce((a, r) => a + (r.ministry || 0), 0);
   /*
     "מה אני אראה כל חודש שאנחנו לא חורגים?" (שרה, 6.10): עלות ההוראה של
-    החודש מול התחשיב הראשוני מהתקציב (חלק ה-12), לכל סניף ולרשת, וגם
-    במצטבר מהחודש הראשון. 100% ומטה = בתוך התחשיב.
+    החודש מול העלות לפי מחשבון המשרד (הסימולציה, לפני התלושים), לכל סניף ולרשת,
+    וגם במצטבר מהחודש הראשון. 100% ומטה = בתוך הסימולציה. (עד 6.10 ההשוואה
+    הייתה מול התחשיב מהתקציב; שרה: "לא רלוונטי — העלות לפי מחשבון המשרד".)
   */
   const planned = summed.filter(r => r.plan != null);
   const planSum = planned.reduce((a, r) => a + r.plan, 0);
@@ -4988,7 +4989,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
     return (
       <div style={{ display:'flex', alignItems:'center', gap:8 }}>
         <div className="bl-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(pc, 100)}
-          aria-label={`${pc}% מהתחשיב הראשוני`} title={`עלות ההוראה ${num(r.cost)} מתוך ${num(r.plan)} שתוכננו`}>
+          aria-label={`${pc}% מהסימולציה`} title={`עלות ההוראה בפועל ${num(r.cost)} מול ${num(r.plan)} לפי מחשבון המשרד`}>
           <span data-over={pc > 100 ? '' : undefined} style={{ width: `${Math.min(pc, 100)}%` }} />
         </div>
         <span className="num" style={{ fontSize:13.6, fontWeight:800, whiteSpace:'nowrap', color: pc > 100 ? 'var(--danger)' : 'var(--text2)' }}>{pc}%</span>
@@ -5055,7 +5056,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           {/* התשובה */}
           <section className="bl-hero" data-state={over || (usePct == null && net < 0) ? 'over' : 'ok'} aria-live="polite">
             {usePct != null && (
-              <div className="bl-ring" role="img" aria-label={`עלות ההוראה היא ${usePct}% מהתחשיב הראשוני`}>
+              <div className="bl-ring" role="img" aria-label={`עלות ההוראה בפועל היא ${usePct}% מהעלות לפי מחשבון המשרד`}>
                 <svg viewBox="0 0 120 120" aria-hidden="true">
                   <defs>
                     <linearGradient id="blGrad" x1="0" y1="0" x2="1" y2="1">
@@ -5067,7 +5068,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     stroke={over ? 'var(--danger)' : 'url(#blGrad)'}
                     strokeDasharray={RING} strokeDashoffset={RING * (1 - Math.min(usePct, 100) / 100)} />
                 </svg>
-                <div className="bl-ring-num"><b className="num">{usePct}%</b><span>מהתחשיב</span></div>
+                <div className="bl-ring-num"><b className="num">{usePct}%</b><span>מהסימולציה</span></div>
               </div>
             )}
             <div style={{ minWidth:0, flex:'1 1 320px' }}>
@@ -5075,12 +5076,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
               {usePct != null ? (
                 <>
                   <h2 className="bl-verdict" style={{ color: over ? 'var(--danger)' : 'var(--text)' }}>
-                    {over ? 'חורגים מהתחשיב' : 'לא חורגים מהתחשיב'}
+                    {over ? 'חורגים מהסימולציה' : 'לא חורגים מהסימולציה'}
                   </h2>
                   <p className="bl-line">
-                    עלות ההוראה בפועל <b className="num">{num(planCost)}</b> מתוך <b className="num">{num(planSum)}</b> שתוכננו
+                    עלות ההוראה בפועל <b className="num">{num(planCost)}</b>, מול <b className="num">{num(planSum)}</b> לפי מחשבון המשרד
                     {over ? <> — חריגה של <b className="num" style={{ color:'var(--danger)' }}>{num(planCost - planSum)}</b>.</>
-                          : <> — נותרו <b className="num" style={{ color:'var(--ok-text)' }}>{num(planSum - planCost)}</b>.</>}
+                          : <> — נמוך ב-<b className="num" style={{ color:'var(--ok-text)' }}>{num(planSum - planCost)}</b>.</>}
                   </p>
                 </>
               ) : (
@@ -5115,9 +5116,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <div className="bl-kpis">
           <p className="bl-group-title">השכר</p>
           <div className="kpi-grid">
-            <Kpi kind="plain" label="תוכנן בתקציב" sub="התחשיב הראשוני, לחודש">{planSum ? num(planSum) : '—'}</Kpi>
+            <Kpi kind="plain" label="לפי מחשבון המשרד" sub="הסימולציה, לפני התלושים">{planSum ? num(planSum) : '—'}</Kpi>
             <Kpi kind="cost" label="עלות ההוראה בפועל" color={over ? 'var(--danger)' : undefined}
-              sub={usePct == null ? '' : over ? `${usePct}% מהתכנון — חריגה של ${num(planCost - planSum)}` : `${usePct}% מהתכנון — נותרו ${num(planSum - planCost)}`}>{num(sum('cost'))}</Kpi>
+              sub={usePct == null ? '' : over ? `${usePct}% מהסימולציה — חריגה של ${num(planCost - planSum)}` : `${usePct}% מהסימולציה — נמוך ב-${num(planSum - planCost)}`}>{num(sum('cost'))}</Kpi>
             <Kpi kind="cost" label="כרית 20%" sub="מילוי מקום וביטחון, מעל העלות">{num(sum('add20'))}</Kpi>
           </div>
           <p className="bl-group-title">הכיסוי</p>
@@ -5135,7 +5136,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <p className="section-sub">כל שורה היא תרגיל אחד, מימין לשמאל: בפועל{anyTz ? ' + שכר צהרון' : ''} − משרד החינוך − מענק רשת − מה שהסניף מעביר = נותר לפני הכרית. ועוד כרית 20% = נותר כולל הכרית. אדום = חסר, ירוק = עודף.</p>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: תוכנן, בפועל, משרד החינוך, מענק רשת, הסניף מעביר, נותר לפני הכרית, כרית 20% ונותר כולל הכרית`}</caption>
+              <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: לפי מחשבון המשרד, בפועל, משרד החינוך, מענק רשת, הסניף מעביר, נותר לפני הכרית, כרית 20% ונותר כולל הכרית`}</caption>
               <colgroup>
                 <col /><col className="g-cost" /><col className="g-cost" />{anyTz && <col className="g-cost" />}
                 <col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
@@ -5151,7 +5152,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   {hasPay && <th colSpan={2} scope="colgroup">העברות בפועל</th>}
                 </tr>
                 <tr>
-                  <TH>סניף</TH><TH>תוכנן</TH><TH>בפועל</TH>{anyTz && <TH><Op c="+" />שכר צהרון</TH>}
+                  <TH>סניף</TH><TH>לפי המחשבון</TH><TH>בפועל</TH>{anyTz && <TH><Op c="+" />שכר צהרון</TH>}
                   <TH><Op c="−" />משרד החינוך</TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />הסניף מעביר</TH>
                   <TH><Op c="=" />נותר לפני הכרית</TH><TH><Op c="+" />כרית 20%</TH><TH><Op c="=" />נותר כולל הכרית</TH>
                   {hasPay && <><TH>הועבר</TH><TH>יתרה מצטברת</TH></>}
@@ -5164,7 +5165,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }}>{r.name}</th>
                     <td style={{ ...td, color:'var(--text2)' }}>{r.plan == null ? '—' : num(r.plan)}</td>
-                    <td style={{ ...td, fontWeight:800 }} title={pc == null ? undefined : `${pc}% מהתכנון`}>
+                    <td style={{ ...td, fontWeight:800 }} title={pc == null ? undefined : `${pc}% מהעלות לפי מחשבון המשרד`}>
                       {num(r.cost)}
                       {pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</td>
                     {anyTz && <td style={td}>{r.hourly > 0 ? num(r.hourly) : '—'}</td>}
@@ -5183,7 +5184,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
                   <td style={td}>{planSum ? num(planSum) : '—'}</td>
-                  <td style={td} title={usePct == null ? undefined : `${usePct}% מהתכנון`}>{num(sum('cost'))}</td>
+                  <td style={td} title={usePct == null ? undefined : `${usePct}% מהעלות לפי מחשבון המשרד`}>{num(sum('cost'))}</td>
                   {anyTz && <td style={td}>{num(tzSum)}</td>}
                   <td style={td}>{num(tot.ministry)}</td>
                   <td style={td}>{num(tot.support)}</td>
@@ -5207,7 +5208,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <CardRow label="נותר כולל כרית 20%" strong><Open r={r} /></CardRow>
                 {open && (
                   <>
-                    <CardRow label="תוכנן">{r.plan == null ? '—' : num(r.plan)}</CardRow>
+                    <CardRow label="לפי מחשבון המשרד">{r.plan == null ? '—' : num(r.plan)}</CardRow>
                     {r.hourly > 0 && <CardRow label="שכר צהרון">{num(r.hourly)}</CardRow>}
                     <CardRow label="כרית 20%">{num(r.add20)}</CardRow>
                     <CardRow label="משרד החינוך">{num(r.ministry)}</CardRow>
@@ -5237,7 +5238,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </button>
           {showNote && (
             <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
-              <b>תוכנן</b> — עלות ההוראה שנקבעה בתקציב (התחשיב הראשוני), החלק ה-12 שלה לחודש. <b>בפועל</b> — עלות המעביד של עובדי ההוראה בחודש, כולל מנהלת; האחוז שלידה הוא בפועל מתוך התכנון.
+              <b>לפי המחשבון</b> — העלות שהמערכת חישבה לכל עובדת ממחשבון משרד החינוך (הסימולציה), לפני שהגיעו התלושים. <b>בפועל</b> — עלות המעביד של עובדי ההוראה בחודש, כולל מנהלת; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
               {' '}<b>כרית 20%</b> — תוספת של 20% על העלות בפועל, למילוי מקום וביטחון. <b>משרד החינוך</b> ו<b>מענק רשת</b> — החלק ה-12 מהסכום השנתי של כל אחד.
               {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו; "טרם סוכם" נספר כאפס. <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
               {anyTz && <>{' '}<b>שכר צהרון</b> — עלות עובדות הצהרון שהרשת משלמת; אין מולה הכנסה ממשרד החינוך ואין עליה כרית, והיא כולה על הסניף: הסכום ש"הסניף מעביר" כולל אותה.</>}

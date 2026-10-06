@@ -116,8 +116,9 @@ export function summarize(schools, rows, finance, ledger, monthsRows) {
         gap: gap == null ? null : Math.round(gap),
         agreed, due: agreed ?? (gap == null ? null : Math.round(gap)),
         ministryReceived: n(l.ministry_received), chabadPaid: n(l.chabad_paid),
-        // התחשיב הראשוני מהתקציב לחודש — היעד שמולו בודקים חריגה (בלי 20%)
-        plan: n(f.teaching_sim) == null ? null : Math.round(n(f.teaching_sim) / 12),
+        // התחשיב הראשוני מהתקציב לחודש (לא מוצג בדף; נשמר להשוואה)
+        budgetPlan: n(f.teaching_sim) == null ? null : Math.round(n(f.teaching_sim) / 12),
+        plan: null,   // מתמלא למטה: העלות לפי מחשבון המשרד
         hourly: Math.round(hourly),
         staff: paid.length, withActual: paid.filter(t => Number(t._actualEmployerCost)).length,
       });
@@ -125,5 +126,19 @@ export function summarize(schools, rows, finance, ledger, monthsRows) {
     const m = moBy.get(key) || {};
     return { key, locked: !!m.locked, closedAt: m.closed_at || null, branches };
   });
+  /*
+    "הסימולציה הראשונה שלי… העלות לפי מחשבון המשרד" (שרה, 6.10). היעד שמולו
+    בודקים חריגה הוא העלות שהמערכת חישבה לכל עובדת מהמחשבון הרשמי, לפני
+    שהגיעו התלושים: אותו ברוטו, עלות המעביד לפי המודל, בלי עלות בפועל מקובץ
+    ובלי הכיול שנלמד מהתלושים (הכיול עצמו נגזר מהם, ולכן אינו "לפני").
+  */
+  emp.setCalib([], 1);
+  for (const mo of months) {
+    const mrows = rows.filter(r => r.month_key === mo.key);
+    for (const b of mo.branches) {
+      const ts = mrows.filter(r => r.school_id === b.id).map(toTeacher).filter(t => !emp.isHourlyRow(t));
+      b.plan = Math.round(ts.reduce((a, t) => a + emp.calcEmployer({ ...t, _actualEmployerCost: null }).total, 0)) || null;
+    }
+  }
   return { months };
 }
