@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 83;
+const BUILD = 84;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5161,12 +5161,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
             "תבדוק מה צריך ומה מיותר — הכי מעולה שאפשר" (שרה, 6.10). הכותרת כבר
             אומרת סימולציה מול בפועל, ולכן שש הכרטיסיות שחזרו על אותם מספרים
             הוחלפו ברצועה אחת — החשבון של הרשת, באותו סדר ובאותן מילים של הטבלה:
-            בפועל − משרד החינוך ומענק − הסניפים מעבירים = לפני הכרית; + כרית = כולל הכרית.
+            בפועל − משרד החינוך − מענק הרשת − הסניפים מעבירים = לפני הכרית; + כרית = כולל הכרית.
           */}
           <div className="bl-eq" role="group" aria-label="החשבון החודשי של הרשת">
             <div className="bl-tile t-cost"><p className="l">עלות ההוראה בפועל</p><p className="v num">{num(sum('cost') + tzSum)}</p>
               <p className="s">{anyTz ? `כולל שכר צהרון ${num(tzSum)}` : 'כולל מנהלות'}</p></div>
-            <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>משרד החינוך + מענק</p><p className="v num">{num(minSum + tot.support)}</p>
+            <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>משרד החינוך + מענק הרשת</p><p className="v num">{num(minSum + tot.support)}</p>
               <p className="s">{recvN === summed.length ? 'משרד החינוך: התקבל בפועל בכל הסניפים'
                 : recvN ? `משרד החינוך: התקבל בפועל ב-${recvN} מתוך ${summed.length} סניפים; בשאר — מתוכנן`
                 : 'משרד החינוך: מתוכנן, טרם הוזנו תקבולים'}</p></div>
@@ -5213,7 +5213,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   const pc = pctOf(r), recv = r.ministryReceived;
                   return (
                   <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
+                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}{r.fromSlips && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3 }} title="הסניף עוד לא הוזן למערכת בחודש הזה; העלות היא סכום התלושים שהתקבלו מהגזברות">לפי התלושים</span>}</th>
                     <td style={{ ...td, color:'var(--text2)' }}>{r.plan == null ? '—' : num(r.plan)}</td>
                     <td style={{ ...td, fontWeight:800 }} title={pc == null ? undefined : `${pc}% מהעלות לפי מחשבון המשרד`}>
                       {num(r.cost)}
@@ -5255,7 +5255,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <div className="only-mobile big-cards">
             {sorted.map(r => { const pc = pctOf(r); const open = openB === r.id; return (
               <div key={'bl-' + r.id} className="apple-card mcard">
-                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
+                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}{r.fromSlips && <span className="bl-tag">לפי התלושים</span>}</p>
                 <CardRow label="בפועל" strong>{num(r.cost)}{pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
                 <CardRow label="נותר לפני הכרית" strong><Remain v={beforeOf(r)} /></CardRow>
                 <CardRow label="נותר כולל כרית 20%" strong><Open r={r} /></CardRow>
@@ -6200,7 +6200,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         {' '}הטבלה הזאת נקייה בכוונה: <b>עלות השכר מול תקציב משרד החינוך בלבד</b>. הכנסות נוספות (תשלומי הורים, צהרון) והוצאות
         {' '}שאינן שכר אינן נכנסות אליה — הן בטבלה שלמטה, ששומרת על התמונה המלאה.
         {' '}<b>להעברה · לחודש</b> — מקום לעגל: הסכום החודשי שסוכם עם הסניף. כל עוד לא מולא, הפער המחושב חלקי 12 הוא הקובע.
-        {' '}<b>להעברה · לשנה</b> — הסכום החודשי כפול 12. <b>מתג חודשי/שנתי</b> מחליף את עמודות החישוב (עלות, משרד החינוך, מענק, פער) בין הסכום השנתי לחלק ה-12 שלו; שתי עמודות ההעברה מוצגות תמיד.
+        {' '}<b>להעברה · לשנה</b> — הסכום החודשי כפול 12. <b>מתג חודשי/שנתי</b> מחליף את עמודות החישוב (עלות, משרד החינוך, מענק הרשת, פער) בין הסכום השנתי לחלק ה-12 שלו; שתי עמודות ההעברה מוצגות תמיד.
         {anyTz && <>{' '}<b>שכר צהרון</b> — עלות עובדות הצהרון שהרשת משלמת. אין מולה הכנסה ממשרד החינוך ואין עליה תוספת 20%; היא מצטרפת במלואה לסכום ההעברה, מעל הסכום החודשי שסוכם.</>}
         {' '}סניף שטרם הוזנו בו עובדות (עלות ההוראה עדיין אומדן מהתקציב) אינו מופיע כאן, ויתווסף מאליו כשיוזנו.
         {skippedRows.length > 0 && (

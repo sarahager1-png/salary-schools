@@ -51,17 +51,19 @@ export default async function handler(req, res) {
         if (!data || data.length < 1000) return out;
       }
     };
-    const [sc, tm, fin, led, mo, snaps] = await Promise.all([
+    const [sc, tm, fin, led, mo, snaps, slips] = await Promise.all([
       all('schools', '*', 'id'),
       all('teacher_months', '*', 'id'),
       all('school_finance', 'school_id, ministry_budget, network_support, monthly_transfer, teaching_sim', 'school_id'),
       all('school_payment_ledger', 'school_id, month_key, ministry_received, chabad_paid', 'month_key'),
       all('months', 'key, opened_at, locked, closed_at', 'key'),
       all('month_sim_snapshot', 'school_id, month_key, sim_cost, source', 'month_key'),
+      // התלושים הם השלמה בלבד — כשל בקריאתם לא מפיל את הדף
+      all('payslip_files', 'id, school_id, month_key, employer_cost', 'id').catch(e => { console.error('monthly-summary payslips', e); return []; }),
     ]);
 
     res.setHeader('cache-control', 'no-store');
-    return res.status(200).json({ ...summarize(sc, tm, fin, led, mo, snaps), fetchedAt: new Date().toISOString() });
+    return res.status(200).json({ ...summarize(sc, tm, fin, led, mo, snaps, slips), fetchedAt: new Date().toISOString() });
   } catch (e) {
     // הפרטים ליומן השרת בלבד — מי שנכנס לצפייה מקבל הודעה כללית
     console.error('monthly-summary', e);
@@ -70,7 +72,7 @@ export default async function handler(req, res) {
 }
 
 /* החישוב עצמו — מיוצא, כדי שסקריפט בדיקה ישווה אותו מול המסך של שרה */
-export function summarize(schools, rows, finance, ledger, monthsRows, snapshots) {
+export function summarize(schools, rows, finance, ledger, monthsRows, snapshots, slips) {
   schools = schools || []; rows = rows || [];
   // מצב המודול — כמו שהאפליקציה ממלאת אותו אחרי טעינה
   emp.CHABAD_SUPP.clear();
@@ -81,14 +83,21 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots)
     if (String(r.mm_for || '').trim()) emp.MM_REPLACED.add(`${r.month_key}|${r.school_id}|${String(r.mm_for).trim()}`);
     if (r.leave_type === 'maternity') emp.MATERNITY_LEAVES.add(`${r.month_key}|${r.school_id}|${String(r.name).trim()}`);
   }
-  const keys = [...new Set([...(monthsRows || []).map(m => m.key), ...rows.map(r => r.month_key)])].sort();
+  const keys = [...new Set([...(monthsRows || []).map(m => m.key), ...rows.map(r => r.month_key), ...(slips || []).map(p => p.month_key)])].sort();
   // הכיול באפליקציה נקבע לפי החודש האחרון, ומשמש את כל החודשים
-  const last = keys[keys.length - 1];
+  const last = [...new Set(rows.map(r => r.month_key))].sort().pop() || keys[keys.length - 1];
   applyCalib(rows.filter(r => r.month_key === last), toTeacher);
 
   const finBy = new Map((finance || []).map(f => [f.school_id, f]));
   const ledBy = new Map((ledger || []).map(l => [`${l.month_key}|${l.school_id}`, l]));
   const moBy  = new Map((monthsRows || []).map(m => [m.key, m]));
+  // תלושים בפועל לסניף ולחודש — לסניף שעוד לא הוזן למערכת באותו חודש (קרית ביאליק, 9/2026)
+  const slipBy = new Map();
+  for (const p of (slips || [])) {
+    const k = `${p.month_key}|${p.school_id}`, o = slipBy.get(k) || { n: 0, cost: 0 };
+    if (!Number(p.employer_cost)) continue;
+    o.n++; o.cost += Number(p.employer_cost); slipBy.set(k, o);
+  }
 
   const months = keys.map(key => {
     const mrows = rows.filter(r => r.month_key === key);
@@ -99,8 +108,10 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots)
       const ts = allTs.filter(t => !emp.isHourlyRow(t));
       // שכר צהרון ומשרות שעתיות: הרשת משלמת, אין מולו הכנסה ממשרד החינוך — כולו על הסניף (שרה, 6.10, גני תקוה)
       const hourly = allTs.filter(t => emp.isHourlyRow(t)).reduce((a, t) => a + emp.calcEmployer(t).total, 0);
-      const cost = ts.reduce((a, t) => a + emp.calcEmployer(t).total, 0);
-      // סניף בלי עובדות בחודש — אין עלות בפועל, ולכן אינו בדף (כמו בטבלת ההעברות)
+      let cost = ts.reduce((a, t) => a + emp.calcEmployer(t).total, 0);
+      // סניף בלי שורות שכר בחודש: אם הגיעו תלושים, העלות היא סכום התלושים; אחרת אינו בדף
+      const sl = !allTs.length ? slipBy.get(`${key}|${s.id}`) : null;
+      if (sl) cost = sl.cost;
       if (!cost) continue;
       const f = finBy.get(s.id) || {};
       const paid = ts.filter(t => !emp.unpaidThisMonth(t));
@@ -121,7 +132,8 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots)
         budgetPlan: n(f.teaching_sim) == null ? null : Math.round(n(f.teaching_sim) / 12),
         plan: null,   // מתמלא למטה: העלות לפי מחשבון המשרד
         hourly: Math.round(hourly),
-        staff: paid.length, withActual: paid.filter(t => Number(t._actualEmployerCost)).length,
+        staff: sl ? sl.n : paid.length, withActual: sl ? sl.n : paid.filter(t => Number(t._actualEmployerCost)).length,
+        fromSlips: !!sl,
       });
     }
     const m = moBy.get(key) || {};
