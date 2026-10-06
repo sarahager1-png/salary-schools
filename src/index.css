@@ -1136,3 +1136,50 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .section-sub { font-size: 14.6px; }
 .page-sub { font-size: 15px; }
 .fin-budget-tag { font-size: 14px !important; }
+
+/* ── המסך הראשי: מעקב מילוי וכרטיסי בתי הספר ("עדיין לא מעוצב", שרה 6.10) ── */
+.fp-row {
+  display: grid; grid-template-columns: 178px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  width: 100%; min-height: 50px; padding: 8px 16px; background: var(--surface); border: none; border-bottom: 1px solid var(--line-soft);
+  cursor: pointer; font-family: inherit; text-align: start;
+}
+.fp-row:last-child { border-bottom: none; }
+.fp-row:hover { background: var(--fill); }
+.fp-state {
+  display: inline-block; width: 100%; text-align: center; padding: 4px 10px; border-radius: 999px;
+  font-size: 14px; font-weight: 700; line-height: 1.4; white-space: nowrap; border: 1px solid transparent;
+}
+.fp-state.gray   { background: #F1EFF7; color: #4A3F6B; border-color: #E2DCF0; }
+.fp-state.orange { background: #FFF4E2; color: #8F4E00; border-color: #F3DDB0; }
+.fp-state.teal   { background: #E5F8FB; color: #00616F; border-color: #B8EAF2; }
+.fp-state.green  { background: #E6F6EC; color: #166534; border-color: #BBE5C8; }
+.fp-name { font-size: 16px; font-weight: 700; color: var(--text); word-break: keep-all; line-height: 1.35; }
+.fp-sub  { font-weight: 500; color: var(--text2); }
+.fp-meta { font-size: 14.4px; color: var(--text2); white-space: nowrap; }
+@media (max-width: 640px) {
+  .fp-row { grid-template-columns: 1fr; gap: 5px; padding: 10px 14px; }
+  .fp-state { width: fit-content; }
+  .fp-meta { white-space: normal; }
+}
+.sc-card {
+  display: grid; grid-template-rows: auto auto 1fr auto; gap: 12px; padding: 18px; cursor: pointer;
+  border-inline-start: 4px solid transparent; transition: transform .18s, box-shadow .18s;
+}
+.sc-card[data-state="sim"]  { border-inline-start-color: var(--warn); }
+.sc-card[data-state="appr"] { border-inline-start-color: var(--teal); }
+.sc-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.sc-card .sc-icon { padding: 0 10px; min-height: 36px; color: var(--text2); }
+.sc-card .sc-del:hover { color: var(--danger-text); border-color: var(--danger-line); background: var(--danger-bg); }
+.sc-card .sc-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-self: end; margin: 0; }
+.sc-card .sc-stats > div { background: var(--fill); border-radius: 12px; padding: 9px 6px; text-align: center; min-width: 0; }
+.sc-card .sc-stats .l { font-size: 14px; color: var(--text2); line-height: 1.3; }
+.sc-card .sc-stats .v { font-size: 18.5px; font-weight: 800; color: var(--text); letter-spacing: -.01em; margin-top: 2px; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .sc-card { transition: none; } .sc-card:hover { transform: none; } }
+
+/* תג קטן ליד מספר: "בפועל" / "מתוכנן" */
+.bl-tag { display: inline-block; margin-inline-start: 6px; padding: 0 7px; border-radius: 999px; font-size: 14px; font-weight: 700; line-height: 1.5;
+  color: var(--text2); background: #F1EFF7; border: 1px solid #E2DCF0; vertical-align: 1px; }
+.bl-tag.ok { color: #166534; background: #E6F6EC; border-color: #BBE5C8; }
+/* כרטיסי בתי הספר: המספרים באריחים אינם נשברים לשתי שורות */
+.sc-card .sc-stats .v { white-space: nowrap; font-size: 17px; overflow-wrap: normal; }
+@media (max-width: 1100px) { .sc-card .sc-stats .v { font-size: 16px; } .sc-card .sc-stats > div { padding: 9px 3px; } }

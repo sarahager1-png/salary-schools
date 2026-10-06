@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 81;
+const BUILD = 83;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5046,17 +5046,26 @@ function BottomLineView({ activeMonth, viewer = false }) {
     ובסיכום: פער − הסניף מעביר = נותר לכיסוי. סניף שלא סוכם איתו סכום מעביר 0,
     וכל הפער שלו נותר; סניף שמעביר יותר מהפער מוצג כעודף.
   */
+  /*
+    "זה מה שהועבר בפועל?" (שרה, 6.10). עמודת משרד החינוך הציגה את המתוכנן (החלק
+    ה-12 מהתקציב) גם כשכבר נרשם מה שהתקבל. מעכשיו: סניף שהוזן לו תקבול לחודש —
+    הסכום שהתקבל הוא שמוצג והוא שנכנס לחשבון; סניף שטרם הוזן לו — המתוכנן, מסומן כך.
+  */
+  const minOf  = r => (r.ministryReceived != null ? r.ministryReceived : r.ministry);
+  const minAdj = r => (r.ministryReceived != null && r.ministry != null ? r.ministry - r.ministryReceived : 0);   // מתוכנן פחות בפועל
+  const minSum = summed.reduce((x, r) => x + (minOf(r) || 0), 0);
+  const adjSum = summed.reduce((x, r) => x + minAdj(r), 0);
   // שכר צהרון (רק היכן שיש): מצטרף לעלות, בלי כרית ובלי הכנסה מולו — כולו על הסניף
   const anyTz = summed.some(r => r.hourly > 0);
   const tzSum = sum('hourly');
   // מה שהסניף מעביר = הסכום שסוכם על ההוראה ועוד שכר הצהרון — בדיוק כמו בטבלת ההעברות לסניפים
   const sendOf = r => (r.agreed || 0) + (r.hourly || 0);
-  const openOf = r => (r.gap == null ? null : r.gap + (r.hourly || 0) - sendOf(r));
+  const openOf = r => (r.gap == null ? null : r.gap + minAdj(r) + (r.hourly || 0) - sendOf(r));
   const dealSum = summed.reduce((x, r) => x + sendOf(r), 0);
   const noDeal = summed.filter(r => r.agreed == null && r.gap > 0).length;
-  const openSum = tot.gap + tzSum - dealSum;
+  const openSum = tot.gap + adjSum + tzSum - dealSum;
   // לפני הכרית: בפועל − משרד החינוך − מענק − מה שהסניף מעביר. אחרי הכרית = זה ועוד 20%.
-  const beforeOf = r => (r.gap == null ? null : r.gap + (r.hourly || 0) - r.add20 - sendOf(r));
+  const beforeOf = r => (r.gap == null ? null : r.gap + minAdj(r) + (r.hourly || 0) - r.add20 - sendOf(r));
   const beforeSum = openSum - sum('add20');
   const hasPay = upTo.some(m => m.branches.some(br => br.chabadPaid != null));
   const Remain = ({ v }) => v == null ? <span>—</span>
@@ -5157,8 +5166,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <div className="bl-eq" role="group" aria-label="החשבון החודשי של הרשת">
             <div className="bl-tile t-cost"><p className="l">עלות ההוראה בפועל</p><p className="v num">{num(sum('cost') + tzSum)}</p>
               <p className="s">{anyTz ? `כולל שכר צהרון ${num(tzSum)}` : 'כולל מנהלות'}</p></div>
-            <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>משרד החינוך + מענק</p><p className="v num">{num(tot.ministry + tot.support)}</p>
-              <p className="s">{recvN ? `התקבל מהמשרד ${num(recvSum)} ב-${recvN === 1 ? 'סניף אחד' : recvN + ' סניפים'}` : `משרד ${num(tot.ministry)} · מענק ${num(tot.support)}`}</p></div>
+            <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>משרד החינוך + מענק</p><p className="v num">{num(minSum + tot.support)}</p>
+              <p className="s">{recvN === summed.length ? 'משרד החינוך: התקבל בפועל בכל הסניפים'
+                : recvN ? `משרד החינוך: התקבל בפועל ב-${recvN} מתוך ${summed.length} סניפים; בשאר — מתוכנן`
+                : 'משרד החינוך: מתוכנן, טרם הוזנו תקבולים'}</p></div>
             <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>הסניפים מעבירים</p><p className="v num">{num(dealSum)}</p>
               <p className="s">{noDeal ? `עם ${noDeal === 1 ? 'סניף אחד' : noDeal + ' סניפים'} טרם סוכם` : 'לפי מה שסוכם איתם'}</p></div>
             <div className="bl-tile t-res"><p className="l"><span className="op" aria-hidden="true">=</span>לפני הכרית</p>
@@ -5192,7 +5203,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 </tr>
                 <tr>
                   <TH>סניף</TH><TH>לפי המחשבון</TH><TH>בפועל</TH>{anyTz && <TH><Op c="+" />שכר צהרון</TH>}
-                  <TH><Op c="−" />משרד החינוך</TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />הסניף מעביר</TH>
+                  <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או מתוכנן</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />הסניף מעביר</TH>
                   <TH><Op c="=" />נותר לפני הכרית</TH><TH><Op c="+" />כרית 20%</TH><TH><Op c="=" />נותר כולל הכרית</TH>
                   {hasPay && <><TH>הועבר</TH><TH>יתרה מצטברת</TH></>}
                 </tr>
@@ -5208,7 +5219,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
                       {num(r.cost)}
                       {pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</td>
                     {anyTz && <td style={td}>{r.hourly > 0 ? num(r.hourly) : '—'}</td>}
-                    <td style={td} title={recv == null ? undefined : `התקבל בפועל ${num(recv)} מתוך ${num(r.ministry)} שתוכננו`}>{num(r.ministry)}</td>
+                    <td style={td} title={recv == null ? 'מתוכנן: החלק ה-12 מהתקציב השנתי. התקבול בפועל טרם הוזן' : `התקבל בפועל. מתוכנן: ${num(r.ministry)}`}>
+                      {recv == null
+                        ? <span style={{ color:'var(--text2)' }}>{num(r.ministry)}<span className="bl-tag">מתוכנן</span></span>
+                        : <span style={{ fontWeight:800 }}>{num(recv)}<span className="bl-tag ok">בפועל</span></span>}</td>
                     <td style={td}>{num(r.support)}</td>
                     <td style={td} title={r.hourly > 0 && r.agreed != null ? `${num(r.agreed)} על ההוראה ועוד ${num(r.hourly)} שכר צהרון` : undefined}>
                       {r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
@@ -5225,7 +5239,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={td}>{planSum ? num(planSum) : '—'}</td>
                   <td style={td} title={usePct == null ? undefined : `${usePct}% מהעלות לפי מחשבון המשרד`}>{num(sum('cost'))}</td>
                   {anyTz && <td style={td}>{num(tzSum)}</td>}
-                  <td style={td}>{num(tot.ministry)}</td>
+                  <td style={td}>{num(minSum)}</td>
                   <td style={td}>{num(tot.support)}</td>
                   <td style={td}>{num(dealSum)}</td>
                   <td style={td}><Remain v={beforeSum} /></td>
@@ -5250,7 +5264,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <CardRow label="לפי מחשבון המשרד">{r.plan == null ? '—' : num(r.plan)}</CardRow>
                     {r.hourly > 0 && <CardRow label="שכר צהרון">{num(r.hourly)}</CardRow>}
                     <CardRow label="כרית 20%">{num(r.add20)}</CardRow>
-                    <CardRow label="משרד החינוך">{num(r.ministry)}</CardRow>
+                    <CardRow label={r.ministryReceived != null ? 'משרד החינוך — בפועל' : 'משרד החינוך — מתוכנן'}>{num(minOf(r))}</CardRow>
                     <CardRow label="מענק רשת">{num(r.support)}</CardRow>
                     <CardRow label="הסניף מעביר">{r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
                     {hasPay && <CardRow label="הועבר">{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</CardRow>}
@@ -5278,7 +5292,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           {showNote && (
             <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
               <b>לפי המחשבון</b> — העלות שהמערכת חישבה לכל עובדת ממחשבון משרד החינוך (הסימולציה), לפני שהגיעו התלושים. <b>בפועל</b> — עלות המעביד של עובדי ההוראה בחודש, כולל מנהלת; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
-              {' '}<b>כרית 20%</b> — תוספת של 20% על העלות בפועל, למילוי מקום וביטחון. <b>משרד החינוך</b> ו<b>מענק רשת</b> — החלק ה-12 מהסכום השנתי של כל אחד.
+              {' '}<b>כרית 20%</b> — תוספת של 20% על העלות בפועל, למילוי מקום וביטחון. <b>משרד החינוך</b> — מה שהתקבל בפועל באותו חודש ("בפועל"); כשהתקבול טרם הוזן במסך "תקבולים", מוצג החלק ה-12 מהתקציב השנתי ("מתוכנן"). <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
               {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו; "טרם סוכם" נספר כאפס. <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
               {anyTz && <>{' '}<b>שכר צהרון</b> — עלות עובדות הצהרון שהרשת משלמת; אין מולה הכנסה ממשרד החינוך ואין עליה כרית, והיא כולה על הסניף: הסכום ש"הסניף מעביר" כולל אותה.</>}
               {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
@@ -7597,7 +7611,7 @@ function FillProgress({ schools, month, onOpenSchool }) {
     סיכום; נפתח בלחיצה — או לבד כשיש ממתינים. ה-hook כאן למעלה,
     לפני ה-return המוקדם — אחרת React מפיל את הדף (שגיאה #310).
   */
-  const [openList, setOpenList] = useState(false);
+  const [openList, setOpenList] = useState(null);   // null = לפי המצב: פתוח כשיש ממתינים
 
   // ה-effect רק מפעיל; כל setState קורה בתוך הפונקציה האסינכרונית,
   // אחרי await, ולא בגוף ה-effect עצמו.
@@ -7643,46 +7657,46 @@ function FillProgress({ schools, month, onOpenSchool }) {
   const waiting = list.filter(r => r.st.k <= 3).length;
   const totalT  = list.reduce((n, r) => n + r.teachers, 0);
 
-  const showList = openList || waiting > 0;
+  const showList = openList ?? waiting > 0;
+  const atClerk = list.filter(r => r.st.k === 4).length;
+  const ready   = list.filter(r => r.st.k === 5).length;
 
+  /*
+    "עדיין לא מעוצב" (שרה, 6.10, על המסך הראשי). אותו מידע, בשפת שאר המסכים:
+    שורת סיכום עם שלושה מונים, ורשימה שבה המצב בגלולה ברוחב קבוע, השם אינו
+    נחתך, והגופן 14 ומעלה. הסדר נשאר לפי מי שדורש טיפול.
+  */
   return (
-    <div className="apple-card" style={{ padding:'14px 16px', marginBottom:14 }}>
-      <div onClick={() => setOpenList(v => !v)}
-        style={{ display:'flex', alignItems:'center', gap:9, flexWrap:'wrap', cursor:'pointer' }}>
-        <ChevronLeft size={15} strokeWidth={2.4} style={{ color:'var(--text3)', transform: showList ? 'rotate(-90deg)' : 'none', transition:'transform .15s' }} />
-        <ClipboardCheck size={15} strokeWidth={2.3} color="var(--purple)" />
-        <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)' }}>מעקב מילוי — {fmtMonth(month)}</p>
-        <span style={{ fontSize:13.2, color: waiting ? '#E65100' : 'var(--text3)', fontWeight: waiting ? 700 : 400 }}>
-          {waiting ? `${waiting} ממתינים לך` : 'כל בתי הספר סיימו'} · {totalT} הוזנו
-        </span>
-        <button onClick={e => { e.stopPropagation(); load(); }} title="רענון"
-          style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text3)', fontSize:13.2, padding:0, marginInlineStart:'auto' }}>
-          רענון
+    <section className="apple-card" style={{ padding:0, marginBottom:16, overflow:'hidden' }} aria-label={`מעקב מילוי, ${fmtMonth(month)}`}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', padding:'10px 16px' }}>
+        <button onClick={() => setOpenList(!showList)} aria-expanded={showList}
+          style={{ display:'inline-flex', alignItems:'center', gap:8, background:'none', border:'none', cursor:'pointer', fontFamily:'inherit', padding:0, minHeight:42 }}>
+          <ChevronLeft size={17} strokeWidth={2.6} style={{ color:'var(--purple)', transform: showList ? 'rotate(-90deg)' : 'none', transition:'transform .15s' }} />
+          <span style={{ fontSize:17.5, fontWeight:800, color:'var(--text)' }}>מעקב מילוי · {fmtMonth(month)}</span>
         </button>
+        {waiting > 0 && <span className="fp-state orange" style={{ width:'auto' }}>{waiting} ממתינים לך</span>}
+        {atClerk > 0 && <span className="fp-state teal" style={{ width:'auto' }}>{atClerk} אצל חשבת השכר</span>}
+        {ready > 0 && <span className="fp-state green" style={{ width:'auto' }}>{ready} מוכנים</span>}
+        <span style={{ fontSize:14.6, color:'var(--text2)' }}>{totalT} עובדים הוזנו</span>
+        <button onClick={load} className="apple-btn apple-btn-ghost" style={{ marginInlineStart:'auto', minHeight:38, fontSize:14.6 }}>רענון</button>
       </div>
 
       {showList && (
-      <div style={{ display:'flex', flexDirection:'column', gap:5, marginTop:11 }}>
-        {list.map(r => (
-          <button key={r.schoolId} onClick={() => onOpenSchool?.(r.schoolId)} className="fill-row"
-            style={{ display:'flex', alignItems:'center', gap:9, padding:'7px 10px', background:'var(--fill)',
-              border:'none', borderRadius:10, cursor:'pointer', textAlign:'right', fontFamily:'inherit', width:'100%' }}>
-            <span className={`apple-badge badge-${r.st.tone}`} style={{ fontSize:13.2, padding:'2px 8px', flexShrink:0, minWidth:96, justifyContent:'center' }}>
-              {r.st.label}
-            </span>
-            <span className="fill-name" style={{ flex:1, minWidth:0, fontSize:14.9, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-              {name(r.schoolId)}
-              {r.principal && <span style={{ fontWeight:400, color:'var(--text3)' }}> · {r.principal}</span>}
-            </span>
-            <span style={{ fontSize:13.2, color:'var(--text3)', flexShrink:0 }}>
-              {r.teachers > 0 && `${r.teachers} עובדים`}
-              {r.ago && ` · ${r.ago}`}
-            </span>
-          </button>
-        ))}
-      </div>
+        <div style={{ borderTop:'1px solid var(--line)' }}>
+          {list.map(r => (
+            <button key={r.schoolId} onClick={() => onOpenSchool?.(r.schoolId)} className="fp-row" title={name(r.schoolId)}>
+              <span className={`fp-state ${r.st.tone}`}>{r.st.label}</span>
+              <span className="fp-name">{shortName(name(r.schoolId))}
+                {r.principal && <span className="fp-sub"> · {r.principal}</span>}</span>
+              <span className="fp-meta">
+                {r.teachers > 0 && `${r.teachers} עובדים`}
+                {r.ago && `${r.teachers > 0 ? ' · ' : ''}${r.ago}`}
+              </span>
+            </button>
+          ))}
+        </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -12710,7 +12724,7 @@ export default function App() {
           <div className="page-wrap" style={{ maxWidth:1152 }}>
             <PageHead
               title="בתי הספר"
-              subtitle={`${schools.length} בתי ספר ברשת · חודש ${fmtMonth(activeMonth)}`}
+              subtitle={`${schools.length} בתי ספר ברשת · ${teachers.length} עובדי הוראה · ${fmtMonth(activeMonth)}`}
               actions={
                 <button className="apple-btn apple-btn-blue" onClick={() => setSchoolModal({ id:'', name:'', city:'', reform:'ofek' })}>
                   <Plus size={15} strokeWidth={2.6} />
@@ -12734,7 +12748,7 @@ export default function App() {
                 <p style={{ fontSize:16.1, color:'var(--apple-text2)' }}>לחצי על "הוסף בית ספר" להתחלה</p>
               </div>
             ) : (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gridAutoRows:'1fr', gap:16 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gridAutoRows:'1fr', gap:14 }}>
                 {schools.map(s => {
                   const ts      = teachers.filter(t => t.schoolId === s.id);
                   const empTot  = ts.reduce((sum, t) => sum + calcEmployer(t).total, 0);
@@ -12744,76 +12758,63 @@ export default function App() {
                   const quota   = Number(s.hoursQuota) || null;
                   const overQuota = quota ? used > quota : false;
                   return (
-                    <div key={s.id} className="apple-card"
-                      style={{ padding:20, cursor:'pointer', transition:'transform .18s var(--ease-out), box-shadow .18s',
-                        borderRight: simN>0 ? '3px solid var(--warn)' : apprN>0 ? '3px solid var(--teal)' : '3px solid transparent' }}
+                    <div key={s.id} className="apple-card sc-card" data-state={simN > 0 ? 'sim' : apprN > 0 ? 'appr' : undefined}
+                      role="link" tabIndex={0} aria-label={`כניסה ל${s.name}`}
                       onClick={() => { setActiveSchool(s); setView('school'); }}
-                      onMouseEnter={e => { e.currentTarget.style.transform='translateY(-3px)'; e.currentTarget.style.boxShadow='var(--shadow-lg)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='var(--shadow)'; }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+                      onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) { setActiveSchool(s); setView('school'); } }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
+                        <h3 style={{ fontWeight:800, fontSize:19.5, color:'var(--text)', letterSpacing:'-0.01em', lineHeight:1.25, wordBreak:'keep-all' }} title={s.name}>{shortName(s.name)}</h3>
+                        <div style={{ display:'flex', gap:4, flexShrink:0 }} onClick={e => e.stopPropagation()}>
+                          <button className="apple-btn apple-btn-ghost sc-icon" title="עריכה" aria-label={`עריכת ${s.name}`} onClick={() => setSchoolModal({ ...s })}><Pencil size={15} strokeWidth={2.2} /></button>
+                          <button className="apple-btn apple-btn-ghost sc-icon sc-del" title="מחיקה" aria-label={`מחיקת ${s.name}`}
+                            onClick={() => { if (window.confirm(`למחוק את ${s.name}?`)) onDeleteSchool(s.id); }}><Trash2 size={15} strokeWidth={2.2} /></button>
+                        </div>
+                      </div>
+                      <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignContent:'flex-start' }}>
+                        {/* המסלול הוא של המורה, לא של בית הספר: מוצג התמהיל בפועל; מסלול בית הספר הוא ברירת מחדל בלבד. */}
+                        {(() => {
+                          const nOfek = ts.filter(t => t.reform === 'ofek').length;
+                          const nPre  = ts.length - nOfek;
+                          if (!ts.length) return (
+                            <span className={`apple-badge ${(s.reform || 'ofek') === 'ofek' ? 'badge-blue' : 'badge-gray'}`} style={{ fontSize:14 }}>
+                              ברירת מחדל: {reformLabel(s.reform)}
+                            </span>
+                          );
+                          return (
+                            <>
+                              {nOfek > 0 && <span className="apple-badge badge-blue" style={{ fontSize:14 }}>{nOfek} אופק חדש</span>}
+                              {nPre  > 0 && <span className="apple-badge badge-gray" style={{ fontSize:14 }}>{nPre} עולם ישן</span>}
+                            </>
+                          );
+                        })()}
+                        {s.paysSalary === false && <span className="apple-badge badge-gray" style={{ fontSize:14 }}>לא לתשלום שכר</span>}
+                        {simN > 0 && <span className="apple-badge badge-orange" style={{ fontSize:14 }}>{simN} לסימולציה</span>}
+                        {apprN > 0 && <span className="apple-badge badge-teal" style={{ fontSize:14 }}>{apprN} לאישור</span>}
+                      </div>
+                      <div className="sc-stats">
                         <div>
-                          <h3 style={{ fontWeight:700, fontSize:18.4, color:'var(--apple-text)', marginBottom:2, letterSpacing:'-0.01em' }}>{s.name}</h3>
-                          {s.city && <p style={{ fontSize:14.9, color:'var(--apple-text2)' }}>{s.city}</p>}
-                          <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
-                            {/* המסלול הוא של המורה, לא של בית הספר. בבית ספר
-                                אופק יש גם מורות בעולם ישן, ולכן מוצג התמהיל
-                                בפועל; מסלול בית הספר הוא ברירת מחדל בלבד. */}
-                            {(() => {
-                              const nOfek = ts.filter(t => t.reform === 'ofek').length;
-                              const nPre  = ts.length - nOfek;
-                              if (!ts.length) return (
-                                <span className={`apple-badge ${(s.reform || 'ofek') === 'ofek' ? 'badge-blue' : 'badge-gray'}`}>
-                                  ברירת מחדל: {reformLabel(s.reform)}
-                                </span>
-                              );
-                              return (
-                                <>
-                                  {nOfek > 0 && <span className="apple-badge badge-blue">{nOfek} אופק חדש</span>}
-                                  {nPre  > 0 && <span className="apple-badge badge-gray">{nPre} עולם ישן</span>}
-                                </>
-                              );
-                            })()}
-                            {simN > 0 && <span className="apple-badge badge-orange">{simN} לסימולציה</span>}
-                            {apprN > 0 && <span className="apple-badge badge-teal">{apprN} לאישור</span>}
-                          </div>
+                          <p className="l">עובדי הוראה</p>
+                          <p className="v num">{ts.length}</p>
                         </div>
-                        <div style={{ display:'flex', gap:4 }} onClick={e => e.stopPropagation()}>
-                          <button className="apple-btn apple-btn-ghost" title="עריכה" onClick={() => setSchoolModal({ ...s })} style={{ padding:'0 10px', minHeight:32 }}><Pencil size={14} strokeWidth={2.2} /></button>
-                          <button className="apple-btn apple-btn-ghost" title="מחיקה" onClick={() => { if(window.confirm(`למחוק את ${s.name}?`)) onDeleteSchool(s.id); }} style={{ padding:'0 10px', minHeight:32, color:'var(--danger)' }}><Trash2 size={14} strokeWidth={2.2} /></button>
+                        <div>
+                          <p className="l">שעות</p>
+                          <p className="v num" style={{ color: overQuota ? 'var(--danger-text)' : undefined }}>{quota ? `${used} / ${quota}` : used || '—'}</p>
+                          {overQuota && <p className="num" style={{ fontSize:14, fontWeight:800, color:'var(--danger-text)' }}>+{used - quota} מעל התקן</p>}
+                        </div>
+                        <div>
+                          <p className="l">עלות לחודש</p>
+                          <p className="v num">{empTot > 0 ? Math.round(empTot).toLocaleString('he-IL') : '—'}</p>
                         </div>
                       </div>
-                      <div className="sc-stats" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
-                        <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-                          <p style={{ fontSize:13.2, color:'var(--text2)', marginBottom:2 }}>עובדי הוראה</p>
-                          <p className="num" style={{ fontWeight:800, fontSize:25.3, color:'var(--text)', letterSpacing:'-0.02em' }}>{ts.length}</p>
-                        </div>
-                        <div style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-                          <p style={{ fontSize:13.2, color:'var(--text2)', marginBottom:2 }}>שעות</p>
-                          <p className="num" style={{ fontWeight:700, fontSize:16.1, color: overQuota ? 'var(--danger)' : 'var(--text)' }}>
-                            {quota ? `${used} / ${quota}` : used || '—'}
-                          </p>
-                          {overQuota && (
-                            <p className="num" style={{ fontSize:12.6, fontWeight:800, color:'var(--danger)', marginTop:1 }}>
-                              +{used - quota} שעות מעל התקן
-                            </p>
-                          )}
-                        </div>
-                        <div className="sc-money" style={{ background:'var(--fill)', borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
-                          <p style={{ fontSize:13.2, color:'var(--text2)', marginBottom:2 }}>למעסיק/חודש</p>
-                          <p className="num" style={{ fontWeight:700, fontSize:16.1, color:'var(--text)', letterSpacing:'-0.01em' }}>{empTot > 0 ? empTot.toLocaleString('he-IL')+' ₪' : '—'}</p>
-                        </div>
-                      </div>
-                      <button className="apple-btn apple-btn-ghost" onClick={e => { e.stopPropagation(); setTeacherModal({ ...EMPTY_TEACHER, schoolId: s.id, reform: s.reform || 'ofek' }); }}
-                        style={{ width:'100%', fontSize:14.9, borderRadius:10, border:'1.5px dashed var(--apple-fill2)' }}>
-                        + הוספת עובד/ת הוראה
-                      </button>
-                      {/* במובייל כל הכרטיס לחיץ אבל שום דבר לא אומר זאת —
-                          כפתור כניסה מפורש. בדסקטופ יש hover, והוא מוסתר. */}
-                      <div className="only-mobile" style={{ marginTop:8 }}>
-                        <button className="apple-btn apple-btn-blue" style={{ width:'100%' }}
-                          onClick={e => { e.stopPropagation(); setActiveSchool(s); setView('school'); }}>
-                          כניסה לבית הספר
-                          <ChevronLeft size={15} strokeWidth={2.4} />
+                      <div style={{ display:'flex', gap:8 }} onClick={e => e.stopPropagation()}>
+                        <button className="apple-btn apple-btn-blue" style={{ flex:'1 1 auto', minHeight:42, fontSize:15.5 }}
+                          onClick={() => { setActiveSchool(s); setView('school'); }}>
+                          כניסה
+                          <ChevronLeft size={16} strokeWidth={2.4} />
+                        </button>
+                        <button className="apple-btn apple-btn-ghost" style={{ minHeight:42, fontSize:14.6 }} title="הוספת עובד/ת הוראה"
+                          onClick={() => setTeacherModal({ ...EMPTY_TEACHER, schoolId: s.id, reform: s.reform || 'ofek' })}>
+                          <Plus size={15} strokeWidth={2.6} />עובד/ת
                         </button>
                       </div>
                     </div>
