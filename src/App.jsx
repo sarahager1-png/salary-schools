@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 77;
+const BUILD = 78;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -377,6 +377,8 @@ const uid   = () => Math.random().toString(36).slice(2, 10);
 const MONTH_NAMES = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 const toMonthKey   = (y, m) => `${y}-${String(m).padStart(2,'0')}`;
 const nowMonthKey  = () => { const d=new Date(); return toMonthKey(d.getFullYear(), d.getMonth()+1); };
+// "בית ספר שלהבות, אשקלון" → "שלהבות אשקלון": בטבלאות השם נכנס בשורה אחת. ב-PDF ובאקסל נשאר השם המלא.
+const shortName    = n => String(n || '').replace(/\s+/g, ' ').replace(/^בית ספר\s+/, '').replace(',', '').trim();
 const fmtMonth     = k => { if (!k) return ''; const [y,m]=k.split('-'); return `${MONTH_NAMES[Number(m)-1]} ${y}`; };
 const nextMonthKey = k => { const [y,m]=k.split('-').map(Number); return m===12 ? toMonthKey(y+1,1) : toMonthKey(y,m+1); };
 
@@ -5169,7 +5171,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   const pc = pctOf(r), recv = r.ministryReceived;
                   return (
                   <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }}>{r.name}</th>
+                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
                     <td style={{ ...td, color:'var(--text2)' }}>{r.plan == null ? '—' : num(r.plan)}</td>
                     <td style={{ ...td, fontWeight:800 }} title={pc == null ? undefined : `${pc}% מהעלות לפי מחשבון המשרד`}>
                       {num(r.cost)}
@@ -5208,7 +5210,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <div className="only-mobile big-cards">
             {sorted.map(r => { const pc = pctOf(r); const open = openB === r.id; return (
               <div key={'bl-' + r.id} className="apple-card mcard">
-                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{r.name}</p>
+                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
                 <CardRow label="בפועל" strong>{num(r.cost)}{pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
                 <CardRow label="נותר לפני הכרית" strong><Remain v={beforeOf(r)} /></CardRow>
                 <CardRow label="נותר כולל כרית 20%" strong><Open r={r} /></CardRow>
@@ -5268,12 +5270,16 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
   const [showNote, setShowNote] = useState(false);
   // "מעניין אותי ברמת כל עובד וברמת בית ספר" (שרה, 6.10): סניף פתוח בטבלת התחשיב מול בפועל
   const [openSim, setOpenSim] = useState(null);
+  const [openTr, setOpenTr] = useState(null);   // הסניף שהחשבון המלא שלו פתוח בנייד
+  const cellC = { textAlign:'center' };
+  const Sign = ({ c }) => <span aria-hidden="true" style={{ color:'var(--text3)', fontWeight:800, marginInlineEnd:4 }}>{c}</span>;
   const [err, setErr]     = useState('');
   const [flash, setFlash] = useState(0);
   // "הכנסות מול הוצאות שיהיה מתרחב" (שרה, 3.9) — סגור כברירת מחדל
   const [openInc, setOpenInc] = useState({});
   // "אני צריכה חתכים שונים — חודשי/שנתי" (3.9): מתג אחד לכל הדף
-  const [period, setPeriod] = useState('year');
+  // ברירת המחדל חודשית: כך חושבים על ההעברה וכך מקלידים אותה (שרה, 6.10 — "חסר בה ראיה חודשית")
+  const [period, setPeriod] = useState('month');
   // עלות מילוי מקום: "לכל בית ספר צריך להיות 5 אחוז מסך הכולל של עלות
   // ההוראה" (שרה, 10.9) — 5% אחד לבית ספר, על עלות ההוראה השנתית המלאה
   // (ברוטו + עלות מעביד, כולל מנהלת). מחליף את הנוסח מ-7.9 (ברוטו הוראה
@@ -5837,39 +5843,37 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
           טבלה עצמאית: תוספת אחת של 20% במקום 10%+5%, ושתי עמודות פער —
           שנתי וחודשי — כדי שלא יידרש חישוב אצל מי שמקבל את הקובץ. */}
 
-      <div className="page-toolbar">
-        {/* בזמן הטעינה transferRows ריק — בלי fin === null הכפתורים נראים
-            כבויים כאילו אין נתונים, והמשתמשת חושבת שאין מה להוריד */}
-        <button className="apple-btn apple-btn-blue" onClick={downloadTransfersPdf} disabled={fin === null || !transferRows.length}
-          title={fin === null ? 'טוען נתונים…' : 'מסמך מעוצב עם לוגו הרשת — להדפסה או לשמירה כ-PDF'}
-          style={{ minHeight:36, fontSize:14.4 }}>
-          <Printer size={14} strokeWidth={2.2} />
-          הורדת PDF מעוצב
-        </button>
-        <button className="apple-btn apple-btn-ghost" onClick={exportTransfersXLSX} disabled={fin === null || !transferRows.length}
-          title={fin === null ? 'טוען נתונים…' : 'גיליון .xlsx לעבודה עם המספרים'} style={{ minHeight:36, fontSize:14.4 }}>
-          <FileSpreadsheet size={14} strokeWidth={2.2} />
-          הורדה לאקסל
-        </button>
+      <div className="page-toolbar" style={{ gap:8 }}>
         {periodSeg}
         {onImportSlip && (
           <button className="apple-btn apple-btn-ghost" onClick={() => setShowImport(v => !v)}
             title="קובץ עלות השכר מהגזברות — ברוטו ועלות מעביד לכל עובדת, לחודש שנבחר"
-            style={{ minHeight:36, fontSize:14.4, borderColor: showImport ? 'var(--purple)' : undefined, color: showImport ? 'var(--purple)' : undefined }}>
-            <Upload size={14} strokeWidth={2.2} />
+            style={{ minHeight:38, fontSize:14.6, borderColor: showImport ? 'var(--purple)' : undefined, color: showImport ? 'var(--purple)' : undefined }}>
+            <Upload size={15} strokeWidth={2.2} />
             {showImport ? 'סגירת הייבוא' : `ייבוא עלות שכר · ${fmtMonth(monthKey)}`}
           </button>
         )}
-        {/* "איפה התחשיב הראשוני מול העלות בפועל?" (שרה, 6.10) — נפתח בלחיצה, כמו תמיד
-            ("חייב להיות מוסתר", 3.9), אבל מכאן ולא מתוך החלק הסגור */}
+        {/* "חייב להיות מוסתר" (3.9) — התחשיב מהתקציב נפתח רק בלחיצה */}
         <button className="apple-btn apple-btn-ghost" onClick={() => setShowSim(v => !v)}
-          style={{ minHeight:36, fontSize:14.4, borderColor: showSim ? 'var(--purple)' : undefined, color: showSim ? 'var(--purple)' : undefined }}>
-          <BarChart3 size={14} strokeWidth={2.2} />
-          {showSim ? 'הסתרת התחשיב הראשוני' : 'תחשיב ראשוני מול בפועל'}
+          style={{ minHeight:38, fontSize:14.6, borderColor: showSim ? 'var(--purple)' : undefined, color: showSim ? 'var(--purple)' : undefined }}>
+          <BarChart3 size={15} strokeWidth={2.2} />
+          {showSim ? 'הסתרת התקציב' : 'מול התקציב'}
         </button>
         {flash > 0 && Date.now() - flash < 4000 && (
-          <span style={{ fontSize:13.8, color:'var(--ok)', fontWeight:700, marginInlineStart:'auto' }}>נשמר ✓</span>
+          <span role="status" style={{ fontSize:14, color:'var(--ok-text)', fontWeight:700 }}>נשמר ✓</span>
         )}
+        {/* בזמן הטעינה transferRows ריק — בלי fin === null הכפתורים נראים כבויים כאילו אין נתונים */}
+        <span style={{ marginInlineStart:'auto', display:'inline-flex', gap:6 }}>
+          <button className="apple-btn apple-btn-ghost" onClick={downloadTransfersPdf} disabled={fin === null || !transferRows.length}
+            title={fin === null ? 'טוען נתונים…' : 'מסמך מעוצב עם לוגו הרשת — להדפסה או לשמירה כ-PDF'}
+            style={{ minHeight:38, fontSize:14.6 }}>
+            <Printer size={15} strokeWidth={2.2} />PDF
+          </button>
+          <button className="apple-btn apple-btn-ghost" onClick={exportTransfersXLSX} disabled={fin === null || !transferRows.length}
+            title={fin === null ? 'טוען נתונים…' : 'גיליון .xlsx לעבודה עם המספרים'} style={{ minHeight:38, fontSize:14.6 }}>
+            <FileSpreadsheet size={15} strokeWidth={2.2} />אקסל
+          </button>
+        </span>
       </div>
 
       {showSim && fin !== null && (() => {
@@ -5931,7 +5935,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         };
         return (
           <>
-            <h2 className="section-head">התחשיב הראשוני מול העלות בפועל</h2>
+            <h2 className="section-head">התקציב מול העלות בפועל</h2>
             <p className="section-sub">עלות ההוראה שתוכננה בתקציב מול עלות ההוראה בפועל, {perLbl}. אדום = בפועל יקר מהתחשיב; ירוק = זול ממנו. בלי תוספת 20%. "העברה לפי התחשיב" — מה שהסניף היה אמור להעביר לפי התכנון: התחשיב פחות משרד החינוך ופחות מענק הרשת. לצדה מה שסוכם איתו בפועל.</p>
             <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
               <table className="sticky-first big-table" style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -5943,7 +5947,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                     <tr style={{ borderBottom:'1px solid var(--line)', cursor:'pointer' }} onClick={() => setOpenSim(v => v === r.sc.id ? null : r.sc.id)}
                       title="לחיצה פותחת את הפירוט לפי עובד/ת">
                       <td style={{ padding:'10px 12px', fontWeight:700 }}>
-                        <span style={{ display:'inline-block', width:16, color:'var(--purple)' }}>{openSim === r.sc.id ? '▾' : '◂'}</span>{r.sc.name}</td>
+                        <span style={{ display:'inline-block', width:16, color:'var(--purple)' }}>{openSim === r.sc.id ? '▾' : '◂'}</span>{shortName(r.sc.name)}</td>
                       <td style={cell}>{r.f.teachingSim == null ? '—' : num(per(r.f.teachingSim))}</td>
                       <td style={cell}>{num(per(r.annual))}</td>
                       <td style={cell}>{r.f.teachingSim == null ? '—' : <Diff sim={r.f.teachingSim} act={r.annual} />}</td>
@@ -5973,7 +5977,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
             <div className="only-mobile big-cards">
               {transferRows.map(r => (
                 <div key={'simm-' + r.sc.id} className="apple-card mcard">
-                  <p className="mcard-name" style={{ marginBottom:4 }}>{r.sc.name}</p>
+                  <p className="mcard-name" style={{ marginBottom:4 }}>{shortName(r.sc.name)}</p>
                   <CardRow label="תחשיב ראשוני">{r.f.teachingSim == null ? '—' : num(per(r.f.teachingSim))}</CardRow>
                   <CardRow label="עלות בפועל">{num(per(r.annual))}</CardRow>
                   <CardRow label="הפרש" strong>{r.f.teachingSim == null ? '—' : <Diff sim={r.f.teachingSim} act={r.annual} />}</CardRow>
@@ -5995,7 +5999,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                 </div>
               )}
             </div>
-            <h2 className="section-head">העברות לסניפים — הטבלה</h2>
+            <h2 className="section-head">ההעברות</h2>
           </>
         );
       })()}
@@ -6018,56 +6022,60 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         );
       })()}
 
+      {/*
+        "תבנה יפה את כל המסכים… הכי מעולה שאפשר" (שרה, 6.10). אותה שפה של "תמונת מצב
+        חודשית": שורה לסניף שנקראת כחשבון, שלוש קבוצות בצבע, ושם קצר שנכנס בשורה אחת.
+        אדום שמור לבעיה (סניף שלא סוכם איתו סכום) — לא לכל מספר.
+      */}
       <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto', marginTop:10 }}>
-        <table className="sticky-first big-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+        <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+          <caption className="sr-only">{`העברות לסניפים, ${perLbl}: עלות הוראה, כרית 20%, הכנסות משרד החינוך, מענק רשת, הפער, הסכום החודשי שסוכם והסכום להעברה`}</caption>
+          <colgroup>
+            <col /><col className="g-cost" /><col className="g-cost" />{anyTz && <col className="g-cost" />}
+            <col className="g-inc" /><col className="g-inc" />
+            <col className="g-res" /><col className="g-res" /><col className="g-res g-sum" />
+          </colgroup>
           <thead>
-            <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
-              <TH>סניף</TH>
-              <TH>עלות הוראה {perLbl}</TH>
-              <TH>תוספת 20%</TH>
-              <TH>סה"כ עלות {perLbl}</TH>
-              <TH>הכנסות משרד החינוך</TH>
-              <TH>מענק רשת</TH>
-              <TH>פער מחושב · {perLbl}</TH>
-              {anyTz && <TH>שכר צהרון · {perLbl}</TH>}
-              <TH>להעברה · לחודש<span style={{ display:'block', fontSize:11.5, fontWeight:600, color:'var(--text3)' }}>מעוגל — למילוי</span></TH>
-              <TH>להעברה · לשנה</TH>
+            <tr className="bl-groups">
+              <th />
+              <th colSpan={anyTz ? 3 : 2} scope="colgroup" className="gh-cost">השכר</th>
+              <th colSpan={2} scope="colgroup" className="gh-inc">ההכנסות</th>
+              <th colSpan={3} scope="colgroup" className="gh-res">ההעברה</th>
+            </tr>
+            <tr>
+              <TH>סניף</TH><TH>עלות הוראה</TH><TH><Sign c="+" />תוספת 20%</TH>{anyTz && <TH><Sign c="+" />שכר צהרון</TH>}
+              <TH><Sign c="−" />משרד החינוך</TH><TH><Sign c="−" />מענק רשת</TH>
+              <TH><Sign c="=" />פער {perLbl}</TH>
+              <TH>סוכם לחודש<span style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--text2)' }}>מעוגל — למילוי</span></TH>
+              <TH>להעברה {perLbl}</TH>
             </tr>
           </thead>
           <tbody>
             {fin === null ? (
-              <tr><td colSpan={10} style={{ padding:22, textAlign:'center', fontSize:14.6, color:'var(--text3)' }}>טוען…</td></tr>
+              <tr><td colSpan={10} style={{ padding:24, textAlign:'center', color:'var(--text2)' }}>טוען…</td></tr>
             ) : transferRows.map((r) => {
-              const { sc, f, annual, add20, costWith20, transfer, dueYearAll, agreedMonth, tzMonth, dueMonthAll } = r;
+              const { sc, f, annual, add20, transfer, dueYearAll, agreedMonth, tzMonth, dueMonthAll } = r;
+              const gapAll = transfer == null ? null : transfer + tzMonth * 12;
               return (
               <tr key={'tr-' + sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:700 }}>{sc.name}
-                  {transfer == null && <span className="fin-budget-tag" title="בלי תקציב משרד החינוך אין פער לחשב — השורה מחוץ לסיכום">טרם הוזן תקציב משרד</span>}</td>
-                <td style={{ textAlign:'center', fontSize:14.6 }}>{num(per(annual))}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }}>{num(per(add20))}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(per(costWith20))}</td>
-                <td style={{ textAlign:'center', fontSize:14.6 }}>{num(per(f.ministryBudget))}</td>
-                <td style={{ textAlign:'center', fontSize:14.6 }}>{num(per(f.networkSupport))}</td>
-                <td style={{ textAlign:'center' }}><TransferGap v={per(transfer)} fmt={num} /></td>
-                {/* "תן לי מקום לעגל סכומים" (שרה, 23.9) — השדה החודשי המעוגל.
-                    ריק = הפער המחושב הוא הקובע; מוצג באפור כהצעה למילוי. */}
-                {anyTz && <td style={{ textAlign:'center', fontSize:14.6 }}>{tzMonth > 0 ? num(per(tzMonth * 12)) : '—'}</td>}
-                <td style={{ textAlign:'center' }}>
+                <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={sc.name}>{shortName(sc.name)}
+                  {transfer == null && <span className="fin-budget-tag" title="בלי תקציב משרד החינוך אין פער לחשב — השורה מחוץ לסיכום">טרם הוזן תקציב משרד</span>}</th>
+                <td style={cellC}>{num(per(annual))}</td>
+                <td style={{ ...cellC, color:'var(--text2)' }}>{num(per(add20))}</td>
+                {anyTz && <td style={cellC}>{tzMonth > 0 ? num(per(tzMonth * 12)) : '—'}</td>}
+                <td style={cellC}>{num(per(f.ministryBudget))}</td>
+                <td style={cellC}>{num(per(f.networkSupport))}</td>
+                <td style={{ ...cellC, fontWeight:700 }}>{gapAll == null ? '—' : gapAll > 0 ? num(per(gapAll)) : <span style={{ color:'var(--ok-text)' }}>עודף {num(per(-gapAll))}</span>}</td>
+                {/* "תן לי מקום לעגל סכומים" (שרה, 23.9) — הסכום החודשי שסוכם על ההוראה. ריק = הפער המחושב קובע. */}
+                <td style={cellC}>
                   {moneyInput(sc.id, 'monthlyTransfer', f.monthlyTransfer)}
-                  {tzMonth > 0 && dueMonthAll != null && (
-                    <span style={{ display:'block', fontSize:13.4, color:'var(--text2)', marginTop:2, whiteSpace:'nowrap' }}>
-                      + צהרון {num(tzMonth)} = <b>{num(dueMonthAll)}</b>
-                    </span>
-                  )}
                   {agreedMonth == null && transfer > 0 && (
-                    <span style={{ display:'block', fontSize:13.4, color:'var(--text3)', marginTop:2 }}>
-                      מחושב {num(transfer / 12)}
-                    </span>
+                    <span style={{ display:'block', fontSize:12.8, fontWeight:700, color:'#8F4E00', marginTop:2, whiteSpace:'nowrap' }}>טרם סוכם · מחושב {num(transfer / 12)}</span>
                   )}
+                  {tzMonth > 0 && <span style={{ display:'block', fontSize:12.8, color:'var(--text2)', marginTop:2, whiteSpace:'nowrap' }}>+ צהרון {num(tzMonth)}</span>}
                 </td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800,
-                  color: dueYearAll > 0 ? 'var(--danger)' : 'var(--text3)' }}>
-                  {dueYearAll == null || dueYearAll <= 0 ? '—' : num(dueYearAll)}
+                <td style={{ ...cellC, fontWeight:800, fontSize:17.4, color:'var(--purple)' }}>
+                  {dueYearAll == null || dueYearAll <= 0 ? '—' : num(period === 'month' ? dueMonthAll : dueYearAll)}
                 </td>
               </tr>
               );
@@ -6075,75 +6083,61 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
           </tbody>
           {fin !== null && transferRows.length > 0 && (
             <tfoot>
-              <tr style={{ borderTop:'2px solid var(--line)', background:'var(--fill)' }}>
-                <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:800 }}>סה"כ
+              <tr>
+                <td style={{ padding:'10px 12px' }}>סה"כ
                   {skippedRows.length > 0 && (
-                    <span style={{ display:'block', fontSize:12.6, fontWeight:600, color:'var(--text3)' }}>
+                    <span style={{ display:'block', fontSize:12.6, fontWeight:600, color:'var(--text2)' }}>
                       {nBranches(summedRows.length)} · {nSkipped(skippedRows.length)}
                     </span>
                   )}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(per(totT.annual))}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(per(totT.add20))}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(per(totT.costWith20))}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(per(totT.ministry))}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(per(totT.support))}</td>
-                {/* אותה שפה כמו בשורות: עודף נקרא "עודף", לא מספר שלילי */}
-                <td style={{ textAlign:'center' }}><TransferGap v={per(totT.transfer)} fmt={num} /></td>
-                {anyTz && <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(per(totT.tz))}</td>}
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800, color: totT.due > 0 ? 'var(--danger)' : undefined }}>
-                  {totT.due <= 0 ? '—' : num(totT.due / 12)}
-                </td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800, color: totT.due > 0 ? 'var(--danger)' : undefined }}>
-                  {totT.due <= 0 ? '—' : num(totT.due)}
-                </td>
+                <td style={cellC}>{num(per(totT.annual))}</td>
+                <td style={cellC}>{num(per(totT.add20))}</td>
+                {anyTz && <td style={cellC}>{num(per(totT.tz))}</td>}
+                <td style={cellC}>{num(per(totT.ministry))}</td>
+                <td style={cellC}>{num(per(totT.support))}</td>
+                <td style={cellC}>{num(per(totT.transfer + totT.tz))}</td>
+                <td style={cellC}>{totT.due <= 0 ? '—' : num(totT.due / 12)}</td>
+                <td style={{ ...cellC, color:'var(--purple)' }}>{totT.due <= 0 ? '—' : num(per(totT.due))}</td>
               </tr>
             </tfoot>
           )}
         </table>
       </div>
 
-      {/* מובייל: אותם נתונים, אותו סדר ואותה שורת סיכום — כרטיס לכל סניף */}
+      {/* נייד: כרטיס קצר לסניף — העיקר והשדה למילוי; החשבון המלא נפתח */}
       <div className="only-mobile big-cards">
         {fin === null ? (
-          <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
+          <div className="apple-card mcard" style={{ padding:22, textAlign:'center', color:'var(--text2)' }}>טוען…</div>
         ) : (
           <>
-            {transferRows.map(({ sc, f, annual, add20, costWith20, transfer, dueYearAll, tzMonth, dueMonthAll }) => (
+            {transferRows.map(({ sc, f, annual, add20, transfer, dueYearAll, tzMonth, dueMonthAll, agreedMonth }) => { const open = openTr === sc.id; return (
               <div key={'trm-' + sc.id} className="apple-card mcard">
-                <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}
+                <p className="mcard-name" style={{ marginBottom:4, wordBreak:'keep-all' }}>{shortName(sc.name)}
                   {transfer == null && <span className="fin-budget-tag" style={{ display:'inline-block', marginInlineStart:8 }}>טרם הוזן תקציב משרד</span>}</p>
-                <CardRow label={`עלות הוראה ${perLbl}`}>{money(per(annual))}</CardRow>
-                <CardRow label="תוספת 20%" color="var(--text2)">{money(per(add20))}</CardRow>
-                <CardRow label={`סה"כ עלות ${perLbl}`} strong>{money(per(costWith20))}</CardRow>
-                <CardRow label="הכנסות משרד החינוך">{money(per(f.ministryBudget))}</CardRow>
-                <CardRow label="מענק רשת">{money(per(f.networkSupport))}</CardRow>
-                <CardRow label={`פער מחושב · ${perLbl}`}><TransferGap v={per(transfer)} /></CardRow>
-                <CardRow label="להעברה · לחודש (מעוגל)">
-                  {moneyInput(sc.id, 'monthlyTransfer', f.monthlyTransfer)}
-                </CardRow>
-                {tzMonth > 0 && <CardRow label="שכר צהרון · לחודש">{money(tzMonth)}</CardRow>}
-                {tzMonth > 0 && <CardRow label="להעברה כולל צהרון · לחודש" strong>{dueMonthAll == null ? '—' : money(dueMonthAll)}</CardRow>}
-                <CardRow label="להעברה · לשנה" strong>
-                  {dueYearAll == null || dueYearAll <= 0 ? '—' : money(dueYearAll)}
-                </CardRow>
+                <CardRow label="להעברה לחודש" strong color="var(--purple)">{dueMonthAll == null || dueMonthAll <= 0 ? '—' : num(dueMonthAll)}</CardRow>
+                <CardRow label={agreedMonth == null ? 'סוכם לחודש — טרם סוכם' : 'סוכם לחודש'}>{moneyInput(sc.id, 'monthlyTransfer', f.monthlyTransfer)}</CardRow>
+                {open && (
+                  <>
+                    <CardRow label={`עלות הוראה ${perLbl}`}>{num(per(annual))}</CardRow>
+                    <CardRow label="תוספת 20%">{num(per(add20))}</CardRow>
+                    {tzMonth > 0 && <CardRow label="שכר צהרון">{num(per(tzMonth * 12))}</CardRow>}
+                    <CardRow label="משרד החינוך">{num(per(f.ministryBudget))}</CardRow>
+                    <CardRow label="מענק רשת">{num(per(f.networkSupport))}</CardRow>
+                    <CardRow label={`פער ${perLbl}`}>{transfer == null ? '—' : num(per(transfer + tzMonth * 12))}</CardRow>
+                    <CardRow label="להעברה לשנה">{dueYearAll == null || dueYearAll <= 0 ? '—' : num(dueYearAll)}</CardRow>
+                  </>
+                )}
+                <button onClick={() => setOpenTr(open ? null : sc.id)} aria-expanded={open}
+                  style={{ background:'none', border:'none', padding:'10px 0 4px', minHeight:44, width:'100%', textAlign:'start', cursor:'pointer', fontSize:15, fontWeight:700, color:'var(--purple)' }}>
+                  {open ? 'הסתרת החשבון' : 'החשבון המלא'}
+                </button>
               </div>
-            ))}
+            ); })}
             {transferRows.length > 1 && (
               <div className="apple-card mcard" style={{ background:'var(--fill)' }}>
-                <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ
-                  {skippedRows.length > 0 && (
-                    <span style={{ display:'block', fontSize:12.6, fontWeight:600, color:'var(--text3)' }}>
-                      {nBranches(summedRows.length)} · {nSkipped(skippedRows.length)}
-                    </span>
-                  )}</p>
-                <CardRow label={`עלות הוראה ${perLbl}`}>{money(per(totT.annual))}</CardRow>
-                <CardRow label="תוספת 20%" color="var(--text2)">{money(per(totT.add20))}</CardRow>
-                <CardRow label={`סה"כ עלות ${perLbl}`} strong>{money(per(totT.costWith20))}</CardRow>
-                <CardRow label="הכנסות משרד החינוך">{money(per(totT.ministry))}</CardRow>
-                <CardRow label="מענק רשת">{money(per(totT.support))}</CardRow>
-                <CardRow label={`פער מחושב · ${perLbl}`}><TransferGap v={per(totT.transfer)} /></CardRow>
-                <CardRow label="להעברה · לחודש" strong>{totT.due <= 0 ? '—' : money(totT.due / 12)}</CardRow>
-                <CardRow label="להעברה · לשנה" strong>{totT.due <= 0 ? '—' : money(totT.due)}</CardRow>
+                <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ</p>
+                <CardRow label="להעברה לחודש" strong color="var(--purple)">{totT.due <= 0 ? '—' : num(totT.due / 12)}</CardRow>
+                <CardRow label="להעברה לשנה">{totT.due <= 0 ? '—' : num(totT.due)}</CardRow>
               </div>
             )}
           </>
