@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 69;
+const BUILD = 70;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5005,12 +5005,14 @@ function BottomLineView({ activeMonth, viewer = false }) {
   // שכר צהרון (רק היכן שיש): מצטרף לעלות, בלי כרית ובלי הכנסה מולו — כולו על הסניף
   const anyTz = summed.some(r => r.hourly > 0);
   const tzSum = sum('hourly');
-  const openOf = r => (r.gap == null ? null : r.gap + (r.hourly || 0) - (r.agreed || 0));
-  const dealSum = summed.reduce((x, r) => x + (r.agreed || 0), 0);
+  // מה שהסניף מעביר = הסכום שסוכם על ההוראה ועוד שכר הצהרון — בדיוק כמו בטבלת ההעברות לסניפים
+  const sendOf = r => (r.agreed || 0) + (r.hourly || 0);
+  const openOf = r => (r.gap == null ? null : r.gap + (r.hourly || 0) - sendOf(r));
+  const dealSum = summed.reduce((x, r) => x + sendOf(r), 0);
   const noDeal = summed.filter(r => r.agreed == null && r.gap > 0).length;
   const openSum = tot.gap + tzSum - dealSum;
   // לפני הכרית: בפועל − משרד החינוך − מענק − מה שהסניף מעביר. אחרי הכרית = זה ועוד 20%.
-  const beforeOf = r => (r.gap == null ? null : r.gap + (r.hourly || 0) - r.add20 - (r.agreed || 0));
+  const beforeOf = r => (r.gap == null ? null : r.gap + (r.hourly || 0) - r.add20 - sendOf(r));
   const beforeSum = openSum - sum('add20');
   const hasPay = upTo.some(m => m.branches.some(br => br.chabadPaid != null));
   const Remain = ({ v }) => v == null ? <span>—</span>
@@ -5168,7 +5170,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     {anyTz && <td style={td}>{r.hourly > 0 ? num(r.hourly) : '—'}</td>}
                     <td style={td} title={recv == null ? undefined : `התקבל בפועל ${num(recv)} מתוך ${num(r.ministry)} שתוכננו`}>{num(r.ministry)}</td>
                     <td style={td}>{num(r.support)}</td>
-                    <td style={td}>{r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(r.agreed)}</td>
+                    <td style={td} title={r.hourly > 0 && r.agreed != null ? `${num(r.agreed)} על ההוראה ועוד ${num(r.hourly)} שכר צהרון` : undefined}>
+                      {r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
                     <td style={{ ...td, fontWeight:700 }}><Remain v={beforeOf(r)} /></td>
                     <td style={{ ...td, color:'var(--text2)' }}>{num(r.add20)}</td>
                     <td style={{ ...td, fontWeight:800 }}><Open r={r} /></td>
@@ -5209,7 +5212,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <CardRow label="כרית 20%">{num(r.add20)}</CardRow>
                     <CardRow label="משרד החינוך">{num(r.ministry)}</CardRow>
                     <CardRow label="מענק רשת">{num(r.support)}</CardRow>
-                    <CardRow label="הסניף מעביר">{r.agreed == null ? 'טרם סוכם' : num(r.agreed)}</CardRow>
+                    <CardRow label="הסניף מעביר">{r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
                     {hasPay && <CardRow label="הועבר">{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</CardRow>}
                     {hasPay && <CardRow label="יתרה מצטברת"><Bal v={r.balance} /></CardRow>}
                   </>
@@ -5237,7 +5240,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <b>תוכנן</b> — עלות ההוראה שנקבעה בתקציב (התחשיב הראשוני), החלק ה-12 שלה לחודש. <b>בפועל</b> — עלות המעביד של עובדי ההוראה בחודש, כולל מנהלת; האחוז שלידה הוא בפועל מתוך התכנון.
               {' '}<b>כרית 20%</b> — תוספת של 20% על העלות בפועל, למילוי מקום וביטחון. <b>משרד החינוך</b> ו<b>מענק רשת</b> — החלק ה-12 מהסכום השנתי של כל אחד.
               {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו; "טרם סוכם" נספר כאפס. <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
-              {anyTz && <>{' '}<b>שכר צהרון</b> — עלות עובדות הצהרון שהרשת משלמת; אין מולה הכנסה ממשרד החינוך ואין עליה כרית, והיא כולה על הסניף.</>}
+              {anyTz && <>{' '}<b>שכר צהרון</b> — עלות עובדות הצהרון שהרשת משלמת; אין מולה הכנסה ממשרד החינוך ואין עליה כרית, והיא כולה על הסניף: הסכום ש"הסניף מעביר" כולל אותה.</>}
               {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
             </p>
           )}
