@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 70;
+const BUILD = 71;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5930,10 +5930,11 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         return (
           <>
             <h2 className="section-head">התחשיב הראשוני מול העלות בפועל</h2>
-            <p className="section-sub">עלות ההוראה שתוכננה בתקציב מול עלות ההוראה בפועל, {perLbl}. אדום = בפועל יקר מהתחשיב; ירוק = זול ממנו. בלי תוספת 20%.</p>
+            <p className="section-sub">עלות ההוראה שתוכננה בתקציב מול עלות ההוראה בפועל, {perLbl}. אדום = בפועל יקר מהתחשיב; ירוק = זול ממנו. בלי תוספת 20%. "העברה לפי התחשיב" — מה שהסניף היה אמור להעביר לפי התכנון: התחשיב פחות משרד החינוך ופחות מענק הרשת. לצדה מה שסוכם איתו בפועל.</p>
             <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
               <table className="sticky-first big-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><tr><TH>סניף</TH><TH>תחשיב ראשוני</TH><TH>עלות בפועל</TH><TH>הפרש</TH></tr></thead>
+                <thead><tr><TH>סניף</TH><TH>תחשיב ראשוני</TH><TH>עלות בפועל</TH><TH>הפרש</TH>
+                  <TH>העברה לפי התחשיב</TH><TH>העברה שסוכמה</TH></tr></thead>
                 <tbody>
                   {transferRows.map(r => (
                     <Fragment key={'sim-' + r.sc.id}>
@@ -5944,9 +5945,14 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                       <td style={cell}>{r.f.teachingSim == null ? '—' : num(per(r.f.teachingSim))}</td>
                       <td style={cell}>{num(per(r.annual))}</td>
                       <td style={cell}>{r.f.teachingSim == null ? '—' : <Diff sim={r.f.teachingSim} act={r.annual} />}</td>
+                      <td style={cell} title="התחשיב הראשוני פחות הכנסות משרד החינוך ופחות מענק הרשת (בלי תוספת 20%)">
+                        {r.chabadTransfer == null ? '—' : r.chabadTransfer > 0 ? num(per(r.chabadTransfer)) : `עודף ${num(per(-r.chabadTransfer))}`}</td>
+                      <td style={{ ...cell, fontWeight:700 }} title={r.agreedMonth == null ? 'טרם סוכם סכום; מוצג הפער המחושב' : r.tzMonth > 0 ? 'כולל שכר צהרון' : undefined}>
+                        {r.dueYearAll == null || r.dueYearAll <= 0 ? '—' : num(per(r.dueYearAll))}
+                        {r.agreedMonth == null && r.dueYearAll > 0 && <span className="sr-only"> מחושב</span>}</td>
                     </tr>
                     {openSim === r.sc.id && (
-                      <tr><td colSpan={4} style={{ padding:'4px 12px 14px', background:'var(--surface)', whiteSpace:'normal' }}><EmpSim r={r} /></td></tr>
+                      <tr><td colSpan={6} style={{ padding:'4px 12px 14px', background:'var(--surface)', whiteSpace:'normal' }}><EmpSim r={r} /></td></tr>
                     )}
                     </Fragment>
                   ))}
@@ -5956,6 +5962,8 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                     <td style={{ padding:'10px 12px' }}>סה"כ{simRows.length < transferRows.length ? ` (${nBranches(simRows.length)} עם תחשיב)` : ''}</td>
                     <td style={cell}>{num(per(tSim))}</td><td style={cell}>{num(per(tAct))}</td>
                     <td style={cell}><Diff sim={tSim} act={tAct} /></td>
+                    <td style={cell}>{num(per(simRows.reduce((x, r) => x + Math.max(0, r.chabadTransfer || 0), 0)))}</td>
+                    <td style={cell}>{num(per(simRows.reduce((x, r) => x + Math.max(0, r.dueYearAll || 0), 0)))}</td>
                   </tr></tfoot>
                 )}
               </table>
@@ -5967,6 +5975,8 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                   <CardRow label="תחשיב ראשוני">{r.f.teachingSim == null ? '—' : num(per(r.f.teachingSim))}</CardRow>
                   <CardRow label="עלות בפועל">{num(per(r.annual))}</CardRow>
                   <CardRow label="הפרש" strong>{r.f.teachingSim == null ? '—' : <Diff sim={r.f.teachingSim} act={r.annual} />}</CardRow>
+                  <CardRow label="העברה לפי התחשיב">{r.chabadTransfer == null ? '—' : r.chabadTransfer > 0 ? num(per(r.chabadTransfer)) : `עודף ${num(per(-r.chabadTransfer))}`}</CardRow>
+                  <CardRow label="העברה שסוכמה">{r.dueYearAll == null || r.dueYearAll <= 0 ? '—' : num(per(r.dueYearAll))}</CardRow>
                   <button onClick={() => setOpenSim(v => v === r.sc.id ? null : r.sc.id)}
                     style={{ background:'none', border:'none', padding:'8px 0 2px', cursor:'pointer', fontSize:15, fontWeight:700, color:'var(--purple)' }}>
                     {openSim === r.sc.id ? 'הסתרת הפירוט לפי עובד/ת' : 'פירוט לפי עובד/ת'}
