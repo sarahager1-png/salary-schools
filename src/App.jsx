@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 55;
+const BUILD = 56;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5699,10 +5699,81 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
             {showImport ? 'סגירת הייבוא' : `ייבוא עלות שכר · ${fmtMonth(monthKey)}`}
           </button>
         )}
+        {/* "איפה התחשיב הראשוני מול העלות בפועל?" (שרה, 6.10) — נפתח בלחיצה, כמו תמיד
+            ("חייב להיות מוסתר", 3.9), אבל מכאן ולא מתוך החלק הסגור */}
+        <button className="apple-btn apple-btn-ghost" onClick={() => setShowSim(v => !v)}
+          style={{ minHeight:36, fontSize:14.4, borderColor: showSim ? 'var(--purple)' : undefined, color: showSim ? 'var(--purple)' : undefined }}>
+          <BarChart3 size={14} strokeWidth={2.2} />
+          {showSim ? 'הסתרת התחשיב הראשוני' : 'תחשיב ראשוני מול בפועל'}
+        </button>
         {flash > 0 && Date.now() - flash < 4000 && (
           <span style={{ fontSize:13.8, color:'var(--ok)', fontWeight:700, marginInlineStart:'auto' }}>נשמר ✓</span>
         )}
       </div>
+
+      {showSim && fin !== null && (() => {
+        // התחשיב הראשוני = עלות ההוראה שתוכננה בתקציב (teachingSim), מול עלות ההוראה בפועל — שתיהן כוללות מנהלת
+        const simRows = transferRows.filter(r => r.f.teachingSim != null);
+        const tSim = simRows.reduce((a, r) => a + r.f.teachingSim, 0);
+        const tAct = simRows.reduce((a, r) => a + r.annual, 0);
+        const cell = { textAlign:'center' };
+        const Diff = ({ sim, act }) => {
+          const d = act - sim;
+          return (
+            <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: d > 0 ? 'var(--danger)' : 'var(--ok)' }}>
+              {Math.round(per(d)) === 0 ? '0' : `${d > 0 ? '+' : '−'}${num(Math.abs(per(d)))}`}
+              <span style={{ fontWeight:600, fontSize:13.4, marginInlineStart:6 }}>({d > 0 ? '+' : '−'}{Math.abs(Math.round(d / sim * 100))}%)</span>
+            </span>
+          );
+        };
+        return (
+          <>
+            <h2 className="section-head">התחשיב הראשוני מול העלות בפועל</h2>
+            <p className="section-sub">עלות ההוראה שתוכננה בתקציב מול עלות ההוראה בפועל, {perLbl}. אדום = בפועל יקר מהתחשיב; ירוק = זול ממנו. בלי תוספת 20%.</p>
+            <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
+              <table className="sticky-first big-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+                <thead><tr><TH>סניף</TH><TH>תחשיב ראשוני</TH><TH>עלות בפועל</TH><TH>הפרש</TH></tr></thead>
+                <tbody>
+                  {transferRows.map(r => (
+                    <tr key={'sim-' + r.sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
+                      <td style={{ padding:'10px 12px', fontWeight:700 }}>{r.sc.name}</td>
+                      <td style={cell}>{r.f.teachingSim == null ? '—' : num(per(r.f.teachingSim))}</td>
+                      <td style={cell}>{num(per(r.annual))}</td>
+                      <td style={cell}>{r.f.teachingSim == null ? '—' : <Diff sim={r.f.teachingSim} act={r.annual} />}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                {simRows.length > 0 && (
+                  <tfoot><tr>
+                    <td style={{ padding:'10px 12px' }}>סה"כ{simRows.length < transferRows.length ? ` (${nBranches(simRows.length)} עם תחשיב)` : ''}</td>
+                    <td style={cell}>{num(per(tSim))}</td><td style={cell}>{num(per(tAct))}</td>
+                    <td style={cell}><Diff sim={tSim} act={tAct} /></td>
+                  </tr></tfoot>
+                )}
+              </table>
+            </div>
+            <div className="only-mobile big-cards">
+              {transferRows.map(r => (
+                <div key={'simm-' + r.sc.id} className="apple-card mcard">
+                  <p className="mcard-name" style={{ marginBottom:4 }}>{r.sc.name}</p>
+                  <CardRow label="תחשיב ראשוני">{r.f.teachingSim == null ? '—' : num(per(r.f.teachingSim))}</CardRow>
+                  <CardRow label="עלות בפועל">{num(per(r.annual))}</CardRow>
+                  <CardRow label="הפרש" strong>{r.f.teachingSim == null ? '—' : <Diff sim={r.f.teachingSim} act={r.annual} />}</CardRow>
+                </div>
+              ))}
+              {simRows.length > 0 && (
+                <div className="apple-card mcard" style={{ background:'var(--fill)' }}>
+                  <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ</p>
+                  <CardRow label="תחשיב ראשוני">{num(per(tSim))}</CardRow>
+                  <CardRow label="עלות בפועל">{num(per(tAct))}</CardRow>
+                  <CardRow label="הפרש" strong><Diff sim={tSim} act={tAct} /></CardRow>
+                </div>
+              )}
+            </div>
+            <h2 className="section-head">העברות לסניפים — הטבלה</h2>
+          </>
+        );
+      })()}
 
       {showImport && onImportSlip && (() => {
         // כמה מעובדות החודש כבר נושאות עלות בפועל מקובץ — שיהיה ברור מה נשאר לייבא
