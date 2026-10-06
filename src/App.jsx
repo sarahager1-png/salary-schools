@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 52;
+const BUILD = 53;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4867,8 +4867,11 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth }) {
   );
 }
 
-function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTeacher }) {
+function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTeacher, onImportSlip }) {
   const [fin, setFin]     = useState(null);   // null: עוד נטען
+  // "תן לי מקום ייבוא עלות שכר לכל מורה לחודש" (שרה, 6.10): אותו ייבוא
+  // של שולחן השכר, נפתח כאן — ליד הטבלה שהמספרים שלו מזינים.
+  const [showImport, setShowImport] = useState(false);
   const [err, setErr]     = useState('');
   const [flash, setFlash] = useState(0);
   // "הכנסות מול הוצאות שיהיה מתרחב" (שרה, 3.9) — סגור כברירת מחדל
@@ -5444,10 +5447,36 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
           הורדה לאקסל
         </button>
         {periodSeg}
+        {onImportSlip && (
+          <button className="apple-btn apple-btn-ghost" onClick={() => setShowImport(v => !v)}
+            title="קובץ עלות השכר מהגזברות — ברוטו ועלות מעביד לכל עובדת, לחודש שנבחר"
+            style={{ minHeight:36, fontSize:14.4, borderColor: showImport ? 'var(--purple)' : undefined, color: showImport ? 'var(--purple)' : undefined }}>
+            <Upload size={14} strokeWidth={2.2} />
+            {showImport ? 'סגירת הייבוא' : `ייבוא עלות שכר · ${fmtMonth(monthKey)}`}
+          </button>
+        )}
         {flash > 0 && Date.now() - flash < 4000 && (
           <span style={{ fontSize:13.8, color:'var(--ok)', fontWeight:700, marginInlineStart:'auto' }}>נשמר ✓</span>
         )}
       </div>
+
+      {showImport && onImportSlip && (() => {
+        // כמה מעובדות החודש כבר נושאות עלות בפועל מקובץ — שיהיה ברור מה נשאר לייבא
+        const paid = teachers.filter(t => !unpaidThisMonth(t));
+        const withActual = paid.filter(t => t._actualEmployerCost).length;
+        return (
+          <div className="apple-card" style={{ padding:'14px 16px', marginTop:10 }}>
+            <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)', marginBottom:2 }}>
+              ייבוא עלות שכר לכל עובדת · {fmtMonth(monthKey)}
+            </p>
+            <p style={{ fontSize:13.8, color:'var(--text3)', marginBottom:10 }}>
+              עלות בפועל רשומה ל-{withActual} מתוך {paid.length} עובדות בחודש הזה. החודש נקבע בבורר החודשים של המערכת.
+              {' '}אחרי הייבוא הטבלה שלמטה מתעדכנת מעצמה.
+            </p>
+            <SlipImportPanel key={monthKey} teachers={teachers} schools={schools} monthKey={monthKey} onImport={onImportSlip} />
+          </div>
+        );
+      })()}
 
       <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto', marginTop:10 }}>
         <table className="sticky-first fin-table" style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -11845,7 +11874,11 @@ export default function App() {
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} onApprove={onApproveTeacher} simState={simState} onCompute={onCompute} onDelete={onDeleteTeacher} />
         ) : view === 'finance' && (user.role === 'coordinator' || user.role === 'clerk') ? (
-          <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} onSaveSchool={onSaveSchool} onSaveTeacher={onSaveTeacher} />
+          <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} onSaveSchool={onSaveSchool} onSaveTeacher={onSaveTeacher}
+            onImportSlip={(items, file, note) => run(async () => {
+              await store.importSlip(items);
+              if (file) await store.uploadDocument({ monthKey: activeMonth, schoolId: null, note, file }).catch(() => {});
+            })} />
         ) : view === 'ledger' && user.role === 'coordinator' ? (
           <PaymentLedgerView schools={schools} teachers={teachers} months={months} activeMonth={activeMonth} />
         ) : view === 'calibration' && (user.role === 'coordinator' || user.role === 'clerk') ? (
