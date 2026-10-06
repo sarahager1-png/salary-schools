@@ -90,7 +90,7 @@ export async function readAll(sb) {
       if (!data || data.length < 1000) return out;
     }
   };
-  const [sc, tm, fin, led, mo, snaps, slips, frozen, fixes] = await Promise.all([
+  const [sc, tm, fin, led, mo, snaps, slips, frozen, fixes, attP, attR] = await Promise.all([
     all('schools', '*', 'id'),
     all('teacher_months', '*', 'id'),
     all('school_finance', 'school_id, ministry_budget, network_support, monthly_transfer, teaching_sim', 'school_id'),
@@ -107,7 +107,18 @@ export async function readAll(sb) {
     }),
     // תיקוני ברוטו לפי תלושים שעוד לא אושרו — כל עוד הם ממתינים, הסניף מוצג לפי הסימולציה
     all('proposed_fixes', 'id, teacher_month_id, status, patch', 'id'),
+    // דוחות נוכחות — שכר שנקבע לפי שעות הדוח. לפני שהטבלאות קיימות: ריק
+    all('attendance_people', 'id, name, school_id, active', 'id').catch(() => []),
+    all('attendance_reports', 'person_id, month_key, total_hours, submitted_at', 'month_key').catch(() => []),
   ]);
+  // ממלאים את מפות המודול כאן, לפני כל חישוב — כמו שהאפליקציה עושה אחרי טעינה
+  const nrm = n => String(n || '').replace(/\s+/g, ' ').trim();
+  const pBy = new Map(attP.filter(p => p.active !== false).map(p => [p.id, p]));
+  emp.ATTENDANCE_STAFF.clear(); emp.ATTENDANCE_HOURS.clear();
+  const dupAtt = new Set();
+  for (const p of pBy.values()) { const k = `${p.school_id}|${nrm(p.name)}`; if (emp.ATTENDANCE_STAFF.has(k)) dupAtt.add(k); emp.ATTENDANCE_STAFF.add(k); }
+  for (const k of dupAtt) emp.ATTENDANCE_STAFF.delete(k);   // שם כפול באותו סניף — לא מחברים לשכר
+  for (const r of attR) { const p = pBy.get(r.person_id); if (p && r.submitted_at && !dupAtt.has(`${p.school_id}|${nrm(p.name)}`)) emp.ATTENDANCE_HOURS.set(`${r.month_key}|${p.school_id}|${nrm(p.name)}`, Number(r.total_hours) || 0); }
   return { args: [sc, tm, fin, led, mo, snaps, slips, fixes], frozen, canClose };
 }
 
@@ -199,6 +210,18 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
   for (const mo of months) for (const b of mo.branches) {
     const sn = snapBy.get(`${mo.key}|${b.id}`);
     if (sn) { b.plan = Math.round(Number(sn.sim_cost)); b.planSource = sn.source; }
+  }
+  /*
+    "למה חסר?" (שרה, 6.10): סניף שמוצג לפי התלושים כי עוד לא הוזן למערכת באותו
+    חודש (קרית ביאליק, 9/2026) — אין לו סימולציה לחודש הזה. במקומה מוצגת
+    הסימולציה הראשונה שנעשתה לו: זו של החודש הראשון שבו הוא במערכת.
+  */
+  for (let i = 0; i < months.length; i++) for (const b of months[i].branches) {
+    if (!b.fromSlips || b.plan != null) continue;
+    for (let j = i + 1; j < months.length; j++) {
+      const nx = months[j].branches.find(x => x.id === b.id && x.plan != null && !x.fromSlips);
+      if (nx) { b.plan = nx.plan; b.planSource = 'first-sim'; b.planFrom = months[j].key; break; }
+    }
   }
   /*
     "תשאיר סימולציה כל עוד לא עודכנו התלושים" (שרה, 6.10.26). סניף שיש לו

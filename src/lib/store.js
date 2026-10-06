@@ -1124,6 +1124,17 @@ export async function loadAttendance(month) {
   return (p.data || []).map(x => { const rr = by.get(x.id); return { id: x.id, code: x.code, name: x.name, role: x.role_title, schoolId: x.school_id,
     days: rr?.days || {}, total: rr ? Number(rr.total_hours) : 0, workDays: rr?.work_days || 0, submittedAt: rr?.submitted_at || null, updatedAt: rr?.updated_at || null, started: !!rr }; });
 }
+// כל הדוחות שנשלחו + מי ששכרה לפי דוח — לחישוב השכר. לפני שהטבלאות קיימות: ריק.
+export async function loadAttendancePay() {
+  const [p, r] = await Promise.all([
+    supabase.from('attendance_people').select('id, name, school_id').eq('active', true),
+    supabase.from('attendance_reports').select('person_id, month_key, total_hours, submitted_at').not('submitted_at', 'is', null),
+  ]);
+  if (p.error || r.error) return { staff: [], hours: [] };
+  const by = new Map((p.data || []).map(x => [x.id, x]));
+  return { staff: (p.data || []).map(x => ({ schoolId: x.school_id, name: x.name })),
+    hours: (r.data || []).filter(x => by.has(x.person_id)).map(x => ({ monthKey: x.month_key, schoolId: by.get(x.person_id).school_id, name: by.get(x.person_id).name, hours: Number(x.total_hours) || 0 })) };
+}
 export async function reopenAttendance(personId, month) {
   const { error } = await supabase.from('attendance_reports').update({ submitted_at: null }).eq('person_id', personId).eq('month_key', month);
   raise(error, 'פתיחת הדוח מחדש נכשלה');

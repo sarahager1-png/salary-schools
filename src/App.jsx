@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 98;
+const BUILD = 99;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -30,6 +30,8 @@ import {
   AGE_RED,
   CHABAD_SUPP,
   MM_REPLACED,
+  ATTENDANCE_HOURS,
+  ATTENDANCE_STAFF,
   setCalib,
   mmKey,
   hasSubstitute,
@@ -3019,8 +3021,16 @@ function HourlyJobsTable({ rows, school, isCoord, isPrincipal, saveRow, onAdd, o
                           placeholder={String(hourlyGross(t) || '₪')} title="ברוטו מהתלוש — ריק = אומדן"
                           onCommit={v => saveRow({ ...t, _officialGross: v })} />
                       )}
-                      {pb.hourlyEstimate && emp.gross > 0 && (
-                        <span style={{ display:'block', fontSize:12.6, color:'var(--text3)' }}>
+                      {pb.fromAttendance ? (
+                        <span style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--ok-text)' }}>
+                          לפי דוח נוכחות · {pb.attendanceHours} שעות
+                        </span>
+                      ) : pb.awaitingAttendance ? (
+                        <span style={{ display:'block', fontSize:14, fontWeight:700, color:'#8F4E00' }}>
+                          ממתין לדוח נוכחות · אומדן
+                        </span>
+                      ) : pb.hourlyEstimate && emp.gross > 0 && (
+                        <span style={{ display:'block', fontSize:14, color:'var(--text3)' }}>
                           אומדן · {Math.round((Number(t.frontalHours) || 0) * HOURLY_WEEKS)} שעות בחודש
                         </span>
                       )}
@@ -4592,7 +4602,7 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth, tabs = null
     "תוסיף גם כמה כסף העבירו השליחים כל חודש ונבדוק פערי חובה וזכות" (שרה, 6.10).
     המסך משווה, לכל סניף ולתקופה שנבחרה, שני זוגות:
       משרד החינוך — מה שתוכנן (החלק ה-12 מהתקציב השנתי) מול מה שהתקבל.
-      הסניף — מה שסוכם שיעביר (כולל שכר צהרון) מול מה שהעביר; ההפרש הוא חובה או זכות.
+      הסניף — מה שסוכם שיעביר (כולל שכר צהרון ומנהלה) מול מה שהעביר; ההפרש הוא חובה או זכות.
     אותו סינון כמו בטבלת ההעברות: רק סניפים שהרשת משלמת בהם שכר ושעלותם בפועל.
     עד 6.10 המסך הציג "עלות התקופה" ו"פער לתשלום הרשת", בלי מענק הרשת ובלי הסכום שסוכם.
   */
@@ -4728,7 +4738,7 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth, tabs = null
 </table>
 <p class="note">
   <b>משרד החינוך · מתוכנן</b> — החלק ה-12 מהתקציב השנתי, כפול מספר החודשים בתקופה. <b>הפרש</b> — מה שהתקבל פחות המתוכנן.
-  <b>הסניף · סוכם</b> — הסכום החודשי שסוכם עם הסניף (כולל שכר צהרון), כפול מספר החודשים. <b>יתרה</b> — הסכום שסוכם פחות מה שהועבר:
+  <b>הסניף · סוכם</b> — הסכום החודשי שסוכם עם הסניף (כולל שכר צהרון ומנהלה), כפול מספר החודשים. <b>יתרה</b> — הסכום שסוכם פחות מה שהועבר:
   חובה = הסניף חייב לרשת, זכות = העביר יותר. ההפרש והיתרה מחושבים רק לסניפים שהוזן להם סכום, והסיכום שלהם כולל רק אותם. כל הסכומים בשקלים חדשים.
 </p>
 </body></html>`;
@@ -4906,7 +4916,7 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth, tabs = null
       {showNote && (
         <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
           <b>מתוכנן</b> — החלק ה-12 מתקציב משרד החינוך השנתי של הסניף{all ? ', כפול מספר החודשים' : ''}. <b>הפרש</b> — מה שהתקבל פחות המתוכנן; ירוק = התקבל יותר.
-          {' '}<b>סוכם להעברה</b> — הסכום החודשי שסוכם עם הסניף במסך "העברות לסניפים", כולל שכר צהרון; כשלא סוכם, מוצג הפער המחושב (באותיות נטויות).
+          {' '}<b>סוכם להעברה</b> — הסכום החודשי שסוכם עם הסניף במסך "העברות לסניפים", כולל שכר צהרון ומנהלה; כשלא סוכם, מוצג הפער המחושב (באותיות נטויות).
           {' '}<b>יתרה</b> — מה שסוכם פחות מה שהועבר: חובה = הסניף חייב לרשת, זכות = העביר יותר.
           {' '}ההפרש והיתרה מחושבים רק לסניף שהוזן לו סכום. רק סניפים שהרשת משלמת בהם שכר ושהוזנו בהם עובדות.
         </p>
@@ -5076,7 +5086,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const minAdj = r => (r.ministryReceived != null && r.ministry != null ? r.ministry - r.ministryReceived : 0);   // מתוכנן פחות בפועל
   const minSum = summed.reduce((x, r) => x + (minOf(r) || 0), 0);
   const adjSum = summed.reduce((x, r) => x + minAdj(r), 0);
-  // שכר צהרון (רק היכן שיש): מצטרף לעלות, בלי כרית ובלי הכנסה מולו — כולו על הסניף
+  // שכר צהרון ומנהלה (רק היכן שיש): מצטרף לעלות, בלי כרית ובלי הכנסה מולו — כולו על הסניף
   const anyTz = summed.some(r => r.hourly > 0);
   const tzSum = sum('hourly');
   // מה שהסניף מעביר = הסכום שסוכם על ההוראה ועוד שכר הצהרון — בדיוק כמו בטבלת ההעברות לסניפים
@@ -5222,7 +5232,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           */}
           <div className="bl-eq n5" role="group" aria-label="החשבון החודשי של הרשת">
             <div className="bl-tile t-cost"><p className="l">עלות ההוראה בפועל</p><p className="v num">{num(sum('cost') + tzSum)}</p>
-              <p className="s">{anyTz ? `כולל שכר צהרון ${num(tzSum)}` : 'כולל מנהלות'}</p></div>
+              <p className="s">{anyTz ? `כולל שכר צהרון ומנהלה ${num(tzSum)}` : 'כולל מנהלות'}</p></div>
             <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>משרד החינוך + מענק הרשת</p><p className="v num">{num(minSum + tot.support)}</p>
               <p className="s">{recvN === summed.length ? 'משרד החינוך: התקבל בפועל בכל הסניפים'
                 : recvN ? `משרד החינוך: התקבל בפועל ב-${recvN} מתוך ${summed.length} סניפים; בשאר — מתוכנן`
@@ -5238,7 +5248,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </div>
 
           <h2 className="section-head">לפי סניף</h2>
-          <p className="section-sub">בפועל{anyTz ? ' + שכר צהרון' : ''} − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. הפס מראה כמה מכרית ה-20% התמלא.</p>
+          <p className="section-sub">בפועל{anyTz ? ' + שכר צהרון ומנהלה' : ''} − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. הפס מראה כמה מכרית ה-20% התמלא.</p>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
               <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: לפי מחשבון המשרד, בפועל, משרד החינוך, מענק רשת, הסניף מעביר, נותר לפני הכרית, כרית 20% ונותר כולל הכרית`}</caption>
@@ -5257,7 +5267,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   {hasPay && <th colSpan={2} scope="colgroup">העברות בפועל</th>}
                 </tr>
                 <tr>
-                  <TH>סניף</TH><TH>לפי המחשבון</TH><TH>בפועל</TH>{anyTz && <TH><Op c="+" />שכר צהרון</TH>}
+                  <TH>סניף</TH><TH>לפי המחשבון</TH><TH>בפועל</TH>{anyTz && <TH><Op c="+" />שכר צהרון ומנהלה</TH>}
                   <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או מתוכנן</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />הסניף מעביר</TH>
                   <TH><Op c="=" />נשאר</TH><TH>כרית 20%</TH>
                   {hasPay && <><TH>הועבר</TH><TH>יתרה מצטברת</TH></>}
@@ -5269,7 +5279,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   return (
                   <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3, color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }} title={`${r.pendingFixes} תיקוני ברוטו לפי התלושים ממתינים לאישור. עד אז העלות מוצגת לפי הסימולציה`}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3 }} title="הסניף עוד לא הוזן למערכת בחודש הזה; העלות היא סכום התלושים שהתקבלו מהגזברות">לפי התלושים</span>}</th>
-                    <td style={{ ...td, color:'var(--text2)' }}>{r.plan == null ? '—' : num(r.plan)}</td>
+                    <td style={{ ...td, color:'var(--text2)' }} title={r.planFrom ? `הסימולציה הראשונה של הסניף, מ-${fmtMonth(r.planFrom)}` : undefined}>{r.plan == null ? '—' : num(r.plan)}</td>
                     <td style={{ ...td, fontWeight:800 }} title={pc == null ? undefined : `${pc}% מהעלות לפי מחשבון המשרד`}>
                       {num(r.cost)}
                       {pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</td>
@@ -5279,7 +5289,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                         ? <span style={{ color:'var(--text2)' }}>{num(r.ministry)}<span className="bl-tag">מתוכנן</span></span>
                         : <span style={{ fontWeight:800 }}>{num(recv)}<span className="bl-tag ok">בפועל</span></span>}</td>
                     <td style={td}>{num(r.support)}</td>
-                    <td style={td} title={r.hourly > 0 && r.agreed != null ? `${num(r.agreed)} על ההוראה ועוד ${num(r.hourly)} שכר צהרון` : undefined}>
+                    <td style={td} title={r.hourly > 0 && r.agreed != null ? `${num(r.agreed)} על ההוראה ועוד ${num(r.hourly)} שכר צהרון ומנהלה` : undefined}>
                       {r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
                     <td style={td}><Left v={leftOf(r)} /></td>
                     <td style={td}><ResBar left={leftOf(r)} cushion={r.add20} /></td>
@@ -5315,7 +5325,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 {open && (
                   <>
                     <CardRow label="לפי מחשבון המשרד">{r.plan == null ? '—' : num(r.plan)}</CardRow>
-                    {r.hourly > 0 && <CardRow label="שכר צהרון">{num(r.hourly)}</CardRow>}
+                    {r.hourly > 0 && <CardRow label="שכר צהרון ומנהלה">{num(r.hourly)}</CardRow>}
                     <CardRow label="כרית 20%">{num(r.add20)}</CardRow>
                     <CardRow label={r.ministryReceived != null ? 'משרד החינוך — בפועל' : 'משרד החינוך — מתוכנן'}>{num(minOf(r))}</CardRow>
                     <CardRow label="מענק רשת">{num(r.support)}</CardRow>
@@ -5376,7 +5386,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <b>לפי המחשבון</b> — העלות שהמערכת חישבה לכל עובדת ממחשבון משרד החינוך (הסימולציה), לפני שהגיעו התלושים. <b>בפועל</b> — עלות המעביד של עובדי ההוראה בחודש, כולל מנהלת; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
               {' '}<b>כרית 20%</b> — תוספת של 20% על העלות בפועל, למילוי מקום וביטחון. <b>משרד החינוך</b> — מה שהתקבל בפועל באותו חודש ("בפועל"); כשהתקבול טרם הוזן במסך "תקבולים", מוצג החלק ה-12 מהתקציב השנתי ("מתוכנן"). <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
               {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו; "טרם סוכם" נספר כאפס. <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
-              {anyTz && <>{' '}<b>שכר צהרון</b> — עלות עובדות הצהרון שהרשת משלמת; אין מולה הכנסה ממשרד החינוך ואין עליה כרית, והיא כולה על הסניף: הסכום ש"הסניף מעביר" כולל אותה.</>}
+              {anyTz && <>{' '}<b>שכר צהרון ומנהלה</b> — עלות עובדות הצהרון והמנהלה (משרות שעתיות) שהרשת משלמת; אין מולה הכנסה ממשרד החינוך ואין עליה כרית, והיא כולה על הסניף: הסכום ש"הסניף מעביר" כולל אותה.</>}
               {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
             </p>
           )}
@@ -5783,7 +5793,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
     { key: 'ministry',   label: 'הכנסות משרד החינוך' },
     { key: 'support',    label: 'מענק רשת' },
     { key: 'transfer',   label: `פער מחושב · ${perLbl}` },
-    ...(anyTz ? [{ key: 'tz', label: `שכר צהרון · ${perLbl}` }] : []),
+    ...(anyTz ? [{ key: 'tz', label: `שכר צהרון ומנהלה · ${perLbl}` }] : []),
     { key: 'agreedMonth',label: 'להעברה · לחודש' },
     { key: 'agreedYear', label: 'להעברה · לשנה' },
     { key: 'note',       label: 'הערה' },
@@ -5798,7 +5808,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
   const rowNote = r => [
     r.transfer == null ? 'טרם הוזן תקציב משרד החינוך — מחוץ לסיכום' : '',
     r.agreedMonth != null ? 'סכום מעוגל שסוכם' : '',
-    r.tzMonth > 0 ? 'ההעברה כוללת שכר צהרון' : '',
+    r.tzMonth > 0 ? 'ההעברה כוללת שכר צהרון ומנהלה' : '',
   ].filter(Boolean).join(' · ');
   // באקסל המספרים נשארים מספרים (לא טקסט מעוצב) — כדי שאפשר יהיה לסכם
   const r0 = v => (v == null ? '' : Math.round(v));
@@ -5883,7 +5893,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
   <thead><tr>
     <th>סניף</th><th>עלות הוראה ${perLbl}</th><th>תוספת 20%</th><th>סה״כ עלות ${perLbl}</th>
     <th>הכנסות משרד החינוך</th><th>מענק רשת</th><th>פער מחושב · ${perLbl}</th>
-    ${anyTz ? `<th>שכר צהרון · ${perLbl}</th>` : ''}<th>להעברה · לחודש</th><th>להעברה · לשנה</th>
+    ${anyTz ? `<th>שכר צהרון ומנהלה · ${perLbl}</th>` : ''}<th>להעברה · לחודש</th><th>להעברה · לשנה</th>
   </tr></thead>
   <tbody>${body}</tbody>
   <tfoot><tr>
@@ -5900,7 +5910,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
   <b>עלות הוראה ${perLbl}</b> — עלות המעביד המלאה של עובדי ההוראה בבית הספר, כולל מנהלת, ייעוץ ושילוב${period === 'month' ? '' : ', כפול 12'}.${period === 'month' ? ' הכנסות משרד החינוך ומענק הרשת מוצגים כחלק ה-12 מהסכום השנתי.' : ''}
   <b>תוספת 20%</b> — מילוי מקום וכרית ביטחון.
   <b>פער מחושב</b> — סה״כ העלות פחות הכנסות משרד החינוך ופחות מענק הרשת. עודף פירושו שאין מה להעביר.
-  <b>להעברה</b> — הסכום שסוכם בפועל: הפער המחושב מעוגל לסכום חודשי, והשנתי הוא הוא כפול 12.${anyTz ? ' <b>שכר צהרון</b> — עלות עובדות הצהרון שהרשת משלמת; היא מצטרפת במלואה לסכום ההעברה, בלי תוספת 20%.' : ''}
+  <b>להעברה</b> — הסכום שסוכם בפועל: הפער המחושב מעוגל לסכום חודשי, והשנתי הוא הוא כפול 12.${anyTz ? ' <b>שכר צהרון ומנהלה</b> — עלות עובדות הצהרון והמנהלה (משרות שעתיות) שהרשת משלמת; היא מצטרפת במלואה לסכום ההעברה, בלי תוספת 20%.' : ''}
   כל הסכומים בשקלים חדשים.${skippedRows.length ? `
   <br><b>שורת הסה״כ אינה כוללת ${skippedRows.length === 1 ? "סניף אחד" : skippedRows.length + " סניפים"}</b> שטרם הוזן להם תקציב משרד החינוך — אין להם פער לחשב. העלות שלהם אינה נספרת בסיכום, כדי שהחיסור בשורה יסתדר.` : ''}
 </p>
@@ -6091,7 +6101,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                       <td style={cell}>{r.f.teachingSim == null ? '—' : <Diff sim={r.f.teachingSim} act={r.annual} />}</td>
                       <td style={cell} title="התחשיב הראשוני פחות הכנסות משרד החינוך ופחות מענק הרשת (בלי תוספת 20%)">
                         {r.chabadTransfer == null ? '—' : r.chabadTransfer > 0 ? num(per(r.chabadTransfer)) : `עודף ${num(per(-r.chabadTransfer))}`}</td>
-                      <td style={{ ...cell, fontWeight:700 }} title={r.agreedMonth == null ? 'טרם סוכם סכום; מוצג הפער המחושב' : r.tzMonth > 0 ? 'כולל שכר צהרון' : undefined}>
+                      <td style={{ ...cell, fontWeight:700 }} title={r.agreedMonth == null ? 'טרם סוכם סכום; מוצג הפער המחושב' : r.tzMonth > 0 ? 'כולל שכר צהרון ומנהלה' : undefined}>
                         {r.dueYearAll == null || r.dueYearAll <= 0 ? '—' : num(per(r.dueYearAll))}
                         {r.agreedMonth == null && r.dueYearAll > 0 && <span className="sr-only"> מחושב</span>}</td>
                     </tr>
@@ -6181,7 +6191,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
               <th colSpan={3} scope="colgroup" className="gh-res">ההעברה</th>
             </tr>
             <tr>
-              <TH>סניף</TH><TH>עלות הוראה</TH><TH><Sign c="+" />תוספת 20%</TH>{anyTz && <TH><Sign c="+" />שכר צהרון</TH>}
+              <TH>סניף</TH><TH>עלות הוראה</TH><TH><Sign c="+" />תוספת 20%</TH>{anyTz && <TH><Sign c="+" />שכר צהרון ומנהלה</TH>}
               <TH><Sign c="−" />משרד החינוך</TH><TH><Sign c="−" />מענק רשת</TH>
               <TH><Sign c="=" />פער {perLbl}</TH>
               <TH>סוכם לחודש<span style={{ display:'block', fontSize:14, fontWeight:600, color:'var(--text2)' }}>מעוגל — למילוי</span></TH>
@@ -6259,7 +6269,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                   <>
                     <CardRow label={`עלות הוראה ${perLbl}`}>{num(per(annual))}</CardRow>
                     <CardRow label="תוספת 20%">{num(per(add20))}</CardRow>
-                    {tzMonth > 0 && <CardRow label="שכר צהרון">{num(per(tzMonth * 12))}</CardRow>}
+                    {tzMonth > 0 && <CardRow label="שכר צהרון ומנהלה">{num(per(tzMonth * 12))}</CardRow>}
                     <CardRow label="משרד החינוך">{num(per(f.ministryBudget))}</CardRow>
                     <CardRow label="מענק רשת">{num(per(f.networkSupport))}</CardRow>
                     <CardRow label={`פער ${perLbl}`}>{transfer == null ? '—' : num(per(transfer + tzMonth * 12))}</CardRow>
@@ -6295,7 +6305,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         {' '}שאינן שכר אינן נכנסות אליה — הן בטבלה שלמטה, ששומרת על התמונה המלאה.
         {' '}<b>להעברה · לחודש</b> — מקום לעגל: הסכום החודשי שסוכם עם הסניף. כל עוד לא מולא, הפער המחושב חלקי 12 הוא הקובע.
         {' '}<b>להעברה · לשנה</b> — הסכום החודשי כפול 12. <b>מתג חודשי/שנתי</b> מחליף את עמודות החישוב (עלות, משרד החינוך, מענק הרשת, פער) בין הסכום השנתי לחלק ה-12 שלו; שתי עמודות ההעברה מוצגות תמיד.
-        {anyTz && <>{' '}<b>שכר צהרון</b> — עלות עובדות הצהרון שהרשת משלמת. אין מולה הכנסה ממשרד החינוך ואין עליה תוספת 20%; היא מצטרפת במלואה לסכום ההעברה, מעל הסכום החודשי שסוכם.</>}
+        {anyTz && <>{' '}<b>שכר צהרון ומנהלה</b> — עלות עובדות הצהרון והמנהלה (משרות שעתיות) שהרשת משלמת. אין מולה הכנסה ממשרד החינוך ואין עליה תוספת 20%; היא מצטרפת במלואה לסכום ההעברה, מעל הסכום החודשי שסוכם.</>}
         {' '}סניף שטרם הוזנו בו עובדות (עלות ההוראה עדיין אומדן מהתקציב) אינו מופיע כאן, ויתווסף מאליו כשיוזנו.
         {skippedRows.length > 0 && (
           <>
@@ -12344,6 +12354,14 @@ export default function App() {
 
   // כל שינוי נשמר בשרת ואז נטען מחדש. פשוט, ותמיד מסונכרן עם מה שבאמת נשמר.
   const refresh = useCallback(async () => {
+    // שעות דוחות הנוכחות נטענות לפני הנתונים, כדי שהחישוב הראשון כבר יכלול אותן
+    const att = await store.loadAttendancePay().catch(() => ({ staff: [], hours: [] }));
+    const nrm = n => String(n || '').replace(/\s+/g, ' ').trim();
+    ATTENDANCE_STAFF.clear(); ATTENDANCE_HOURS.clear();
+    const dupAtt = new Set();
+    for (const x of att.staff) { const k = `${x.schoolId}|${nrm(x.name)}`; if (ATTENDANCE_STAFF.has(k)) dupAtt.add(k); ATTENDANCE_STAFF.add(k); }
+    for (const k of dupAtt) ATTENDANCE_STAFF.delete(k);
+    for (const x of att.hours) { if (!dupAtt.has(`${x.schoolId}|${nrm(x.name)}`)) ATTENDANCE_HOURS.set(`${x.monthKey}|${x.schoolId}|${nrm(x.name)}`, x.hours); }
     const data = await store.loadAll();
     store.listFixes().then(setFixes).catch(() => setFixes([]));
     setSchools(data.schools);

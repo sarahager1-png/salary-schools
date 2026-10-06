@@ -124,8 +124,27 @@ const hourlyRateOf = t => {
   const r = Number(t?.hourlyRate);
   return r > 0 ? r : MIN_WAGE_HOUR;
 };
+/*
+  שכר לפי דוח נוכחות (שרה, 6.10.26): "כל חודש ייקבע על פי דוח הנוכחות".
+  עובדת מנהלה שממלאת דוח נוכחות דיגיטלי: כשהדוח של החודש נשלח, הברוטו
+  הוא שעות הדוח × התעריף לשעה. עד שהדוח נשלח — האומדן הרגיל מהשעות
+  השבועיות, מסומן כממתין לדוח.
+  המפות ממולאות אחרי הטעינה (כמו MM_REPLACED): מפתח "חודש|סניף|שם".
+*/
+const ATTENDANCE_HOURS = new Map();   // חודש|סניף|שם → שעות החודש מדוח שנשלח
+const ATTENDANCE_STAFF = new Set();   // סניף|שם → מי ששכרה נקבע לפי דוח נוכחות
+const attName = t => String(t?.name || '').replace(/\s+/g, ' ').trim();
+const attendanceHours = t => {
+  const k = `${t?.monthKey}|${t?.schoolId}|${attName(t)}`;
+  return ATTENDANCE_HOURS.has(k) ? ATTENDANCE_HOURS.get(k) : null;
+};
+const paidByAttendance = t => ATTENDANCE_STAFF.has(`${t?.schoolId}|${attName(t)}`);
 // אומדן הברוטו החודשי למשרה שעתית — עד שחשבת השכר מזינה ברוטו מהתלוש
-const hourlyGross = t => Math.round((Number(t?.frontalHours) || 0) * HOURLY_WEEKS * hourlyRateOf(t));
+const hourlyGross = t => {
+  const h = isHourlyRow(t) ? attendanceHours(t) : null;
+  return h != null ? Math.round(h * hourlyRateOf(t))
+    : Math.round((Number(t?.frontalHours) || 0) * HOURLY_WEEKS * hourlyRateOf(t));
+};
 // אחוז משרה של שורה שעתית — נגזר מהשעות, לתצוגה ולהבראה
 const hourlyScope = t => Math.min(200, Math.round((Number(t?.frontalHours) || 0) / HOURLY_FULL_WEEK * 100));
 /*
@@ -608,8 +627,15 @@ function payBreakdown(t) {
     שעות שבועיות × תעריף לשעה × שבועות בחודש. בלי תוספת בית חב"ד.
   */
   if (isHourlyRow(t)) {
-    const gross = agreed || gross0 || hourlyGross(t);
-    return { base: gross, mom: 0, supplement: 0, gross, agreed: !!agreed, hourlyEstimate: !agreed && !gross0 };
+    // דוח נוכחות שנשלח קובע את החודש; רק ברוטו מוסכם גובר עליו
+    const att = attendanceHours(t);
+    // מי ששכרה לפי דוח נוכחות: עד שהדוח נשלח — האומדן, ולא ברוטו ישן שנשאר בשורה
+    const byAtt = att != null || paidByAttendance(t);
+    const gross = agreed || (byAtt ? hourlyGross(t) : (gross0 || hourlyGross(t)));
+    return { base: gross, mom: 0, supplement: 0, gross, agreed: !!agreed,
+      hourlyEstimate: !agreed && att == null && (byAtt || !gross0),
+      fromAttendance: !agreed && att != null, attendanceHours: att,
+      awaitingAttendance: !agreed && att == null && paidByAttendance(t) };
   }
 
   const gross = agreed || gross0;
@@ -771,6 +797,10 @@ export {
   HOURLY_FULL_WEEK,
   hourlyRateOf,
   hourlyGross,
+  ATTENDANCE_HOURS,
+  ATTENDANCE_STAFF,
+  attendanceHours,
+  paidByAttendance,
   hourlyScope,
   EXTRA_ROLE_IDS,
   allRolesOf,
