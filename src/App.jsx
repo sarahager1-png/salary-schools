@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 59;
+const BUILD = 60;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4945,8 +4945,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
 
   const Bal = ({ v }) => v == null
     ? <span style={{ color:'var(--text2)', fontSize:14.4 }}>טרם הוזן</span>
-    : Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok)' }}>מאוזן</span>
-    : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger)' : 'var(--ok)' }}>
+    : Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>מאוזן</span>
+    : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger)' : 'var(--ok-text)' }}>
         {v > 0 ? 'חובה ' : 'זכות '}{num(Math.abs(v))}</span>;
   // גוון הכרטיסייה לפי סוג המספר — אותה שפה של הטבלה הראשית: הכנסה ירקרק, הוצאה ורדרד, תוצאה סגלגל
   const TINT = { cost:['#FDF3F4','#F3D5D9'], income:['#F1F9F3','#CFE8D5'], result:['#F5F1FC','#D8CEEF'], plain:['var(--surface)','var(--line)'] };
@@ -4959,11 +4959,11 @@ function BottomLineView({ activeMonth, viewer = false }) {
     </div>
   );
   const status = r => r.gap == null ? { t:'טרם הוזן תקציב משרד החינוך', c:'var(--text2)' }
-    : r.agreed == null ? { t:'טרם סוכם סכום להעברה', c:'#B4650A' }
+    : r.agreed == null ? { t:'טרם סוכם סכום להעברה', c:'#8F4E00' }
     : r.over > 0 ? { t:`הפער גבוה ב-${num(r.over)} מהסכום שסוכם`, c:'var(--danger)' }
-    : { t:'בתוך הסכום שסוכם', c:'var(--ok)' };
+    : { t:'בתוך הסכום שסוכם', c:'var(--ok-text)' };
   const TH = ({ children }) => (
-    <th style={{ padding:'8px 4px', fontSize:12.8, fontWeight:700, color:'var(--text2)', textAlign:'center', lineHeight:1.25, verticalAlign:'bottom' }}>{children}</th>
+    <th scope="col" style={{ padding:'8px 4px', fontSize:12.8, fontWeight:700, color:'var(--text2)', textAlign:'center', lineHeight:1.25, verticalAlign:'bottom' }}>{children}</th>
   );
   const td = { textAlign:'center', fontSize:14.6 };
 
@@ -5005,7 +5005,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             {months.map(m => (
               <button key={m.key} onClick={() => setSel(m.key)} aria-pressed={sel === m.key}
                 className={['apple-seg-item', sel === m.key ? 'active' : ''].join(' ')}
-                style={{ padding:'6px 15px', fontSize:15 }}>{fmtMonth(m.key)}</button>
+                style={{ padding:'6px 15px', fontSize:15, minHeight:40 }}>{fmtMonth(m.key)}</button>
             ))}
           </div>
         ) : null}
@@ -5048,7 +5048,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <p className="bl-line">
                     עלות ההוראה <b className="num">{num(planCost)}</b> מתוך <b className="num">{num(planSum)}</b> שתוכננו
                     {over ? <> — חריגה של <b className="num" style={{ color:'var(--danger)' }}>{num(planCost - planSum)}</b>.</>
-                          : <> — נותרו <b className="num" style={{ color:'var(--ok)' }}>{num(planSum - planCost)}</b>.</>}
+                          : <> — נותרו <b className="num" style={{ color:'var(--ok-text)' }}>{num(planSum - planCost)}</b>.</>}
                   </p>
                 </>
               ) : (
@@ -5059,7 +5059,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <span className="bl-fact">מתחילת השנה <b className="num" style={{ color: cumPct > 100 ? 'var(--danger)' : undefined }}>{cumPct}%</b></span>
                 )}
                 <span className="bl-fact">
-                  מול מה שסוכם עם הסניפים: {net >= 0 ? 'עודף' : 'חסר'} <b className="num" style={{ color: net >= 0 ? 'var(--ok)' : 'var(--danger)' }}>{num(Math.abs(net))}</b>
+                  מול מה שסוכם עם הסניפים: {net >= 0 ? 'עודף' : 'חסר'} <b className="num" style={{ color: net >= 0 ? 'var(--ok-text)' : 'var(--danger)' }}>{num(Math.abs(net))}</b>
                 </span>
                 <span className="bl-fact">
                   {tot.paid == null ? 'העברות הסניפים טרם הוזנו' : <>הועבר <b className="num">{num(tot.paid)}</b> מתוך {num(tot.due)}</>}
@@ -5086,7 +5086,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             <Kpi kind="income" label="סוכם להעברה">{num(tot.due)}</Kpi>
             <Kpi kind="income" label="הועבר בפועל" sub={tot.paid == null ? 'טרם הוזן' : ''}>{tot.paid == null ? '—' : num(tot.paid)}</Kpi>
             <Kpi kind="result" label="יתרה מצטברת" sub={tot.balance == null ? 'טרם הוזנו העברות' : 'מתחילת השנה עד החודש הזה'}
-              color={tot.balance == null ? 'var(--text2)' : tot.balance > 0 ? 'var(--danger)' : 'var(--ok)'}>
+              color={tot.balance == null ? 'var(--text2)' : tot.balance > 0 ? 'var(--danger)' : 'var(--ok-text)'}>
               {tot.balance == null ? '—' : Math.round(tot.balance) === 0 ? 'מאוזן' : `${tot.balance > 0 ? 'חובה' : 'זכות'} ${num(Math.abs(tot.balance))}`}
             </Kpi>
           </div>
@@ -5096,6 +5096,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <p className="section-sub">מהקרוב ביותר לתחשיב ועד הרחוק ממנו. הפס מראה כמה מהתחשיב הראשוני נוצל החודש.</p>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+              <caption className="sr-only">{`שורה תחתונה לפי סניף, ${fmtMonth(sel)}: עלות, הכנסות, פער, העברה מוסכמת, העברה בפועל ויתרה מצטברת`}</caption>
               <thead>
                 <tr>
                   <TH>סניף</TH><TH>עלות הוראה + 20%</TH><TH>משרד החינוך + מענק</TH>
@@ -5105,16 +5106,16 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <tbody>
                 {sorted.map(r => { const st = status(r); return (
                   <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                    <td style={{ padding:'10px 12px', fontWeight:700 }}>{r.name}
+                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }}>{r.name}
                       <Bar r={r} />
-                      <span style={{ display:'block', fontSize:13.4, fontWeight:600, color: st.c, marginTop:3 }}>{st.t}</span></td>
+                      <span style={{ display:'block', fontSize:13.4, fontWeight:600, color: st.c, marginTop:3 }}>{st.t}</span></th>
                     <td style={td}>{num(r.costWith20)}</td>
                     <td style={td}>{num(income(r))}
                       {r.ministryReceived != null && (
-                        <span style={{ display:'block', fontSize:13.2, fontWeight:700, color: r.ministryReceived >= (r.ministry || 0) ? 'var(--ok)' : 'var(--danger)' }}
-                          title={`מתוכנן ממשרד החינוך לחודש: ${num(r.ministry)}`}>התקבל מהמשרד {num(r.ministryReceived)}</span>
+                        <span style={{ display:'block', fontSize:13.2, fontWeight:700, color: r.ministryReceived >= (r.ministry || 0) ? 'var(--ok-text)' : 'var(--danger)' }}
+                          title={`מתוכנן ממשרד החינוך לחודש: ${num(r.ministry)}`}>התקבל מהמשרד {num(r.ministryReceived)} · {r.ministryReceived >= (r.ministry || 0) ? 'מעל המתוכנן' : 'מתחת למתוכנן'}</span>
                       )}</td>
-                    <td style={{ ...td, fontWeight:800 }}>{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : <span style={{ color:'var(--ok)' }}>עודף {num(-r.gap)}</span>}</td>
+                    <td style={{ ...td, fontWeight:800 }}>{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : <span style={{ color:'var(--ok-text)' }}>עודף {num(-r.gap)}</span>}</td>
                     <td style={td}>{r.due == null || r.due <= 0 ? '—' : num(r.due)}
                       {r.agreed == null && r.due > 0 && <span style={{ display:'block', fontSize:12.6, color:'var(--text2)' }}>מחושב</span>}</td>
                     <td style={td}>{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</td>
@@ -5150,7 +5151,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <CardRow label="עלות הוראה + 20%">{num(r.costWith20)}</CardRow>
                     <CardRow label="משרד החינוך + מענק">{num(income(r))}</CardRow>
                     {r.ministryReceived != null && (
-                      <CardRow label="התקבל מהמשרד" color={r.ministryReceived >= (r.ministry || 0) ? 'var(--ok)' : 'var(--danger)'}>{num(r.ministryReceived)}</CardRow>
+                      <CardRow label="התקבל מהמשרד" color={r.ministryReceived >= (r.ministry || 0) ? 'var(--ok-text)' : 'var(--danger)'}>{num(r.ministryReceived)}</CardRow>
                     )}
                     <CardRow label={r.agreed == null ? 'להעברה (מחושב)' : 'סוכם להעברה'}>{r.due == null || r.due <= 0 ? '—' : num(r.due)}</CardRow>
                     <CardRow label="הועבר בפועל">{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</CardRow>

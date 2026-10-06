@@ -24,7 +24,7 @@
   /* Ink */
   --text:       #1A0B35;
   --text2:      #4A3F6B;
-  --text3:      #8878AA;
+  --text3:      #6E6893;   /* היה #8878AA (3.9:1), מתחת לרצפת הניגודיות; עכשיו 5.2:1 */
 
   /* Lines */
   --line:       #E2DCF0;
@@ -1023,3 +1023,17 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   .bl-kpis .kpi-grid { display: contents; }
   .bl-kpis .bl-group-title { display: none; }
 }
+
+/* ── נגישות ("חייב מונגש", שרה 6.10) ──
+   ירוק לטקסט: #16A34A נותן רק 3.3:1 על לבן; #15803D נותן 4.9:1 (AA). */
+:root { --ok-text: #15803D; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.big-table tbody th[scope="row"] { background: inherit; white-space: normal; min-width: 150px; line-height: 1.3; padding-inline-start: 16px !important; }
+.big-table tbody tr:nth-child(even) th[scope="row"] { background: #FBFAFE; }
+.bl-hero ~ * .section-sub, .bl-hero ~ .section-sub { color: var(--text2); }
+.apple-seg-item:focus-visible, .bl-hero ~ button:focus-visible, .mcard button:focus-visible {
+  outline: 3px solid var(--purple); outline-offset: 2px; border-radius: 10px;
+}
+.big-table tbody tr:hover th[scope="row"] { background: #F4F0FB; }
+/* סימון פוקוס למקלדת בכל המערכת — לא היה כזה בכלל */
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid var(--purple); outline-offset: 2px; }
