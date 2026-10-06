@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 57;
+const BUILD = 58;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5141,6 +5141,8 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
   // כרטיסי בתי הספר והסברי העמודות סגורים, ונפתחים בלחיצה.
   const [showFull, setShowFull] = useState(false);
   const [showNote, setShowNote] = useState(false);
+  // "מעניין אותי ברמת כל עובד וברמת בית ספר" (שרה, 6.10): סניף פתוח בטבלת התחשיב מול בפועל
+  const [openSim, setOpenSim] = useState(null);
   const [err, setErr]     = useState('');
   const [flash, setFlash] = useState(0);
   // "הכנסות מול הוצאות שיהיה מתרחב" (שרה, 3.9) — סגור כברירת מחדל
@@ -5742,6 +5744,48 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         const tSim = simRows.reduce((a, r) => a + r.f.teachingSim, 0);
         const tAct = simRows.reduce((a, r) => a + r.annual, 0);
         const cell = { textAlign:'center' };
+        /*
+          רמת העובד/ת: התחשיב הראשוני בנוי משעות × תעריף לשעה שבועית לחודש
+          (detail.basis.hourRate — 700 באופק, 550 בעולם ישן). לכן לכל עובד/ת
+          התקציב הוא השעות הפרונטליות שלו/ה × התעריף, ומולו העלות בפועל לחודש.
+          מנהלת אינה נמדדת בתעריף שעה (שכרה מתוקצב בנפרד), ומי שבחופשה בלי
+          שכר מוצג/ת בלי אחוז. הסכומים כאן תמיד לחודש.
+        */
+        const EmpSim = ({ r }) => {
+          const rate = r.perHourSim;
+          const list = teachers.filter(t => t.schoolId === r.sc.id && !isHourlyRow(t)).map(t => {
+            const cost = calcEmployer(t).total;
+            const hours = Number(t.frontalHours) || 0;
+            const principal = isPrincipalRow(t), off = unpaidThisMonth(t);
+            const plan = (!principal && !off && rate && hours) ? rate * hours : null;
+            return { t, cost, hours, principal, off, plan, pct: plan ? cost / plan * 100 : null };
+          }).sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
+          const over = list.filter(x => x.pct > 100).length;
+          return (
+            <div style={{ marginTop:6 }}>
+              <p style={{ fontSize:14.4, color:'var(--text2)', marginBottom:6, lineHeight:1.5 }}>
+                {rate ? <>התעריף בתחשיב: <b>{num(rate)}</b> לשעה שבועית לחודש. {over ? <span style={{ color:'var(--danger)', fontWeight:700 }}>{over} מעל התעריף.</span> : <span style={{ color:'var(--ok)', fontWeight:700 }}>אף אחד/ת לא מעל התעריף.</span>}</>
+                  : 'לא נמשך תעריף שעה מהתקציב לסניף הזה — מוצגת העלות בפועל בלבד.'}
+              </p>
+              <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1.6fr) repeat(4, minmax(0,1fr))', gap:'6px 8px', fontSize:15, alignItems:'center' }}>
+                {['עובד/ת', 'שעות', 'עלות לחודש', 'לפי התחשיב', 'מול התחשיב'].map(h => (
+                  <span key={h} style={{ fontSize:13.2, fontWeight:700, color:'var(--text3)', textAlign: h === 'עובד/ת' ? 'right' : 'center' }}>{h}</span>
+                ))}
+                {list.map(x => (
+                  <Fragment key={x.t.id}>
+                    <span style={{ fontWeight:600, overflowWrap:'anywhere' }}>{x.t.name}
+                      {(x.principal || x.off) && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }}>{x.principal ? 'מנהלת — מחוץ לתעריף השעה' : 'בחופשה — הפקדות בלבד'}</span>}</span>
+                    <span className="num" style={{ textAlign:'center' }}>{x.hours || '—'}</span>
+                    <span className="num" style={{ textAlign:'center', fontWeight:700 }}>{num(x.cost)}</span>
+                    <span className="num" style={{ textAlign:'center', color:'var(--text2)' }}>{x.plan == null ? '—' : num(x.plan)}</span>
+                    <span className="num" style={{ textAlign:'center', fontWeight:800, color: x.pct == null ? 'var(--text3)' : x.pct > 100 ? 'var(--danger)' : 'var(--ok)' }}>
+                      {x.pct == null ? '—' : `${Math.round(x.pct)}%`}</span>
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+          );
+        };
         const Diff = ({ sim, act }) => {
           const d = act - sim;
           return (
@@ -5760,12 +5804,19 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                 <thead><tr><TH>סניף</TH><TH>תחשיב ראשוני</TH><TH>עלות בפועל</TH><TH>הפרש</TH></tr></thead>
                 <tbody>
                   {transferRows.map(r => (
-                    <tr key={'sim-' + r.sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                      <td style={{ padding:'10px 12px', fontWeight:700 }}>{r.sc.name}</td>
+                    <Fragment key={'sim-' + r.sc.id}>
+                    <tr style={{ borderBottom:'1px solid var(--line)', cursor:'pointer' }} onClick={() => setOpenSim(v => v === r.sc.id ? null : r.sc.id)}
+                      title="לחיצה פותחת את הפירוט לפי עובד/ת">
+                      <td style={{ padding:'10px 12px', fontWeight:700 }}>
+                        <span style={{ display:'inline-block', width:16, color:'var(--purple)' }}>{openSim === r.sc.id ? '▾' : '◂'}</span>{r.sc.name}</td>
                       <td style={cell}>{r.f.teachingSim == null ? '—' : num(per(r.f.teachingSim))}</td>
                       <td style={cell}>{num(per(r.annual))}</td>
                       <td style={cell}>{r.f.teachingSim == null ? '—' : <Diff sim={r.f.teachingSim} act={r.annual} />}</td>
                     </tr>
+                    {openSim === r.sc.id && (
+                      <tr><td colSpan={4} style={{ padding:'4px 12px 14px', background:'var(--surface)', whiteSpace:'normal' }}><EmpSim r={r} /></td></tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
                 {simRows.length > 0 && (
@@ -5784,6 +5835,11 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                   <CardRow label="תחשיב ראשוני">{r.f.teachingSim == null ? '—' : num(per(r.f.teachingSim))}</CardRow>
                   <CardRow label="עלות בפועל">{num(per(r.annual))}</CardRow>
                   <CardRow label="הפרש" strong>{r.f.teachingSim == null ? '—' : <Diff sim={r.f.teachingSim} act={r.annual} />}</CardRow>
+                  <button onClick={() => setOpenSim(v => v === r.sc.id ? null : r.sc.id)}
+                    style={{ background:'none', border:'none', padding:'8px 0 2px', cursor:'pointer', fontSize:15, fontWeight:700, color:'var(--purple)' }}>
+                    {openSim === r.sc.id ? 'הסתרת הפירוט לפי עובד/ת' : 'פירוט לפי עובד/ת'}
+                  </button>
+                  {openSim === r.sc.id && <EmpSim r={r} />}
                 </div>
               ))}
               {simRows.length > 0 && (
