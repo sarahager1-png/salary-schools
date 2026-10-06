@@ -1026,7 +1026,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 
 /* ── נגישות ("חייב מונגש", שרה 6.10) ──
    ירוק לטקסט: #16A34A נותן רק 3.3:1 על לבן; #15803D נותן 4.9:1 (AA). */
-:root { --ok-text: #15803D; }
+:root { --ok-text: #166534; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .big-table tbody th[scope="row"] { background: inherit; white-space: normal; min-width: 150px; line-height: 1.3; padding-inline-start: 16px !important; }
 .big-table tbody tr:nth-child(even) th[scope="row"] { background: #FBFAFE; }
@@ -1048,12 +1048,12 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .bl-table tbody tr:hover td, .bl-table tbody tr:hover th[scope="row"] { background: rgba(75,46,131,.045) !important; }
 .bl-table thead tr.bl-groups th { padding: 8px 6px 6px !important; font-size: 13.6px !important; letter-spacing: .01em; border-bottom: none; background: var(--surface); }
 .bl-table thead tr.bl-groups th.gh-cost { color: #B42318; background: #FBEBEB; border-bottom: 2px solid #F0A8A8; }
-.bl-table thead tr.bl-groups th.gh-inc  { color: #15803D; background: #E6F6EC; border-bottom: 2px solid #86CFA0; }
+.bl-table thead tr.bl-groups th.gh-inc  { color: #166534; background: #E6F6EC; border-bottom: 2px solid #86CFA0; }
 .bl-table thead tr.bl-groups th.gh-res  { color: var(--purple); background: #EFE9FA; border-bottom: 2px solid #C9B8EC; }
 .bl-chip {
   display: inline-block; margin-inline-start: 7px; padding: 1px 7px; border-radius: 999px;
   font-size: 12.6px; font-weight: 800; line-height: 1.5; vertical-align: 1px;
-  color: #15803D; background: #E6F6EC; border: 1px solid #BBE5C8;
+  color: #166534; background: #E6F6EC; border: 1px solid #BBE5C8;
 }
 .bl-chip.over { color: #B42318; background: #FBEBEB; border-color: #F0A8A8; }
 .bl-table tfoot td { font-size: 15.8px !important; }
@@ -1077,3 +1077,20 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   .nav-wrap { flex-wrap: nowrap; overflow-x: auto; max-width: 100%;
     -webkit-mask-image: linear-gradient(to left, transparent 0, #000 26px); mask-image: linear-gradient(to left, transparent 0, #000 26px); }
 }
+
+/* ── רצועת החשבון של הרשת — שש אריחים שווים, נקראת מימין לשמאל ── */
+.bl-eq { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 10px; margin-top: 14px; }
+.bl-tile { min-width: 0; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface);
+  display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 1px 2px rgba(40,20,90,.04); }
+.bl-tile.t-cost { background: #FDF3F4; border-color: #F3D5D9; }
+.bl-tile.t-inc  { background: #F1F9F3; border-color: #CFE8D5; }
+.bl-tile.t-res  { background: #F5F1FC; border-color: #D8CEEF; }
+.bl-tile.t-final { box-shadow: 0 0 0 2px rgba(75,46,131,.18), 0 6px 18px rgba(75,46,131,.12); }
+.bl-tile .l { font-size: 13.8px; font-weight: 700; color: var(--text2); line-height: 1.3; }
+.bl-tile .l .op { display: inline-block; min-width: 14px; margin-inline-end: 3px; font-weight: 900; color: var(--purple); }
+.bl-tile .v { font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--text); margin-top: 5px; line-height: 1.15; overflow-wrap: anywhere; }
+.bl-tile .s { font-size: 12.6px; color: var(--text2); margin-top: 3px; line-height: 1.35; min-height: 17px; }
+@media (max-width: 1100px) { .bl-tile { padding: 10px 11px; } .bl-tile .v { font-size: 19.5px; } .bl-tile .l { font-size: 13px; } }
+@media (max-width: 700px) { .bl-eq { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bl-tile .v { font-size: 21px; } }
+/* אדום לטקסט: #DC2626 נותן 4.0:1 על רקע סגלגל; #B91C1C עובר AA גם שם */
+:root { --danger-text: #B91C1C; }

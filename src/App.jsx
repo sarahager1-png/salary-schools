@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 75;
+const BUILD = 76;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4953,7 +4953,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const Bal = ({ v }) => v == null
     ? <span style={{ color:'var(--text2)', fontSize:14.4 }}>טרם הוזן</span>
     : Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>מאוזן</span>
-    : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger)' : 'var(--ok-text)' }}>
+    : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>
         {v > 0 ? 'חובה ' : 'זכות '}{num(Math.abs(v))}</span>;
   // גוון הכרטיסייה לפי סוג המספר — אותה שפה של הטבלה הראשית: הכנסה ירקרק, הוצאה ורדרד, תוצאה סגלגל
   const TINT = { cost:['#FDF3F4','#F3D5D9'], income:['#F1F9F3','#CFE8D5'], result:['#F5F1FC','#D8CEEF'], plain:['var(--surface)','var(--line)'] };
@@ -4967,7 +4967,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   );
   const status = r => r.gap == null ? { t:'טרם הוזן תקציב משרד החינוך', c:'var(--text2)' }
     : r.agreed == null ? { t:'טרם סוכם סכום להעברה', c:'#8F4E00' }
-    : r.over > 0 ? { t:`הפער גבוה ב-${num(r.over)} מהסכום שסוכם`, c:'var(--danger)' }
+    : r.over > 0 ? { t:`הפער גבוה ב-${num(r.over)} מהסכום שסוכם`, c:'var(--danger-text)' }
     : { t:'בתוך הסכום שסוכם', c:'var(--ok-text)' };
   const TH = ({ children }) => (
     <th scope="col" style={{ padding:'8px 4px', fontSize:12.8, fontWeight:700, color:'var(--text2)', textAlign:'center', lineHeight:1.25, verticalAlign:'bottom' }}>{children}</th>
@@ -4987,7 +4987,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const usePct20 = planSum > 0 ? Math.round(planned.reduce((x, r) => x + r.costWith20, 0) / planSum * 100) : null;
   const Pct20 = ({ v }) => v == null ? null : (
     <span className="num" title="עלות ההוראה עם תוספת 20%, מול התחשיב הראשוני"
-      style={{ fontSize:13.6, fontWeight:800, whiteSpace:'nowrap', color: v > 100 ? 'var(--danger)' : 'var(--text2)' }}>{v}%</span>
+      style={{ fontSize:13.6, fontWeight:800, whiteSpace:'nowrap', color: v > 100 ? 'var(--danger-text)' : 'var(--text2)' }}>{v}%</span>
   );
   const Bar = ({ r }) => {
     const pc = pctOf(r);
@@ -4998,7 +4998,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           aria-label={`${pc}% מהסימולציה`} title={`עלות ההוראה בפועל ${num(r.cost)} מול ${num(r.plan)} לפי מחשבון המשרד`}>
           <span data-over={pc > 100 ? '' : undefined} style={{ width: `${Math.min(pc, 100)}%` }} />
         </div>
-        <span className="num" style={{ fontSize:13.6, fontWeight:800, whiteSpace:'nowrap', color: pc > 100 ? 'var(--danger)' : 'var(--text2)' }}>{pc}%</span>
+        <span className="num" style={{ fontSize:13.6, fontWeight:800, whiteSpace:'nowrap', color: pc > 100 ? 'var(--danger-text)' : 'var(--text2)' }}>{pc}%</span>
       </div>
     );
   };
@@ -5024,7 +5024,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const hasPay = upTo.some(m => m.branches.some(br => br.chabadPaid != null));
   const Remain = ({ v }) => v == null ? <span>—</span>
     : Math.round(v) === 0 ? <span style={{ color:'var(--ok-text)' }}>מאוזן</span>
-    : v > 0 ? <span className="num" style={{ color:'var(--danger)', whiteSpace:'nowrap' }}>{num(v)}</span>
+    : v > 0 ? <span className="num" style={{ color:'var(--danger-text)', whiteSpace:'nowrap' }}>{num(v)}</span>
     : <span className="num" style={{ color:'var(--ok-text)', whiteSpace:'nowrap' }}>עודף {num(-v)}</span>;
   const Open = ({ r }) => <Remain v={openOf(r)} />;
   // סימן החשבון ליד שם העמודה — כדי שהשורה תיקרא כתרגיל
@@ -5051,7 +5051,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
       />
 
       {err && (
-        <div role="alert" style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'1px solid var(--danger-line)', borderRadius:12,
+        <div role="alert" style={{ background:'var(--danger-bg)', color:'var(--danger-text)', border:'1px solid var(--danger-line)', borderRadius:12,
           padding:'10px 14px', fontSize:15, fontWeight:600, marginBottom:12 }}>{err}</div>
       )}
       {!data && !err && <div className="apple-card" style={{ padding:26, textAlign:'center', fontSize:15.5, color:'var(--text2)' }}>טוען…</div>}
@@ -5071,7 +5071,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   </defs>
                   <circle cx="60" cy="60" r="52" fill="none" stroke="var(--fill2)" strokeWidth="10" />
                   <circle key={sel} className="bl-ring-prog" cx="60" cy="60" r="52" fill="none" strokeWidth="10" strokeLinecap="round"
-                    stroke={over ? 'var(--danger)' : 'url(#blGrad)'}
+                    stroke={over ? 'var(--danger-text)' : 'url(#blGrad)'}
                     strokeDasharray={RING} strokeDashoffset={RING * (1 - Math.min(usePct, 100) / 100)} />
                 </svg>
                 <div className="bl-ring-num"><b className="num">{usePct}%</b><span>מהסימולציה</span></div>
@@ -5081,12 +5081,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <p className="bl-eyebrow">{fmtMonth(sel)}</p>
               {usePct != null ? (
                 <>
-                  <h2 className="bl-verdict" style={{ color: over ? 'var(--danger)' : 'var(--text)' }}>
+                  <h2 className="bl-verdict" style={{ color: over ? 'var(--danger-text)' : 'var(--text)' }}>
                     {over ? 'חורגים מהסימולציה' : 'לא חורגים מהסימולציה'}
                   </h2>
                   <p className="bl-line">
                     עלות ההוראה בפועל <b className="num">{num(planCost)}</b>, מול <b className="num">{num(planSum)}</b> לפי מחשבון המשרד
-                    {over ? <> — חריגה של <b className="num" style={{ color:'var(--danger)' }}>{num(planCost - planSum)}</b>.</>
+                    {over ? <> — חריגה של <b className="num" style={{ color:'var(--danger-text)' }}>{num(planCost - planSum)}</b>.</>
                           : <> — נמוך ב-<b className="num" style={{ color:'var(--ok-text)' }}>{num(planSum - planCost)}</b>.</>}
                   </p>
                 </>
@@ -5095,50 +5095,43 @@ function BottomLineView({ activeMonth, viewer = false }) {
               )}
               <div className="bl-facts">
                 {upTo.length > 1 && cumPct != null && (
-                  <span className="bl-fact">מתחילת השנה <b className="num" style={{ color: cumPct > 100 ? 'var(--danger)' : undefined }}>{cumPct}%</b></span>
+                  <span className="bl-fact">מתחילת השנה <b className="num" style={{ color: cumPct > 100 ? 'var(--danger-text)' : undefined }}>{cumPct}%</b></span>
                 )}
-                <span className="bl-fact">
-                  לפני כרית ה-20%: {beforeSum > 0 ? 'חסר' : 'עודף'} <b className="num" style={{ color: beforeSum > 0 ? 'var(--danger)' : 'var(--ok-text)' }}>{num(Math.abs(beforeSum))}</b>
-                  {' · '}כולל הכרית: {openSum > 0 ? 'חסר' : 'עודף'} <b className="num" style={{ color: openSum > 0 ? 'var(--danger)' : 'var(--ok-text)' }}>{num(Math.abs(openSum))}</b>
-                </span>
-                <span className="bl-fact">
-                  {tot.paid == null ? 'העברות הסניפים טרם הוזנו' : <>הועבר <b className="num">{num(tot.paid)}</b> מתוך {num(tot.due)}</>}
-                </span>
+                {usePct != null && (
+                  <span className="bl-fact" title="הסימולציה: העלות שחושבה ממחשבון משרד החינוך, לפני התלושים">
+                    {summed.length && summed.every(r => r.planSource === 'auto') ? 'הסימולציה נשמרה לפני התלושים'
+                      : summed.some(r => r.planSource === 'live') ? 'הסימולציה כרגע; תישמר בסגירת החודש' : 'הסימולציה שוחזרה'}
+                  </span>
+                )}
                 <span className="bl-fact" title="עובדות שעלותן נלקחה מקובץ השכר; לשאר — אומדן של המערכת">
                   עלות מקובץ השכר: <b className="num">{tot.withActual}</b> מתוך {tot.staff}
                 </span>
+                {tot.paid != null && <span className="bl-fact">הועבר <b className="num">{num(tot.paid)}</b> מתוך {num(dealSum)}</span>}
               </div>
             </div>
           </section>
 
           {/*
-            "חייב לחשוב איך נראה הכי טוב — לא ממש מובן" (שרה, 6.10). הדף מסופר עכשיו
-            כחשבון אחד, באותן מילים בכרטיסיות ובטבלה:
-              השכר: תוכנן · בפועל · כרית 20%
-              הכיסוי: הכנסות (משרד + מענק) · הסניף מעביר · נשאר פתוח
-            אחוז אחד בלבד (בפועל מול תוכנן); ה-20% מופיע כסכום בשקלים, לא כאחוז שני.
-            "הועבר" ו"יתרה" מופיעים רק כשיש העברות רשומות.
+            "תבדוק מה צריך ומה מיותר — הכי מעולה שאפשר" (שרה, 6.10). הכותרת כבר
+            אומרת סימולציה מול בפועל, ולכן שש הכרטיסיות שחזרו על אותם מספרים
+            הוחלפו ברצועה אחת — החשבון של הרשת, באותו סדר ובאותן מילים של הטבלה:
+            בפועל − משרד החינוך ומענק − הסניפים מעבירים = לפני הכרית; + כרית = כולל הכרית.
           */}
-          <div className="bl-kpis">
-          <p className="bl-group-title">השכר</p>
-          <div className="kpi-grid">
-            <Kpi kind="plain" label="לפי מחשבון המשרד"
-              sub={summed.length && summed.every(r => r.planSource === 'auto') ? 'הסימולציה כפי שנשמרה לפני התלושים'
-                : summed.some(r => r.planSource === 'live') ? 'הסימולציה כרגע; תישמר בסגירת החודש'
-                : 'הסימולציה, לפני התלושים (שוחזרה)'}>{planSum ? num(planSum) : '—'}</Kpi>
-            <Kpi kind="cost" label="עלות ההוראה בפועל" color={over ? 'var(--danger)' : undefined}
-              sub={usePct == null ? '' : over ? `${usePct}% מהסימולציה — חריגה של ${num(planCost - planSum)}` : `${usePct}% מהסימולציה — נמוך ב-${num(planSum - planCost)}`}>{num(sum('cost'))}</Kpi>
-            <Kpi kind="cost" label="כרית 20%" sub="מילוי מקום וביטחון, מעל העלות">{num(sum('add20'))}</Kpi>
-          </div>
-          <p className="bl-group-title">הכיסוי</p>
-          <div className="kpi-grid">
-            <Kpi kind="income" label="משרד החינוך + מענק רשת" sub={recvN
-              ? `התקבל מהמשרד ${num(recvSum)} ב-${recvN === 1 ? 'סניף אחד' : recvN + ' סניפים'} (תוכנן ${num(recvPlan)})`
-              : `משרד ${num(tot.ministry)} · מענק ${num(tot.support)}`}>{num(tot.ministry + tot.support)}</Kpi>
-            <Kpi kind="income" label="הסניפים מעבירים" sub={noDeal ? `סוכם עם ${summed.length - noDeal} סניפים; עם ${noDeal === 1 ? 'אחד' : noDeal} טרם סוכם` : 'לפי מה שסוכם איתם'}>{num(dealSum)}</Kpi>
-            <Kpi kind="result" label="נותר כולל הכרית" color={openSum > 0 ? 'var(--danger)' : 'var(--ok-text)'}
-              sub={`לפני הכרית: ${beforeSum > 0 ? 'חסר ' + num(beforeSum) : Math.round(beforeSum) === 0 ? 'מאוזן' : 'עודף ' + num(-beforeSum)}`}>{openSum > 0 ? num(openSum) : Math.round(openSum) === 0 ? 'מאוזן' : `עודף ${num(-openSum)}`}</Kpi>
-          </div>
+          <div className="bl-eq" role="group" aria-label="החשבון החודשי של הרשת">
+            <div className="bl-tile t-cost"><p className="l">עלות ההוראה בפועל</p><p className="v num">{num(sum('cost') + tzSum)}</p>
+              <p className="s">{anyTz ? `כולל שכר צהרון ${num(tzSum)}` : 'כולל מנהלות'}</p></div>
+            <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>משרד החינוך + מענק</p><p className="v num">{num(tot.ministry + tot.support)}</p>
+              <p className="s">{recvN ? `התקבל מהמשרד ${num(recvSum)} ב-${recvN === 1 ? 'סניף אחד' : recvN + ' סניפים'}` : `משרד ${num(tot.ministry)} · מענק ${num(tot.support)}`}</p></div>
+            <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>הסניפים מעבירים</p><p className="v num">{num(dealSum)}</p>
+              <p className="s">{noDeal ? `עם ${noDeal === 1 ? 'סניף אחד' : noDeal + ' סניפים'} טרם סוכם` : 'לפי מה שסוכם איתם'}</p></div>
+            <div className="bl-tile t-res"><p className="l"><span className="op" aria-hidden="true">=</span>לפני הכרית</p>
+              <p className="v num" style={{ color: beforeSum > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>{Math.round(beforeSum) === 0 ? 'מאוזן' : `${beforeSum > 0 ? 'חסר' : 'עודף'} ${num(Math.abs(beforeSum))}`}</p>
+              <p className="s">מה שנשאר מהשכר עצמו</p></div>
+            <div className="bl-tile t-cost"><p className="l"><span className="op" aria-hidden="true">+</span>כרית 20%</p><p className="v num">{num(sum('add20'))}</p>
+              <p className="s">מילוי מקום וביטחון</p></div>
+            <div className="bl-tile t-res t-final"><p className="l"><span className="op" aria-hidden="true">=</span>כולל הכרית</p>
+              <p className="v num" style={{ color: openSum > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>{Math.round(openSum) === 0 ? 'מאוזן' : `${openSum > 0 ? 'חסר' : 'עודף'} ${num(Math.abs(openSum))}`}</p>
+              <p className="s">השורה התחתונה של החודש</p></div>
           </div>
 
           <h2 className="section-head">לפי סניף</h2>
