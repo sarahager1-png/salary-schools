@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 97;
+const BUILD = 98;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5094,6 +5094,30 @@ function BottomLineView({ activeMonth, viewer = false }) {
     : v > 0 ? <span className="num" style={{ color:'var(--danger-text)', whiteSpace:'nowrap' }}>{num(v)}</span>
     : <span className="num" style={{ color:'var(--ok-text)', whiteSpace:'nowrap' }}>עודף {num(-v)}</span>;
   const Open = ({ r }) => <Remain v={openOf(r)} />;
+  /*
+    "לא ברור… שיראה בלי מילים" (שרה, 6.10). במקום שלוש עמודות של חשבון
+    (נותר לפני הכרית + כרית = נותר כולל הכרית, עם מספר אדום שנראה כמו הפסד):
+    מספר אחד — כמה נשאר אחרי השכר — ולידו פס שמראה כמה מכרית ה-20% התמלא.
+    פס ירוק מלא עם וי = הכרית מלאה; פס כתום חלקי = חלק ממנה; פס ריק אדום = חסר לשכר עצמו.
+  */
+  const leftOf = r => { const b = beforeOf(r); return b == null ? null : -b; };
+  const Left = ({ v }) => v == null ? <span>—</span>
+    : <bdi dir="ltr" className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v < 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>{v < 0 ? '−' : ''}{num(Math.abs(v))}</bdi>;
+  const ResBar = ({ left, cushion }) => {
+    if (left == null || !cushion) return <span>—</span>;
+    const p = left / cushion, w = Math.max(0, Math.min(1, p));
+    const state = left < 0 ? 'bad' : p >= 1 ? 'ok' : 'mid';
+    const label = left < 0 ? `חסרים ${num(-left)} לשכר עצמו, ואין כרית`
+      : p >= 1 ? `הכרית מלאה: נשארו ${num(left)}, והכרית היא ${num(cushion)}`
+      : `הכרית מלאה ב-${Math.min(99, Math.round(p * 100))}%: נשארו ${num(left)} מתוך כרית של ${num(cushion)}`;
+    return (
+      <span className={'resbar ' + state} role="img" aria-label={label} title={label}>
+        <span className="track"><span className="fill" style={{ width: `${w * 100}%` }} /></span>
+        {state === 'ok' ? <Check size={17} strokeWidth={3.2} /> : state === 'bad' ? <AlertTriangle size={16} strokeWidth={2.4} />
+          : <span className="num pc">{Math.min(99, Math.round(p * 100))}%</span>}
+      </span>
+    );
+  };
   // סימן החשבון ליד שם העמודה — כדי שהשורה תיקרא כתרגיל
   const Op = ({ c }) => <span aria-hidden="true" style={{ color:'var(--text3)', fontWeight:800, marginInlineEnd:4 }}>{c}</span>;
 
@@ -5196,7 +5220,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             הוחלפו ברצועה אחת — החשבון של הרשת, באותו סדר ובאותן מילים של הטבלה:
             בפועל − משרד החינוך − מענק הרשת − הסניפים מעבירים = לפני הכרית; + כרית = כולל הכרית.
           */}
-          <div className="bl-eq" role="group" aria-label="החשבון החודשי של הרשת">
+          <div className="bl-eq n5" role="group" aria-label="החשבון החודשי של הרשת">
             <div className="bl-tile t-cost"><p className="l">עלות ההוראה בפועל</p><p className="v num">{num(sum('cost') + tzSum)}</p>
               <p className="s">{anyTz ? `כולל שכר צהרון ${num(tzSum)}` : 'כולל מנהלות'}</p></div>
             <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>משרד החינוך + מענק הרשת</p><p className="v num">{num(minSum + tot.support)}</p>
@@ -5205,25 +5229,23 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 : 'משרד החינוך: מתוכנן, טרם הוזנו תקבולים'}</p></div>
             <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>הסניפים מעבירים</p><p className="v num">{num(dealSum)}</p>
               <p className="s">{noDeal ? `עם ${noDeal === 1 ? 'סניף אחד' : noDeal + ' סניפים'} טרם סוכם` : 'לפי מה שסוכם איתם'}</p></div>
-            <div className="bl-tile t-res"><p className="l"><span className="op" aria-hidden="true">=</span>לפני הכרית</p>
-              <p className="v num" style={{ color: beforeSum > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>{Math.round(beforeSum) === 0 ? 'מאוזן' : `${beforeSum > 0 ? 'חסר' : 'עודף'} ${num(Math.abs(beforeSum))}`}</p>
-              <p className="s">מה שנשאר מהשכר עצמו</p></div>
-            <div className="bl-tile t-cost"><p className="l"><span className="op" aria-hidden="true">+</span>כרית 20%</p><p className="v num">{num(sum('add20'))}</p>
-              <p className="s">מילוי מקום וביטחון</p></div>
-            <div className="bl-tile t-res t-final"><p className="l"><span className="op" aria-hidden="true">=</span>כולל הכרית</p>
-              <p className="v num" style={{ color: openSum > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>{Math.round(openSum) === 0 ? 'מאוזן' : `${openSum > 0 ? 'חסר' : 'עודף'} ${num(Math.abs(openSum))}`}</p>
-              <p className="s">השורה התחתונה של החודש</p></div>
+            <div className="bl-tile t-res"><p className="l"><span className="op" aria-hidden="true">=</span>נשאר</p>
+              <p className="v"><Left v={-beforeSum} /></p>
+              <p className="s">אחרי השכר של החודש</p></div>
+            <div className="bl-tile t-res t-final"><p className="l">כרית 20%</p>
+              <p className="v" style={{ display:'flex', alignItems:'center' }}><ResBar left={-beforeSum} cushion={sum('add20')} /></p>
+              <p className="s num">{num(sum('add20'))}</p></div>
           </div>
 
           <h2 className="section-head">לפי סניף</h2>
-          <p className="section-sub">כל שורה היא תרגיל אחד, מימין לשמאל: בפועל{anyTz ? ' + שכר צהרון' : ''} − משרד החינוך − מענק רשת − מה שהסניף מעביר = נותר לפני הכרית. ועוד כרית 20% = נותר כולל הכרית. אדום = חסר, ירוק = עודף.</p>
+          <p className="section-sub">בפועל{anyTz ? ' + שכר צהרון' : ''} − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. הפס מראה כמה מכרית ה-20% התמלא.</p>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
               <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: לפי מחשבון המשרד, בפועל, משרד החינוך, מענק רשת, הסניף מעביר, נותר לפני הכרית, כרית 20% ונותר כולל הכרית`}</caption>
               <colgroup>
                 <col /><col className="g-cost" /><col className="g-cost" />{anyTz && <col className="g-cost" />}
                 <col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
-                <col className="g-res" /><col className="g-res" /><col className="g-res g-sum" />
+                <col className="g-res" /><col className="g-res g-sum" />
                 {hasPay && <><col /><col /></>}
               </colgroup>
               <thead>
@@ -5231,13 +5253,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <th />
                   <th colSpan={anyTz ? 3 : 2} scope="colgroup" className="gh-cost">השכר</th>
                   <th colSpan={3} scope="colgroup" className="gh-inc">הכיסוי</th>
-                  <th colSpan={3} scope="colgroup" className="gh-res">מה נותר</th>
+                  <th colSpan={2} scope="colgroup" className="gh-res">מה נשאר</th>
                   {hasPay && <th colSpan={2} scope="colgroup">העברות בפועל</th>}
                 </tr>
                 <tr>
                   <TH>סניף</TH><TH>לפי המחשבון</TH><TH>בפועל</TH>{anyTz && <TH><Op c="+" />שכר צהרון</TH>}
                   <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או מתוכנן</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />הסניף מעביר</TH>
-                  <TH><Op c="=" />נותר לפני הכרית</TH><TH><Op c="+" />כרית 20%</TH><TH><Op c="=" />נותר כולל הכרית</TH>
+                  <TH><Op c="=" />נשאר</TH><TH>כרית 20%</TH>
                   {hasPay && <><TH>הועבר</TH><TH>יתרה מצטברת</TH></>}
                 </tr>
               </thead>
@@ -5259,9 +5281,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <td style={td}>{num(r.support)}</td>
                     <td style={td} title={r.hourly > 0 && r.agreed != null ? `${num(r.agreed)} על ההוראה ועוד ${num(r.hourly)} שכר צהרון` : undefined}>
                       {r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
-                    <td style={{ ...td, fontWeight:700 }}><Remain v={beforeOf(r)} /></td>
-                    <td style={{ ...td, color:'var(--text2)' }}>{num(r.add20)}</td>
-                    <td style={{ ...td, fontWeight:800 }}><Open r={r} /></td>
+                    <td style={td}><Left v={leftOf(r)} /></td>
+                    <td style={td}><ResBar left={leftOf(r)} cushion={r.add20} /></td>
                     {hasPay && <><td style={td}>{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</td><td style={td}><Bal v={r.balance} /></td></>}
                   </tr>
                 ); })}
@@ -5275,9 +5296,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={td}>{num(minSum)}</td>
                   <td style={td}>{num(tot.support)}</td>
                   <td style={td}>{num(dealSum)}</td>
-                  <td style={td}><Remain v={beforeSum} /></td>
-                  <td style={td}>{num(sum('add20'))}</td>
-                  <td style={td}><Remain v={openSum} /></td>
+                  <td style={td}><Left v={-beforeSum} /></td>
+                  <td style={td}><ResBar left={-beforeSum} cushion={sum('add20')} /></td>
                   {hasPay && <><td style={td}>{tot.paid == null ? '—' : num(tot.paid)}</td><td style={td}><Bal v={tot.balance} /></td></>}
                 </tr>
               </tfoot>
@@ -5290,8 +5310,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <div key={'bl-' + r.id} className="apple-card mcard">
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag">לפי התלושים</span>}</p>
                 <CardRow label="בפועל" strong>{num(r.cost)}{pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
-                <CardRow label="נותר לפני הכרית" strong><Remain v={beforeOf(r)} /></CardRow>
-                <CardRow label="נותר כולל כרית 20%" strong><Open r={r} /></CardRow>
+                <CardRow label="נשאר" strong><Left v={leftOf(r)} /></CardRow>
+                <CardRow label="כרית 20%" strong><ResBar left={leftOf(r)} cushion={r.add20} /></CardRow>
                 {open && (
                   <>
                     <CardRow label="לפי מחשבון המשרד">{r.plan == null ? '—' : num(r.plan)}</CardRow>

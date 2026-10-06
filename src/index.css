@@ -1280,3 +1280,16 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .att-btns .apple-btn, .att-ask .apple-btn { min-height: 48px; font-size: 16px; justify-content: center; }
 .att-ask p { grid-column: 1 / -1; font-size: 15.5px; line-height: 1.5; font-weight: 600; }
 .att-err { color: var(--danger-text); font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+
+/* הפס של כרית ה-20% — מראה בלי מילים כמה מהכרית התמלא */
+.bl-eq.n5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 700px) { .bl-eq.n5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.resbar { display: inline-flex; align-items: center; gap: 8px; vertical-align: middle; min-width: 0; }
+.resbar .track { position: relative; display: block; width: 104px; height: 14px; border-radius: 999px; background: #E9E4F4; border: 1px solid #CFC6E8; overflow: hidden; flex: 0 1 104px; }
+.resbar .fill { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: 999px; }
+.resbar.ok .fill { background: #22A55B; } .resbar.ok { color: #166534; } .resbar.ok .track { border-color: #9AD8B4; }
+.resbar.mid .fill { background: #F0A63A; } .resbar.mid .track { border-color: #EBCB95; }
+.resbar.bad .track { background: #FDECEC; border-color: #F0A8A8; } .resbar.bad { color: var(--danger-text); }
+.resbar .pc { font-size: 14.5px; font-weight: 800; color: #8F4E00; min-width: 38px; text-align: start; }
+.resbar svg { flex-shrink: 0; min-width: 38px; }
+.bl-tile .resbar .track { width: 100%; flex: 1 1 auto; height: 16px; } .bl-tile .v .resbar { width: 100%; }
