@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 58;
+const BUILD = 59;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4884,6 +4884,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const [err, setErr]   = useState('');
   const [sel, setSel]   = useState(null);
   const [showNote, setShowNote] = useState(false);
+  const [openB, setOpenB] = useState(null);   // הסניף שפירוטו פתוח בנייד
   useEffect(() => {
     let alive = true;
     store.fetchMonthlySummary().then(d => {
@@ -4943,7 +4944,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const net = tot.due - tot.gap;   // מה שסוכם להעברה מול הפער המחושב: חיובי = עודף לרשת
 
   const Bal = ({ v }) => v == null
-    ? <span style={{ color:'var(--text3)', fontSize:14.4 }}>טרם הוזן</span>
+    ? <span style={{ color:'var(--text2)', fontSize:14.4 }}>טרם הוזן</span>
     : Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok)' }}>מאוזן</span>
     : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger)' : 'var(--ok)' }}>
         {v > 0 ? 'חובה ' : 'זכות '}{num(Math.abs(v))}</span>;
@@ -4954,10 +4955,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
       background:TINT[kind][0], border:`1px solid ${TINT[kind][1]}`, borderRadius:16, boxShadow:'0 1px 2px rgba(40,20,90,.04)' }}>
       <p style={{ fontSize:14.6, fontWeight:700, color:'var(--text2)', lineHeight:1.3 }}>{label}</p>
       <p className="num" style={{ fontSize:26, fontWeight:800, letterSpacing:'-0.02em', color: color || 'var(--text)', marginTop:6, overflowWrap:'anywhere', lineHeight:1.15 }}>{children}</p>
-      <p style={{ fontSize:13.4, color:'var(--text3)', marginTop:4, minHeight:18, lineHeight:1.35 }}>{sub || ''}</p>
+      <p style={{ fontSize:13.4, color:'var(--text2)', marginTop:4, minHeight:18, lineHeight:1.35 }}>{sub || ''}</p>
     </div>
   );
-  const status = r => r.gap == null ? { t:'טרם הוזן תקציב משרד החינוך', c:'var(--text3)' }
+  const status = r => r.gap == null ? { t:'טרם הוזן תקציב משרד החינוך', c:'var(--text2)' }
     : r.agreed == null ? { t:'טרם סוכם סכום להעברה', c:'#B4650A' }
     : r.over > 0 ? { t:`הפער גבוה ב-${num(r.over)} מהסכום שסוכם`, c:'var(--danger)' }
     : { t:'בתוך הסכום שסוכם', c:'var(--ok)' };
@@ -4966,165 +4967,216 @@ function BottomLineView({ activeMonth, viewer = false }) {
   );
   const td = { textAlign:'center', fontSize:14.6 };
 
+  /*
+    "תנגיש הכי יפה שאפשר, נוח, ממוקד וברור" (שרה, 6.10). הדף עונה על שאלה
+    אחת — חורגים או לא — ולכן התשובה ראשונה וגדולה (טבעת האחוז והמשפט),
+    אחריה ששת המספרים בשתי קבוצות, ובסוף הסניפים, מהקרוב ביותר לתחשיב.
+  */
+  const over = usePct != null && usePct > 100;
+  const RING = 2 * Math.PI * 52;
+  const sorted = rows.slice().sort((x, y) => ((y.plan ? y.cost / y.plan : -1) - (x.plan ? x.cost / x.plan : -1)));
+  const pctOf = r => (r.plan > 0 ? Math.round(r.cost / r.plan * 100) : null);
+  const Bar = ({ r }) => {
+    const pc = pctOf(r);
+    if (pc == null) return null;
+    return (
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:5 }}>
+        <div className="bl-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(pc, 100)}
+          aria-label={`${pc}% מהתחשיב הראשוני`} title={`עלות ההוראה ${num(r.cost)} מתוך ${num(r.plan)} שתוכננו`}>
+          <span data-over={pc > 100 ? '' : undefined} style={{ width: `${Math.min(pc, 100)}%` }} />
+        </div>
+        <span className="num" style={{ fontSize:13.6, fontWeight:800, whiteSpace:'nowrap', color: pc > 100 ? 'var(--danger)' : 'var(--text2)' }}>{pc}%</span>
+      </div>
+    );
+  };
+  const income = r => (r.ministry == null ? null : r.ministry + (r.support || 0));
+
   return (
-    <div className="fade-in page-wrap" style={{ maxWidth:1280 }} dir="rtl">
+    <div className="fade-in page-wrap" style={{ maxWidth:1180 }} dir="rtl">
       <PageHead
-        title={`שורה תחתונה${sel ? ' · ' + fmtMonth(sel) : ''}`}
+        title="שורה תחתונה"
         badge={viewer ? (
           <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700, color:'var(--purple)',
             background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, padding:'3px 11px' }}>
             <ShieldCheck size={14} strokeWidth={2.4} />צפייה בלבד
           </span>) : null}
-        subtitle="עלות ההוראה מול הכנסות משרד החינוך, מה שסוכם שכל סניף מעביר, ומה שהועבר בפועל. כל הסכומים לחודש, בש״ח."
+        actions={months.length > 0 ? (
+          <div className="apple-seg" role="group" aria-label="בחירת חודש" style={{ flexWrap:'wrap' }}>
+            {months.map(m => (
+              <button key={m.key} onClick={() => setSel(m.key)} aria-pressed={sel === m.key}
+                className={['apple-seg-item', sel === m.key ? 'active' : ''].join(' ')}
+                style={{ padding:'6px 15px', fontSize:15 }}>{fmtMonth(m.key)}</button>
+            ))}
+          </div>
+        ) : null}
       />
 
       {err && (
-        <div style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'1px solid var(--danger-line)', borderRadius:10,
-          padding:'9px 14px', fontSize:14.9, fontWeight:600, marginBottom:12 }}>{err}</div>
+        <div role="alert" style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'1px solid var(--danger-line)', borderRadius:12,
+          padding:'10px 14px', fontSize:15, fontWeight:600, marginBottom:12 }}>{err}</div>
       )}
-      {!data && !err && <div className="apple-card" style={{ padding:22, textAlign:'center', fontSize:15, color:'var(--text3)' }}>טוען…</div>}
-      {data && !months.length && <div className="apple-card" style={{ padding:22, textAlign:'center', fontSize:15, color:'var(--text3)' }}>עדיין אין חודש עם נתוני שכר.</div>}
+      {!data && !err && <div className="apple-card" style={{ padding:26, textAlign:'center', fontSize:15.5, color:'var(--text2)' }}>טוען…</div>}
+      {data && !months.length && <div className="apple-card" style={{ padding:26, textAlign:'center', fontSize:15.5, color:'var(--text2)' }}>עדיין אין חודש עם נתוני שכר. הדף יתמלא אחרי שיוזנו עובדות לחודש.</div>}
 
       {cur && (
         <>
-          <div className="page-toolbar">
-            <div className="apple-seg" style={{ flexWrap:'wrap' }}>
-              {months.map(m => (
-                <button key={m.key} onClick={() => setSel(m.key)}
-                  className={['apple-seg-item', sel === m.key ? 'active' : ''].join(' ')}
-                  style={{ padding:'5px 14px' }}>{fmtMonth(m.key)}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* המשפט שהמנהל בא בשבילו */}
-          <div className="apple-card" style={{ padding:'18px 20px', marginTop:12, borderInlineStart:`4px solid ${net >= 0 ? 'var(--ok)' : 'var(--danger)'}` }}>
-            <p style={{ fontSize:19.5, fontWeight:800, color:'var(--text)', lineHeight:1.45, letterSpacing:'-0.01em' }}>
-              {net >= 0
-                ? <>הסכומים שסוכמו עם הסניפים מכסים את הפער של {fmtMonth(sel)}, עם עודף של <span className="num" style={{ color:'var(--ok)' }}>{num(net)}</span>.</>
-                : <>הסכומים שסוכמו עם הסניפים אינם מכסים את הפער של {fmtMonth(sel)}: חסרים <span className="num" style={{ color:'var(--danger)' }}>{num(-net)}</span>.</>}
-            </p>
-            <p style={{ fontSize:15, color:'var(--text2)', marginTop:5, lineHeight:1.6 }}>
-              {tot.paid == null
-                ? 'העברות הסניפים לחודש הזה טרם הוזנו, ולכן אין עדיין יתרת חובה וזכות.'
-                : <>הועבר בפועל {num(tot.paid)} מתוך {num(tot.due)} שסוכמו.</>}
-              {' '}עלות בפועל מקובץ השכר רשומה ל-{tot.withActual} מתוך {tot.staff} עובדות; לשאר — אומדן של המערכת.
-            </p>
+          {/* התשובה */}
+          <section className="bl-hero" data-state={over || (usePct == null && net < 0) ? 'over' : 'ok'} aria-live="polite">
             {usePct != null && (
-              <p style={{ fontSize:16.6, fontWeight:700, marginTop:8, lineHeight:1.5, color: usePct > 100 ? 'var(--danger)' : 'var(--ok)' }}>
-                {usePct > 100 ? 'חריגה מהתחשיב הראשוני' : 'בתוך התחשיב הראשוני'}: עלות ההוראה החודש {num(planCost)} מתוך {num(planSum)} שתוכננו ({usePct}%).
-                {upTo.length > 1 && cumPct != null && <span style={{ color: cumPct > 100 ? 'var(--danger)' : 'var(--ok)' }}> מתחילת השנה: {num(cum.cost)} מתוך {num(cum.plan)} ({cumPct}%).</span>}
-              </p>
+              <div className="bl-ring" role="img" aria-label={`עלות ההוראה היא ${usePct}% מהתחשיב הראשוני`}>
+                <svg viewBox="0 0 120 120" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="blGrad" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#00B4CC" /><stop offset="100%" stopColor="#4B2E83" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="var(--fill2)" strokeWidth="10" />
+                  <circle key={sel} className="bl-ring-prog" cx="60" cy="60" r="52" fill="none" strokeWidth="10" strokeLinecap="round"
+                    stroke={over ? 'var(--danger)' : 'url(#blGrad)'}
+                    strokeDasharray={RING} strokeDashoffset={RING * (1 - Math.min(usePct, 100) / 100)} />
+                </svg>
+                <div className="bl-ring-num"><b className="num">{usePct}%</b><span>מהתחשיב</span></div>
+              </div>
             )}
-          </div>
+            <div style={{ minWidth:0, flex:'1 1 320px' }}>
+              <p className="bl-eyebrow">{fmtMonth(sel)}</p>
+              {usePct != null ? (
+                <>
+                  <h2 className="bl-verdict" style={{ color: over ? 'var(--danger)' : 'var(--text)' }}>
+                    {over ? 'חורגים מהתחשיב' : 'לא חורגים מהתחשיב'}
+                  </h2>
+                  <p className="bl-line">
+                    עלות ההוראה <b className="num">{num(planCost)}</b> מתוך <b className="num">{num(planSum)}</b> שתוכננו
+                    {over ? <> — חריגה של <b className="num" style={{ color:'var(--danger)' }}>{num(planCost - planSum)}</b>.</>
+                          : <> — נותרו <b className="num" style={{ color:'var(--ok)' }}>{num(planSum - planCost)}</b>.</>}
+                  </p>
+                </>
+              ) : (
+                <h2 className="bl-verdict">{net >= 0 ? 'ההעברות מכסות את הפער' : 'ההעברות אינן מכסות את הפער'}</h2>
+              )}
+              <div className="bl-facts">
+                {upTo.length > 1 && cumPct != null && (
+                  <span className="bl-fact">מתחילת השנה <b className="num" style={{ color: cumPct > 100 ? 'var(--danger)' : undefined }}>{cumPct}%</b></span>
+                )}
+                <span className="bl-fact">
+                  מול מה שסוכם עם הסניפים: {net >= 0 ? 'עודף' : 'חסר'} <b className="num" style={{ color: net >= 0 ? 'var(--ok)' : 'var(--danger)' }}>{num(Math.abs(net))}</b>
+                </span>
+                <span className="bl-fact">
+                  {tot.paid == null ? 'העברות הסניפים טרם הוזנו' : <>הועבר <b className="num">{num(tot.paid)}</b> מתוך {num(tot.due)}</>}
+                </span>
+                <span className="bl-fact" title="עובדות שעלותן נלקחה מקובץ השכר; לשאר — אומדן של המערכת">
+                  עלות מקובץ השכר: <b className="num">{tot.withActual}</b> מתוך {tot.staff}
+                </span>
+              </div>
+            </div>
+          </section>
 
+          {/* ששת המספרים — שתי קבוצות, אותו גודל. בנייד: רשת אחת של שתיים בשורה, בלי כרטיסייה יתומה */}
+          <div className="bl-kpis">
+          <p className="bl-group-title">החודש</p>
           <div className="kpi-grid">
             <Kpi kind="cost" label="עלות הוראה + 20%" sub={prevCost != null ? `מול ${fmtMonth(prev.key)}: ${tot.costWith20 - prevCost >= 0 ? '+' : '−'}${num(Math.abs(tot.costWith20 - prevCost))}` : ''}>{num(tot.costWith20)}</Kpi>
             <Kpi kind="income" label="משרד החינוך + מענק רשת" sub={recvN
-              ? `התקבל בפועל מהמשרד ${num(recvSum)} ב-${recvN === 1 ? 'סניף אחד' : recvN + ' סניפים'} (לפי התכנון שלהם: ${num(recvPlan)})`
+              ? `התקבל מהמשרד ${num(recvSum)} ב-${recvN === 1 ? 'סניף אחד' : recvN + ' סניפים'} (תוכנן ${num(recvPlan)})`
               : `משרד ${num(tot.ministry)} · מענק ${num(tot.support)}`}>{num(tot.ministry + tot.support)}</Kpi>
             <Kpi kind="result" label="הפער החודשי" color="var(--danger)" sub="העלות פחות ההכנסות">{num(tot.gap)}</Kpi>
-            <Kpi kind="income" label="סוכם להעברה מהסניפים">{num(tot.due)}</Kpi>
-            <Kpi kind="income" label="הועבר בפועל החודש" sub={tot.paid == null ? 'טרם הוזן' : ''}>{tot.paid == null ? '—' : num(tot.paid)}</Kpi>
+          </div>
+          <p className="bl-group-title">מול הסניפים</p>
+          <div className="kpi-grid">
+            <Kpi kind="income" label="סוכם להעברה">{num(tot.due)}</Kpi>
+            <Kpi kind="income" label="הועבר בפועל" sub={tot.paid == null ? 'טרם הוזן' : ''}>{tot.paid == null ? '—' : num(tot.paid)}</Kpi>
             <Kpi kind="result" label="יתרה מצטברת" sub={tot.balance == null ? 'טרם הוזנו העברות' : 'מתחילת השנה עד החודש הזה'}
-              color={tot.balance == null ? 'var(--text3)' : tot.balance > 0 ? 'var(--danger)' : 'var(--ok)'}>
+              color={tot.balance == null ? 'var(--text2)' : tot.balance > 0 ? 'var(--danger)' : 'var(--ok)'}>
               {tot.balance == null ? '—' : Math.round(tot.balance) === 0 ? 'מאוזן' : `${tot.balance > 0 ? 'חובה' : 'זכות'} ${num(Math.abs(tot.balance))}`}
             </Kpi>
           </div>
+          </div>
 
           <h2 className="section-head">לפי סניף</h2>
+          <p className="section-sub">מהקרוב ביותר לתחשיב ועד הרחוק ממנו. הפס מראה כמה מהתחשיב הראשוני נוצל החודש.</p>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table" style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
-                <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
-                  <TH>סניף</TH><TH>עלות הוראה + 20%</TH><TH>הכנסות משרד החינוך</TH><TH>מענק רשת</TH>
+                <tr>
+                  <TH>סניף</TH><TH>עלות הוראה + 20%</TH><TH>משרד החינוך + מענק</TH>
                   <TH>פער החודש</TH><TH>סוכם להעברה</TH><TH>הועבר בפועל</TH><TH>יתרה מצטברת</TH>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => { const st = status(r); return (
+                {sorted.map(r => { const st = status(r); return (
                   <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                    <td style={{ padding:'9px 12px', fontSize:14.6, fontWeight:700 }}>{r.name}
-                      <span style={{ display:'block', fontSize:13.6, fontWeight:600, color: st.c }}>{st.t}</span></td>
-                    <td style={td}>{num(r.costWith20)}
-                      {r.plan > 0 && (
-                        <span style={{ display:'block', fontSize:13.2, fontWeight:700, color: r.cost > r.plan ? 'var(--danger)' : 'var(--ok)' }}
-                          title={`עלות ההוראה בלי 20%: ${num(r.cost)} · התחשיב הראשוני לחודש: ${num(r.plan)}`}>
-                          {Math.round(r.cost / r.plan * 100)}% מהתחשיב</span>
-                      )}</td>
-                    <td style={td}>{num(r.ministry)}
-                      {/* מה שהתקבל בפועל באותו חודש, כשהוזן במסך התקבולים */}
+                    <td style={{ padding:'10px 12px', fontWeight:700 }}>{r.name}
+                      <Bar r={r} />
+                      <span style={{ display:'block', fontSize:13.4, fontWeight:600, color: st.c, marginTop:3 }}>{st.t}</span></td>
+                    <td style={td}>{num(r.costWith20)}</td>
+                    <td style={td}>{num(income(r))}
                       {r.ministryReceived != null && (
-                        <span style={{ display:'block', fontSize:13.2, fontWeight:700, color: r.ministryReceived >= (r.ministry || 0) ? 'var(--ok)' : 'var(--danger)' }}>
-                          התקבל {num(r.ministryReceived)}</span>
+                        <span style={{ display:'block', fontSize:13.2, fontWeight:700, color: r.ministryReceived >= (r.ministry || 0) ? 'var(--ok)' : 'var(--danger)' }}
+                          title={`מתוכנן ממשרד החינוך לחודש: ${num(r.ministry)}`}>התקבל מהמשרד {num(r.ministryReceived)}</span>
                       )}</td>
-                    <td style={td}>{num(r.support)}</td>
                     <td style={{ ...td, fontWeight:800 }}>{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : <span style={{ color:'var(--ok)' }}>עודף {num(-r.gap)}</span>}</td>
                     <td style={td}>{r.due == null || r.due <= 0 ? '—' : num(r.due)}
-                      {r.agreed == null && r.due > 0 && <span style={{ display:'block', fontSize:12, color:'var(--text3)' }}>מחושב</span>}</td>
+                      {r.agreed == null && r.due > 0 && <span style={{ display:'block', fontSize:12.6, color:'var(--text2)' }}>מחושב</span>}</td>
                     <td style={td}>{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</td>
                     <td style={td}><Bal v={r.balance} /></td>
                   </tr>
                 ); })}
               </tbody>
               <tfoot>
-                <tr style={{ borderTop:'2px solid var(--line)', background:'var(--fill)' }}>
-                  <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:800 }}>סה"כ</td>
-                  <td style={{ ...td, fontWeight:800 }}>{num(tot.costWith20)}</td>
-                  <td style={{ ...td, fontWeight:800 }}>{num(tot.ministry)}</td>
-                  <td style={{ ...td, fontWeight:800 }}>{num(tot.support)}</td>
-                  <td style={{ ...td, fontWeight:800 }}>{num(tot.gap)}</td>
-                  <td style={{ ...td, fontWeight:800 }}>{num(tot.due)}</td>
-                  <td style={{ ...td, fontWeight:800 }}>{tot.paid == null ? '—' : num(tot.paid)}</td>
+                <tr>
+                  <td style={{ padding:'10px 12px' }}>סה"כ</td>
+                  <td style={td}>{num(tot.costWith20)}</td>
+                  <td style={td}>{num(tot.ministry + tot.support)}</td>
+                  <td style={td}>{num(tot.gap)}</td>
+                  <td style={td}>{num(tot.due)}</td>
+                  <td style={td}>{tot.paid == null ? '—' : num(tot.paid)}</td>
                   <td style={td}><Bal v={tot.balance} /></td>
                 </tr>
               </tfoot>
             </table>
           </div>
 
+          {/* נייד: כרטיס קצר לכל סניף — העיקר גלוי, הפירוט נפתח */}
           <div className="only-mobile big-cards">
-            {rows.map(r => { const st = status(r); return (
+            {sorted.map(r => { const st = status(r); const open = openB === r.id; return (
               <div key={'bl-' + r.id} className="apple-card mcard">
-                <p className="mcard-name" style={{ marginBottom:2 }}>{r.name}</p>
-                <p style={{ fontSize:12.8, fontWeight:600, color: st.c, marginBottom:4 }}>{st.t}</p>
-                <CardRow label="עלות הוראה + 20%">{num(r.costWith20)}</CardRow>
-                {r.plan > 0 && (
-                  <CardRow label="מול התחשיב הראשוני" color={r.cost > r.plan ? 'var(--danger)' : 'var(--ok)'}>{Math.round(r.cost / r.plan * 100)}% ({num(r.cost)} מתוך {num(r.plan)})</CardRow>
-                )}
-                <CardRow label="הכנסות משרד החינוך">{num(r.ministry)}</CardRow>
-                {r.ministryReceived != null && (
-                  <CardRow label="התקבל בפועל" color={r.ministryReceived >= (r.ministry || 0) ? 'var(--ok)' : 'var(--danger)'}>{num(r.ministryReceived)}</CardRow>
-                )}
-                <CardRow label="מענק רשת">{num(r.support)}</CardRow>
+                <p className="mcard-name" style={{ wordBreak:'keep-all' }}>{r.name}</p>
+                <Bar r={r} />
+                <p style={{ fontSize:13.6, fontWeight:600, color: st.c, margin:'4px 0 6px' }}>{st.t}</p>
                 <CardRow label="פער החודש" strong>{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : `עודף ${num(-r.gap)}`}</CardRow>
-                <CardRow label={r.agreed == null ? 'להעברה (מחושב)' : 'סוכם להעברה'}>{r.due == null || r.due <= 0 ? '—' : num(r.due)}</CardRow>
-                <CardRow label="הועבר בפועל">{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</CardRow>
-                <CardRow label="יתרה מצטברת" strong><Bal v={r.balance} /></CardRow>
+                <CardRow label="יתרה מצטברת"><Bal v={r.balance} /></CardRow>
+                {open && (
+                  <>
+                    <CardRow label="עלות הוראה + 20%">{num(r.costWith20)}</CardRow>
+                    <CardRow label="משרד החינוך + מענק">{num(income(r))}</CardRow>
+                    {r.ministryReceived != null && (
+                      <CardRow label="התקבל מהמשרד" color={r.ministryReceived >= (r.ministry || 0) ? 'var(--ok)' : 'var(--danger)'}>{num(r.ministryReceived)}</CardRow>
+                    )}
+                    <CardRow label={r.agreed == null ? 'להעברה (מחושב)' : 'סוכם להעברה'}>{r.due == null || r.due <= 0 ? '—' : num(r.due)}</CardRow>
+                    <CardRow label="הועבר בפועל">{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</CardRow>
+                  </>
+                )}
+                <button onClick={() => setOpenB(open ? null : r.id)} aria-expanded={open}
+                  style={{ background:'none', border:'none', padding:'10px 0 4px', minHeight:44, width:'100%', textAlign:'start', cursor:'pointer', fontSize:15, fontWeight:700, color:'var(--purple)' }}>
+                  {open ? 'הסתרת הפירוט' : 'פירוט מלא'}
+                </button>
               </div>
             ); })}
-            <div className="apple-card mcard" style={{ background:'var(--fill)' }}>
-              <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ</p>
-              <CardRow label="עלות הוראה + 20%">{num(tot.costWith20)}</CardRow>
-              <CardRow label="משרד החינוך + מענק רשת">{num(tot.ministry + tot.support)}</CardRow>
-              <CardRow label="פער החודש" strong>{num(tot.gap)}</CardRow>
-              <CardRow label="סוכם להעברה">{num(tot.due)}</CardRow>
-              <CardRow label="הועבר בפועל">{tot.paid == null ? '—' : num(tot.paid)}</CardRow>
-              <CardRow label="יתרה מצטברת" strong><Bal v={tot.balance} /></CardRow>
-            </div>
           </div>
 
-          <button onClick={() => setShowNote(v => !v)}
-            style={{ background:'none', border:'none', padding:'8px 2px', marginTop:6, cursor:'pointer', fontSize:14.6, fontWeight:700, color:'var(--purple)' }}>
-            {showNote ? 'הסתרת ההסבר על העמודות' : 'הסבר על העמודות'}
+          <button onClick={() => setShowNote(v => !v)} aria-expanded={showNote}
+            style={{ background:'none', border:'none', padding:'10px 2px', marginTop:6, minHeight:44, cursor:'pointer', fontSize:14.8, fontWeight:700, color:'var(--purple)' }}>
+            {showNote ? 'הסתרת ההסבר על המספרים' : 'הסבר על המספרים'}
           </button>
           {showNote && (
-          <p style={{ fontSize:15, color:'var(--text2)', marginTop:12, lineHeight:1.75 }}>
-            <b>עלות הוראה + 20%</b> — עלות המעביד של עובדי ההוראה בחודש (כולל מנהלת), ועוד 20% למילוי מקום וכרית ביטחון.
-            {' '}<b>הכנסות משרד החינוך</b> ו<b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
-            {' '}<b>פער החודש</b> — העלות פחות שניהם. <b>סוכם להעברה</b> — הסכום החודשי שסוכם עם הסניף; כשלא סוכם, מוצג הפער המחושב.
-            {' '}<b>יתרה מצטברת</b> — מה שהיה על הסניף להעביר מהחודש הראשון עד החודש שנבחר, פחות מה שהעביר: חובה = הסניף חייב לרשת, זכות = העביר יותר.
-            {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
-          </p>
+            <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
+              <b>התחשיב הראשוני</b> — עלות ההוראה שתוכננה בתקציב, החלק ה-12 שלה לחודש, בלי תוספת 20%. האחוז והפס משווים אליו את עלות ההוראה בפועל.
+              {' '}<b>עלות הוראה + 20%</b> — עלות המעביד של עובדי ההוראה בחודש (כולל מנהלת), ועוד 20% למילוי מקום וכרית ביטחון.
+              {' '}<b>משרד החינוך + מענק</b> — החלק ה-12 מהסכום השנתי; "התקבל" הוא מה שנרשם בפועל לאותו חודש.
+              {' '}<b>פער החודש</b> — העלות פחות ההכנסות. <b>סוכם להעברה</b> — הסכום החודשי שסוכם עם הסניף; כשלא סוכם, מוצג הפער המחושב.
+              {' '}<b>יתרה מצטברת</b> — מה שהיה על הסניף להעביר מהחודש הראשון עד החודש שנבחר, פחות מה שהעביר: חובה = הסניף חייב לרשת, זכות = העביר יותר.
+              {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
+            </p>
           )}
         </>
       )}

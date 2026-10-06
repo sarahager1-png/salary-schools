@@ -966,3 +966,60 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* כרטיסיות המספרים — תמיד אותו רוחב ואותו גובה: שלוש בשורה, שתיים בנייד */
 .kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; margin-top: 12px; }
 @media (max-width: 700px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+
+/* ── דף "שורה תחתונה" — התשובה ראשונה וגדולה ("הכי יפה שאפשר, נוח, ממוקד וברור", שרה 6.10) ── */
+.bl-hero {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+  padding: 22px 26px; margin-top: 2px;
+  border: 1px solid var(--line); border-radius: 20px;
+  background:
+    radial-gradient(120% 150% at 100% 0%, rgba(75,46,131,.08), transparent 58%),
+    radial-gradient(90% 130% at 0% 100%, rgba(0,180,204,.09), transparent 60%),
+    var(--surface);
+  box-shadow: 0 2px 12px rgba(75,46,131,.10);
+}
+.bl-hero::before {
+  content: ''; position: absolute; inset-block-start: 0; inset-inline: 0; height: 4px;
+  background: linear-gradient(270deg, #4B2E83, #00B4CC);
+}
+.bl-hero[data-state="over"]::before { background: var(--danger); }
+.bl-ring { position: relative; width: 124px; height: 124px; flex-shrink: 0; }
+.bl-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.bl-ring-num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+.bl-ring-num b { font-size: 31px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+.bl-ring-num span { font-size: 12.6px; font-weight: 700; color: var(--text2); margin-top: 2px; }
+.bl-ring-prog { animation: blRing 1s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes blRing { from { stroke-dashoffset: 326.73; } }
+.bl-eyebrow { font-size: 14px; font-weight: 800; color: var(--purple); }
+.bl-verdict { font-size: 30px; font-weight: 800; letter-spacing: -.025em; line-height: 1.15; margin: 2px 0 6px; }
+.bl-line { font-size: 17px; color: var(--text2); line-height: 1.5; }
+.bl-line b { color: var(--text); font-weight: 800; }
+.bl-facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.bl-fact {
+  font-size: 13.8px; font-weight: 600; color: var(--text2); line-height: 1.4;
+  background: rgba(255,255,255,.75); border: 1px solid var(--line); border-radius: 999px; padding: 5px 13px;
+}
+.bl-fact b { color: var(--text); font-weight: 800; }
+.bl-group-title { font-size: 14.4px; font-weight: 800; color: var(--purple); margin: 20px 2px 0; }
+.bl-bar { flex: 1 1 auto; max-width: 200px; height: 8px; border-radius: 999px; background: var(--fill2); overflow: hidden; }
+.bl-bar span {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(270deg, #4B2E83, #00B4CC);
+  transform-origin: right center; animation: blBar .8s cubic-bezier(.2,.8,.2,1) both;
+}
+.bl-bar span[data-over] { background: var(--danger); }
+@keyframes blBar { from { transform: scaleX(0); } }
+@media (max-width: 640px) {
+  .bl-hero { padding: 20px 18px; gap: 14px; }
+  .bl-ring { margin-inline: auto; }
+  .bl-verdict { font-size: 25px; }
+  .bl-line { font-size: 16px; }
+  .bl-bar { max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) { .bl-ring-prog, .bl-bar span { animation: none; } }
+@media (max-width: 700px) {
+  .bl-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 10px; margin-top: 14px; }
+  .bl-kpis .kpi-grid { display: contents; }
+  .bl-kpis .bl-group-title { display: none; }
+}
