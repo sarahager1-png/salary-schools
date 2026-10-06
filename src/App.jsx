@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 99;
+const BUILD = 100;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -7238,6 +7238,19 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
         kita: false, base: bd.base, supp: bd.supplement, gross: bd.gross,
         paysSupp: bd.supplement > 0, principal: true };
     }
+    /*
+      "תבדוק שזה התלוש שלה" (שרה, 6.10 — מושקא זיו): משרה שעתית אינה תלוש של
+      עולם ישן. הברוטו שלה הוא שעות החודש × התעריף — לפי דוח הנוכחות כשנשלח,
+      ועד אז אומדן מהשעות השבועיות — ולא הברוטו הישן שנשאר בשורה.
+    */
+    if (isHourlyRow(t)) {
+      const pb = payBreakdown(t);
+      if (!pb.gross && !pb.fromAttendance) return { skip: 'אין עדיין ברוטו' };
+      const monthHours = pb.fromAttendance ? pb.attendanceHours : Math.round((Number(t.frontalHours) || 0) * HOURLY_WEEKS);
+      return { darga: null, vetek: null, pct: Math.round(monthHours / 182 * 100), hours: monthHours, kita: false,
+        base: pb.gross, supp: 0, gross: pb.gross, paysSupp: false, hourly: true, rate: hourlyRateOf(t),
+        fromAttendance: pb.fromAttendance, awaiting: pb.awaitingAttendance };
+    }
     if (t.leaveType === 'maternity') return { skip: 'חל"ד — הפרשות בלבד, אין תלוש' };
     if (t.leaveType === 'unpaid') return { skip: 'חל"ת — אין תלוש' };
     if (!Number(t.frontalHours)) return { skip: '0 שעות — ממתינה לעדכון המנהלת' };
@@ -7362,15 +7375,17 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                       <td colSpan={9} style={{ fontSize:14 }}>{r.skip}</td>
                     </tr>
                   ) : (
-                    <tr key={t.id} onClick={() => (lines[t.id] || r.principal) && setOpenSlip({ t, r })}
-                      style={{ cursor: (lines[t.id] || r.principal) ? 'pointer' : 'default' }}
-                      title={(lines[t.id] || r.principal) ? 'לחיצה פותחת את התלוש המלא' : 'התלוש המפורט בהכנה — יופיע בסיום החישוב'}>
+                    <tr key={t.id} onClick={() => ((lines[t.id] && !r.hourly) || r.principal) && setOpenSlip({ t, r })}
+                      style={{ cursor: ((lines[t.id] && !r.hourly) || r.principal) ? 'pointer' : 'default' }}
+                      title={((lines[t.id] && !r.hourly) || r.principal) ? 'לחיצה פותחת את התלוש המלא' : 'התלוש המפורט בהכנה — יופיע בסיום החישוב'}>
                       <td style={{ fontWeight:600 }}>
                         {r.principal && <Briefcase size={12} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}
                         {t.name}
-                        {(lines[t.id] || r.principal) && <FileText size={12} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-1px', marginInlineStart:5, color:'var(--purple)' }} />}
+                        {((lines[t.id] && !r.hourly) || r.principal) && <FileText size={12} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-1px', marginInlineStart:5, color:'var(--purple)' }} />}
                         <p style={{ fontSize:14, fontWeight:500, color:'var(--text3)' }}>
-                          {[r.darga && r.darga !== '—' ? `דרגה ${r.darga}` : null, DEGREE_LABELS[t.degree] || t.degree || null, r.vetek != null && r.vetek !== '' ? `ותק ${r.vetek}` : null, r.kita ? 'גמול חינוך' : null].filter(Boolean).join(' · ')}
+                          {r.hourly
+                            ? [jobLabel(t.job), `${r.rate} ₪ לשעה`, r.fromAttendance ? `לפי דוח נוכחות: ${r.hours} שעות` : r.awaiting ? 'ממתין לדוח נוכחות (אומדן)' : `כ-${r.hours} שעות בחודש (אומדן)`].join(' · ')
+                            : [r.darga && r.darga !== '—' ? `דרגה ${r.darga}` : null, DEGREE_LABELS[t.degree] || t.degree || null, r.vetek != null && r.vetek !== '' ? `ותק ${r.vetek}` : null, r.kita ? 'גמול חינוך' : null].filter(Boolean).join(' · ')}
                         </p>
                         {subInfo(t) && <p style={{ fontSize:14, fontWeight:600, color:'#8F4E00' }}>{subInfo(t)}</p>}
                       </td>
@@ -7534,7 +7549,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                   ) : monthFiles.some(x => x.schoolId === sc.id) ? (
                     <p style={{ marginTop:6 }}><span className="apple-badge badge-red">תלוש לא התקבל</span></p>
                   ) : null}
-                  {(lines[t.id] || r.principal) && (
+                  {((lines[t.id] && !r.hourly) || r.principal) && (
                     <button className="apple-btn apple-btn-ghost" onClick={() => setOpenSlip({ t, r })}
                       style={{ width:'100%', marginTop:6, fontSize:14.4 }}>
                       <FileText size={14} strokeWidth={2.2} />
