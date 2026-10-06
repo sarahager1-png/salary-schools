@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 85;
+const BUILD = 86;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4535,7 +4535,7 @@ function teachingCostOf(teachers, sc, f) {
    ממשרד החינוך ופחות מה ששולם מבית חב"ד. מספר שנשמר יכול לסתור את
    שני האחרים אחרי עריכה; מספר שמחושב אינו יכול.
 ═══════════════════════════════════════════════════════════════ */
-function PaymentLedgerView({ schools, teachers, months, activeMonth }) {
+function PaymentLedgerView({ schools, teachers, months, activeMonth, tabs = null }) {
   const [fin, setFin]     = useState(null);
   const [led, setLed]     = useState(null);   // {schoolId: {monthKey: {...}}}
   const [err, setErr]     = useState('');
@@ -4749,6 +4749,7 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth }) {
 
   return (
     <div className="fade-in page-wrap" style={{ maxWidth:1180 }}>
+      {tabs}
       <PageHead
         title="תקבולים"
         badge={
@@ -5304,7 +5305,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   );
 }
 
-function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTeacher, onImportSlip }) {
+function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTeacher, onImportSlip, tabs = null }) {
   const [fin, setFin]     = useState(null);   // null: עוד נטען
   // "תן לי מקום ייבוא עלות שכר לכל מורה לחודש" (שרה, 6.10): אותו ייבוא
   // של שולחן השכר, נפתח כאן — ליד הטבלה שהמספרים שלו מזינים.
@@ -5863,6 +5864,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
 
   return (
     <div className="page-wrap" style={{ maxWidth:1380 }}>
+      {tabs}
       <PageHead
         title="העברות לסניפים"
         badge={
@@ -6666,9 +6668,9 @@ function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
             <div className="apple-seg">
               <button onClick={() => setOnlyReported(true)} className={['apple-seg-item', onlyReported ? 'active' : ''].join(' ')}
-                style={{ padding:'5px 11px', fontSize:13.8 }}>עם דיווח</button>
+                style={{ padding:'5px 11px', fontSize:14 }}>עם דיווח</button>
               <button onClick={() => setOnlyReported(false)} className={['apple-seg-item', !onlyReported ? 'active' : ''].join(' ')}
-                style={{ padding:'5px 11px', fontSize:13.8 }}>כל העובדות</button>
+                style={{ padding:'5px 11px', fontSize:14 }}>כל העובדות</button>
             </div>
             <button className="apple-btn apple-btn-ghost" onClick={exportCSV} style={{ fontSize:14.4 }}>
               <FileSpreadsheet size={15} strokeWidth={2.2} />
@@ -6682,76 +6684,76 @@ function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
           <p style={{ fontSize:17.2, fontWeight:700, color:'var(--text)' }}>אין דיווחי היעדרות או ממ"מ החודש</p>
           <p style={{ fontSize:14.4, color:'var(--text3)', marginTop:4 }}>מה שהמנהלות ימלאו בדשבורד החודשי יופיע כאן.</p>
         </div>
-      ) : bySchool.map(({ sc, list }) => (
-        <div key={sc.id} className="apple-card" style={{ padding:'14px 16px', marginBottom:16 }}>
-          <p style={{ fontSize:16.7, fontWeight:800, marginBottom:8 }}>{sc.name} · {list.length}</p>
+      ) : (
+        /* טבלה אחת לכל הרשת, מקובצת לפי בית ספר — שש עמודות, בלי גלילה לרוחב (שרה אישרה, 6.10) */
+        <div className="apple-card" style={{ padding:0, overflow:'hidden' }}>
           <div className="table-scroll">
-            <table className="apple-table sticky-first" style={{ fontSize:14.9, minWidth:760 }}>
+            <table className="apple-table abs-table" style={{ fontSize:15.5 }}>
               <thead><tr>
                 <th>שם</th>
-                <th style={{ textAlign:'center' }}>ימי היעדרות</th>
-                <th style={{ textAlign:'center' }}>שעות היעדרות</th>
-                <th style={{ textAlign:'center' }}>סיבה</th>
-                <th style={{ textAlign:'center' }}>אישור</th>
-                <th style={{ textAlign:'center' }}>סטטוס</th>
-                <th style={{ textAlign:'center' }}>שעות ממ"מ</th>
-                <th>במקום מי</th>
-                <th>תקופת ממ"מ</th>
+                <th style={{ textAlign:'center' }} title="ימי היעדרות">ימים</th>
+                <th style={{ textAlign:'center' }} title="שעות היעדרות">שעות</th>
+                <th>סיבה</th>
+                <th style={{ textAlign:'center' }} title="אישור היעדרות">אישור</th>
+                <th>מילוי מקום</th>
               </tr></thead>
-              <tbody>
+              {bySchool.map(({ sc, list }) => (
+              <tbody key={sc.id}>
+                <tr className="grp"><th colSpan={6} scope="colgroup">{shortName(sc.name)} <span>· {list.length}</span></th></tr>
                 {list.map(t => {
                   const replaced = t.mmFor ? list.find(x => x.name === t.mmFor) || teachers.find(x => x.name === t.mmFor) : null;
                   const weekly = Boolean(replaced &&
                     (replaced.leaveType === 'maternity' || replaced.absenceReason === 'maternity'));
+                  const period = weekly ? 'שבועי, כל תקופת החל"ד'
+                    : t.mmFrom ? (!t.mmTo || t.mmTo === t.mmFrom ? fmtD(t.mmFrom) : `${fmtD(t.mmFrom)} – ${fmtD(t.mmTo)}`)
+                    : t.isTemp ? subInfo(t) : '';
+                  const reason = reasonLabel(t.absenceReason);
                   return (
                   <tr key={t.id}>
-                    <td style={{ fontWeight:600 }}>{t.name}</td>
-                    <td style={{ textAlign:'center', fontWeight:(t.absenceDays||0)>0 ? 700 : 400,
-                      color:(t.absenceDays||0)>0 ? 'var(--danger)' : 'var(--text3)' }}>
+                    <td style={{ fontWeight:600, wordBreak:'keep-all' }}>{t.name}</td>
+                    <td data-l="ימי היעדרות" style={{ textAlign:'center', fontWeight:(t.absenceDays||0)>0 ? 700 : 400,
+                      color:(t.absenceDays||0)>0 ? 'var(--danger-text)' : 'var(--text3)' }}>
                       {(t.absenceDays||0) > 0 ? t.absenceDays : '—'}
                     </td>
-                    <td style={{ textAlign:'center', color:(t.absenceHours||0)>0 ? 'var(--text)' : 'var(--text3)' }}>
+                    <td data-l="שעות היעדרות" style={{ textAlign:'center', color:(t.absenceHours||0)>0 ? 'var(--text)' : 'var(--text3)' }}>
                       {(t.absenceHours||0) > 0 ? t.absenceHours : '—'}
                     </td>
-                    <td style={{ textAlign:'center' }}>{reasonLabel(t.absenceReason) || '—'}</td>
-                    <td style={{ textAlign:'center' }}>
+                    <td data-l="סיבה">
+                      {reason || (onLeave(t) ? '' : <span style={{ color:'var(--text3)' }}>—</span>)}
+                      {onLeave(t) && <span className="apple-badge badge-orange" style={{ marginInlineStart: reason ? 6 : 0 }}>{leaveText(t)}</span>}
+                    </td>
+                    <td data-l="אישור" style={{ textAlign:'center' }}>
                       {t.sickFormPath ? (
-                        <button className="apple-btn apple-btn-ghost" title="פתיחת אישור ההיעדרות"
+                        <button className="apple-btn apple-btn-ghost" title="פתיחת אישור ההיעדרות" aria-label={`פתיחת אישור ההיעדרות של ${t.name}`}
                           onClick={async () => { try { window.open(await store.sickFormUrl(t.sickFormPath), '_blank'); } catch (e) { alert(e.message); } }}
-                          style={{ minHeight:28, padding:'0 9px', fontSize:13.8 }}>📎</button>
+                          style={{ minHeight:34, padding:'0 10px', fontSize:14 }}><FileText size={15} strokeWidth={2.2} />פתיחה</button>
                       ) : missingDoc(t)
                         ? <span className="apple-badge badge-red" title="להיעדרות לא צורף אישור">חסר</span>
-                        : '—'}
-                    </td>
-                    <td style={{ textAlign:'center' }}>
-                      {onLeave(t)
-                        ? <span className="apple-badge badge-orange">{leaveText(t)}</span>
                         : <span style={{ color:'var(--text3)' }}>—</span>}
                     </td>
-                    <td style={{ textAlign:'center', fontWeight:(t.mmHours||0)>0 ? 700 : 400,
-                      color:(t.mmHours||0)>0 ? 'var(--purple)' : 'var(--text3)' }}>
-                      {(t.mmHours||0) > 0 ? `${t.mmHours}${weekly ? ' שבועי' : ''}` : '—'}
-                    </td>
-                    <td>
-                      {t.mmFor || '—'}
-                      {held(t) && (
-                        <span className="apple-badge badge-orange" style={{ marginInlineStart:6 }}
-                          title={`להיעדרות של ${held(t).name} לא צורף אישור — מילוי המקום אינו עובר לשכר`}>מוחזק</span>
-                      )}
-                    </td>
-                    <td style={{ fontSize:13.8, color:'var(--apple-orange)' }}>
-                      {weekly ? 'שבועי — כל תקופת החל"ד'
-                        : t.mmFrom ? (!t.mmTo || t.mmTo === t.mmFrom ? fmtD(t.mmFrom) : `${fmtD(t.mmFrom)} – ${fmtD(t.mmTo)}`)
-                        : t.isTemp ? subInfo(t) : '—'}
+                    <td data-l="מילוי מקום">
+                      {(t.mmHours||0) > 0 || t.mmFor ? (
+                        <>
+                          {(t.mmHours||0) > 0 && <b className="num" style={{ color:'var(--purple)' }}>{t.mmHours} שעות{weekly ? ' בשבוע' : ''}</b>}
+                          {t.mmFor && <span> במקום {t.mmFor}</span>}
+                          {held(t) && (
+                            <span className="apple-badge badge-orange" style={{ marginInlineStart:6 }}
+                              title={`להיעדרות של ${held(t).name} לא צורף אישור — מילוי המקום אינו עובר לשכר`}>מוחזק</span>
+                          )}
+                          {period && <span style={{ display:'block', fontSize:14, color:'#8F4E00' }}>{period}</span>}
+                        </>
+                      ) : period ? <span style={{ fontSize:14, color:'#8F4E00' }}>{period}</span>
+                        : <span style={{ color:'var(--text3)' }}>—</span>}
                     </td>
                   </tr>
                   );
                 })}
               </tbody>
+              ))}
             </table>
           </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -6898,7 +6900,21 @@ function PayslipArchive({ schools }) {
   );
 }
 
-function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onMarkSlip, onSaveSlipGross }) {
+function GenderPick({ value, onChange }) {
+  return (
+    <span className="gender-pick" role="group" aria-label="מין" style={{ background: value ? undefined : 'var(--warn-bg, #FFF6E5)' }}>
+      {[['f', 'נקבה'], ['m', 'זכר']].map(([k, l]) => (
+        <button key={k} type="button" aria-pressed={value === k} className={value === k ? 'on' : ''}
+          onClick={() => onChange(value === k ? null : k)}>{l}</button>
+      ))}
+    </span>
+  );
+}
+
+function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onMarkSlip, onSaveSlipGross, docs = null }) {
+  // שתי לשוניות: התלושים שהתקבלו מהגזברות, והכנת התלושים לפי חישוב המערכת (שרה אישרה, 6.10)
+  const [mode, setMode] = useState(onSaveTeacher ? 'archive' : 'prep');
+  const [openSc, setOpenSc] = useState(null);
   const money = v => (v == null ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
   /*
     "לא רואים את התלוש רק עלויות" (שרה, 3.9): שורות הרכיבים המלאות —
@@ -6968,16 +6984,22 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
     <div className="page-wrap" style={{ maxWidth:1180 }}>
       <PageHead
         title={`תלושים · ${fmtMonthFn ? fmtMonthFn(monthKey) : monthKey}`}
-        subtitle={'הבסיס בעולם ישן לפי השעות (מחנכת +3 · אם מעל 79% +10), תוספת בית חב"ד שורה קבועה, והסה"כ הוא השכר המאומת. הכול מתעדכן חי מהנתונים.'}
-        actions={
-          <button className="apple-btn apple-btn-ghost no-print" onClick={() => window.print()} style={{ fontSize:14.9 }}>
+        subtitle={mode === 'archive' ? 'התלושים שהתקבלו מהגזברות, לכל עובדת ולכל חודש, עם עלות השכר לסניף.' : 'הבסיס בעולם ישן לפי השעות (מחנכת +3 · אם מעל 79% +10), תוספת בית חב"ד שורה קבועה, והסה"כ הוא השכר המאומת. הכול מתעדכן חי מהנתונים.'}
+        actions={mode === 'prep' ? (
+          <button className="apple-btn apple-btn-ghost no-print" onClick={() => window.print()} style={{ fontSize:14.9 }} title="מדפיס את כל בתי הספר">
             <Printer size={15} strokeWidth={2.2} />הדפסה
           </button>
-        }
+        ) : null}
       />
-      <PayslipArchive schools={schools} />
-      <h2 className="section-head no-print">התלושים לפי חישוב המערכת</h2>
-      {bySchool.map(({ sc, ts: tsAll }) => {
+      <div className="apple-seg even-grid no-print" role="group" aria-label="תצוגת תלושים" style={{ marginBottom:16, maxWidth:520, gap:2 }}>
+        {[['archive', 'תלושים שהתקבלו'], ['prep', 'הכנת תלושים']].map(([k, l]) => (
+          <button key={k} onClick={() => setMode(k)} aria-pressed={mode === k}
+            className={['apple-seg-item', mode === k ? 'active' : ''].join(' ')} style={{ padding:'6px 13px', fontSize:15.5, minHeight:42 }}>{l}</button>
+        ))}
+      </div>
+      {mode === 'archive' && <PayslipArchive schools={schools} />}
+      {mode === 'archive' && docs}
+      {mode === 'prep' && bySchool.map(({ sc, ts: tsAll }) => {
         const paysSupp = sc.chabadSupp !== false;
         /*
           "חסי בירנהאק פעמיים תלושים" (שרה, 22.9): עובדת עם משרת הוראה וגם
@@ -7005,36 +7027,39 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
         const tot = live.reduce((a, x) => ({ base: a.base + x.r.base, supp: a.supp + x.r.supp, gross: a.gross + x.r.gross }),
           { base: 0, supp: 0, gross: 0 });
         return (
-          <div key={sc.id} className="apple-card slip-school" style={{ padding:'14px 16px', marginBottom:18 }}>
-            <p style={{ fontSize:17.2, fontWeight:800, marginBottom:8 }}>
-              {sc.name} · {live.length} תלושים{!paysSupp ? ' · תשלום ישיר (בלי תוספת)' : ''}
-            </p>
+          <div key={sc.id} className={'apple-card slip-school' + (openSc === sc.id ? '' : ' closed')} style={{ padding:0, marginBottom:10, overflow:'hidden' }}>
+            <button type="button" className="slip-head no-print" aria-expanded={openSc === sc.id} onClick={() => setOpenSc(openSc === sc.id ? null : sc.id)}>
+              <ChevronLeft size={18} strokeWidth={2.4} style={{ transform: openSc === sc.id ? 'rotate(-90deg)' : 'none', transition:'transform .15s', flexShrink:0 }} />
+              <span className="nm">{shortName(sc.name)}</span>
+              {!paysSupp && <span className="bl-tag">תשלום ישיר</span>}
+              <span className="st"><b className="num">{live.length}</b> תלושים</span>
+              <span className="st">ברוטו <b className="num">{money(tot.gross)}</b></span>
+              <span className={'st' + (live.length && live.every(x => x.t._slipIssuedAt) ? ' ok' : '')}>הוצאו <b className="num">{live.filter(x => x.t._slipIssuedAt).length}/{live.length}</b></span>
+            </button>
+            <p className="only-print" style={{ fontSize:17.2, fontWeight:800, margin:'10px 16px 8px' }}>{sc.name} · {live.length} תלושים</p>
+            <div className="slip-body" style={{ padding:'0 14px 14px' }}>
             <div className="table-scroll only-desktop">
-              <table className="apple-table sticky-first" style={{ fontSize:14.9, minWidth:960 }}>
+              <table className="apple-table sticky-first slip-table" style={{ fontSize:15.2 }}>
                 <thead><tr>
                   <th>שם</th>
-                  <th style={{ textAlign:'center' }}>דרגה</th>
-                  <th style={{ textAlign:'center' }}>תואר</th>
-                  <th style={{ textAlign:'center' }}>ותק</th>
                   <th style={{ textAlign:'center' }} title="קובע את תוספת האם: 24 שעות לאם = 90%">מין</th>
-                  <th style={{ textAlign:'center' }}>ילדים עד 18</th>
-                  <th style={{ textAlign:'center' }}>שעות לתלוש</th>
+                  <th style={{ textAlign:'center' }} title="ילדים עד גיל 18">ילדים</th>
+                  <th style={{ textAlign:'center' }} title="שעות לתלוש">שעות</th>
                   <th style={{ textAlign:'center' }}>אחוז</th>
-                  <th style={{ textAlign:'center' }}>גמול חינוך</th>
-                  <th style={{ textAlign:'center' }}>בסיס עולם ישן</th>
-                  <th style={{ textAlign:'center' }}>תוספת בית חב"ד</th>
-                  <th style={{ textAlign:'center' }}>ברוטו לתשלום</th>
+                  <th style={{ textAlign:'center' }} title="בסיס עולם ישן">בסיס</th>
+                  <th style={{ textAlign:'center' }} title='תוספת בית חב"ד'>תוספת</th>
+                  <th style={{ textAlign:'center' }} title="ברוטו לתשלום">ברוטו</th>
                   <th style={{ textAlign:'center' }} title="הברוטו שיצא בתלוש בפועל — נרשם לצד המספר של המערכת, לא במקומו">יצא בתלוש</th>
-                  <th style={{ textAlign:'center' }} title="וי — התלוש לחודש הזה כבר הוצא">תלוש הוצא</th>
+                  <th style={{ textAlign:'center' }} title="וי — התלוש לחודש הזה כבר הוצא">הוצא</th>
                 </tr></thead>
                 <tbody>
                   {rows.map(({ t, r }) => r.skip ? (
                     <tr key={t.id} style={{ color:'var(--text3)' }}>
                       <td style={{ fontWeight:600 }}>
                         {t.name}
-                        {subInfo(t) && <p style={{ fontSize:12.6, fontWeight:600, color:'var(--apple-orange)' }}>{subInfo(t)}</p>}
+                        {subInfo(t) && <p style={{ fontSize:14, fontWeight:600, color:'var(--apple-orange)' }}>{subInfo(t)}</p>}
                       </td>
-                      <td colSpan={13} style={{ fontSize:13.8 }}>{r.skip}</td>
+                      <td colSpan={9} style={{ fontSize:14 }}>{r.skip}</td>
                     </tr>
                   ) : (
                     <tr key={t.id} onClick={() => (lines[t.id] || r.principal) && setOpenSlip({ t, r })}
@@ -7044,21 +7069,14 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                         {r.principal && <Briefcase size={12} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}
                         {t.name}
                         {(lines[t.id] || r.principal) && <FileText size={12} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-1px', marginInlineStart:5, color:'var(--purple)' }} />}
-                        {subInfo(t) && <p style={{ fontSize:12.6, fontWeight:600, color:'var(--apple-orange)' }}>{subInfo(t)}</p>}
+                        <p style={{ fontSize:14, fontWeight:500, color:'var(--text3)' }}>
+                          {[r.darga && r.darga !== '—' ? `דרגה ${r.darga}` : null, DEGREE_LABELS[t.degree] || t.degree || null, r.vetek != null && r.vetek !== '' ? `ותק ${r.vetek}` : null, r.kita ? 'גמול חינוך' : null].filter(Boolean).join(' · ')}
+                        </p>
+                        {subInfo(t) && <p style={{ fontSize:14, fontWeight:600, color:'#8F4E00' }}>{subInfo(t)}</p>}
                       </td>
-                      <td style={{ textAlign:'center' }}>{r.darga || '—'}</td>
-                      <td style={{ textAlign:'center' }}>{DEGREE_LABELS[t.degree] || t.degree || '—'}</td>
-                      <td style={{ textAlign:'center' }}>{r.vetek}</td>
                       <td style={{ textAlign:'center' }} onClick={e => e.stopPropagation()}>
                         {onSaveTeacher ? (
-                          <select className="apple-select" value={t.gender || ''}
-                            onChange={e => onSaveTeacher({ ...t, gender: e.target.value || null })}
-                            style={{ fontSize:13.8, padding:'3px 6px', minWidth:64,
-                              background: t.gender ? undefined : 'var(--warn-bg, #FFF6E5)' }}>
-                            <option value="">—</option>
-                            <option value="f">נקבה</option>
-                            <option value="m">זכר</option>
-                          </select>
+                          <GenderPick value={t.gender || null} onChange={g => onSaveTeacher({ ...t, gender: g })} />
                         ) : (t.gender === 'f' ? 'נקבה' : t.gender === 'm' ? 'זכר' : '—')}
                       </td>
                       <td style={{ textAlign:'center' }} onClick={e => e.stopPropagation()}>
@@ -7074,12 +7092,11 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                       </td>
                       <td style={{ textAlign:'center' }}>{r.hours}</td>
                       <td style={{ textAlign:'center', fontWeight:600 }}>{r.pct}%</td>
-                      <td style={{ textAlign:'center' }}>{r.kita ? '✓' : ''}</td>
                       <td style={{ textAlign:'center' }}>{money(r.base)}</td>
                       <td style={{ textAlign:'center' }}>{r.paysSupp ? money(r.supp) : '—'}</td>
                       <td style={{ textAlign:'center', fontWeight:800 }}>{money(r.gross)}
                         {r.extra?.map(({ h, gross }) => (
-                          <span key={h.id} style={{ display:'block', fontSize:12.6, fontWeight:600, color:'var(--text3)' }}>
+                          <span key={h.id} style={{ display:'block', fontSize:14, fontWeight:600, color:'var(--text3)' }}>
                             כולל {jobLabel(h.job)} {money(gross)}
                           </span>
                         ))}</td>
@@ -7116,7 +7133,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                   ))}
                 </tbody>
                 <tfoot><tr style={{ background:'var(--apple-fill)', fontWeight:800 }}>
-                  <td colSpan={9}>סה"כ {sc.name}</td>
+                  <td colSpan={5}>סה"כ {shortName(sc.name)}</td>
                   <td style={{ textAlign:'center' }}>{money(tot.base)}</td>
                   <td style={{ textAlign:'center' }}>{money(tot.supp)}</td>
                   <td style={{ textAlign:'center' }}>{money(tot.gross)}</td>
@@ -7135,8 +7152,8 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
               {rows.map(({ t, r }) => r.skip ? (
                 <div key={'m-' + t.id} className="slipm">
                   <p style={{ fontWeight:700, fontSize:15.5, color:'var(--text2)' }}>{t.name}</p>
-                  {subInfo(t) && <p style={{ fontSize:12.6, fontWeight:600, color:'var(--apple-orange)' }}>{subInfo(t)}</p>}
-                  <p style={{ fontSize:13.8, color:'var(--text3)' }}>{r.skip}</p>
+                  {subInfo(t) && <p style={{ fontSize:14, fontWeight:600, color:'var(--apple-orange)' }}>{subInfo(t)}</p>}
+                  <p style={{ fontSize:14, color:'var(--text3)' }}>{r.skip}</p>
                 </div>
               ) : (
                 <div key={'m-' + t.id} className="slipm">
@@ -7146,11 +7163,11 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                         {r.principal && <Briefcase size={13} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}
                         {t.name}
                       </p>
-                      <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:1 }}>
+                      <p style={{ fontSize:14, color:'var(--text3)', marginTop:1 }}>
                         {r.darga && r.darga !== '—' ? `דרגה ${r.darga} · ` : ''}
                         ותק {r.vetek} · {r.hours} שעות · {r.pct}%{r.kita ? ' · גמול חינוך' : ''}
                       </p>
-                      {subInfo(t) && <p style={{ fontSize:12.6, fontWeight:600, color:'var(--apple-orange)' }}>{subInfo(t)}</p>}
+                      {subInfo(t) && <p style={{ fontSize:14, fontWeight:600, color:'var(--apple-orange)' }}>{subInfo(t)}</p>}
                     </div>
                     {onMarkSlip ? (
                       <button className="apple-btn apple-btn-ghost"
@@ -7158,7 +7175,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                           ? `הוצא ${new Date(t._slipIssuedAt).toLocaleDateString('he-IL')} — לחיצה מבטלת`
                           : 'סימון שהתלוש הוצא'}
                         onClick={() => onMarkSlip(t.id, !t._slipIssuedAt)}
-                        style={{ flexShrink:0, fontSize:13.8, fontWeight:700,
+                        style={{ flexShrink:0, fontSize:14, fontWeight:700,
                           color: t._slipIssuedAt ? 'var(--ok)' : 'var(--text3)' }}>
                         {t._slipIssuedAt ? '✓ הוצא' : 'סימון הוצא'}
                       </button>
@@ -7187,13 +7204,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                     <div style={{ display:'flex', gap:10, padding:'8px 0', borderTop:'1px dashed var(--line-soft)' }}>
                       <label style={{ flex:1 }}>
                         <span className="mcard-label" style={{ display:'block', marginBottom:3 }} title="קובע את תוספת האם: 24 שעות לאם = 90%">מין</span>
-                        <select className="apple-select" value={t.gender || ''}
-                          onChange={e => onSaveTeacher({ ...t, gender: e.target.value || null })}
-                          style={{ fontSize:14.4, background: t.gender ? undefined : 'var(--warn-bg, #FFF6E5)' }}>
-                          <option value="">—</option>
-                          <option value="f">נקבה</option>
-                          <option value="m">זכר</option>
-                        </select>
+                        <GenderPick value={t.gender || null} onChange={g => onSaveTeacher({ ...t, gender: g })} />
                       </label>
                       <label style={{ flex:1 }}>
                         <span className="mcard-label" style={{ display:'block', marginBottom:3 }}>ילדים עד 18</span>
@@ -7224,13 +7235,14 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                 <CardRow label="תלושים הוצאו">{live.filter(x => x.t._slipIssuedAt).length}/{live.length}</CardRow>
               </div>
             </div>
+            </div>
           </div>
         );
       })}
-      <p className="no-print" style={{ fontSize:13.8, color:'var(--text3)' }}>
+      {mode === 'prep' && <p className="no-print" style={{ fontSize:14.5, color:'var(--text2)', marginTop:10 }}>
         ההפרשות: פנסיה וקרן השתלמות על הבסיס בלבד; על התוספת מס שכר וביטוח לאומי בלבד.
-        לחיצה על שם עם סמל 📄 פותחת את התלוש המלא.
-      </p>
+        לחיצה על שורה עם סמל המסמך פותחת את התלוש המלא.
+      </p>}
       {openSlip && (() => {
         const { t, r } = openSlip;
         const sl = lines[t.id];
@@ -7249,23 +7261,23 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                 <p style={{ fontSize:18.4, fontWeight:800 }}>תלוש שכר · {fmtMonthFn ? fmtMonthFn(monthKey) : monthKey}</p>
                 <p style={{ fontSize:15.5, fontWeight:600 }}>{t.name}</p>
                 {r.principal ? (
-                  <p style={{ fontSize:13.8, color:'var(--text2)', fontWeight:600 }}>
+                  <p style={{ fontSize:14, color:'var(--text2)', fontWeight:600 }}>
                     מנהל/ת בית ספר · 40 שעות שבועיות · משרה מלאה{r.principalCalc ? ' · עולם ישן + גמול ניהול' : ''}
                   </p>
                 ) : (<>
-                <p style={{ fontSize:13.8, color:'var(--text2)', fontWeight:600 }}>
+                <p style={{ fontSize:14, color:'var(--text2)', fontWeight:600 }}>
                   {t.frontalHours} שעות פרונטליות{r.kita ? ' + 3 שעות חינוך (מחנכת)' : ''} = {r.hours} שעות
                 </p>
-                <p style={{ fontSize:13.8, color:'var(--text2)', fontWeight:600 }}>
+                <p style={{ fontSize:14, color:'var(--text2)', fontWeight:600 }}>
                   אחוז משרה עולם ישן: {r.hours}/30 = {r.pct}%
                 </p>
-                <p style={{ fontSize:13.2, color:'var(--text3)' }}>
+                <p style={{ fontSize:14, color:'var(--text3)' }}>
                   דרגה {r.darga} · ותק {r.vetek}{r.kita ? ' · גמול חינוך' : ''}
                 </p>
                 </>)}
               </div>
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:14.4 }}>
-                <thead><tr style={{ borderBottom:'1px solid var(--line)', color:'var(--text3)', fontSize:13.2 }}>
+                <thead><tr style={{ borderBottom:'1px solid var(--line)', color:'var(--text3)', fontSize:14 }}>
                   <th style={{ textAlign:'right', padding:'3px 4px' }}>סמל</th>
                   <th style={{ textAlign:'right', padding:'3px 4px' }}>רכיב</th>
                   <th style={{ textAlign:'left', padding:'3px 4px' }}>סכום</th>
@@ -7273,14 +7285,14 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                 <tbody>
                   {r.principal && !r.principalCalc && (
                     <tr style={{ borderBottom:'1px solid var(--line)' }}>
-                      <td style={{ padding:'4px', color:'var(--text3)', fontSize:13.2 }}></td>
+                      <td style={{ padding:'4px', color:'var(--text3)', fontSize:14 }}></td>
                       <td style={{ padding:'4px' }}>שכר מנהל/ת בית ספר</td>
                       <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(r.base).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   )}
                   {(sl?.lines || []).map((ln, i) => (
                     <tr key={i} style={{ borderBottom:'1px solid var(--line)' }}>
-                      <td style={{ padding:'4px', color:'var(--text3)', fontSize:13.2 }}>{ln.code}</td>
+                      <td style={{ padding:'4px', color:'var(--text3)', fontSize:14 }}>{ln.code}</td>
                       <td style={{ padding:'4px' }}>{ln.label}</td>
                       <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(ln.amount).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                     </tr>
@@ -7295,7 +7307,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                   {r.paysSupp && (
                     <tr style={{ borderBottom:'1px solid var(--line)' }}>
                       <td style={{ padding:'4px' }}></td>
-                      <td style={{ padding:'4px' }}>תוספת בית חב"ד <span style={{ fontSize:13.2, color:'var(--text3)' }}>(שורה קבועה — ללא נלוות)</span></td>
+                      <td style={{ padding:'4px' }}>תוספת בית חב"ד <span style={{ fontSize:14, color:'var(--text3)' }}>(שורה קבועה — ללא נלוות)</span></td>
                       <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{(r.principal ? r.supp : Math.max(0, r.gross - (sl?.gross || 0))).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   )}
@@ -7306,7 +7318,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                   </tr>
                 </tbody>
               </table>
-              <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:10 }}>
+              <p style={{ fontSize:14, color:'var(--text3)', marginTop:10 }}>
                 הרכיבים כפי שמפיק מחשבון משרד החינוך לנתוני התלוש · הופק ממערכת השכר, רשת גני חב"ד
               </p>
             </div>
@@ -7750,9 +7762,9 @@ function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, use
         <p style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--text)' }}>
           {title || `מסמכים מהנהלת החשבונות — ${fmtMonth(monthKey)}`}
         </p>
-        {(docs?.length ?? 0) > 0 && <span className="apple-badge badge-purple" style={{ fontSize: 13.2, padding: '2px 8px' }}>{docs.length}</span>}
+        {(docs?.length ?? 0) > 0 && <span className="apple-badge badge-purple" style={{ fontSize:14, padding: '2px 8px' }}>{docs.length}</span>}
       </div>
-      <p style={{ fontSize: 13.2, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.6 }}>
+      <p style={{ fontSize:14, color: 'var(--text3)', marginBottom: 10, lineHeight: 1.6 }}>
         דוח השכר, סיכום עלות מעביד או כל קובץ שיצא ממערכת השכר. גלוי לרשת, לחשבת השכר ולמאשרות — לא למנהלות.
       </p>
 
@@ -7774,7 +7786,7 @@ function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, use
           </label>
         </div>
       )}
-      {err && <p style={{ fontSize: 13.8, color: 'var(--danger)', marginBottom: 8 }}>{err}</p>}
+      {err && <p style={{ fontSize:14, color: 'var(--danger)', marginBottom: 8 }}>{err}</p>}
 
       {docs === null ? (
         <p style={{ fontSize: 15.5, color: 'var(--text3)' }}>טוען…</p>
@@ -7788,7 +7800,7 @@ function MonthDocuments({ monthKey, schools = [], schoolId = null, userRole, use
               <button onClick={() => open(d)} title="פתיחה"
                 style={{ flex: 1, minWidth: 0, textAlign: 'right', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
                 <p style={{ fontSize: 14.9, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fileName}</p>
-                <p style={{ fontSize: 13.2, color: 'var(--text3)' }}>
+                <p style={{ fontSize:14, color: 'var(--text3)' }}>
                   {[d.schoolId ? schoolName(d.schoolId) : 'כל בתי הספר', fmtSize(d.size), fmtWhen(d.uploadedAt), d.note].filter(Boolean).join(' · ')}
                 </p>
               </button>
@@ -7870,7 +7882,7 @@ function PrincipalLinkModal({ school, onClose }) {
               <MessageCircle size={15} strokeWidth={2.3} />
               {st.loading ? 'מנפיק…' : 'הנפקת קישור חדש'}
             </button>
-            <p style={{ fontSize: 13.2, color: 'var(--text3)', marginTop: 10, lineHeight: 1.6 }}>
+            <p style={{ fontSize:14, color: 'var(--text3)', marginTop: 10, lineHeight: 1.6 }}>
               הקישור הקודם שלה יבוטל. מי שמחזיק בקישור נכנס בשמה — לשלוח רק לה.
             </p>
           </>
@@ -7878,7 +7890,7 @@ function PrincipalLinkModal({ school, onClose }) {
         {st.link && (
           <>
             <input readOnly value={st.link} dir="ltr" className="apple-input" onFocus={e => e.target.select()}
-              style={{ fontSize: 13.8, marginBottom: 12, fontFamily: 'monospace' }} />
+              style={{ fontSize:14, marginBottom: 12, fontFamily: 'monospace' }} />
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {st.wa && (
                 <a href={st.wa} target="_blank" rel="noreferrer" className="apple-btn apple-btn-green" style={{ flex: 1, minHeight: 40, textDecoration: 'none' }}>
@@ -7890,7 +7902,7 @@ function PrincipalLinkModal({ school, onClose }) {
                 {copied ? '✓ הועתק' : 'העתקת הקישור'}
               </button>
             </div>
-            <p style={{ fontSize: 13.2, color: 'var(--text3)', marginTop: 12, lineHeight: 1.6 }}>
+            <p style={{ fontSize:14, color: 'var(--text3)', marginTop: 12, lineHeight: 1.6 }}>
               הקישור הקודם בוטל. {!st.wa && 'כדי לקבל כפתור וואטסאפ, שמרי לה טלפון בפרופיל.'}
             </p>
           </>
@@ -7939,13 +7951,13 @@ function ActualCostPanel({ teachers, schools, onSave }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-      <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6 }}>
+      <p style={{ fontSize:14, color:'var(--text3)', lineHeight:1.6 }}>
         הסכום מהנהלת החשבונות מחליף את האומדן בכל מקום — בדוחות, אצל השליח ואצל המאשרת.
         ריק = חזרה לאומדן. {missing > 0 ? `${missing} ללא עלות בפועל.` : 'לכולן יש עלות בפועל.'}
       </p>
       {bySchool.map(({ school, list }) => (
         <div key={school.id}>
-          <div style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
             <School size={13} strokeWidth={2.2} />
             {school.name}
           </div>
@@ -7960,10 +7972,10 @@ function ActualCostPanel({ teachers, schools, onSave }) {
                     <p style={{ fontSize:15.5, fontWeight:600, color:'var(--text)' }}>
                       {t.name}
                       {subInfo(t) && (
-                        <span style={{ fontWeight:600, fontSize:12.6, color:'var(--apple-orange)' }}>{` · ${subInfo(t)}`}</span>
+                        <span style={{ fontWeight:600, fontSize:14, color:'var(--apple-orange)' }}>{` · ${subInfo(t)}`}</span>
                       )}
                     </p>
-                    <p style={{ fontSize:13.2, color:'var(--text3)' }}>
+                    <p style={{ fontSize:14, color:'var(--text3)' }}>
                       אומדן {emp.estimate.toLocaleString('he-IL')} ₪ ({emp.pct}%)
                       {diff !== null && <span style={{ marginInlineStart:6, color: Math.abs(diff) > 10 ? 'var(--warn)' : 'var(--text3)' }}>· בפועל {diff > 0 ? '+' : ''}{diff}%</span>}
                     </p>
@@ -8041,7 +8053,7 @@ function SlipImportPanel({ teachers, schools, monthKey, onImport }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-      <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6 }}>
+      <p style={{ fontSize:14, color:'var(--text3)', lineHeight:1.6 }}>
         קובץ מרכז מהנהלת החשבונות — אקסל או CSV, עם או בלי כותרות. המערכת מזהה שם, ברוטו ועלות מעביד,
         מצליבה מול עובדות {fmtMonth(monthKey)} ומראה מה נמצא. הברוטו והעלות נכתבים רק אחרי אישור.
       </p>
@@ -8057,7 +8069,7 @@ function SlipImportPanel({ teachers, schools, monthKey, onImport }) {
           <input ref={fileRef} type="file" onChange={onPick} style={{ display:'none' }} accept=".xlsx,.xls,.csv" />
         </label>
       </div>
-      {err && <p style={{ fontSize:13.8, color:'var(--danger)' }}>{err}</p>}
+      {err && <p style={{ fontSize:14, color:'var(--danger)' }}>{err}</p>}
       {done != null && (
         <div className="apple-card" style={{ padding:'12px 14px', background:'var(--ok-bg)', display:'flex', gap:8, alignItems:'center' }}>
           <Check size={16} strokeWidth={2.4} color="var(--ok)" />
@@ -8068,10 +8080,10 @@ function SlipImportPanel({ teachers, schools, monthKey, onImport }) {
       {res && (
         <>
           <div style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}>
-            <span className="apple-badge badge-purple" style={{ fontSize:13.2 }}>{res.matched.length} הוצלבו מתוך {res.rows}</span>
-            {res.unmatchedRows.length > 0 && <span className="apple-badge" style={{ fontSize:13.2, background:'#FFF9EF', border:'1px solid #F3E3C2', color:'#B4650A' }}>{res.unmatchedRows.length} בקובץ בלי עובדת</span>}
-            {missing.length > 0 && <span className="apple-badge" style={{ fontSize:13.2 }}>{missing.length} עובדות בלי שורה בקובץ</span>}
-            {res.mode === 'guess' && <span style={{ fontSize:13.2, color:'var(--text3)' }}>בלי כותרות — העמודות זוהו לפי המספרים, בדקי שהברוטו נכון</span>}
+            <span className="apple-badge badge-purple" style={{ fontSize:14 }}>{res.matched.length} הוצלבו מתוך {res.rows}</span>
+            {res.unmatchedRows.length > 0 && <span className="apple-badge" style={{ fontSize:14, background:'#FFF9EF', border:'1px solid #F3E3C2', color:'#B4650A' }}>{res.unmatchedRows.length} בקובץ בלי עובדת</span>}
+            {missing.length > 0 && <span className="apple-badge" style={{ fontSize:14 }}>{missing.length} עובדות בלי שורה בקובץ</span>}
+            {res.mode === 'guess' && <span style={{ fontSize:14, color:'var(--text3)' }}>בלי כותרות — העמודות זוהו לפי המספרים, בדקי שהברוטו נכון</span>}
           </div>
 
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
@@ -8083,9 +8095,9 @@ function SlipImportPanel({ teachers, schools, monthKey, onImport }) {
                   <div style={{ flex:'1 1 170px', minWidth:0 }}>
                     <p style={{ fontSize:15.5, fontWeight:600, color:'var(--text)' }}>
                       {m.teacher.name}
-                      <span style={{ fontWeight:500, fontSize:12.6, color:'var(--text3)', marginInlineStart:6 }}>{howLabel[m.how]}{m.how !== 'tz' && m.row.name !== m.teacher.name ? ` · בקובץ: ${m.row.name}` : ''}</span>
+                      <span style={{ fontWeight:500, fontSize:14, color:'var(--text3)', marginInlineStart:6 }}>{howLabel[m.how]}{m.how !== 'tz' && m.row.name !== m.teacher.name ? ` · בקובץ: ${m.row.name}` : ''}</span>
                     </p>
-                    <p style={{ fontSize:13.2, color:'var(--text3)' }}>
+                    <p style={{ fontSize:14, color:'var(--text3)' }}>
                       {skip ? (m.left ? 'ברוטו 0 בקובץ — עזבה? לא מעדכנים' : 'אין ברוטו בשורה — לא מעדכנים')
                         : <>ברוטו {num(m.prevGross)} ← <b style={{ color:'var(--text)', whiteSpace:'nowrap' }}>{money(m.gross)}</b>
                             {jump != null && Math.abs(jump) >= 10 && <span style={{ color:'#B4650A', marginInlineStart:6 }}>{jump > 0 ? '+' : ''}{jump}%</span>}
@@ -8099,22 +8111,22 @@ function SlipImportPanel({ teachers, schools, monthKey, onImport }) {
 
           {res.unmatchedRows.length > 0 && (
             <div className="apple-card" style={{ padding:'10px 12px' }}>
-              <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text)', marginBottom:4 }}>בקובץ, בלי עובדת תואמת בחודש</p>
-              <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.7 }}>
+              <p style={{ fontSize:14, fontWeight:700, color:'var(--text)', marginBottom:4 }}>בקובץ, בלי עובדת תואמת בחודש</p>
+              <p style={{ fontSize:14, color:'var(--text3)', lineHeight:1.7 }}>
                 {res.unmatchedRows.map(r => `${r.name}${r.gross ? ` (${money(r.gross)})` : ''}`).join(' · ')}
               </p>
-              <p style={{ fontSize:12.6, color:'var(--text3)', marginTop:4 }}>שם שכתוב אחרת במערכת, או עובדת שאינה בחודש הזה. אפשר לתקן את השם בכרטיס העובדת ולייבא שוב.</p>
+              <p style={{ fontSize:14, color:'var(--text3)', marginTop:4 }}>שם שכתוב אחרת במערכת, או עובדת שאינה בחודש הזה. אפשר לתקן את השם בכרטיס העובדת ולייבא שוב.</p>
             </div>
           )}
           {missing.length > 0 && (
             <div className="apple-card" style={{ padding:'10px 12px' }}>
-              <p style={{ fontSize:13.8, fontWeight:700, color:'var(--text)', marginBottom:4 }}>
+              <p style={{ fontSize:14, fontWeight:700, color:'var(--text)', marginBottom:4 }}>
                 במערכת, בלי שורה בקובץ <span style={{ fontWeight:500, color:'var(--text3)' }}>· {missing.length}</span>
               </p>
-              <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.7 }}>
+              <p style={{ fontSize:14, color:'var(--text3)', lineHeight:1.7 }}>
                 {(showAllMissing ? missing : missing.slice(0, 12)).map(t => t.name).join(' · ')}
                 {missing.length > 12 && !showAllMissing && (
-                  <button onClick={() => setShowAllMissing(true)} style={{ background:'none', border:'none', color:'var(--purple)', fontWeight:600, fontSize:13.2, cursor:'pointer', padding:0, marginInlineStart:6 }}>
+                  <button onClick={() => setShowAllMissing(true)} style={{ background:'none', border:'none', color:'var(--purple)', fontWeight:600, fontSize:14, cursor:'pointer', padding:0, marginInlineStart:6 }}>
                     ועוד {missing.length - 12}
                   </button>
                 )}
@@ -8127,7 +8139,7 @@ function SlipImportPanel({ teachers, schools, monthKey, onImport }) {
               {busy ? 'מעדכנת…' : `עדכון ${writable.length} עובדות`}
             </button>
             <button className="apple-btn apple-btn-ghost" onClick={() => { setRes(null); setFile(null); }} disabled={busy} style={{ minHeight:44 }}>ביטול</button>
-            <span style={{ fontSize:12.6, color:'var(--text3)', flexBasis:'100%' }}>הקובץ נשמר גם במסמכי החודש.</span>
+            <span style={{ fontSize:14, color:'var(--text3)', flexBasis:'100%' }}>הקובץ נשמר גם במסמכי החודש.</span>
           </div>
         </>
       )}
@@ -8219,7 +8231,7 @@ function ScopePanel({ teachers, schools, onSave }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
-        <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6, flex:'1 1 220px' }}>
+        <p style={{ fontSize:14, color:'var(--text3)', lineHeight:1.6, flex:'1 1 220px' }}>
           {showAll
             ? `${rows.length} עובדות — כולל מי שאחוזה כבר נקבע ומי שכבר אושרה. הקלדה דורסת את הקיים.`
             : `${rows.length} עובדות שאחוז המשרה שלהן עדיין ברירת המחדל — 100 שאיש לא בחר.`}
@@ -8228,12 +8240,12 @@ function ScopePanel({ teachers, schools, onSave }) {
         <div className="apple-seg" style={{ flexShrink:0 }}>
           <button onClick={() => setShowAll(false)}
             className={['apple-seg-item', !showAll ? 'active' : ''].join(' ')}
-            style={{ padding:'5px 11px', fontSize:13.8 }}>
+            style={{ padding:'5px 11px', fontSize:14 }}>
             {`ממתינות (${missing.length})`}
           </button>
           <button onClick={() => setShowAll(true)}
             className={['apple-seg-item', showAll ? 'active' : ''].join(' ')}
-            style={{ padding:'5px 11px', fontSize:13.8 }}>
+            style={{ padding:'5px 11px', fontSize:14 }}>
             {`כל העובדות (${all.length})`}
           </button>
         </div>
@@ -8249,7 +8261,7 @@ function ScopePanel({ teachers, schools, onSave }) {
       )}
       {bySchool.map(({ school, list }) => (
         <div key={school.id}>
-          <div style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
             <School size={13} strokeWidth={2.2} />
             {school.name} · {list.length}
           </div>
@@ -8275,7 +8287,7 @@ function ScopePanel({ teachers, schools, onSave }) {
                 <div key={t.id} className="apple-card" style={{ padding:'10px 12px' }}>
                   <p style={{ fontSize:15.5, fontWeight:600, color:'var(--text)', marginBottom:2 }}>
                     {t.name}
-                    <span style={{ fontWeight:400, fontSize:13.2, color:'var(--text3)' }}>
+                    <span style={{ fontWeight:400, fontSize:14, color:'var(--text3)' }}>
                       {' · '}{reformLabel(t.reform)}
                       {` · ${DEGREE_LABELS[t.degree] || t.degree || 'בלי תואר'}`}
                       {` · ${t.seniority ?? 1} שנות ותק`}
@@ -8284,7 +8296,7 @@ function ScopePanel({ teachers, schools, onSave }) {
                   </p>
                   {/* הגמול משנה את האחוז — מחנכת מקבלת 3 שעות מעליו, ושאר
                       הגמולים אחוז מהשכר. בלי לראות אותו אי אפשר להחליט. */}
-                  <p style={{ fontSize:13.2, color:'var(--text3)', marginBottom:4 }}>
+                  <p style={{ fontSize:14, color:'var(--text3)', marginBottom:4 }}>
                     {t.role && t.role !== 'none'
                       ? <span style={{ color:'var(--purple)', fontWeight:600 }}>{ROLE_SHORT[t.role] || t.role}</span>
                       : <span>ללא גמול תפקיד</span>}
@@ -8298,7 +8310,7 @@ function ScopePanel({ teachers, schools, onSave }) {
                       תוספת אם קיימת. */}
                   {(t.childrenUnder18 || 0) > 0 && (
                     <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:4 }}>
-                      <span style={{ fontSize:13.2, color: t.gender ? 'var(--text3)' : 'var(--warn)', fontWeight: t.gender ? 400 : 700 }}>
+                      <span style={{ fontSize:14, color: t.gender ? 'var(--text3)' : 'var(--warn)', fontWeight: t.gender ? 400 : 700 }}>
                         {`${t.childrenUnder18} ילדים עד 18 · `}
                         {t.gender === 'f' ? 'אֵם' : t.gender === 'm' ? 'גבר — אין תוספת אם' : 'מי היא?'}
                         {t.gender === 'f' && isOfek ? ' — רלוונטי לאחוז בעולם הישן' : ''}
@@ -8307,11 +8319,11 @@ function ScopePanel({ teachers, schools, onSave }) {
                       {[{ v:'f', l:'אישה' }, { v:'m', l:'גבר' }].map(o => (
                         <button key={o.v} onClick={() => saveGender(t, o.v)}
                           className={`apple-btn ${t.gender === o.v ? 'apple-btn-blue' : 'apple-btn-ghost'}`}
-                          style={{ minHeight:28, padding:'0 11px', fontSize:13.2 }}>
+                          style={{ minHeight:28, padding:'0 11px', fontSize:14 }}>
                           {o.l}
                         </button>
                       ))}
-                      {flash[`${t.id}|gender`] && <span style={{ fontSize:13.2, color:'var(--ok)', fontWeight:700 }}>✓</span>}
+                      {flash[`${t.id}|gender`] && <span style={{ fontSize:14, color:'var(--ok)', fontWeight:700 }}>✓</span>}
                     </div>
                   )}
                   {fields.map(f => {
@@ -8320,12 +8332,12 @@ function ScopePanel({ teachers, schools, onSave }) {
                     return (
                       <div key={f.which} style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:6 }}>
                         <div style={{ flex:'1 1 150px', minWidth:0 }}>
-                          <p style={{ fontSize:13.8, fontWeight:600, color: f.done ? 'var(--text2)' : 'var(--warn)' }}>
+                          <p style={{ fontSize:14, fontWeight:600, color: f.done ? 'var(--text2)' : 'var(--warn)' }}>
                             {f.label}
                             {f.done && <span style={{ color:'var(--ok)', fontWeight:700 }}>{` · ${f.now}%`}</span>}
-                            {flash[key] && <span style={{ marginInlineStart:6, fontSize:13.2, color:'var(--ok)', fontWeight:700 }}>✓ נקבע</span>}
+                            {flash[key] && <span style={{ marginInlineStart:6, fontSize:14, color:'var(--ok)', fontWeight:700 }}>✓ נקבע</span>}
                           </p>
-                          <p style={{ fontSize:13.2, color:'var(--text3)' }}>{f.hint}</p>
+                          <p style={{ fontSize:14, color:'var(--text3)' }}>{f.hint}</p>
                         </div>
                         <input type="number" inputMode="numeric" className="apple-input" dir="ltr" placeholder="%"
                           value={cur}
@@ -8342,12 +8354,12 @@ function ScopePanel({ teachers, schools, onSave }) {
                         {f.sugg != null && (
                           <button className="apple-btn apple-btn-ghost" onClick={() => save(t, f.which, f.sugg)}
                             title="מחושב מהשעות שהמנהלת הזינה. אפשר להתעלם ולהקליד מספר אחר."
-                            style={{ minHeight:36, padding:'0 11px', fontSize:13.8 }}>
+                            style={{ minHeight:36, padding:'0 11px', fontSize:14 }}>
                             {`לפי השעות · ${f.sugg}%`}
                           </button>
                         )}
                         <button className="apple-btn apple-btn-ghost" onClick={() => save(t, f.which, 100)}
-                          style={{ minHeight:36, padding:'0 11px', fontSize:13.8 }}>
+                          style={{ minHeight:36, padding:'0 11px', fontSize:14 }}>
                           100%
                         </button>
                       </div>
@@ -8463,11 +8475,11 @@ function NotificationsView() {
               </span>
               {tab === 'sent' && (
                 <span className={`apple-badge badge-${n.status === 'sent' ? 'green' : n.status === 'failed' ? 'orange' : 'purple'}`}
-                  style={{ fontSize:13.2, padding:'2px 8px' }}>
+                  style={{ fontSize:14, padding:'2px 8px' }}>
                   {n.status === 'sent' ? 'נשלח' : n.status === 'failed' ? 'נכשל' : 'ממתין'} · {n.toName || ''}
                 </span>
               )}
-              <span style={{ fontSize:13.2, color:'var(--text3)', marginInlineStart:'auto' }}>{when(n.createdAt)}</span>
+              <span style={{ fontSize:14, color:'var(--text3)', marginInlineStart:'auto' }}>{when(n.createdAt)}</span>
             </div>
             <p style={{ fontSize:14.4, color:'var(--text2)', whiteSpace:'pre-wrap', lineHeight:1.6 }}>{n.body}</p>
           </div>
@@ -8503,7 +8515,7 @@ function FormsRequest({ teachers, monthKey }) {
         <Send size={15} strokeWidth={2.3} color="var(--purple)" />
         <div style={{ flex:'1 1 220px', minWidth:0 }}>
           <p style={{ fontSize:14.4, fontWeight:700, color:'var(--text)' }}>בקשת טפסים מעובדי ההוראה</p>
-          <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.6 }}>
+          <p style={{ fontSize:14, color:'var(--text3)', lineHeight:1.6 }}>
             טופס 101, נתוני העסקה והסכם — קישור אישי לכל אחת.
             {` ${approved.length} עובדי הוראה שאושרו החודש.`} רק מי שישלים/תשלים — השכר בחודש הבא ישולם.
           </p>
@@ -8513,9 +8525,9 @@ function FormsRequest({ teachers, monthKey }) {
           {busy ? 'שולח…' : 'שליחה לעובדי ההוראה'}
         </button>
       </div>
-      {err && <p style={{ fontSize:13.2, color:'var(--danger)', marginTop:8 }}>{err}</p>}
+      {err && <p style={{ fontSize:14, color:'var(--danger)', marginTop:8 }}>{err}</p>}
       {res && (
-        <p style={{ fontSize:13.2, marginTop:8, color: res.queued ? 'var(--ok)' : 'var(--text3)', fontWeight:600 }}>
+        <p style={{ fontSize:14, marginTop:8, color: res.queued ? 'var(--ok)' : 'var(--text3)', fontWeight:600 }}>
           {res.queued ? `${res.queued} הודעות נשלחות` : 'לא נשלחו הודעות חדשות'}
           {res.done ? ` · ${res.done} כבר השלימו` : ''}
           {res.noPhone ? ` · ${res.noPhone} בלי נייד — לא ניתן לשלוח אליהן` : ''}
@@ -8547,7 +8559,7 @@ function SlipsHandoff({ monthKey, role }) {
   const card = (bg, line, children) => (
     <div className="apple-card" style={{ padding: '12px 14px', marginBottom: 14, background: bg, borderColor: line }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>{children}</div>
-      {err && <p style={{ fontSize: 13.2, color: 'var(--danger)', marginTop: 6 }}>{err}</p>}
+      {err && <p style={{ fontSize:14, color: 'var(--danger)', marginTop: 6 }}>{err}</p>}
     </div>
   );
   if (role === 'clerk') {
@@ -8558,7 +8570,7 @@ function SlipsHandoff({ monthKey, role }) {
     if (st.doneAt) return card('var(--fill)', 'var(--line)', <>
       <p style={{ fontSize: 14.4, color: 'var(--text2)' }}>הודעת לשרה שהתלושים מוכנים ({fmt(st.doneAt)}) — ממתין לאישורה.</p>
       <button className="apple-btn apple-btn-ghost" disabled={busy} onClick={() => act('done')}
-        style={{ minHeight: 34, padding: '0 12px', fontSize: 13.8 }}>שליחת תזכורת</button>
+        style={{ minHeight: 34, padding: '0 12px', fontSize:14 }}>שליחת תזכורת</button>
     </>);
     return card('var(--purple-100, #F3EFFB)', 'var(--line)', <>
       <Send size={15} strokeWidth={2.3} color="var(--purple)" />
@@ -8840,6 +8852,7 @@ function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveSco
   const canSetScope = userRole === 'coordinator';
   const scopeTodo = canSetScope ? teachers.filter(scopeMissing).length : 0;
   const [tab, setTab] = useState(isClerk ? 'entry' : (scopeTodo ? 'scope' : 'entry'));
+  const [costMode, setCostMode] = useState('file');
 
   const rows = teachers.filter(t => !unpaidThisMonth(t));
   const missingGross = rows.filter(t => !simComplete(t)).length;
@@ -8850,8 +8863,8 @@ function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveSco
       <PageHead
         title={`שולחן השכר · ${fmtMonth(activeMonth)}`}
         subtitle={isClerk
-          ? 'הזנת ברוטו ותוספת בית חב"ד, עלות מעביד בפועל, ותלושי החודש.'
-          : 'אחוזי משרה, הזנת שכר, עלות מעביד בפועל, ומסמכי החודש.'}
+          ? 'הזנת ברוטו ותוספת בית חב"ד, ועלות מעביד בפועל.'
+          : 'אחוזי משרה, הזנת שכר ועלות מעביד בפועל.'}
       />
       <SlipsHandoff monthKey={activeMonth} role={userRole} />
       {/* לשוניות באותו גודל גם כשהן נשברות לשתי שורות */}
@@ -8869,15 +8882,7 @@ function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveSco
         </button>
         <button onClick={() => setTab('cost')} className={['apple-seg-item', tab === 'cost' ? 'active' : ''].join(' ')}
           style={{ padding:'6px 13px', fontSize:14.9 }}>
-          עלות מעביד בפועל{missingCost > 0 ? ` (${missingCost})` : ''}
-        </button>
-        <button onClick={() => setTab('import')} className={['apple-seg-item', tab === 'import' ? 'active' : ''].join(' ')}
-          style={{ padding:'6px 13px', fontSize:14.9 }}>
-          ייבוא תלוש
-        </button>
-        <button onClick={() => setTab('docs')} className={['apple-seg-item', tab === 'docs' ? 'active' : ''].join(' ')}
-          style={{ padding:'6px 13px', fontSize:14.9 }}>
-          תלושים ומסמכים
+          עלות בפועל{missingCost > 0 ? ` (${missingCost})` : ''}
         </button>
       </div>
 
@@ -8886,10 +8891,19 @@ function PayrollDesk({ teachers, schools, onSavePayroll, onSaveActual, onSaveSco
 
       {tab === 'scope' && canSetScope && <ScopePanel teachers={teachers} schools={schools} onSave={onSaveScope} />}
       {tab === 'entry' && <PayrollEntry teachers={rows} schools={schools} onSave={onSavePayroll} />}
-      {tab === 'cost'  && <ActualCostPanel teachers={teachers} schools={schools} onSave={onSaveActual} />}
-      {tab === 'import' && <SlipImportPanel teachers={teachers} schools={schools} monthKey={activeMonth} onImport={onImportSlip} />}
-      {tab === 'docs'  && (
-        <MonthDocuments monthKey={activeMonth} schools={schools} userRole={userRole} userId={userId} />
+      {/* דרך אחת לעלות בפועל: קובץ מהגזברות, או הקלדה לעובדת בודדת — באותה לשונית */}
+      {tab === 'cost' && (
+        <>
+          <div className="apple-seg even-grid" role="group" aria-label="איך מזינים עלות בפועל" style={{ marginBottom:12, maxWidth:420, gap:2 }}>
+            {[['file', 'מקובץ השכר'], ['hand', 'הקלדה ידנית']].map(([k, l]) => (
+              <button key={k} onClick={() => setCostMode(k)} aria-pressed={costMode === k}
+                className={['apple-seg-item', costMode === k ? 'active' : ''].join(' ')} style={{ padding:'6px 13px', fontSize:14.9 }}>{l}</button>
+            ))}
+          </div>
+          {costMode === 'file'
+            ? <SlipImportPanel teachers={teachers} schools={schools} monthKey={activeMonth} onImport={onImportSlip} />
+            : <ActualCostPanel teachers={teachers} schools={schools} onSave={onSaveActual} />}
+        </>
       )}
     </div>
   );
@@ -8935,15 +8949,15 @@ function PayrollEntry({ teachers, schools, onSave }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
-        <p style={{ fontSize:13.8, color:'var(--text3)', lineHeight:1.6, flex:'1 1 240px' }}>
+        <p style={{ fontSize:14, color:'var(--text3)', lineHeight:1.6, flex:'1 1 240px' }}>
           הברוטו שאת מזינה הוא מה שרץ בתשלומים. תוספת בית חב"ד היא החלק שאינו
           פנסיוני ואינו נושא קרן השתלמות — הוא נושא מס שכר וביטוח לאומי בלבד.
         </p>
         <div className="apple-seg" style={{ flexShrink:0 }}>
           <button onClick={() => setOnlyMissing(true)} className={['apple-seg-item', onlyMissing ? 'active' : ''].join(' ')}
-            style={{ padding:'5px 11px', fontSize:13.8 }}>ממתינות</button>
+            style={{ padding:'5px 11px', fontSize:14 }}>ממתינות</button>
           <button onClick={() => setOnlyMissing(false)} className={['apple-seg-item', !onlyMissing ? 'active' : ''].join(' ')}
-            style={{ padding:'5px 11px', fontSize:13.8 }}>כל העובדות</button>
+            style={{ padding:'5px 11px', fontSize:14 }}>כל העובדות</button>
         </div>
       </div>
       {err && <p style={{ fontSize:14.4, color:'var(--danger)' }}>{err}</p>}
@@ -8959,7 +8973,7 @@ function PayrollEntry({ teachers, schools, onSave }) {
 
       {bySchool.map(({ school, list }) => (
         <div key={school.id}>
-          <div style={{ fontSize:13.8, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:'var(--purple)', marginBottom:8, padding:'5px 11px', background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, display:'inline-flex', alignItems:'center', gap:6 }}>
             <School size={13} strokeWidth={2.2} />
             {school.name}
             {school.chabadSupp === false && <span style={{ fontWeight:400 }}> · בלי תוספת בית חב"ד</span>}
@@ -8974,18 +8988,18 @@ function PayrollEntry({ teachers, schools, onSave }) {
                 <div key={t.id} className="apple-card" style={{ padding:'10px 12px' }}>
                   <p style={{ fontSize:15.5, fontWeight:600, color:'var(--text)' }}>
                     {t.name}
-                    <span style={{ fontWeight:400, fontSize:13.2, color:'var(--text3)' }}>
+                    <span style={{ fontWeight:400, fontSize:14, color:'var(--text3)' }}>
                       {` · ${reformLabel(t.reform)} · ${DEGREE_LABELS[t.degree] || t.degree || '—'}`}
                       {` · ותק ${t.seniority ?? 1} · ${effectiveScope(t)}% משרה`}
                       {t.role && t.role !== 'none' ? ` · ${ROLE_SHORT[t.role] || t.role}` : ''}
                     </span>
                     {subInfo(t) && (
-                      <span style={{ fontWeight:600, fontSize:13.2, color:'var(--apple-orange)' }}>{` · ${subInfo(t)}`}</span>
+                      <span style={{ fontWeight:600, fontSize:14, color:'var(--apple-orange)' }}>{` · ${subInfo(t)}`}</span>
                     )}
-                    {flash[t.id] && <span style={{ marginInlineStart:6, fontSize:13.2, color:'var(--ok)', fontWeight:700 }}>✓ נשמר</span>}
+                    {flash[t.id] && <span style={{ marginInlineStart:6, fontSize:14, color:'var(--ok)', fontWeight:700 }}>✓ נשמר</span>}
                   </p>
                   <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:6 }}>
-                    <label style={{ fontSize:13.2, color:'var(--text3)' }}>
+                    <label style={{ fontSize:14, color:'var(--text3)' }}>
                       ברוטו
                       <input type="number" min="0" dir="ltr" className="apple-input"
                         value={gCur}
@@ -8995,7 +9009,7 @@ function PayrollEntry({ teachers, schools, onSave }) {
                         style={{ width:104, minHeight:36, textAlign:'center', fontWeight:700, marginInlineStart:6 }} />
                     </label>
                     {!noSupp && (
-                      <label style={{ fontSize:13.2, color:'var(--text3)' }}>
+                      <label style={{ fontSize:14, color:'var(--text3)' }}>
                         תוספת בית חב"ד
                         <input type="number" min="0" dir="ltr" className="apple-input"
                           value={sCur}
@@ -9007,12 +9021,12 @@ function PayrollEntry({ teachers, schools, onSave }) {
                       </label>
                     )}
                     {simComplete(t) && (
-                      <span style={{ fontSize:13.2, color:'var(--text3)' }}>
+                      <span style={{ fontSize:14, color:'var(--text3)' }}>
                         {`עלות מעביד לפי הנוסחה: ${emp.estimate.toLocaleString('he-IL')} ₪ (${emp.pct}%)`}
                         {` · סה״כ ${emp.total.toLocaleString('he-IL')} ₪`}
                       </span>
                     )}
-                    {busy === t.id && <span style={{ fontSize:13.2, color:'var(--text3)' }}>שומר…</span>}
+                    {busy === t.id && <span style={{ fontSize:14, color:'var(--text3)' }}>שומר…</span>}
                   </div>
                 </div>
               );
@@ -12374,6 +12388,14 @@ export default function App() {
   const area = view === 'bottomline' ? 'director' : ['calc', 'slips', 'mm', 'calibration'].includes(view) ? 'clerk' : 'mine';
   const inClerk = isClerk || (isCoord && area === 'clerk');
   const inMine = isCoord && area === 'mine';
+  const finTabs = isCoord ? (
+    <div className="apple-seg even-grid no-print" role="group" aria-label="כספי הסניפים" style={{ marginBottom:16, maxWidth:560, gap:2 }}>
+      {[['finance', 'כמה כל סניף מעביר'], ['ledger', 'מה התקבל והועבר']].map(([k, l]) => (
+        <button key={k} onClick={() => setView(k)} aria-pressed={view === k}
+          className={['apple-seg-item', view === k ? 'active' : ''].join(' ')} style={{ padding:'6px 13px', fontSize:15.5, minHeight:42 }}>{l}</button>
+      ))}
+    </div>
+  ) : null;
   const AREAS = [
     { key:'clerk', label:'גזברית', Icon: Calculator, go:'calc', title:'העבודה החודשית של חשבת השכר' },
     { key:'mine', label:'שלי', Icon: Wallet, go:'schools', title:'בתי הספר, העברות ותקבולים' },
@@ -12555,17 +12577,11 @@ export default function App() {
             {inClerk && <span className="nav-sep" />}
 
             {/* ── כספים ── */}
+            {/* העברות ותקבולים אוחדו למסך אחד עם שתי לשוניות (שרה אישרה, 6.10) */}
             {inMine && (
-              <button className={`nav-btn ${view==='finance' ? 'active' : ''}`} onClick={() => setView('finance')}>
+              <button className={`nav-btn ${view==='finance' || view==='ledger' ? 'active' : ''}`} onClick={() => setView('finance')}>
                 <Wallet size={15} strokeWidth={2.2} />
-                העברות לסניפים
-              </button>
-            )}
-            {/* "תן אפשרות לרשום בטבלה כל חודש מה התקבל..." (שרה, 23.9) — לעיני שרה בלבד */}
-            {inMine && (
-              <button className={`nav-btn ${view==='ledger' ? 'active' : ''}`} onClick={() => setView('ledger')}>
-                <Wallet size={15} strokeWidth={2.2} />
-                תקבולים
+                כספי הסניפים
               </button>
             )}
             {/* ── עובדים ── */}
@@ -12587,16 +12603,13 @@ export default function App() {
             {/* ── עוד ── */}
             {(inClerk || inMine) && (() => {
               const items = (inMine ? [
-                { key:'report', label:'דוח רשת', Icon: BarChart3, on: () => setView('report'), active: view === 'report' },
                 { key:'alerts', label:'התראות', Icon: Bell, on: () => setView('alerts'), active: view === 'alerts' },
                 { key:'backup', label:'גיבוי ושחזור', Icon: Database, on: () => setShowBackup(true), active: false },
               ] : isClerk ? [
-                { key:'calibration', label:'תלושים מול תחשיב', Icon: Percent, on: () => setView('calibration'), active: view === 'calibration' },
                 { key:'alerts', label:'התראות', Icon: Bell, on: () => setView('alerts'), active: view === 'alerts' },
                 { key:'backup', label:'גיבוי ושחזור', Icon: Database, on: () => setShowBackup(true), active: false },
-              ] : [
-                { key:'calibration', label:'תלושים מול תחשיב', Icon: Percent, on: () => setView('calibration'), active: view === 'calibration' },
-              ]);
+              ] : []);
+              if (!items.length) return null;
               const anyActive = items.some(x => x.active);
               return (
                 <>
@@ -12710,7 +12723,7 @@ export default function App() {
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} onApprove={onApproveTeacher} simState={simState} onCompute={onCompute} onDelete={onDeleteTeacher} />
         ) : view === 'finance' && (user.role === 'coordinator' || user.role === 'clerk') ? (
-          <TeachingCostView schools={schools} teachers={teachers} monthKey={activeMonth} onSaveSchool={onSaveSchool} onSaveTeacher={onSaveTeacher}
+          <TeachingCostView tabs={finTabs} schools={schools} teachers={teachers} monthKey={activeMonth} onSaveSchool={onSaveSchool} onSaveTeacher={onSaveTeacher}
             onImportSlip={(items, file, note) => run(async () => {
               await store.importSlip(items);
               if (file) await store.uploadDocument({ monthKey: activeMonth, schoolId: null, note, file }).catch(() => {});
@@ -12718,13 +12731,15 @@ export default function App() {
         ) : view === 'bottomline' && user.role === 'coordinator' ? (
           <BottomLineView activeMonth={activeMonth} />
         ) : view === 'ledger' && user.role === 'coordinator' ? (
-          <PaymentLedgerView schools={schools} teachers={teachers} months={months} activeMonth={activeMonth} />
+          <PaymentLedgerView tabs={finTabs} schools={schools} teachers={teachers} months={months} activeMonth={activeMonth} />
         ) : view === 'calibration' && (user.role === 'coordinator' || user.role === 'clerk') ? (
           <CalibrationView schools={schools} teachers={teachers} monthKey={activeMonth} />
         ) : view === 'mm' && (user.role === 'coordinator' || user.role === 'clerk') ? (
           <AbsencesView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} />
         ) : view === 'slips' ? (
           <SlipsView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth}
+            docs={(user.role === 'coordinator' || user.role === 'clerk')
+              ? <div style={{ marginTop:22 }}><MonthDocuments monthKey={activeMonth} schools={schools} userRole={user.role} userId={user.id} title="מסמכי החודש וקובצי השכר" /></div> : null}
             onSaveTeacher={user.role === 'coordinator' ? onSaveTeacher : null}
             onMarkSlip={(user.role === 'coordinator' || user.role === 'clerk')
               ? (id, issued) => run(() => store.markSlipIssued(id, issued)) : null}

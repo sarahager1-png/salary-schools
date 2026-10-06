@@ -1195,3 +1195,44 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .area-note { font-size: 14.5px; color: var(--text2); margin-inline-start: 8px; }
 @media (max-width: 720px) { .area-seg { flex: 1 1 100%; order: 2; margin-bottom: 6px; } .nav-wrap { order: 3; } .area-note { display: none; } }
 @media (min-width: 721px) and (max-width: 1100px) { .area-seg { flex-basis: 312px; } .area-seg button { font-size: 15px; gap: 4px; padding: 0 2px; } .area-seg button svg { width: 15px; height: 15px; } }
+
+/* מסך התלושים: בית ספר = שורה נפתחת; בהדפסה הכול פתוח */
+.slip-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; border: none; background: none; cursor: pointer;
+  font: inherit; text-align: start; color: var(--text); flex-wrap: wrap; }
+.slip-head:hover { background: #F7F4FC; }
+.slip-head .nm { font-size: 17.5px; font-weight: 800; flex: 1 1 180px; word-break: keep-all; }
+.slip-head .st { font-size: 15px; color: var(--text2); white-space: nowrap; min-width: 118px; }
+.slip-head .st b { color: var(--text); font-weight: 800; }
+.slip-head .st.ok b { color: var(--ok-text); }
+.slip-school.closed .slip-body { display: none; }
+.only-print { display: none; }
+@media print { .slip-school.closed .slip-body { display: block; } .only-print { display: block; } }
+.slip-table th { font-size: 14.5px !important; white-space: nowrap; }
+.slip-table td { padding-top: 9px; padding-bottom: 9px; }
+.gender-pick { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; border-radius: 9px; border: 1px solid var(--line); }
+.gender-pick button { border: none; background: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--text2); padding: 4px 8px;
+  border-radius: 7px; cursor: pointer; min-height: 30px; }
+.gender-pick button.on { background: var(--purple); color: #fff; }
+
+.slip-table td { white-space: nowrap; } .slip-table td:first-child { white-space: normal; min-width: 170px; }
+
+/* היעדרויות: טבלה אחת, שורת כותרת לכל בית ספר */
+.abs-table { width: 100%; }
+.abs-table thead th { font-size: 14.5px !important; white-space: nowrap; }
+.abs-table td { padding-top: 11px; padding-bottom: 11px; vertical-align: top; }
+.abs-table tr.grp th { text-align: start; background: #F3EFFA; color: var(--text); font-size: 16px; font-weight: 800; padding: 9px 14px;
+  border-top: 2px solid #D8CEEF; }
+.abs-table tr.grp th span { font-weight: 600; color: var(--text2); }
+
+.slip-table th, .slip-table td { padding-inline: 7px !important; } .slip-table td:first-child { min-width: 150px; }
+.apple-badge { font-size: 14px; }
+@media (max-width: 640px) {
+  .abs-table thead { display: none; }
+  .abs-table, .abs-table tbody, .abs-table tr, .abs-table td, .abs-table tr.grp th { display: block; width: 100%; }
+  .abs-table tr { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .abs-table tr.grp { padding: 0; }
+  .abs-table td { padding: 3px 0 !important; text-align: start !important; border: none !important; }
+  .abs-table td:first-child { font-size: 16.5px; font-weight: 800 !important; }
+  .abs-table td[data-l]::before { content: attr(data-l) ": "; color: var(--text2); font-weight: 600; }
+}
+.abs-table thead th:last-child { width: 34%; } .abs-table thead th:first-child { width: 20%; }
