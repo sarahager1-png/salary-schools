@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 91;
+const BUILD = 92;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4988,7 +4988,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
     וגם במצטבר מהחודש הראשון. 100% ומטה = בתוך הסימולציה. (עד 6.10 ההשוואה
     הייתה מול התחשיב מהתקציב; שרה: "לא רלוונטי — העלות לפי מחשבון המשרד".)
   */
-  const planned = summed.filter(r => r.plan != null);
+  // סניף שעדיין בסימולציה אינו נכנס לאחוז: אצלו בפועל = סימולציה, והוא היה מושך את האחוז ל-100
+  const planned = summed.filter(r => r.plan != null && !r.simOnly);
+  const simN = summed.filter(r => r.simOnly).length;
   const planSum = planned.reduce((a, r) => a + r.plan, 0);
   const planCost = planned.reduce((a, r) => a + r.cost, 0);
   const usePct = planSum > 0 ? Math.round(planCost / planSum * 100) : null;
@@ -5028,7 +5030,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const over = usePct != null && usePct > 100;
   const RING = 2 * Math.PI * 52;
   const sorted = rows.slice().sort((x, y) => ((y.plan ? y.cost / y.plan : -1) - (x.plan ? x.cost / x.plan : -1)));
-  const pctOf = r => (r.plan > 0 ? Math.round(r.cost / r.plan * 100) : null);
+  const pctOf = r => (r.plan > 0 && !r.simOnly ? Math.round(r.cost / r.plan * 100) : null);
   const pct20Of = r => (r.plan > 0 ? Math.round(r.costWith20 / r.plan * 100) : null);
   const usePct20 = planSum > 0 ? Math.round(planned.reduce((x, r) => x + r.costWith20, 0) / planSum * 100) : null;
   const Pct20 = ({ v }) => v == null ? null : (
@@ -5164,6 +5166,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
                       : summed.some(r => r.planSource === 'live') ? 'הסימולציה כרגע; תישמר בסגירת החודש' : 'הסימולציה שוחזרה'}
                   </span>
                 )}
+                {simN > 0 && (
+                  <span className="bl-fact" style={{ background:'var(--warn-bg)', borderColor:'var(--warn-line)', color:'#8F4E00', fontWeight:700 }}
+                    title="בסניפים האלה יש תיקוני ברוטו לפי התלושים שעוד לא אושרו במסך אישורים. עד האישור הם מוצגים לפי הסימולציה, ואינם נכללים באחוז.">
+                    <b className="num">{simN}</b> סניפים עדיין לפי הסימולציה
+                  </span>
+                )}
                 <span className="bl-fact" title="עובדות שעלותן נלקחה מקובץ השכר; לשאר — אומדן של המערכת">
                   עלות מקובץ השכר: <b className="num">{tot.withActual}</b> מתוך {tot.staff}
                 </span>
@@ -5228,7 +5236,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   const pc = pctOf(r), recv = r.ministryReceived;
                   return (
                   <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}{r.fromSlips && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3 }} title="הסניף עוד לא הוזן למערכת בחודש הזה; העלות היא סכום התלושים שהתקבלו מהגזברות">לפי התלושים</span>}</th>
+                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3, color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }} title={`${r.pendingFixes} תיקוני ברוטו לפי התלושים ממתינים לאישור. עד אז העלות מוצגת לפי הסימולציה`}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3 }} title="הסניף עוד לא הוזן למערכת בחודש הזה; העלות היא סכום התלושים שהתקבלו מהגזברות">לפי התלושים</span>}</th>
                     <td style={{ ...td, color:'var(--text2)' }}>{r.plan == null ? '—' : num(r.plan)}</td>
                     <td style={{ ...td, fontWeight:800 }} title={pc == null ? undefined : `${pc}% מהעלות לפי מחשבון המשרד`}>
                       {num(r.cost)}
@@ -5251,7 +5259,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  <td style={td}>{planSum ? num(planSum) : '—'}</td>
+                  <td style={td}>{summed.some(r => r.plan != null) ? num(summed.reduce((x, r) => x + (r.plan || 0), 0)) : '—'}</td>
                   <td style={td} title={usePct == null ? undefined : `${usePct}% מהעלות לפי מחשבון המשרד`}>{num(sum('cost'))}</td>
                   {anyTz && <td style={td}>{num(tzSum)}</td>}
                   <td style={td}>{num(minSum)}</td>
@@ -5270,7 +5278,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <div className="only-mobile big-cards">
             {sorted.map(r => { const pc = pctOf(r); const open = openB === r.id; return (
               <div key={'bl-' + r.id} className="apple-card mcard">
-                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}{r.fromSlips && <span className="bl-tag">לפי התלושים</span>}</p>
+                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag">לפי התלושים</span>}</p>
                 <CardRow label="בפועל" strong>{num(r.cost)}{pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
                 <CardRow label="נותר לפני הכרית" strong><Remain v={beforeOf(r)} /></CardRow>
                 <CardRow label="נותר כולל כרית 20%" strong><Open r={r} /></CardRow>

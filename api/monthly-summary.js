@@ -42,7 +42,6 @@ export default async function handler(req, res) {
     if (isPost && prof.role !== 'coordinator') return res.status(403).json({ error: 'רק הרכזת סוגרת חודש' });
 
     const { args, frozen, canClose } = await readAll(sb);
-    const [sc, tm, fin, led, mo, snaps, slips] = args;
 
     if (isPost) {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
@@ -56,7 +55,7 @@ export default async function handler(req, res) {
       if (body.action !== 'close') return res.status(400).json({ error: 'פעולה לא מוכרת' });
       if (frozen.some(f => f.month_key === month)) return res.status(409).json({ error: 'החודש כבר סגור' });
       // נסגר בדיוק מה שהדף מציג עכשיו — אותו חישוב
-      const live = summarize(sc, tm, fin, led, mo, snaps, slips, []).months.find(m => m.key === month);
+      const live = summarize(...args, []).months.find(m => m.key === month);
       if (!live || !live.branches.length) return res.status(400).json({ error: 'אין נתונים לחודש הזה' });
       const { error } = await sb.from('month_summary').insert(live.branches.map(b => ({
         month_key: month, school_id: b.id, data: b, closed_by: userData.user.id })));
@@ -66,7 +65,7 @@ export default async function handler(req, res) {
     }
 
     res.setHeader('cache-control', 'no-store');
-    return res.status(200).json({ ...summarize(sc, tm, fin, led, mo, snaps, slips, frozen), canClose, fetchedAt: new Date().toISOString() });
+    return res.status(200).json({ ...summarize(...args, frozen), canClose, fetchedAt: new Date().toISOString() });
   } catch (e) {
     // הפרטים ליומן השרת בלבד — מי שנכנס לצפייה מקבל הודעה כללית
     console.error('monthly-summary', e);
@@ -91,7 +90,7 @@ export async function readAll(sb) {
       if (!data || data.length < 1000) return out;
     }
   };
-  const [sc, tm, fin, led, mo, snaps, slips, frozen] = await Promise.all([
+  const [sc, tm, fin, led, mo, snaps, slips, frozen, fixes] = await Promise.all([
     all('schools', '*', 'id'),
     all('teacher_months', '*', 'id'),
     all('school_finance', 'school_id, ministry_budget, network_support, monthly_transfer, teaching_sim', 'school_id'),
@@ -106,12 +105,14 @@ export async function readAll(sb) {
       if (/does not exist|schema cache|PGRST205|42P01/i.test(String(e?.message))) { canClose = false; return []; }
       throw e;
     }),
+    // תיקוני ברוטו לפי תלושים שעוד לא אושרו — כל עוד הם ממתינים, הסניף מוצג לפי הסימולציה
+    all('proposed_fixes', 'id, teacher_month_id, status, patch', 'id'),
   ]);
-  return { args: [sc, tm, fin, led, mo, snaps, slips], frozen, canClose };
+  return { args: [sc, tm, fin, led, mo, snaps, slips, fixes], frozen, canClose };
 }
 
 /* החישוב עצמו — מיוצא, כדי שסקריפט בדיקה ישווה אותו מול המסך של שרה */
-export function summarize(schools, rows, finance, ledger, monthsRows, snapshots, slips, frozen) {
+export function summarize(schools, rows, finance, ledger, monthsRows, snapshots, slips, fixes, frozen) {
   schools = schools || []; rows = rows || [];
   // מצב המודול — כמו שהאפליקציה ממלאת אותו אחרי טעינה
   emp.CHABAD_SUPP.clear();
@@ -199,6 +200,32 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
     const sn = snapBy.get(`${mo.key}|${b.id}`);
     if (sn) { b.plan = Math.round(Number(sn.sim_cost)); b.planSource = sn.source; }
   }
+  /*
+    "תשאיר סימולציה כל עוד לא עודכנו התלושים" (שרה, 6.10.26). סניף שיש לו
+    תיקוני ברוטו לפי תלושים שעוד לא אושרו — העלות שלו בחודש הזה היא עדיין
+    לא "בפועל": חלק מהשורות לפי התלוש וחלק לפי המחשבון. עד שהתיקונים
+    מאושרים, הסניף מוצג לפי הסימולציה, ומסומן כך.
+  */
+  const rowBy = new Map(rows.map(r => [r.id, r]));
+  const waiting = new Map();   // "חודש|סניף" → מספר התיקונים הממתינים
+  for (const f of (fixes || [])) {
+    if (f.status !== 'pending' || !f.patch || (f.patch._slipGross == null && f.patch._officialGross == null)) continue;
+    const r = rowBy.get(f.teacher_month_id);
+    if (!r) continue;
+    const k = `${r.month_key}|${r.school_id}`;
+    waiting.set(k, (waiting.get(k) || 0) + 1);
+  }
+  for (const mo of months) for (const b of mo.branches) {
+    const w = waiting.get(`${mo.key}|${b.id}`);
+    if (!w || b.plan == null || b.fromSlips) continue;
+    b.simOnly = true; b.pendingFixes = w; b.systemCost = b.cost;
+    b.cost = b.plan; b.add20 = Math.round(b.cost * TRANSFER_PCT); b.costWith20 = b.cost + b.add20;
+    if (b.ministry != null) {
+      b.gap = Math.round(b.cost + b.add20 - b.ministry - b.support);
+      if (b.agreed == null) b.due = b.gap;
+    }
+  }
+
   /*
     חודש סגור: השורות כפי שנשמרו ברגע הסגירה, ולא החישוב החי. מה שנרשם
     אחר כך בתקבולים (משרד החינוך, העברת הסניף) ושם הסניף — מהנתונים הנוכחיים.
