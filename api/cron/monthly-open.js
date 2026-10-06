@@ -7,6 +7,7 @@
 */
 import { randomUUID } from 'node:crypto';
 import { db, guard, monthKeyNow, monthOf, cycleStarted, dueDatesFor } from '../_lib/db.js';
+import { snapshotSim } from '../_lib/simcost.js';
 
 export default async function handler(req, res) {
   const bad = guard(req);
@@ -23,8 +24,16 @@ export default async function handler(req, res) {
   const prevD = new Date(Date.UTC(py, pm - 2, 1));
   const prev = `${prevD.getUTCFullYear()}-${String(prevD.getUTCMonth() + 1).padStart(2, '0')}`;
 
+  /*
+    צילום הסימולציה של החודש שהסתיים, לפני שהתלושים שלו מגיעים (שרה, 6.10.26).
+    רץ גם כשהחודש החדש כבר נפתח ידנית. כשל כאן אינו עוצר את פתיחת החודש.
+  */
+  let simSnapshot = null;
+  try { simSnapshot = await snapshotSim(sb, prev); }
+  catch (e) { simSnapshot = { error: e.message }; console.error('sim snapshot', e); }
+
   const { data: exists } = await sb.from('months').select('key').eq('key', key).maybeSingle();
-  if (exists) return res.status(200).json({ ok: true, month: key, note: 'החודש כבר פתוח' });
+  if (exists) return res.status(200).json({ ok: true, month: key, note: 'החודש כבר פתוח', simSnapshot });
 
   const { error: mErr } = await sb.from('months').insert({
     key,
@@ -106,5 +115,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: `החודש נפתח, אבל התלושים המפורטים לא הועתקו במלואם: ${slipsError}`,
       month: key, copied: copied.length, slipsCopied });
   }
-  return res.status(200).json({ ok: true, month: key, copied: copied.length, slipsCopied });
+  return res.status(200).json({ ok: true, month: key, copied: copied.length, slipsCopied, simSnapshot });
 }

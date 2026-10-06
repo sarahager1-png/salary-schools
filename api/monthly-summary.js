@@ -51,16 +51,17 @@ export default async function handler(req, res) {
         if (!data || data.length < 1000) return out;
       }
     };
-    const [sc, tm, fin, led, mo] = await Promise.all([
+    const [sc, tm, fin, led, mo, snaps] = await Promise.all([
       all('schools', '*', 'id'),
       all('teacher_months', '*', 'id'),
       all('school_finance', 'school_id, ministry_budget, network_support, monthly_transfer, teaching_sim', 'school_id'),
       all('school_payment_ledger', 'school_id, month_key, ministry_received, chabad_paid', 'month_key'),
       all('months', 'key, opened_at, locked, closed_at', 'key'),
+      all('month_sim_snapshot', 'school_id, month_key, sim_cost, source', 'month_key'),
     ]);
 
     res.setHeader('cache-control', 'no-store');
-    return res.status(200).json({ ...summarize(sc, tm, fin, led, mo), fetchedAt: new Date().toISOString() });
+    return res.status(200).json({ ...summarize(sc, tm, fin, led, mo, snaps), fetchedAt: new Date().toISOString() });
   } catch (e) {
     // הפרטים ליומן השרת בלבד — מי שנכנס לצפייה מקבל הודעה כללית
     console.error('monthly-summary', e);
@@ -69,7 +70,7 @@ export default async function handler(req, res) {
 }
 
 /* החישוב עצמו — מיוצא, כדי שסקריפט בדיקה ישווה אותו מול המסך של שרה */
-export function summarize(schools, rows, finance, ledger, monthsRows) {
+export function summarize(schools, rows, finance, ledger, monthsRows, snapshots) {
   schools = schools || []; rows = rows || [];
   // מצב המודול — כמו שהאפליקציה ממלאת אותו אחרי טעינה
   emp.CHABAD_SUPP.clear();
@@ -138,7 +139,14 @@ export function summarize(schools, rows, finance, ledger, monthsRows) {
     for (const b of mo.branches) {
       const ts = mrows.filter(r => r.school_id === b.id).map(toTeacher).filter(t => !emp.isHourlyRow(t));
       b.plan = Math.round(ts.reduce((a, t) => a + emp.calcEmployer({ ...t, _actualEmployerCost: null }).total, 0)) || null;
+      b.planSource = 'live';   // מחושב עכשיו מהנתונים הנוכחיים — עוד לא צולם
     }
+  }
+  // צילום שנשמר גובר על החישוב החי: זו הסימולציה כפי שהייתה לפני התלושים
+  const snapBy = new Map((snapshots || []).map(x => [`${x.month_key}|${x.school_id}`, x]));
+  for (const mo of months) for (const b of mo.branches) {
+    const sn = snapBy.get(`${mo.key}|${b.id}`);
+    if (sn) { b.plan = Math.round(Number(sn.sim_cost)); b.planSource = sn.source; }
   }
   return { months };
 }

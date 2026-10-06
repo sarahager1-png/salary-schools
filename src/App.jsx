@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 74;
+const BUILD = 75;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5122,7 +5122,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <div className="bl-kpis">
           <p className="bl-group-title">השכר</p>
           <div className="kpi-grid">
-            <Kpi kind="plain" label="לפי מחשבון המשרד" sub="הסימולציה, לפני התלושים">{planSum ? num(planSum) : '—'}</Kpi>
+            <Kpi kind="plain" label="לפי מחשבון המשרד"
+              sub={summed.length && summed.every(r => r.planSource === 'auto') ? 'הסימולציה כפי שנשמרה לפני התלושים'
+                : summed.some(r => r.planSource === 'live') ? 'הסימולציה כרגע; תישמר בסגירת החודש'
+                : 'הסימולציה, לפני התלושים (שוחזרה)'}>{planSum ? num(planSum) : '—'}</Kpi>
             <Kpi kind="cost" label="עלות ההוראה בפועל" color={over ? 'var(--danger)' : undefined}
               sub={usePct == null ? '' : over ? `${usePct}% מהסימולציה — חריגה של ${num(planCost - planSum)}` : `${usePct}% מהסימולציה — נמוך ב-${num(planSum - planCost)}`}>{num(sum('cost'))}</Kpi>
             <Kpi kind="cost" label="כרית 20%" sub="מילוי מקום וביטחון, מעל העלות">{num(sum('add20'))}</Kpi>
