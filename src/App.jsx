@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 63;
+const BUILD = 65;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4997,21 +4997,23 @@ function BottomLineView({ activeMonth, viewer = false }) {
   };
   const income = r => (r.ministry == null ? null : r.ministry + (r.support || 0));
   // "נשאר פתוח" = החסר פחות מה שסוכם שהסניף מעביר. בלי סכום מוסכם — אין מה לחסר, ומסומן "טרם סוכם".
-  const openOf = r => (r.gap == null || r.agreed == null ? null : r.gap - r.agreed);
+  /*
+    "לא ברור" (שרה, 6.10): שלוש העמודות האחרונות חייבות להסתדר בחיסור, בשורה
+    ובסיכום: פער − הסניף מעביר = נותר לכיסוי. סניף שלא סוכם איתו סכום מעביר 0,
+    וכל הפער שלו נותר; סניף שמעביר יותר מהפער מוצג כעודף.
+  */
+  const openOf = r => (r.gap == null ? null : r.gap - (r.agreed || 0));
   const dealSum = summed.reduce((x, r) => x + (r.agreed || 0), 0);
   const noDeal = summed.filter(r => r.agreed == null && r.gap > 0).length;
-  const openSum = summed.reduce((x, r) => x + (r.agreed == null ? Math.max(0, r.gap || 0) : Math.max(0, r.gap - r.agreed)), 0);
+  const openSum = tot.gap - dealSum;
   const hasPay = upTo.some(m => m.branches.some(br => br.chabadPaid != null));
-  const Open = ({ r }) => {
-    const o = openOf(r);
-    if (r.gap == null) return <span>—</span>;
-    if (r.agreed == null) return r.gap > 0
-      ? <span className="num" style={{ color:'var(--danger)', whiteSpace:'nowrap' }}>{num(r.gap)}</span>
-      : <span style={{ color:'var(--ok-text)' }}>מכוסה</span>;
-    return o > 0
-      ? <span className="num" style={{ color:'var(--danger)', whiteSpace:'nowrap' }}>{num(o)}</span>
-      : <span style={{ color:'var(--ok-text)' }} title={o < 0 ? `הסניף מעביר ${num(-o)} יותר מהחסר` : undefined}>מכוסה</span>;
-  };
+  const Remain = ({ v }) => v == null ? <span>—</span>
+    : Math.round(v) === 0 ? <span style={{ color:'var(--ok-text)' }}>מאוזן</span>
+    : v > 0 ? <span className="num" style={{ color:'var(--danger)', whiteSpace:'nowrap' }}>{num(v)}</span>
+    : <span className="num" style={{ color:'var(--ok-text)', whiteSpace:'nowrap' }}>עודף {num(-v)}</span>;
+  const Open = ({ r }) => <Remain v={openOf(r)} />;
+  // סימן החשבון ליד שם העמודה — כדי שהשורה תיקרא כתרגיל
+  const Op = ({ c }) => <span aria-hidden="true" style={{ color:'var(--text3)', fontWeight:800, marginInlineEnd:4 }}>{c}</span>;
 
   return (
     <div className="fade-in page-wrap" style={{ maxWidth:1180 }} dir="rtl">
@@ -5081,7 +5083,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <span className="bl-fact">מתחילת השנה <b className="num" style={{ color: cumPct > 100 ? 'var(--danger)' : undefined }}>{cumPct}%</b></span>
                 )}
                 <span className="bl-fact">
-                  {openSum > 0 ? <>נשאר פתוח ברשת <b className="num" style={{ color:'var(--danger)' }}>{num(openSum)}</b></> : 'הכול מכוסה בהעברות שסוכמו'}
+                  {openSum > 0 ? <>נותר לכיסוי ברשת <b className="num" style={{ color:'var(--danger)' }}>{num(openSum)}</b></> : 'הכול מכוסה בהעברות שסוכמו'}
                 </span>
                 <span className="bl-fact">
                   {tot.paid == null ? 'העברות הסניפים טרם הוזנו' : <>הועבר <b className="num">{num(tot.paid)}</b> מתוך {num(tot.due)}</>}
@@ -5115,32 +5117,33 @@ function BottomLineView({ activeMonth, viewer = false }) {
               ? `התקבל מהמשרד ${num(recvSum)} ב-${recvN === 1 ? 'סניף אחד' : recvN + ' סניפים'} (תוכנן ${num(recvPlan)})`
               : `משרד ${num(tot.ministry)} · מענק ${num(tot.support)}`}>{num(tot.ministry + tot.support)}</Kpi>
             <Kpi kind="income" label="הסניפים מעבירים" sub={noDeal ? `סוכם עם ${summed.length - noDeal} סניפים; עם ${noDeal === 1 ? 'אחד' : noDeal} טרם סוכם` : 'לפי מה שסוכם איתם'}>{num(dealSum)}</Kpi>
-            <Kpi kind="result" label="נשאר פתוח" color={openSum > 0 ? 'var(--danger)' : 'var(--ok-text)'}
-              sub={openSum > 0 ? 'עלות + כרית, פחות ההכנסות והעברות הסניפים' : 'הכול מכוסה'}>{openSum > 0 ? num(openSum) : 'מכוסה'}</Kpi>
+            <Kpi kind="result" label="נותר לכיסוי" color={openSum > 0 ? 'var(--danger)' : 'var(--ok-text)'}
+              sub="בפועל + כרית, פחות ההכנסות ופחות מה שהסניפים מעבירים">{openSum > 0 ? num(openSum) : Math.round(openSum) === 0 ? 'מאוזן' : `עודף ${num(-openSum)}`}</Kpi>
           </div>
           </div>
 
           <h2 className="section-head">לפי סניף</h2>
-          <p className="section-sub">בכל שורה אותו חשבון: בפועל ועוד הכרית, פחות ההכנסות, פחות מה שהסניף מעביר — ומה שנשאר פתוח. הסניפים מסודרים מהקרוב ביותר לתכנון.</p>
+          <p className="section-sub">כל שורה היא תרגיל אחד, מימין לשמאל: בפועל + כרית 20% − משרד החינוך − מענק רשת = פער. הפער − מה שהסניף מעביר = נותר לכיסוי.</p>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{`שורה תחתונה לפי סניף, ${fmtMonth(sel)}: תוכנן, בפועל, כרית 20%, הכנסות, חסר, הסניף מעביר ונשאר פתוח`}</caption>
+              <caption className="sr-only">{`שורה תחתונה לפי סניף, ${fmtMonth(sel)}: תוכנן, בפועל, כרית 20%, משרד החינוך, מענק רשת, פער, הסניף מעביר ונותר לכיסוי`}</caption>
               <colgroup>
                 <col /><col className="g-cost" /><col className="g-cost" /><col className="g-cost" />
-                <col className="g-inc" /><col className="g-res" /><col className="g-res" /><col className="g-res g-sum" />
+                <col className="g-inc" /><col className="g-inc" /><col className="g-res" /><col className="g-res" /><col className="g-res g-sum" />
                 {hasPay && <><col /><col /></>}
               </colgroup>
               <thead>
                 <tr className="bl-groups">
                   <th />
                   <th colSpan={3} scope="colgroup" className="gh-cost">השכר</th>
-                  <th scope="colgroup" className="gh-inc">ההכנסות</th>
+                  <th colSpan={2} scope="colgroup" className="gh-inc">ההכנסות</th>
                   <th colSpan={3} scope="colgroup" className="gh-res">מה נשאר</th>
                   {hasPay && <th colSpan={2} scope="colgroup">העברות בפועל</th>}
                 </tr>
                 <tr>
-                  <TH>סניף</TH><TH>תוכנן</TH><TH>בפועל</TH><TH>כרית 20%</TH>
-                  <TH>משרד החינוך + מענק</TH><TH>חסר</TH><TH>הסניף מעביר</TH><TH>נשאר פתוח</TH>
+                  <TH>סניף</TH><TH>תוכנן</TH><TH>בפועל</TH><TH><Op c="+" />כרית 20%</TH>
+                  <TH><Op c="−" />משרד החינוך</TH><TH><Op c="−" />מענק רשת</TH>
+                  <TH><Op c="=" />פער</TH><TH><Op c="−" />הסניף מעביר</TH><TH><Op c="=" />נותר לכיסוי</TH>
                   {hasPay && <><TH>הועבר</TH><TH>יתרה מצטברת</TH></>}
                 </tr>
               </thead>
@@ -5155,7 +5158,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                       {num(r.cost)}
                       {pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</td>
                     <td style={{ ...td, color:'var(--text2)' }}>{num(r.add20)}</td>
-                    <td style={td} title={recv == null ? undefined : `התקבל ממשרד החינוך ${num(recv)} מתוך ${num(r.ministry)} שתוכננו`}>{num(income(r))}</td>
+                    <td style={td} title={recv == null ? undefined : `התקבל בפועל ${num(recv)} מתוך ${num(r.ministry)} שתוכננו`}>{num(r.ministry)}</td>
+                    <td style={td}>{num(r.support)}</td>
                     <td style={{ ...td, fontWeight:700 }}>{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : `עודף ${num(-r.gap)}`}</td>
                     <td style={td}>{r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(r.agreed)}</td>
                     <td style={{ ...td, fontWeight:800 }}><Open r={r} /></td>
@@ -5167,12 +5171,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
                   <td style={td}>{planSum ? num(planSum) : '—'}</td>
-                  <td style={td}>{num(sum('cost'))}{usePct != null && <span className={'bl-chip' + (over ? ' over' : '')}>{usePct}%</span>}</td>
+                  <td style={td} title={usePct == null ? undefined : `${usePct}% מהתכנון`}>{num(sum('cost'))}</td>
                   <td style={td}>{num(sum('add20'))}</td>
-                  <td style={td}>{num(tot.ministry + tot.support)}</td>
+                  <td style={td}>{num(tot.ministry)}</td>
+                  <td style={td}>{num(tot.support)}</td>
                   <td style={td}>{num(tot.gap)}</td>
                   <td style={td}>{num(dealSum)}</td>
-                  <td style={{ ...td, color: openSum > 0 ? 'var(--danger)' : 'var(--ok-text)' }}>{openSum > 0 ? num(openSum) : 'מכוסה'}</td>
+                  <td style={td}><Remain v={openSum} /></td>
                   {hasPay && <><td style={td}>{tot.paid == null ? '—' : num(tot.paid)}</td><td style={td}><Bal v={tot.balance} /></td></>}
                 </tr>
               </tfoot>
@@ -5185,13 +5190,14 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <div key={'bl-' + r.id} className="apple-card mcard">
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{r.name}</p>
                 <CardRow label="בפועל" strong>{num(r.cost)}{pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
-                <CardRow label="נשאר פתוח" strong><Open r={r} /></CardRow>
+                <CardRow label="נותר לכיסוי" strong><Open r={r} /></CardRow>
                 {open && (
                   <>
                     <CardRow label="תוכנן">{r.plan == null ? '—' : num(r.plan)}</CardRow>
                     <CardRow label="כרית 20%">{num(r.add20)}</CardRow>
-                    <CardRow label="משרד החינוך + מענק">{num(income(r))}</CardRow>
-                    <CardRow label="חסר">{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : `עודף ${num(-r.gap)}`}</CardRow>
+                    <CardRow label="משרד החינוך">{num(r.ministry)}</CardRow>
+                    <CardRow label="מענק רשת">{num(r.support)}</CardRow>
+                    <CardRow label="פער">{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : `עודף ${num(-r.gap)}`}</CardRow>
                     <CardRow label="הסניף מעביר">{r.agreed == null ? 'טרם סוכם' : num(r.agreed)}</CardRow>
                     {hasPay && <CardRow label="הועבר">{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</CardRow>}
                     {hasPay && <CardRow label="יתרה מצטברת"><Bal v={r.balance} /></CardRow>}
@@ -5218,8 +5224,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
           {showNote && (
             <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
               <b>תוכנן</b> — עלות ההוראה שנקבעה בתקציב (התחשיב הראשוני), החלק ה-12 שלה לחודש. <b>בפועל</b> — עלות המעביד של עובדי ההוראה בחודש, כולל מנהלת; האחוז שלידה הוא בפועל מתוך התכנון.
-              {' '}<b>כרית 20%</b> — תוספת של 20% על העלות בפועל, למילוי מקום וביטחון. <b>משרד החינוך + מענק</b> — החלק ה-12 מהסכום השנתי.
-              {' '}<b>חסר</b> — בפועל ועוד הכרית, פחות ההכנסות. <b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו. <b>נשאר פתוח</b> — החסר פחות מה שהסניף מעביר; "מכוסה" כשאין מה להשלים.
+              {' '}<b>כרית 20%</b> — תוספת של 20% על העלות בפועל, למילוי מקום וביטחון. <b>משרד החינוך</b> ו<b>מענק רשת</b> — החלק ה-12 מהסכום השנתי של כל אחד.
+              {' '}<b>פער</b> — בפועל ועוד הכרית, פחות משרד החינוך ופחות המענק. <b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו; "טרם סוכם" נספר כאפס. <b>נותר לכיסוי</b> — הפער פחות מה שהסניף מעביר; "עודף" כשהסניף מעביר יותר מהפער.
               {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
             </p>
           )}
