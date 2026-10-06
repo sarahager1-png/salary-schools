@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 95;
+const BUILD = 96;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -925,7 +925,7 @@ function RejectDialog({ t, schoolName, onCancel, onConfirm }) {
   );
 }
 
-function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose, fixes = [], onDecideFix }) {
+function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose, fixes = [], onDecideFix, monthLabel = '', otherFixes = 0 }) {
   // דיווחי מנהלות — השלב הראשון: בלי אישורה אין סימולציה ואין שכר (21.9.26)
   const reports = onApproveReport ? teachers.filter(reportPending) : [];
   const [rejecting, setRejecting] = useState(null);
@@ -946,7 +946,7 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
         {/* Header */}
         <div className="modal-head" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24, gap:10, flexWrap:'wrap' }}>
           <div>
-            <h2 style={{ fontSize:23, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)', marginBottom:2 }}>אישור שכר חודשי</h2>
+            <h2 style={{ fontSize:23, fontWeight:700, letterSpacing:'-0.02em', color:'var(--apple-text)', marginBottom:2 }}>אישור שכר חודשי{monthLabel ? ` · ${monthLabel}` : ''}</h2>
             <p style={{ fontSize:14.9, color:'var(--apple-text2)' }}>{readyToApprove.length} ממתינים לאישורך</p>
           </div>
           <div style={{ display:'flex', gap:8 }}>
@@ -959,6 +959,13 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
           </div>
         </div>
 
+        {/* מה שמוצג כאן שייך לחודש הנבחר בלבד — שיהיה ברור, ושיידעו שיש עוד בחודש אחר */}
+        {otherFixes > 0 && (
+          <p style={{ fontSize:15, fontWeight:600, lineHeight:1.5, padding:'10px 14px', borderRadius:12, marginBottom:14,
+            background:'var(--warn-bg)', border:'1px solid var(--warn-line)', color:'#8F4E00' }}>
+            כאן מוצגים רק התיקונים של {monthLabel}. עוד {otherFixes} תיקונים ממתינים בחודשים אחרים. מחליפים חודש בבורר שבראש המסך.
+          </p>
+        )}
         {/* תיקונים שהוצעו מהשרת — "תמלא, אני מאשרת" (שרה, 22.9) */}
         {fixes.length > 0 && (
           <div className="apple-card" style={{ padding:16, marginBottom:16, borderRight:'3px solid var(--apple-blue)' }}>
@@ -12366,8 +12373,22 @@ export default function App() {
   // המאשרת הרשתית נדרשת בחודש הראשון בלבד, ולכן היא נוחתת עליו — לא על
   // החודש הקלנדרי, שבו אין לה מה לעשות ושבו המסך אמר לה "אין צורך".
   const landOnFirstMonth = useCallback((profile, data) => {
-    if (profile?.role !== 'network') return;
     const keys = Object.keys(data?.months || {}).sort();
+    /*
+      "הכל ספטמבר!" (שרה, 6.10). השכר משולם בדיעבד והחודש נסגר ב-10 בחודש
+      שאחריו: עד ה-10 שרה וחשבת השכר עובדות על החודש הקודם, ולכן שם הן
+      נוחתות בכניסה — לא על החודש בלוח, שעדיין נושא העתק של קודמו.
+    */
+    if (profile?.role === 'coordinator' || profile?.role === 'clerk') {
+      const d = new Date();
+      if (d.getDate() <= 10) {
+        const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+        const wk = toMonthKey(prev.getFullYear(), prev.getMonth() + 1);
+        if (keys.includes(wk)) setActiveMonth(wk);
+      }
+      return;
+    }
+    if (profile?.role !== 'network') return;
     if (keys.length) setActiveMonth(keys[0]);
   }, []);
 
@@ -13170,6 +13191,8 @@ export default function App() {
           onApprove={onApproveTeacher}
           onReject={user.role === 'coordinator' ? onRejectTeacher : null}
           fixes={user.role === 'coordinator' ? liveFixes : []}
+          monthLabel={fmtMonth(activeMonth)}
+          otherFixes={user.role === 'coordinator' ? fixes.length - liveFixes.length : 0}
           onDecideFix={onDecideFix}
           onApproveAll={onApproveAll}
           onApproveReport={user.role === 'coordinator' ? onApproveReport : null}
