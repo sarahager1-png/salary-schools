@@ -930,3 +930,39 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   background: #FFE7BA; border: 1px solid #F5C77A; border-radius: 8px; padding: 1px 6px; white-space: normal; line-height: 1.25; }
 .fin-nopay-card { background: #FFF8EC !important; border-color: #F5C77A !important; }
 .fin-budget-tag { display: block; font-size: 11px; font-weight: 700; color: var(--purple); }
+
+/* ── טבלה גדולה ומעוצבת — העברות לסניפים ושורה תחתונה ─────────────
+   "תגדיל גופן ותעצב יותר הכל" (שרה, 6.10). הגדלים כאן גוברים על
+   הגדלים שבשורות עצמן, כדי ששתי הטבלאות ייראו אותו דבר ממקום אחד. */
+.big-table { font-variant-numeric: tabular-nums; }
+.big-table thead th {
+  background: #F3EFFA; color: #4A3480;
+  font-size: 14.4px !important; font-weight: 800 !important;
+  padding: 13px 6px !important; border-bottom: 2px solid #C9BCE6;
+}
+.big-table thead th:first-child { text-align: right !important; padding-inline-start: 16px !important; }
+.big-table tbody td { font-size: 16.6px !important; padding-top: 13px; padding-bottom: 13px; }
+.big-table tbody td:first-child { padding-inline-start: 16px !important; }
+.big-table tbody tr:nth-child(even) td { background: #FBFAFE; }
+.big-table tbody tr:hover td { background: #F4F0FB; }
+.big-table tfoot td {
+  font-size: 17.4px !important; font-weight: 800;
+  background: #EDE8F8; border-top: 2px solid #C9BCE6;
+  padding-top: 15px; padding-bottom: 15px;
+}
+.big-table tfoot td:first-child { padding-inline-start: 16px !important; }
+.big-table .fin-input { font-size: 16.6px; min-height: 40px; }
+.big-cards .mcard { padding: 16px 18px 12px; border-radius: 16px; }
+.big-cards .mcard-name { font-size: 18.4px; }
+.big-cards .mcard-label { font-size: 15.2px; }
+.big-cards .mcard-value { font-size: 16.6px; }
+.big-cards .mcard-row { padding-top: 9px; padding-bottom: 9px; }
+.big-cards .mcard-row-strong .mcard-value { font-size: 18.4px; }
+.big-table.sticky-first thead th:first-child { background: #F3EFFA; }
+.big-table.sticky-first tfoot td:first-child { background: #EDE8F8; }
+.big-table td { white-space: nowrap; }
+.big-table td:first-child { white-space: normal; min-width: 150px; line-height: 1.3; }
+.big-table .fin-input { width: 92px; padding: 5px 4px !important; }
+/* כרטיסיות המספרים — תמיד אותו רוחב ואותו גובה: שלוש בשורה, שתיים בנייד */
+.kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; margin-top: 12px; }
+@media (max-width: 700px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }

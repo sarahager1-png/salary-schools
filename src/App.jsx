@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 53;
+const BUILD = 54;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4867,11 +4867,240 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth }) {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   שורה תחתונה לחודש — דף המנהל
+   ═══════════════════════════════════════════════════════════════
+   "המנהל רוצה לראות כל חודש מה קורה, שורה תחתונה"; "כניסה שלו לצפייה";
+   "תוסיף גם כמה כסף העבירו השליחים כל חודש ונבדוק פערי חובה וזכות"
+   (שרה, 6.10).
+
+   הדף קריאה בלבד. המספרים מגיעים מ-api/monthly-summary — סכומים לסניף,
+   מחושבים בשרת באותו מודול של המסכים האחרים; שורות השכר האישיות אינן
+   מגיעות לדפדפן של מי שנכנס לצפייה. ההעברות בפועל מוזנות במסך
+   "תקבולים ותשלומים", והיתרה כאן מצטברת מהחודש הראשון עד החודש שנבחר.
+*/
+function BottomLineView({ activeMonth, viewer = false }) {
+  const [data, setData] = useState(null);
+  const [err, setErr]   = useState('');
+  const [sel, setSel]   = useState(null);
+  const [showNote, setShowNote] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    store.fetchMonthlySummary().then(d => {
+      if (!alive) return;
+      const keys = (d.months || []).filter(m => m.branches.length).map(m => m.key);
+      setData(d);
+      setSel(keys.includes(activeMonth) ? activeMonth : (keys[keys.length - 1] || null));
+    }).catch(e => { if (alive) setErr(e.message); });
+    return () => { alive = false; };
+  }, [activeMonth]);
+
+  const num = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL'));
+  const months = (data?.months || []).filter(m => m.branches.length);
+  const idx  = months.findIndex(m => m.key === sel);
+  const cur  = idx >= 0 ? months[idx] : null;
+  const prev = idx > 0 ? months[idx - 1] : null;
+  const upTo = idx >= 0 ? months.slice(0, idx + 1) : [];
+  // יתרה מצטברת לסניף: מה שהיה עליו להעביר עד החודש הזה פחות מה שהעביר.
+  // חיובי = חובה (הסניף חייב לרשת), שלילי = זכות. בלי אף העברה רשומה — אין יתרה להציג.
+  const balanceOf = id => {
+    let due = 0, paid = 0, any = false;
+    for (const m of upTo) {
+      const b = m.branches.find(x => x.id === id);
+      if (!b) continue;
+      if (b.chabadPaid != null) any = true;
+      due += Math.max(0, b.due || 0); paid += b.chabadPaid || 0;
+    }
+    return any ? due - paid : null;
+  };
+  const rows = (cur?.branches || []).map(b => ({ ...b, balance: balanceOf(b.id),
+    over: b.gap != null && b.agreed != null ? b.gap - b.agreed : null }));
+  // הסיכום רק על סניפים שיש להם פער לחשב — כדי שהחיסור בשורה יסתדר
+  const summed = rows.filter(r => r.gap != null);
+  const sum = k => summed.reduce((a, r) => a + (r[k] || 0), 0);
+  const tot = { costWith20: sum('costWith20'), ministry: sum('ministry'), support: sum('support'), gap: sum('gap'),
+    due: summed.reduce((a, r) => a + Math.max(0, r.due || 0), 0),
+    paid: summed.some(r => r.chabadPaid != null) ? sum('chabadPaid') : null,
+    balance: summed.some(r => r.balance != null) ? sum('balance') : null,
+    staff: sum('staff'), withActual: sum('withActual') };
+  const prevCost = prev ? prev.branches.filter(b => b.gap != null).reduce((a, b) => a + b.costWith20, 0) : null;
+  const net = tot.due - tot.gap;   // מה שסוכם להעברה מול הפער המחושב: חיובי = עודף לרשת
+
+  const Bal = ({ v }) => v == null
+    ? <span style={{ color:'var(--text3)', fontSize:14.4 }}>טרם הוזן</span>
+    : Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok)' }}>מאוזן</span>
+    : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger)' : 'var(--ok)' }}>
+        {v > 0 ? 'חובה ' : 'זכות '}{num(Math.abs(v))}</span>;
+  // גוון הכרטיסייה לפי סוג המספר — אותה שפה של הטבלה הראשית: הכנסה ירקרק, הוצאה ורדרד, תוצאה סגלגל
+  const TINT = { cost:['#FDF3F4','#F3D5D9'], income:['#F1F9F3','#CFE8D5'], result:['#F5F1FC','#D8CEEF'], plain:['var(--surface)','var(--line)'] };
+  const Kpi = ({ label, children, sub, color, kind = 'plain' }) => (
+    <div style={{ padding:'14px 16px', display:'flex', flexDirection:'column', justifyContent:'space-between', minWidth:0,
+      background:TINT[kind][0], border:`1px solid ${TINT[kind][1]}`, borderRadius:16, boxShadow:'0 1px 2px rgba(40,20,90,.04)' }}>
+      <p style={{ fontSize:14.6, fontWeight:700, color:'var(--text2)', lineHeight:1.3 }}>{label}</p>
+      <p className="num" style={{ fontSize:26, fontWeight:800, letterSpacing:'-0.02em', color: color || 'var(--text)', marginTop:6, overflowWrap:'anywhere', lineHeight:1.15 }}>{children}</p>
+      <p style={{ fontSize:13.4, color:'var(--text3)', marginTop:4, minHeight:18, lineHeight:1.35 }}>{sub || ''}</p>
+    </div>
+  );
+  const status = r => r.gap == null ? { t:'טרם הוזן תקציב משרד החינוך', c:'var(--text3)' }
+    : r.agreed == null ? { t:'טרם סוכם סכום להעברה', c:'#B4650A' }
+    : r.over > 0 ? { t:`הפער גבוה ב-${num(r.over)} מהסכום שסוכם`, c:'var(--danger)' }
+    : { t:'בתוך הסכום שסוכם', c:'var(--ok)' };
+  const TH = ({ children }) => (
+    <th style={{ padding:'8px 4px', fontSize:12.8, fontWeight:700, color:'var(--text2)', textAlign:'center', lineHeight:1.25, verticalAlign:'bottom' }}>{children}</th>
+  );
+  const td = { textAlign:'center', fontSize:14.6 };
+
+  return (
+    <div className="fade-in page-wrap" style={{ maxWidth:1280 }} dir="rtl">
+      <PageHead
+        title={`שורה תחתונה${sel ? ' · ' + fmtMonth(sel) : ''}`}
+        badge={viewer ? (
+          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700, color:'var(--purple)',
+            background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, padding:'3px 11px' }}>
+            <ShieldCheck size={14} strokeWidth={2.4} />צפייה בלבד
+          </span>) : null}
+        subtitle="עלות ההוראה מול הכנסות משרד החינוך, מה שסוכם שכל סניף מעביר, ומה שהועבר בפועל. כל הסכומים לחודש, בש״ח."
+      />
+
+      {err && (
+        <div style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'1px solid var(--danger-line)', borderRadius:10,
+          padding:'9px 14px', fontSize:14.9, fontWeight:600, marginBottom:12 }}>{err}</div>
+      )}
+      {!data && !err && <div className="apple-card" style={{ padding:22, textAlign:'center', fontSize:15, color:'var(--text3)' }}>טוען…</div>}
+      {data && !months.length && <div className="apple-card" style={{ padding:22, textAlign:'center', fontSize:15, color:'var(--text3)' }}>עדיין אין חודש עם נתוני שכר.</div>}
+
+      {cur && (
+        <>
+          <div className="page-toolbar">
+            <div className="apple-seg" style={{ flexWrap:'wrap' }}>
+              {months.map(m => (
+                <button key={m.key} onClick={() => setSel(m.key)}
+                  className={['apple-seg-item', sel === m.key ? 'active' : ''].join(' ')}
+                  style={{ padding:'5px 14px' }}>{fmtMonth(m.key)}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* המשפט שהמנהל בא בשבילו */}
+          <div className="apple-card" style={{ padding:'18px 20px', marginTop:12, borderInlineStart:`4px solid ${net >= 0 ? 'var(--ok)' : 'var(--danger)'}` }}>
+            <p style={{ fontSize:19.5, fontWeight:800, color:'var(--text)', lineHeight:1.45, letterSpacing:'-0.01em' }}>
+              {net >= 0
+                ? <>הסכומים שסוכמו עם הסניפים מכסים את הפער של {fmtMonth(sel)}, עם עודף של <span className="num" style={{ color:'var(--ok)' }}>{num(net)}</span>.</>
+                : <>הסכומים שסוכמו עם הסניפים אינם מכסים את הפער של {fmtMonth(sel)}: חסרים <span className="num" style={{ color:'var(--danger)' }}>{num(-net)}</span>.</>}
+            </p>
+            <p style={{ fontSize:15, color:'var(--text2)', marginTop:5, lineHeight:1.6 }}>
+              {tot.paid == null
+                ? 'העברות הסניפים לחודש הזה טרם הוזנו, ולכן אין עדיין יתרת חובה וזכות.'
+                : <>הועבר בפועל {num(tot.paid)} מתוך {num(tot.due)} שסוכמו.</>}
+              {' '}עלות בפועל מקובץ השכר רשומה ל-{tot.withActual} מתוך {tot.staff} עובדות; לשאר — אומדן של המערכת.
+            </p>
+          </div>
+
+          <div className="kpi-grid">
+            <Kpi kind="cost" label="עלות הוראה + 20%" sub={prevCost != null ? `מול ${fmtMonth(prev.key)}: ${tot.costWith20 - prevCost >= 0 ? '+' : '−'}${num(Math.abs(tot.costWith20 - prevCost))}` : ''}>{num(tot.costWith20)}</Kpi>
+            <Kpi kind="income" label="משרד החינוך + מענק רשת" sub={`משרד ${num(tot.ministry)} · מענק ${num(tot.support)}`}>{num(tot.ministry + tot.support)}</Kpi>
+            <Kpi kind="result" label="הפער החודשי" color="var(--danger)" sub="העלות פחות ההכנסות">{num(tot.gap)}</Kpi>
+            <Kpi kind="income" label="סוכם להעברה מהסניפים">{num(tot.due)}</Kpi>
+            <Kpi kind="income" label="הועבר בפועל החודש" sub={tot.paid == null ? 'טרם הוזן' : ''}>{tot.paid == null ? '—' : num(tot.paid)}</Kpi>
+            <Kpi kind="result" label="יתרה מצטברת" sub={tot.balance == null ? 'טרם הוזנו העברות' : 'מתחילת השנה עד החודש הזה'}
+              color={tot.balance == null ? 'var(--text3)' : tot.balance > 0 ? 'var(--danger)' : 'var(--ok)'}>
+              {tot.balance == null ? '—' : Math.round(tot.balance) === 0 ? 'מאוזן' : `${tot.balance > 0 ? 'חובה' : 'זכות'} ${num(Math.abs(tot.balance))}`}
+            </Kpi>
+          </div>
+
+          <h2 className="section-head">לפי סניף</h2>
+          <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
+            <table className="sticky-first big-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
+                  <TH>סניף</TH><TH>עלות הוראה + 20%</TH><TH>הכנסות משרד החינוך</TH><TH>מענק רשת</TH>
+                  <TH>פער החודש</TH><TH>סוכם להעברה</TH><TH>הועבר בפועל</TH><TH>יתרה מצטברת</TH>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => { const st = status(r); return (
+                  <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
+                    <td style={{ padding:'9px 12px', fontSize:14.6, fontWeight:700 }}>{r.name}
+                      <span style={{ display:'block', fontSize:13.6, fontWeight:600, color: st.c }}>{st.t}</span></td>
+                    <td style={td}>{num(r.costWith20)}</td>
+                    <td style={td}>{num(r.ministry)}</td>
+                    <td style={td}>{num(r.support)}</td>
+                    <td style={{ ...td, fontWeight:800 }}>{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : <span style={{ color:'var(--ok)' }}>עודף {num(-r.gap)}</span>}</td>
+                    <td style={td}>{r.due == null || r.due <= 0 ? '—' : num(r.due)}
+                      {r.agreed == null && r.due > 0 && <span style={{ display:'block', fontSize:12, color:'var(--text3)' }}>מחושב</span>}</td>
+                    <td style={td}>{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</td>
+                    <td style={td}><Bal v={r.balance} /></td>
+                  </tr>
+                ); })}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop:'2px solid var(--line)', background:'var(--fill)' }}>
+                  <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:800 }}>סה"כ</td>
+                  <td style={{ ...td, fontWeight:800 }}>{num(tot.costWith20)}</td>
+                  <td style={{ ...td, fontWeight:800 }}>{num(tot.ministry)}</td>
+                  <td style={{ ...td, fontWeight:800 }}>{num(tot.support)}</td>
+                  <td style={{ ...td, fontWeight:800 }}>{num(tot.gap)}</td>
+                  <td style={{ ...td, fontWeight:800 }}>{num(tot.due)}</td>
+                  <td style={{ ...td, fontWeight:800 }}>{tot.paid == null ? '—' : num(tot.paid)}</td>
+                  <td style={td}><Bal v={tot.balance} /></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div className="only-mobile big-cards">
+            {rows.map(r => { const st = status(r); return (
+              <div key={'bl-' + r.id} className="apple-card mcard">
+                <p className="mcard-name" style={{ marginBottom:2 }}>{r.name}</p>
+                <p style={{ fontSize:12.8, fontWeight:600, color: st.c, marginBottom:4 }}>{st.t}</p>
+                <CardRow label="עלות הוראה + 20%">{num(r.costWith20)}</CardRow>
+                <CardRow label="הכנסות משרד החינוך">{num(r.ministry)}</CardRow>
+                <CardRow label="מענק רשת">{num(r.support)}</CardRow>
+                <CardRow label="פער החודש" strong>{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : `עודף ${num(-r.gap)}`}</CardRow>
+                <CardRow label={r.agreed == null ? 'להעברה (מחושב)' : 'סוכם להעברה'}>{r.due == null || r.due <= 0 ? '—' : num(r.due)}</CardRow>
+                <CardRow label="הועבר בפועל">{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</CardRow>
+                <CardRow label="יתרה מצטברת" strong><Bal v={r.balance} /></CardRow>
+              </div>
+            ); })}
+            <div className="apple-card mcard" style={{ background:'var(--fill)' }}>
+              <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ</p>
+              <CardRow label="עלות הוראה + 20%">{num(tot.costWith20)}</CardRow>
+              <CardRow label="משרד החינוך + מענק רשת">{num(tot.ministry + tot.support)}</CardRow>
+              <CardRow label="פער החודש" strong>{num(tot.gap)}</CardRow>
+              <CardRow label="סוכם להעברה">{num(tot.due)}</CardRow>
+              <CardRow label="הועבר בפועל">{tot.paid == null ? '—' : num(tot.paid)}</CardRow>
+              <CardRow label="יתרה מצטברת" strong><Bal v={tot.balance} /></CardRow>
+            </div>
+          </div>
+
+          <button onClick={() => setShowNote(v => !v)}
+            style={{ background:'none', border:'none', padding:'8px 2px', marginTop:6, cursor:'pointer', fontSize:14.6, fontWeight:700, color:'var(--purple)' }}>
+            {showNote ? 'הסתרת ההסבר על העמודות' : 'הסבר על העמודות'}
+          </button>
+          {showNote && (
+          <p style={{ fontSize:15, color:'var(--text2)', marginTop:12, lineHeight:1.75 }}>
+            <b>עלות הוראה + 20%</b> — עלות המעביד של עובדי ההוראה בחודש (כולל מנהלת), ועוד 20% למילוי מקום וכרית ביטחון.
+            {' '}<b>הכנסות משרד החינוך</b> ו<b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
+            {' '}<b>פער החודש</b> — העלות פחות שניהם. <b>סוכם להעברה</b> — הסכום החודשי שסוכם עם הסניף; כשלא סוכם, מוצג הפער המחושב.
+            {' '}<b>יתרה מצטברת</b> — מה שהיה על הסניף להעביר מהחודש הראשון עד החודש שנבחר, פחות מה שהעביר: חובה = הסניף חייב לרשת, זכות = העביר יותר.
+            {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
+          </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTeacher, onImportSlip }) {
   const [fin, setFin]     = useState(null);   // null: עוד נטען
   // "תן לי מקום ייבוא עלות שכר לכל מורה לחודש" (שרה, 6.10): אותו ייבוא
   // של שולחן השכר, נפתח כאן — ליד הטבלה שהמספרים שלו מזינים.
   const [showImport, setShowImport] = useState(false);
+  // "כל השאר פחות רלוונטי"; "מה שמיותר - יוסתר" (שרה, 6.10): התמונה המלאה,
+  // כרטיסי בתי הספר והסברי העמודות סגורים, ונפתחים בלחיצה.
+  const [showFull, setShowFull] = useState(false);
+  const [showNote, setShowNote] = useState(false);
   const [err, setErr]     = useState('');
   const [flash, setFlash] = useState(0);
   // "הכנסות מול הוצאות שיהיה מתרחב" (שרה, 3.9) — סגור כברירת מחדל
@@ -5479,7 +5708,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
       })()}
 
       <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto', marginTop:10 }}>
-        <table className="sticky-first fin-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+        <table className="sticky-first big-table" style={{ width:'100%', borderCollapse:'collapse' }}>
           <thead>
             <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
               <TH>סניף</TH>
@@ -5513,7 +5742,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                 <td style={{ textAlign:'center' }}>
                   {moneyInput(sc.id, 'monthlyTransfer', f.monthlyTransfer)}
                   {agreedMonth == null && transfer > 0 && (
-                    <span style={{ display:'block', fontSize:12, color:'var(--text3)', marginTop:2 }}>
+                    <span style={{ display:'block', fontSize:13.4, color:'var(--text3)', marginTop:2 }}>
                       מחושב {num(transfer / 12)}
                     </span>
                   )}
@@ -5555,7 +5784,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
       </div>
 
       {/* מובייל: אותם נתונים, אותו סדר ואותה שורת סיכום — כרטיס לכל סניף */}
-      <div className="only-mobile">
+      <div className="only-mobile big-cards">
         {fin === null ? (
           <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
         ) : (
@@ -5600,7 +5829,12 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         )}
       </div>
 
-      <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
+      <button onClick={() => setShowNote(v => !v)}
+        style={{ background:'none', border:'none', padding:'8px 2px', marginTop:6, cursor:'pointer', fontSize:14.6, fontWeight:700, color:'var(--purple)' }}>
+        {showNote ? 'הסתרת ההסבר על העמודות' : 'הסבר על העמודות'}
+      </button>
+      {showNote && (
+      <p style={{ fontSize:15, color:'var(--text2)', marginTop:12, lineHeight:1.75 }}>
         <b>תוספת 20%</b> — מילוי מקום וכרית ביטחון, תוספת אחת לטבלה הזאת (בטבלה שלמטה הן מופיעות בנפרד, 10% ו-5%).
         {' '}<b>פער מחושב</b> — סה"כ העלות פחות הכנסות משרד החינוך ופחות מענק הרשת. <b>עודף</b> — אין מה להעביר.
         {' '}הטבלה הזאת נקייה בכוונה: <b>עלות השכר מול תקציב משרד החינוך בלבד</b>. הכנסות נוספות (תשלומי הורים, צהרון) והוצאות
@@ -5615,7 +5849,14 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
           </>
         )}
       </p>
+      )}
 
+      <button className="apple-btn apple-btn-ghost" onClick={() => setShowFull(v => !v)}
+        style={{ minHeight:44, fontSize:15.5, fontWeight:700, width:'100%', marginTop:18, justifyContent:'center' }}>
+        {showFull ? 'הסתרת התמונה המלאה וכרטיסי בתי הספר' : 'הצגת התמונה המלאה וכרטיסי בתי הספר'}
+      </button>
+
+      {showFull && (<>
       <h2 className="section-head">התמונה המלאה</h2>
       <p className="section-sub">כל ההכנסות מול כל ההוצאות, כולל הכנסות והוצאות שאינן שכר.</p>
 
@@ -5864,7 +6105,11 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         {' '}<b>תקציב שאושר (למילוי)</b> — הסכום השנתי שאושר להשלמת הסניף. <b>חריגה</b> — היתרה להשלמה פחות התקציב שאושר.
       </p>
 
+      </>)}
+
       {onSaveTeacher && <MaternityPanel schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} />}
+
+      {showFull && (<>
 
       {/* "לכל בית ספר תעשה הכנסות מול הוצאות ללא עלות הוראה" (שרה, 3.9) —
           התמונה התפעולית מהתקציב במבט-רשת: כל ההכנסות מול כל ההוצאות
@@ -5984,6 +6229,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
           </div>
         );
       })()}
+      </>)}
     </div>
   );
 }
@@ -11615,6 +11861,25 @@ export default function App() {
     + (user.role === 'coordinator' ? teachers.filter(reportPending).length + liveFixes.length : 0);
   const sortedMonthKeys    = Object.keys(months).sort();
 
+  // מנהל בצפייה (director): הדף הזה בלבד — בלי ניווט ובלי שום מסך אחר
+  if (user.role === 'director') return (
+    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column' }} dir="rtl">
+      <header className="app-header no-print">
+        <div style={{ maxWidth:1280, margin:'0 auto', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, minHeight:60 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:11, padding:'9px 0' }}>
+            <img src="/logo-chabad.png" alt="לוגו רשת" style={{ height:36, width:'auto', objectFit:'contain' }} />
+            <p style={{ fontWeight:700, fontSize:16.7, color:'var(--text)' }}>מערכת שכר מורים</p>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            <span style={{ fontSize:13.2, color:'var(--text3)' }}>ב״ה</span>
+            <button className="apple-btn apple-btn-ghost" onClick={onSignOut} style={{ minHeight:36, fontSize:14.4 }}>יציאה</button>
+          </div>
+        </div>
+      </header>
+      <BottomLineView activeMonth={activeMonth} viewer />
+    </div>
+  );
+
   // Principal goes directly to their school
   const principalSchool = user.role === 'principal' ? schools.find(s => s.id === user.schoolId) : null;
 
@@ -11704,6 +11969,13 @@ export default function App() {
               <button className={`nav-btn ${view==='finance' ? 'active' : ''}`} onClick={() => setView('finance')}>
                 <Wallet size={15} strokeWidth={2.2} />
                 עלות הוראה
+              </button>
+            )}
+            {/* הדף של המנהל — שרה רואה בדיוק את מה שהוא רואה */}
+            {isCoord && (
+              <button className={`nav-btn ${view==='bottomline' ? 'active' : ''}`} onClick={() => setView('bottomline')}>
+                <BarChart3 size={15} strokeWidth={2.2} />
+                שורה תחתונה
               </button>
             )}
             {/* "תן אפשרות לרשום בטבלה כל חודש מה התקבל..." (שרה, 23.9) —
@@ -11879,6 +12151,8 @@ export default function App() {
               await store.importSlip(items);
               if (file) await store.uploadDocument({ monthKey: activeMonth, schoolId: null, note, file }).catch(() => {});
             })} />
+        ) : view === 'bottomline' && user.role === 'coordinator' ? (
+          <BottomLineView activeMonth={activeMonth} />
         ) : view === 'ledger' && user.role === 'coordinator' ? (
           <PaymentLedgerView schools={schools} teachers={teachers} months={months} activeMonth={activeMonth} />
         ) : view === 'calibration' && (user.role === 'coordinator' || user.role === 'clerk') ? (
@@ -12053,3 +12327,6 @@ export default function App() {
     </div>
   );
 }
+
+// לבדיקת תצוגה מבודדת של הדף (בלי כניסה)
+export { BottomLineView, TeachingCostView };

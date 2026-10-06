@@ -10,84 +10,8 @@ import { supabase } from './supabase.js';
   כל הפונקציות זורקות שגיאה עם הודעה בעברית. הקורא אחראי להציג אותה.
 */
 
-// ── תרגום שדות ────────────────────────────────────────────────
-// [שם בטבלה, שם באפליקציה]
-const TEACHER_FIELDS = [
-  ['school_id',            'schoolId'],
-  ['job',                  'job'],
-  ['extra_roles',          'extraRoles'],
-  ['non_quota_hours',      'nonQuotaHours'],
-  ['hourly_rate',          'hourlyRate'],
-  ['name',                 'name'],
-  ['tz_id',                'tzId'],
-  ['email',                'email'],
-  ['phone',                'phone'],
-  ['reform',               'reform'],
-  ['nihul_grade',          'nihulGrade'],
-  ['level',                'level'],
-  ['grade',                'grade'],
-  ['degree',               'degree'],
-  ['seniority',            'seniority'],
-  ['frontal_hours',        'frontalHours'],
-  ['individual_hours',     'individualHours'],
-  ['presence_hours',       'presenceHours'],
-  ['scope_pct',            'scopePct'],
-  ['scope_set_at',         'scopeSetAt'],
-  ['scope_pct_pre',        'scopePctPre'],
-  ['scope_pre_set_at',     'scopePreSetAt'],
-  ['gender',               'gender'],
-  ['gamul_role',           'role'],
-  ['age_group',            'ageGroup'],
-  ['is_temp',              'isTemp'],
-  ['start_date',           'startDate'],
-  ['end_date',             'endDate'],
-  ['children_under_18',    'childrenUnder18'],
-  ['leave_type',           'leaveType'],
-  ['leave_from',           'leaveFrom'],
-  ['leave_to',             'leaveTo'],
-  ['absence_days',         'absenceDays'],
-  ['absence_hours',        'absenceHours'],
-  ['absence_reason',       'absenceReason'],
-  ['sick_form_path',       'sickFormPath'],
-  ['mm_hours',             'mmHours'],
-  ['mm_for',               'mmFor'],
-  ['mm_from',              'mmFrom'],
-  ['mm_to',                'mmTo'],
-  ['monthly_extras',       'monthlyExtras'],
-  ['travel_days',          'travelDays'],
-  ['daycare_children',     'daycareChildren'],
-  ['official_gross',       '_officialGross'],
-  ['official_gross_pre',   '_officialGrossPre'],
-  ['agreed_gross',         '_agreedGross'],
-  ['actual_employer_cost', '_actualEmployerCost'],
-  ['min_wage_supp',        '_minWageSupp'],
-  ['chabad_supp',          '_chabadSupp'],
-  ['gross_set_at',         '_grossSetAt'],
-  ['reported_at',          '_reportedAt'],
-  ['late_report',          '_lateReport'],
-  ['payroll_ready',        '_payrollReady'],
-  ['slip_issued_at',       '_slipIssuedAt'],
-  ['slip_gross',           '_slipGross'],
-  ['changed_at',           '_changedAt'],
-  ['snapshot',             '_snapshot'],
-  ['approved',             '_approved'],
-  ['approved_at',          '_approvedAt'],
-  ['net_approved',         '_netApproved'],
-  ['net_approved_at',      '_netApprovedAt'],
-];
-
-// שדות שהאפליקציה מחזיקה אך אינם נשמרים: אחוז המשרה של העולם הישן נגזר
-// מ-scopePct, והקבצים יעברו ל-Storage בשלב נפרד.
-const rowToTeacher = (r) => {
-  const t = { id: r.id, monthKey: r.month_key, scope: r.scope_pct, _files: [], sickFiles: [] };
-  for (const [col, key] of TEACHER_FIELDS) t[key] = r[col];
-  if (!Array.isArray(t.extraRoles)) t.extraRoles = [];
-  // דיווח מנהלת שממתין לאישור שרה (21.9.26). נקרא בלבד — אינו ב-TEACHER_FIELDS,
-  // כדי ששמירת שורה שלמה עם ערך ישן לא תנקה אותו בלי אישור.
-  t._reportPending   = Boolean(r.report_pending);
-  t._reportPendingAt = r.report_pending_at ?? null;
-  return t;
-};
+// תרגום השדות עצמו ב-teacherFields.js — משותף גם לנקודות השרת
+import { TEACHER_FIELDS, rowToTeacher } from './teacherFields.js';
 
 const teacherToRow = (t, monthKey) => {
   const r = {};
@@ -1161,4 +1085,18 @@ export async function listSlipLines(teacherIds) {
     .in('teacher_month_id', teacherIds);
   raise(error, 'טעינת שורות התלוש נכשלה');
   return Object.fromEntries((data || []).map(r => [r.teacher_month_id, r]));
+}
+
+/* השורה התחתונה לחודש — סכומים לסניף, מחושבים בשרת (api/monthly-summary).
+   מי שנכנס לצפייה מקבל רק אותם, ולא את שורות השכר. */
+export async function fetchMonthlySummary() {
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error('פג תוקף ההתחברות — התחברי מחדש');
+  const r = await fetch('/api/monthly-summary', { headers: { authorization: `Bearer ${token}` } });
+  const ct = r.headers.get('content-type') || '';
+  if (!ct.includes('json')) throw new Error('שירות הסיכום החודשי אינו זמין כאן (התקבל דף במקום נתונים)');
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `סיכום חודשי: שגיאה ${r.status}`);
+  return j;
 }

@@ -15,7 +15,7 @@ import * as emp from '../src/lib/employer.js';
 // השדות שהחישוב נוגע בהם — תרגום עמודות המסד לשמות האפליקציה.
 // רשימה מפורשת ותחומה; שדה חדש שנכנס לנוסחה חייב להתווסף גם כאן
 // (smoke-costs-api משווה מול האפליקציה ותופס שכחה כזו).
-const toTeacher = (r) => ({
+export const toTeacher = (r) => ({
   monthKey: r.month_key, schoolId: r.school_id, name: r.name,
   reform: r.reform, level: r.level, grade: r.grade, degree: r.degree,
   seniority: r.seniority, frontalHours: r.frontal_hours,
@@ -31,7 +31,7 @@ const toTeacher = (r) => ({
 
 
 /* כיול עלות המעביד לפי התלושים בפועל, לכל בית ספר (שרה, 22.9) — כמו באפליקציה */
-function applyCalib(rows, toTeacher) {
+export function applyCalib(rows, toTeacher) {
   const agg = new Map(); let slipAll = 0, modelAll = 0;
   for (const r of rows || []) {
     const t = toTeacher(r);
