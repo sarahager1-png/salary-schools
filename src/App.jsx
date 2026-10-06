@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 96;
+const BUILD = 97;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4516,15 +4516,18 @@ function MaternityPanel({ schools, teachers, onSaveTeacher }) {
   שורה כזאת יוצאת משני המסכים עד שיוזנו בה עובדות.
 */
 const TRANSFER_PCT = 0.20;
-function teachingCostOf(teachers, sc, f) {
-  const realMonthly = teachers
+function teachingCostOf(teachers, sc, f, slipMonthly = 0) {
+  const rowsMonthly = teachers
     .filter(t => t.schoolId === sc.id && !isHourlyRow(t))
     .reduce((sum, t) => sum + calcEmployer(t).total, 0);
+  // "אין ביאליק" (שרה, 6.10): סניף בלי שורות שכר בחודש, שהתקבלו לו תלושים — העלות היא סכום התלושים
+  const fromSlips = !rowsMonthly && sc.paysSalary !== false && slipMonthly > 0;
+  const realMonthly = fromSlips ? slipMonthly : rowsMonthly;
   const costFromBudget = !realMonthly && sc.paysSalary !== false && f?.teachingSim > 0;
   const monthly = costFromBudget ? f.teachingSim / 12 : realMonthly;
   const annual  = monthly * 12;
   const add20   = annual * TRANSFER_PCT;
-  return { monthly, annual, add20, costWith20: annual + add20, costFromBudget };
+  return { monthly, annual, add20, costWith20: annual + add20, costFromBudget, fromSlips };
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -5365,6 +5368,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
 
 function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTeacher, onImportSlip, tabs = null }) {
   const [fin, setFin]     = useState(null);   // null: עוד נטען
+  // עלות לפי התלושים שהתקבלו, לסניף ולחודש הנבחר — משמשת רק סניף שאין לו שורות שכר בחודש
+  const [slipCost, setSlipCost] = useState({});
+  useEffect(() => {
+    let alive = true;
+    store.loadPayslips().then(r => { if (!alive) return; const m = {}; for (const x of r) if (x.monthKey === monthKey) m[x.schoolId] = (m[x.schoolId] || 0) + (x.cost || 0); setSlipCost(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, [monthKey]);
   // "תן לי מקום ייבוא עלות שכר לכל מורה לחודש" (שרה, 6.10): אותו ייבוא
   // של שולחן השכר, נפתח כאן — ליד הטבלה שהמספרים שלו מזינים.
   const [showImport, setShowImport] = useState(false);
@@ -5522,7 +5532,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
       "לפי התקציב", עד שיוזנו העובדות. לא לתשלום שכר (באר שבע, חיפה) — 0.
     */
     // אותו חישוב בדיוק כמו במסך התקבולים — teachingCostOf ברמת המודול
-    const { monthly, annual, costFromBudget } = teachingCostOf(teachers, sc, f);
+    const { monthly, annual, costFromBudget, fromSlips } = teachingCostOf(teachers, sc, f, slipCost[sc.id] || 0);
     const hourlyMonthly = hourlyCost(sc.id);   // צהרון — מחוץ להשוואה מול המשרד
     const mmCost  = annual * MM_PCT;   // 5% מסך עלות ההוראה השנתית
     const bufferCost = annual * BUFFER_PCT;   // 10% כרית ביטחון (שרה, 15.9)
@@ -5600,7 +5610,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
       מעביר לרשת; חלקי 12 — מה שהוא מעביר בכל חודש. שלילי = עודף, אין
       מה להעביר. בלי תקציב משרד החינוך אין פער לחשב — התא נשאר ריק.
     */
-    const { add20, costWith20 } = teachingCostOf(teachers, sc, f);
+    const { add20, costWith20 } = teachingCostOf(teachers, sc, f, slipCost[sc.id] || 0);
     const transfer   = f.ministryBudget != null
       ? costWith20 - (f.ministryBudget || 0) - (f.networkSupport || 0)
       : null;
@@ -5624,7 +5634,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
     const tzMonth     = hourlyMonthly || 0;
     const dueMonthAll = dueMonth == null ? (tzMonth || null) : Math.max(0, dueMonth) + tzMonth;
     const dueYearAll  = dueYear  == null ? (tzMonth ? tzMonth * 12 : null) : Math.max(0, dueYear) + tzMonth * 12;
-    return { sc, f, monthly, costFromBudget, hourlyMonthly, annual, mmCost, bufferCost, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left: leftAll, needed, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer,
+    return { sc, f, fromSlips, monthly, costFromBudget, hourlyMonthly, annual, mmCost, bufferCost, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left: leftAll, needed, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer,
       cover, coverPct, remains, add20, costWith20, transfer, agreedMonth, agreedYear, dueYear, dueMonth, tzMonth, dueMonthAll, dueYearAll };
   })
     // "תוריד אותם למטה בטבלה, גם את קרית ביאליק" (שרה, 22.9): בתי ספר בלי
@@ -6167,6 +6177,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
               return (
               <tr key={'tr-' + sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
                 <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={sc.name}>{shortName(sc.name)}
+                  {r.fromSlips && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3 }} title="הסניף עוד לא הוזן למערכת בחודש הזה; העלות היא סכום התלושים שהתקבלו מהגזברות">לפי התלושים</span>}
                   {transfer == null && <span className="fin-budget-tag" title="בלי תקציב משרד החינוך אין פער לחשב — השורה מחוץ לסיכום">טרם הוזן תקציב משרד</span>}</th>
                 <td style={cellC}>{num(per(annual))}</td>
                 <td style={{ ...cellC, color:'var(--text2)' }}>{num(per(add20))}</td>
