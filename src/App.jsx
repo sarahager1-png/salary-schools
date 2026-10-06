@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 89;
+const BUILD = 90;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -12729,7 +12729,7 @@ export default function App() {
       <div className="flex-1">
         {/* לחשבת יש כפתורי תלושים/התראות בניווט, אבל הענף הזה רונדר תמיד
             לפניהם — הכפתורים היו מתים (ממצא QA, 3.9). עכשיו הם עוברים. */}
-        {isClerk && view !== 'slips' && view !== 'alerts' && view !== 'finance' && view !== 'mm' && view !== 'calibration' ? (
+        {isClerk && view !== 'slips' && view !== 'alerts' && view !== 'mm' ? (
           <PayrollDesk
             teachers={teachers}
             schools={schools}
@@ -12786,7 +12786,7 @@ export default function App() {
           <NotificationsView />
         ) : view === 'report' ? (
           <ReportView schools={schools} teachers={teachers} onSaveTeacher={onSaveTeacher} onApprove={onApproveTeacher} simState={simState} onCompute={onCompute} onDelete={onDeleteTeacher} />
-        ) : view === 'finance' && (user.role === 'coordinator' || user.role === 'clerk') ? (
+        ) : view === 'finance' && user.role === 'coordinator' ? (
           <TeachingCostView tabs={finTabs} schools={schools} teachers={teachers} monthKey={activeMonth} onSaveSchool={onSaveSchool} onSaveTeacher={onSaveTeacher}
             onImportSlip={(items, file, note) => run(async () => {
               await store.importSlip(items);
