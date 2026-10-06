@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 88;
+const BUILD = 89;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -12452,7 +12452,7 @@ export default function App() {
   const AREAS = [
     { key:'clerk', label:'גזברית', Icon: Calculator, go:'calc', title:'העבודה החודשית של חשבת השכר' },
     { key:'mine', label:'שלי', Icon: Wallet, go:'schools', title:'בתי הספר, העברות ותקבולים' },
-    { key:'director', label:'מנהל הרשת', Icon: BarChart3, go:'bottomline', title:'תמונת מצב חודשית — מה שמנהל הרשת רואה' },
+    { key:'director', label:'מנכ"ל הרשת', Icon: BarChart3, go:'bottomline', title:'תמונת מצב חודשית — מה שמנכ"ל הרשת רואה' },
   ];
 
   // החודש הראשון מסומן בבורר החודשים — זה כל תפקידו מעכשיו
@@ -12591,7 +12591,7 @@ export default function App() {
                   <BarChart3 size={15} strokeWidth={2.2} />
                   תמונת מצב חודשית
                 </button>
-                <span className="area-note">זה המסך היחיד שמנהל הרשת רואה — צפייה בלבד, בלי שמות ובלי שכר אישי.</span>
+                <span className="area-note">זה המסך שמיועד למנכ"ל הרשת — צפייה בלבד, בלי שמות ובלי שכר אישי.</span>
               </>
             )}
             {isCoord && area === 'mine' && (
