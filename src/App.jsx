@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 93;
+const BUILD = 94;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5421,13 +5421,16 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
     try {
       const hub = await store.fetchHubBudget();
       const byName = new Map(hub.map(h => [norm(h.name), h]));
+      // שם שהשתנה רק במילה בנים/בנות (עפולה, 6.10) עדיין מותאם — כשיש התאמה אחת בלבד
+      const loose = n => norm(n).replace(/בנים|בנות/g, '').replace(/\s+/g, ' ').trim();
+      const hubOf = sc => byName.get(norm(sc.name)) || (() => { const c = hub.filter(h => loose(h.name) === loose(sc.name)); return c.length === 1 ? c[0] : null; })();
       /*
         "לא מתעדכן מבט הרשת" (שרה, 2.9): כל ערך שמקורו במשיכה מתרענן
         במשיכה הבאה; רק ערך שהוקלד ידנית (src manual) מוגן מדריסה.
       */
       let filled = 0; const misses = [];
       for (const sc of schools) {
-        const h = byName.get(norm(sc.name));
+        const h = hubOf(sc);
         if (!h) { misses.push(sc.name); continue; }
         const cur = fin?.[sc.id] || {};
         const src = { ...(cur.src || {}) };
