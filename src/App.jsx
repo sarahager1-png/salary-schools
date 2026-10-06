@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 78;
+const BUILD = 80;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4540,6 +4540,7 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth }) {
   const [led, setLed]     = useState(null);   // {schoolId: {monthKey: {...}}}
   const [err, setErr]     = useState('');
   const [saved, setSaved] = useState(false);
+  const [showNote, setShowNote] = useState(false);
   const monthKeys = Object.keys(months || {}).sort();
   // ברירת מחדל: חודש השכר שבעבודה — הלפני-אחרון ("והחודש הוא ספטמבר!", שרה 6.10):
   // התקבולים וההעברות שרושמים בתחילת אוקטובר שייכים לספטמבר. חודש יחיד — הוא עצמו.
@@ -4578,25 +4579,42 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth }) {
     p.includes(k) ? p.filter(x => x !== k) : [...p, k].sort());
 
   /*
-    אותו סינון כמו בטבלת ההעברות: רק סניפים שהרשת משלמת בהם שכר, ורק
-    כאלה שעלות ההוראה שלהם היא בפועל ולא אומדן מהתקציב.
+    "תוסיף גם כמה כסף העבירו השליחים כל חודש ונבדוק פערי חובה וזכות" (שרה, 6.10).
+    המסך משווה, לכל סניף ולתקופה שנבחרה, שני זוגות:
+      משרד החינוך — מה שתוכנן (החלק ה-12 מהתקציב השנתי) מול מה שהתקבל.
+      הסניף — מה שסוכם שיעביר (כולל שכר צהרון) מול מה שהעביר; ההפרש הוא חובה או זכות.
+    אותו סינון כמו בטבלת ההעברות: רק סניפים שהרשת משלמת בהם שכר ושעלותם בפועל.
+    עד 6.10 המסך הציג "עלות התקופה" ו"פער לתשלום הרשת", בלי מענק הרשת ובלי הסכום שסוכם.
   */
+  const nM = picked.length;
+  const hourlyOf = sid => teachers.filter(t => t.schoolId === sid && isHourlyRow(t)).reduce((x, t) => x + calcEmployer(t).total, 0);
   const data = schools.map(sc => {
     const f = fin?.[sc.id] || {};
     const { costWith20, costFromBudget, annual } = teachingCostOf(teachers, sc, f);
     const mine = led?.[sc.id] || {};
-    const ministry = picked.reduce((a, k) => a + (mine[k]?.ministryReceived || 0), 0);
-    const chabad   = picked.reduce((a, k) => a + (mine[k]?.chabadPaid       || 0), 0);
-    // עלות התקופה: עלות חודש אחת כפול מספר החודשים שנבחרו
-    const cost = (costWith20 / 12) * picked.length;
-    const network = cost - ministry - chabad;   // מה שנותר על הרשת
-    return { sc, f, annual, costWith20, costFromBudget, mine, ministry, chabad, cost, network };
+    const ministry = picked.reduce((x, k) => x + (mine[k]?.ministryReceived || 0), 0);
+    const chabad   = picked.reduce((x, k) => x + (mine[k]?.chabadPaid       || 0), 0);
+    const hasMin   = picked.some(k => mine[k]?.ministryReceived != null);
+    const hasPaid  = picked.some(k => mine[k]?.chabadPaid != null);
+    const planMin  = f.ministryBudget == null ? null : (f.ministryBudget / 12) * nM;
+    const gapMonth = f.ministryBudget == null ? null : (costWith20 - (f.ministryBudget || 0) - (f.networkSupport || 0)) / 12;
+    const tzMonth  = hourlyOf(sc.id);
+    const agreed   = f.monthlyTransfer ?? null;
+    const dueMonth = agreed ?? (gapMonth == null ? null : Math.max(0, gapMonth));
+    const due      = dueMonth == null ? null : (dueMonth + tzMonth) * nM;
+    const minDiff  = hasMin && planMin != null ? ministry - planMin : null;   // חיובי = התקבל יותר מהמתוכנן
+    const balance  = hasPaid && due != null ? due - chabad : null;            // חיובי = חובה של הסניף
+    return { sc, f, annual, costFromBudget, mine, ministry, chabad, hasMin, hasPaid, planMin, due, agreed, minDiff, balance };
   }).filter(r => r.sc.paysSalary !== false && r.annual > 0 && !r.costFromBudget);
 
-  const tot = data.reduce((a, r) => ({
-    cost: a.cost + r.cost, ministry: a.ministry + r.ministry,
-    chabad: a.chabad + r.chabad, network: a.network + r.network,
-  }), { cost: 0, ministry: 0, chabad: 0, network: 0 });
+  const sumOf = (k, only) => data.filter(r => !only || r[only]).reduce((x, r) => x + (r[k] || 0), 0);
+  const tot = {
+    planMin: sumOf('planMin'), ministry: sumOf('ministry'), anyMin: data.some(r => r.hasMin),
+    planMinEntered: sumOf('planMin', 'hasMin'), minDiff: sumOf('minDiff', 'hasMin'),
+    due: sumOf('due'), chabad: sumOf('chabad'), anyPaid: data.some(r => r.hasPaid),
+    dueEntered: sumOf('due', 'hasPaid'), balance: sumOf('balance', 'hasPaid'),
+    nMin: data.filter(r => r.hasMin).length, nPaid: data.filter(r => r.hasPaid).length,
+  };
 
   const periodLabel = picked.length === 0 ? 'לא נבחר חודש'
     : picked.length === 1 ? fmtMonth(picked[0])
@@ -4617,17 +4635,21 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth }) {
   /* ── ייצוא ── */
   const exportHeaders = [
     { key: 'name',     label: 'סניף' },
-    { key: 'cost',     label: 'עלות התקופה' },
-    { key: 'ministry', label: 'התקבל ממשרד החינוך' },
-    { key: 'chabad',   label: 'שולם מבית חב"ד' },
-    { key: 'network',  label: 'פער לתשלום הרשת' },
+    { key: 'planMin',  label: 'משרד החינוך — מתוכנן' },
+    { key: 'ministry', label: 'משרד החינוך — התקבל' },
+    { key: 'minDiff',  label: 'הפרש מהמתוכנן' },
+    { key: 'due',      label: 'הסניף — סוכם להעברה' },
+    { key: 'chabad',   label: 'הסניף — הועבר' },
+    { key: 'balance',  label: 'יתרה (חובה חיובי, זכות שלילי)' },
   ];
   const r0 = v => (v == null ? '' : Math.round(v));
   const exportRows = data.map(r => ({
-    name: r.sc.name, cost: r0(r.cost), ministry: r0(r.ministry), chabad: r0(r.chabad), network: r0(r.network),
+    name: r.sc.name, planMin: r0(r.planMin), ministry: r.hasMin ? r0(r.ministry) : '', minDiff: r0(r.minDiff),
+    due: r0(r.due), chabad: r.hasPaid ? r0(r.chabad) : '', balance: r0(r.balance),
   }));
   const exportFooter = {
-    name: 'סה"כ', cost: r0(tot.cost), ministry: r0(tot.ministry), chabad: r0(tot.chabad), network: r0(tot.network),
+    name: 'סה"כ', planMin: r0(tot.planMin), ministry: tot.anyMin ? r0(tot.ministry) : '', minDiff: tot.anyMin ? r0(tot.minDiff) : '',
+    due: r0(tot.due), chabad: tot.anyPaid ? r0(tot.chabad) : '', balance: tot.anyPaid ? r0(tot.balance) : '',
   };
   const stampPeriod = picked.length === 1 ? picked[0]
     : picked.length ? `${picked[0]}_עד_${picked[picked.length - 1]}` : stampToday();
@@ -4638,13 +4660,17 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth }) {
     const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[c]));
     const n = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL'));
     const today = new Date().toLocaleDateString('he-IL', { day:'numeric', month:'long', year:'numeric' });
+    const bal = v => v == null ? '—' : Math.round(v) === 0 ? 'מאוזן' : (v > 0 ? 'חובה ' : 'זכות ') + n(Math.abs(v));
+    const dif = v => v == null ? '—' : (v >= 0 ? '+' : '−') + n(Math.abs(v));
     const body = data.map(r => `
       <tr>
         <td class="nm">${esc(r.sc.name)}</td>
-        <td>${n(r.cost)}</td>
-        <td>${n(r.ministry)}</td>
-        <td>${n(r.chabad)}</td>
-        <td class="b ${r.network > 0 ? 'neg' : 'pos'}">${n(r.network)}</td>
+        <td>${n(r.planMin)}</td>
+        <td>${r.hasMin ? n(r.ministry) : '—'}</td>
+        <td class="b ${r.minDiff == null ? '' : r.minDiff >= 0 ? 'pos' : 'neg'}">${dif(r.minDiff)}</td>
+        <td>${n(r.due)}</td>
+        <td>${r.hasPaid ? n(r.chabad) : '—'}</td>
+        <td class="b ${r.balance == null ? '' : r.balance > 0 ? 'neg' : 'pos'}">${bal(r.balance)}</td>
       </tr>`).join('');
     const html = `<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8">
 <title>תקבולים ותשלומים ${esc(stampPeriod)}</title>
@@ -4679,18 +4705,21 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth }) {
 </header>
 <table>
   <thead><tr>
-    <th>סניף</th><th>עלות התקופה</th><th>התקבל ממשרד החינוך</th><th>שולם מבית חב״ד</th><th>פער לתשלום הרשת</th>
+    <th>סניף</th><th>משרד החינוך · מתוכנן</th><th>משרד החינוך · התקבל</th><th>הפרש</th>
+    <th>הסניף · סוכם</th><th>הסניף · הועבר</th><th>יתרה</th>
   </tr></thead>
   <tbody>${body}</tbody>
   <tfoot><tr>
-    <td class="nm">סה״כ</td><td>${n(tot.cost)}</td><td>${n(tot.ministry)}</td><td>${n(tot.chabad)}</td>
-    <td class="${tot.network > 0 ? 'neg' : 'pos'}">${n(tot.network)}</td>
+    <td class="nm">סה״כ</td><td>${n(tot.planMin)}</td><td>${tot.anyMin ? n(tot.ministry) : '—'}</td>
+    <td class="${tot.minDiff >= 0 ? 'pos' : 'neg'}">${tot.anyMin ? dif(tot.minDiff) : '—'}</td>
+    <td>${n(tot.due)}</td><td>${tot.anyPaid ? n(tot.chabad) : '—'}</td>
+    <td class="${tot.balance > 0 ? 'neg' : 'pos'}">${tot.anyPaid ? bal(tot.balance) : '—'}</td>
   </tr></tfoot>
 </table>
 <p class="note">
-  <b>עלות התקופה</b> — עלות ההוראה השנתית של הסניף ועוד 20%, חלקי 12, כפול מספר החודשים בתקופה.
-  <b>פער לתשלום הרשת</b> — עלות התקופה פחות מה שהתקבל ממשרד החינוך ופחות מה ששולם מבית חב״ד: מה שנותר על הרשת לכסות.
-  מספר שלילי פירושו שהתקבל יותר מן העלות. כל הסכומים בשקלים חדשים.
+  <b>משרד החינוך · מתוכנן</b> — החלק ה-12 מהתקציב השנתי, כפול מספר החודשים בתקופה. <b>הפרש</b> — מה שהתקבל פחות המתוכנן.
+  <b>הסניף · סוכם</b> — הסכום החודשי שסוכם עם הסניף (כולל שכר צהרון), כפול מספר החודשים. <b>יתרה</b> — הסכום שסוכם פחות מה שהועבר:
+  חובה = הסניף חייב לרשת, זכות = העביר יותר. ההפרש והיתרה מחושבים רק לסניפים שהוזן להם סכום, והסיכום שלהם כולל רק אותם. כל הסכומים בשקלים חדשים.
 </p>
 </body></html>`;
     const frame = document.createElement('iframe');
@@ -4705,170 +4734,172 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth }) {
   };
 
   const TH = ({ children }) => (
-    <th style={{ padding:'8px 4px', fontSize:12.8, fontWeight:700, color:'var(--text2)',
+    <th scope="col" style={{ padding:'8px 4px', fontSize:14, fontWeight:700, color:'var(--text2)',
       textAlign:'center', whiteSpace:'normal', lineHeight:1.25, verticalAlign:'bottom' }}>{children}</th>
   );
-  // חיובי = נותר על הרשת לכסות (אדום); שלילי = התקבל יותר מן העלות (ירוק)
-  const netColor = v => (v == null ? 'var(--text3)' : v > 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)');
+  const all = nM > 1;
+  const Diff = ({ v }) => v == null ? <span style={{ color:'var(--text2)', fontSize:14.4 }}>—</span>
+    : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v >= 0 ? 'var(--ok-text)' : 'var(--danger-text)' }}>
+        {Math.round(v) === 0 ? 'בדיוק' : <bdi dir="ltr">{v > 0 ? '+' : '−'}{num(Math.abs(v))}</bdi>}</span>;
+  const Bal = ({ v }) => v == null ? <span style={{ color:'var(--text2)', fontSize:14.4 }}>טרם הוזן</span>
+    : Math.round(v) === 0 ? <span style={{ fontWeight:800, color:'var(--ok-text)' }}>מאוזן</span>
+    : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>
+        {v > 0 ? 'חובה ' : 'זכות '}{num(Math.abs(v))}</span>;
+  const cellC = { textAlign:'center' };
 
   return (
-    <div className="page-wrap" style={{ maxWidth:1380 }}>
+    <div className="fade-in page-wrap" style={{ maxWidth:1180 }}>
       <PageHead
-        title="תקבולים ותשלומים"
+        title="תקבולים"
         badge={
-          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700,
+          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:14, fontWeight:700,
             color:'var(--purple)', background:'var(--purple-100)',
             border:'1px solid #D8CEEF', borderRadius:999, padding:'3px 11px' }}>
             <ShieldCheck size={14} strokeWidth={2.4} />לעינייך בלבד
           </span>
         }
-        subtitle="מה התקבל ממשרד החינוך, מה שולם מבית חב״ד ומה נותר על הרשת — לכל סניף בכל חודש."
+        actions={
+          <div className="apple-seg" role="group" aria-label="בחירת חודש" style={{ flexWrap:'wrap' }}>
+            {monthKeys.map(k => (
+              <button key={k} onClick={() => setPicked([k])} aria-pressed={one === k}
+                className={['apple-seg-item', one === k ? 'active' : ''].join(' ')}
+                style={{ padding:'6px 15px', fontSize:15, minHeight:40 }}>{fmtMonth(k)}</button>
+            ))}
+            {monthKeys.length > 1 && (
+              <button onClick={() => setPicked(monthKeys)} aria-pressed={all}
+                className={['apple-seg-item', all ? 'active' : ''].join(' ')}
+                style={{ padding:'6px 15px', fontSize:15, minHeight:40 }}>מצטבר</button>
+            )}
+          </div>
+        }
+        subtitle={all ? 'סיכום כל החודשים. כדי לרשום — בחרי חודש אחד.' : 'מה התקבל ממשרד החינוך ומה העביר כל סניף, מול מה שתוכנן וסוכם. מקלידים בטבלה, והשינוי נשמר ביציאה מהשדה.'}
       />
 
       {err && (
-        <div style={{ background:'var(--danger-bg)', color:'var(--danger)', border:'1px solid var(--danger-line)', borderRadius:10,
-          padding:'9px 14px', fontSize:14.9, fontWeight:600, marginBottom:12 }}>{err}</div>
+        <div role="alert" style={{ background:'var(--danger-bg)', color:'var(--danger-text)', border:'1px solid var(--danger-line)', borderRadius:12,
+          padding:'10px 14px', fontSize:15, fontWeight:600, marginBottom:12 }}>{err}</div>
       )}
 
-      {/* בורר החודשים: אריחים שווי-גודל, בחירה מרובה. חודש אחד = הקלדה;
-          כמה = סכום התקופה. הכלל נאמר במילים כדי שלא יידרש ניחוש. */}
-      <div className="apple-card" style={{ padding:'13px 15px', marginBottom:12 }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8, marginBottom:9 }}>
-          <p style={{ fontSize:14.4, fontWeight:700, color:'var(--text)' }}>
-            חודשים <span style={{ fontWeight:600, color:'var(--text3)' }}>· {periodLabel}</span>
-          </p>
-          <div style={{ display:'flex', gap:6 }}>
-            <button className="apple-btn apple-btn-ghost" style={{ minHeight:32, fontSize:13.8 }}
-              onClick={() => setPicked(monthKeys)}>כל החודשים</button>
-            <button className="apple-btn apple-btn-ghost" style={{ minHeight:32, fontSize:13.8 }}
-              onClick={() => setPicked(activeMonth ? [activeMonth] : [])}>חודש נוכחי</button>
-          </div>
+      {/* השורה התחתונה של המסך: כמה נכנס מול מה שהיה אמור להיכנס */}
+      {led !== null && nM > 0 && (
+        <div className="bl-eq n3" role="group" aria-label={`סיכום ${periodLabel}`}>
+          <div className="bl-tile t-inc"><p className="l">התקבל ממשרד החינוך</p>
+            <p className="v num">{tot.anyMin ? num(tot.ministry) : '—'}</p>
+            <p className="s">{tot.anyMin ? `הוזן ל-${tot.nMin} מתוך ${data.length} סניפים · מתוכנן להם ${num(tot.planMinEntered)}` : `טרם הוזן · מתוכנן ${num(tot.planMin)}`}</p></div>
+          <div className="bl-tile t-inc"><p className="l">הועבר מהסניפים</p>
+            <p className="v num">{tot.anyPaid ? num(tot.chabad) : '—'}</p>
+            <p className="s">{tot.anyPaid ? `הוזן ל-${tot.nPaid} מתוך ${data.length} סניפים · סוכם איתם ${num(tot.dueEntered)}` : `טרם הוזן · סוכם ${num(tot.due)}`}</p></div>
+          <div className="bl-tile t-res t-final"><p className="l">יתרת הסניפים</p>
+            <p className="v num" style={{ color: !tot.anyPaid ? 'var(--text2)' : tot.balance > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>
+              {!tot.anyPaid ? '—' : Math.round(tot.balance) === 0 ? 'מאוזן' : `${tot.balance > 0 ? 'חובה' : 'זכות'} ${num(Math.abs(tot.balance))}`}</p>
+            <p className="s">{tot.anyPaid ? 'מה שסוכם פחות מה שהועבר, בסניפים שהוזנו' : 'תתמלא כשיוזנו העברות'}</p></div>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(min(100%,150px),1fr))',
-          gridAutoRows:'1fr', gap:7 }}>
-          {monthKeys.map(k => {
-            const on = picked.includes(k);
-            return (
-              <button key={k} onClick={() => toggleMonth(k)} className="apple-btn apple-btn-ghost"
-                style={{ minHeight:44, height:'100%', fontSize:14, whiteSpace:'normal', lineHeight:1.3,
-                  ...(on ? { background:'var(--purple-100)', color:'var(--purple)', borderColor:'#D8CEEF', fontWeight:800 } : {}) }}>
-                {on ? '✓ ' : ''}{fmtMonth(k)}
-              </button>
-            );
-          })}
-        </div>
-        <p style={{ fontSize:13.2, color:'var(--text3)', marginTop:9, lineHeight:1.6 }}>
-          {one
-            ? 'חודש אחד נבחר — אפשר להקליד בטבלה את מה שהתקבל ומה ששולם.'
-            : picked.length > 1
-              ? 'כמה חודשים נבחרו — הטבלה מסכמת אותם. לרישום, בחרי חודש אחד.'
-              : 'בחרי חודש כדי לרשום, או כמה חודשים כדי לסכם.'}
-        </p>
-      </div>
+      )}
 
-      <div className="page-toolbar">
-        <button className="apple-btn apple-btn-blue" onClick={downloadPdf} disabled={led === null || !data.length}
-          title={led === null ? 'טוען נתונים…' : 'מסמך מעוצב עם לוגו הרשת'} style={{ minHeight:36, fontSize:14.4 }}>
-          <Printer size={14} strokeWidth={2.2} />
-          הורדת PDF מעוצב
-        </button>
-        <button className="apple-btn apple-btn-ghost" onClick={exportXLSX} disabled={led === null || !data.length}
-          title={led === null ? 'טוען נתונים…' : 'גיליון .xlsx לעבודה עם המספרים'} style={{ minHeight:36, fontSize:14.4 }}>
-          <FileSpreadsheet size={14} strokeWidth={2.2} />
-          הורדה לאקסל
-        </button>
-        {saved && <span style={{ fontSize:13.8, fontWeight:700, color:'var(--ok, #2e7d32)' }}>נשמר</span>}
+      <div className="page-toolbar" style={{ gap:8, marginTop:12 }}>
+        <span style={{ fontSize:15.5, fontWeight:800, color:'var(--text)' }}>{periodLabel}</span>
+        {saved && <span role="status" style={{ fontSize:14, fontWeight:700, color:'var(--ok-text)' }}>נשמר ✓</span>}
+        <span style={{ marginInlineStart:'auto', display:'inline-flex', gap:6 }}>
+          <button className="apple-btn apple-btn-ghost" onClick={downloadPdf} disabled={led === null || !data.length}
+            title={led === null ? 'טוען נתונים…' : 'מסמך מעוצב עם לוגו הרשת'} style={{ minHeight:38, fontSize:14.6 }}>
+            <Printer size={15} strokeWidth={2.2} />PDF
+          </button>
+          <button className="apple-btn apple-btn-ghost" onClick={exportXLSX} disabled={led === null || !data.length}
+            title={led === null ? 'טוען נתונים…' : 'גיליון .xlsx לעבודה עם המספרים'} style={{ minHeight:38, fontSize:14.6 }}>
+            <FileSpreadsheet size={15} strokeWidth={2.2} />אקסל
+          </button>
+        </span>
       </div>
 
       <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto', marginTop:10 }}>
-        <table className="sticky-first fin-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+        <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+          <caption className="sr-only">{`תקבולים, ${periodLabel}: משרד החינוך — מתוכנן, התקבל והפרש; הסניף — סוכם, הועבר ויתרה`}</caption>
+          <colgroup>
+            <col /><col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
+            <col className="g-res" /><col className="g-res" /><col className="g-res g-sum" />
+          </colgroup>
           <thead>
-            <tr style={{ borderBottom:'1.5px solid var(--line)' }}>
-              <TH>סניף</TH>
-              <TH>עלות התקופה</TH>
-              <TH>התקבל ממשרד החינוך</TH>
-              <TH>שולם מבית חב"ד</TH>
-              <TH>פער לתשלום הרשת</TH>
+            <tr className="bl-groups">
+              <th />
+              <th colSpan={3} scope="colgroup" className="gh-inc">משרד החינוך</th>
+              <th colSpan={3} scope="colgroup" className="gh-res">הסניף</th>
+            </tr>
+            <tr>
+              <TH>סניף</TH><TH>מתוכנן</TH><TH>התקבל</TH><TH>הפרש</TH>
+              <TH>סוכם להעברה</TH><TH>הועבר</TH><TH>יתרה</TH>
             </tr>
           </thead>
           <tbody>
             {led === null ? (
-              <tr><td colSpan={5} style={{ padding:22, textAlign:'center', fontSize:14.6, color:'var(--text3)' }}>טוען…</td></tr>
-            ) : !picked.length ? (
-              <tr><td colSpan={5} style={{ padding:22, textAlign:'center', fontSize:14.6, color:'var(--text3)' }}>בחרי חודש למעלה</td></tr>
-            ) : data.map(({ sc, mine, cost, ministry, chabad, network }) => (
+              <tr><td colSpan={7} style={{ padding:24, textAlign:'center', color:'var(--text2)' }}>טוען…</td></tr>
+            ) : !nM ? (
+              <tr><td colSpan={7} style={{ padding:24, textAlign:'center', color:'var(--text2)' }}>בחרי חודש למעלה</td></tr>
+            ) : data.map(({ sc, mine, ministry, chabad, hasMin, hasPaid, planMin, due, agreed, minDiff, balance }) => (
               <tr key={'pl-' + sc.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:700 }}>{sc.name}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:600 }}>{num(cost)}</td>
-                <td style={{ textAlign:'center' }}>
-                  {one ? cellInput(sc.id, one, 'ministryReceived', mine[one]?.ministryReceived)
-                       : <span style={{ fontSize:14.6 }}>{num(ministry)}</span>}
+                <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={sc.name}>{shortName(sc.name)}</th>
+                <td style={{ ...cellC, color:'var(--text2)' }}>{num(planMin)}</td>
+                <td style={cellC}>
+                  {one ? cellInput(sc.id, one, 'ministryReceived', mine[one]?.ministryReceived) : (hasMin ? num(ministry) : '—')}
                 </td>
-                <td style={{ textAlign:'center' }}>
-                  {one ? cellInput(sc.id, one, 'chabadPaid', mine[one]?.chabadPaid)
-                       : <span style={{ fontSize:14.6 }}>{num(chabad)}</span>}
+                <td style={cellC}><Diff v={minDiff} /></td>
+                <td style={{ ...cellC, color:'var(--text2)' }} title={agreed == null ? 'טרם סוכם סכום; מוצג הפער המחושב' : undefined}>
+                  {due == null ? '—' : agreed == null ? <span style={{ fontStyle:'italic' }}>{num(due)}</span> : num(due)}</td>
+                <td style={cellC}>
+                  {one ? cellInput(sc.id, one, 'chabadPaid', mine[one]?.chabadPaid) : (hasPaid ? num(chabad) : '—')}
                 </td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800, color:netColor(network) }}>
-                  {num(network)}
-                </td>
+                <td style={cellC}><Bal v={balance} /></td>
               </tr>
             ))}
           </tbody>
-          {led !== null && picked.length > 0 && data.length > 0 && (
+          {led !== null && nM > 0 && data.length > 0 && (
             <tfoot>
-              <tr style={{ borderTop:'2px solid var(--line)', background:'var(--fill)' }}>
-                <td style={{ padding:'10px 12px', fontSize:14.6, fontWeight:800 }}>סה"כ</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(tot.cost)}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(tot.ministry)}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{num(tot.chabad)}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800, color:netColor(tot.network) }}>{num(tot.network)}</td>
+              <tr>
+                <td style={{ padding:'10px 12px' }}>סה"כ</td>
+                <td style={cellC}>{num(tot.planMin)}</td>
+                <td style={cellC}>{tot.anyMin ? num(tot.ministry) : '—'}</td>
+                <td style={cellC}>{tot.anyMin ? <Diff v={tot.minDiff} /> : '—'}</td>
+                <td style={cellC}>{num(tot.due)}</td>
+                <td style={cellC}>{tot.anyPaid ? num(tot.chabad) : '—'}</td>
+                <td style={cellC}>{tot.anyPaid ? <Bal v={tot.balance} /> : '—'}</td>
               </tr>
             </tfoot>
           )}
         </table>
       </div>
 
-      {/* מובייל: כרטיס לכל סניף, ואותה שורת סיכום */}
-      <div className="only-mobile">
+      {/* נייד: כרטיס לסניף — שני השדות למילוי והיתרה */}
+      <div className="only-mobile big-cards">
         {led === null ? (
-          <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>טוען…</div>
-        ) : !picked.length ? (
-          <div className="apple-card mcard" style={{ padding:22, textAlign:'center', fontSize:15.5, color:'var(--text3)' }}>בחרי חודש למעלה</div>
-        ) : (
-          <>
-            {data.map(({ sc, mine, cost, ministry, chabad, network }) => (
-              <div key={'plm-' + sc.id} className="apple-card mcard">
-                <p className="mcard-name" style={{ marginBottom:4 }}>{sc.name}</p>
-                <CardRow label="עלות התקופה">{money(cost)}</CardRow>
-                <CardRow label="התקבל ממשרד החינוך">
-                  {one ? cellInput(sc.id, one, 'ministryReceived', mine[one]?.ministryReceived) : money(ministry)}
-                </CardRow>
-                <CardRow label='שולם מבית חב"ד'>
-                  {one ? cellInput(sc.id, one, 'chabadPaid', mine[one]?.chabadPaid) : money(chabad)}
-                </CardRow>
-                <CardRow label="פער לתשלום הרשת" strong color={netColor(network)}>{money(network)}</CardRow>
-              </div>
-            ))}
-            {data.length > 1 && (
-              <div className="apple-card mcard" style={{ background:'var(--fill)' }}>
-                <p className="mcard-name" style={{ marginBottom:4 }}>סה"כ</p>
-                <CardRow label="עלות התקופה">{money(tot.cost)}</CardRow>
-                <CardRow label="התקבל ממשרד החינוך">{money(tot.ministry)}</CardRow>
-                <CardRow label='שולם מבית חב"ד'>{money(tot.chabad)}</CardRow>
-                <CardRow label="פער לתשלום הרשת" strong color={netColor(tot.network)}>{money(tot.network)}</CardRow>
-              </div>
-            )}
-          </>
-        )}
+          <div className="apple-card mcard" style={{ padding:22, textAlign:'center', color:'var(--text2)' }}>טוען…</div>
+        ) : !nM ? (
+          <div className="apple-card mcard" style={{ padding:22, textAlign:'center', color:'var(--text2)' }}>בחרי חודש למעלה</div>
+        ) : data.map(({ sc, mine, ministry, chabad, hasMin, hasPaid, planMin, due, minDiff, balance }) => (
+          <div key={'plm-' + sc.id} className="apple-card mcard">
+            <p className="mcard-name" style={{ marginBottom:4, wordBreak:'keep-all' }}>{shortName(sc.name)}</p>
+            <CardRow label={`משרד החינוך · מתוכנן ${num(planMin)}`}>
+              {one ? cellInput(sc.id, one, 'ministryReceived', mine[one]?.ministryReceived) : (hasMin ? num(ministry) : '—')}
+            </CardRow>
+            {minDiff != null && <CardRow label="הפרש מהמתוכנן"><Diff v={minDiff} /></CardRow>}
+            <CardRow label={`הסניף · סוכם ${num(due)}`}>
+              {one ? cellInput(sc.id, one, 'chabadPaid', mine[one]?.chabadPaid) : (hasPaid ? num(chabad) : '—')}
+            </CardRow>
+            <CardRow label="יתרה" strong><Bal v={balance} /></CardRow>
+          </div>
+        ))}
       </div>
 
-      <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
-        <b>עלות התקופה</b> — עלות ההוראה השנתית של הסניף ועוד 20%, חלקי 12, כפול מספר החודשים שנבחרו.
-        {' '}<b>פער לתשלום הרשת</b> — עלות התקופה פחות מה שהתקבל ממשרד החינוך ופחות מה ששולם מבית חב"ד:
-        {' '}מה שנותר על הרשת לכסות. מספר שלילי (ירוק) פירושו שהתקבל יותר מן העלות.
-        {' '}הפער אינו נשמר אלא מחושב, כדי שלא יוכל לסתור את שני הסכומים שלצדו.
-        {' '}רק סניפים שהרשת משלמת בהם שכר ושהוזנו בהם עובדות — אותו סינון כמו בטבלת ההעברות.
-      </p>
+      <button onClick={() => setShowNote(v => !v)} aria-expanded={showNote}
+        style={{ background:'none', border:'none', padding:'10px 2px', marginTop:6, minHeight:44, cursor:'pointer', fontSize:14.8, fontWeight:700, color:'var(--purple)' }}>
+        {showNote ? 'הסתרת ההסבר על העמודות' : 'הסבר על העמודות'}
+      </button>
+      {showNote && (
+        <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
+          <b>מתוכנן</b> — החלק ה-12 מתקציב משרד החינוך השנתי של הסניף{all ? ', כפול מספר החודשים' : ''}. <b>הפרש</b> — מה שהתקבל פחות המתוכנן; ירוק = התקבל יותר.
+          {' '}<b>סוכם להעברה</b> — הסכום החודשי שסוכם עם הסניף במסך "העברות לסניפים", כולל שכר צהרון; כשלא סוכם, מוצג הפער המחושב (באותיות נטויות).
+          {' '}<b>יתרה</b> — מה שסוכם פחות מה שהועבר: חובה = הסניף חייב לרשת, זכות = העביר יותר.
+          {' '}ההפרש והיתרה מחושבים רק לסניף שהוזן לו סכום. רק סניפים שהרשת משלמת בהם שכר ושהוזנו בהם עובדות.
+        </p>
+      )}
     </div>
   );
 }
@@ -4968,7 +4999,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
       background:TINT[kind][0], border:`1px solid ${TINT[kind][1]}`, borderRadius:16, boxShadow:'0 1px 2px rgba(40,20,90,.04)' }}>
       <p style={{ fontSize:14.6, fontWeight:700, color:'var(--text2)', lineHeight:1.3 }}>{label}</p>
       <p className="num" style={{ fontSize:26, fontWeight:800, letterSpacing:'-0.02em', color: color || 'var(--text)', marginTop:6, overflowWrap:'anywhere', lineHeight:1.15 }}>{children}</p>
-      <p style={{ fontSize:13.4, color:'var(--text2)', marginTop:4, minHeight:18, lineHeight:1.35 }}>{sub || ''}</p>
+      <p style={{ fontSize:14, color:'var(--text2)', marginTop:4, minHeight:18, lineHeight:1.35 }}>{sub || ''}</p>
     </div>
   );
   const status = r => r.gap == null ? { t:'טרם הוזן תקציב משרד החינוך', c:'var(--text2)' }
@@ -4976,7 +5007,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
     : r.over > 0 ? { t:`הפער גבוה ב-${num(r.over)} מהסכום שסוכם`, c:'var(--danger-text)' }
     : { t:'בתוך הסכום שסוכם', c:'var(--ok-text)' };
   const TH = ({ children }) => (
-    <th scope="col" style={{ padding:'8px 4px', fontSize:12.8, fontWeight:700, color:'var(--text2)', textAlign:'center', lineHeight:1.25, verticalAlign:'bottom' }}>{children}</th>
+    <th scope="col" style={{ padding:'8px 4px', fontSize:14, fontWeight:700, color:'var(--text2)', textAlign:'center', lineHeight:1.25, verticalAlign:'bottom' }}>{children}</th>
   );
   const td = { textAlign:'center', fontSize:14.6 };
 
@@ -4993,7 +5024,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const usePct20 = planSum > 0 ? Math.round(planned.reduce((x, r) => x + r.costWith20, 0) / planSum * 100) : null;
   const Pct20 = ({ v }) => v == null ? null : (
     <span className="num" title="עלות ההוראה עם תוספת 20%, מול התחשיב הראשוני"
-      style={{ fontSize:13.6, fontWeight:800, whiteSpace:'nowrap', color: v > 100 ? 'var(--danger-text)' : 'var(--text2)' }}>{v}%</span>
+      style={{ fontSize:14, fontWeight:800, whiteSpace:'nowrap', color: v > 100 ? 'var(--danger-text)' : 'var(--text2)' }}>{v}%</span>
   );
   const Bar = ({ r }) => {
     const pc = pctOf(r);
@@ -5004,7 +5035,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           aria-label={`${pc}% מהסימולציה`} title={`עלות ההוראה בפועל ${num(r.cost)} מול ${num(r.plan)} לפי מחשבון המשרד`}>
           <span data-over={pc > 100 ? '' : undefined} style={{ width: `${Math.min(pc, 100)}%` }} />
         </div>
-        <span className="num" style={{ fontSize:13.6, fontWeight:800, whiteSpace:'nowrap', color: pc > 100 ? 'var(--danger-text)' : 'var(--text2)' }}>{pc}%</span>
+        <span className="num" style={{ fontSize:14, fontWeight:800, whiteSpace:'nowrap', color: pc > 100 ? 'var(--danger-text)' : 'var(--text2)' }}>{pc}%</span>
       </div>
     );
   };
@@ -5041,7 +5072,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
       <PageHead
         title="תמונת מצב חודשית"
         badge={viewer ? (
-          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700, color:'var(--purple)',
+          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:14, fontWeight:700, color:'var(--purple)',
             background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, padding:'3px 11px' }}>
             <ShieldCheck size={14} strokeWidth={2.4} />צפייה בלבד
           </span>) : null}
@@ -5292,7 +5323,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
   // מדד בכותרת כרטיס: תווית קטנה מעל מספר, רוחב קבוע — הכרטיסים מיושרים
   const Metric = ({ label, val, big }) => (
     <div style={{ minWidth:150, flexShrink:0 }}>
-      <p style={{ fontSize:13.2, color:'var(--text3)', fontWeight:600, marginBottom:1 }}>{label}</p>
+      <p style={{ fontSize:14, color:'var(--text3)', fontWeight:600, marginBottom:1 }}>{label}</p>
       <p className="num" style={{ fontSize: big ? 17.8 : 15.5, fontWeight:800,
         color: val == null ? 'var(--text3)' : val < 0 ? 'var(--danger)' : 'var(--ok, #2e7d32)' }}>
         {val == null ? '—' : money(per(val))}
@@ -5587,10 +5618,10 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
   // חריגה: מה שהסניף צריך להשלים פחות התקציב שאושר. חיובי = חריגה (אדום)
   const Remains = ({ cover, coverPct, remains, needed, fmt = money }) => (
     cover == null
-      ? <span style={{ fontSize:13.8, color:'var(--text3)' }}>{needed == null ? '—' : needed > 0 ? 'טרם אושר' : 'אין צורך'}</span>
+      ? <span style={{ fontSize:14, color:'var(--text3)' }}>{needed == null ? '—' : needed > 0 ? 'טרם אושר' : 'אין צורך'}</span>
       : <span style={{ whiteSpace:'nowrap' }}>
           <span className="num" style={{ fontSize:16.1, fontWeight:700, color: coverColor(remains) }}>{remains > 0 ? fmt(per(remains)) : 'אין חריגה'}</span>
-          {coverPct != null && <span style={{ fontSize:13.2, color:'var(--text3)', marginInlineStart:5 }}>אושר {coverPct}%</span>}
+          {coverPct != null && <span style={{ fontSize:14, color:'var(--text3)', marginInlineStart:5 }}>אושר {coverPct}%</span>}
         </span>
   );
 
@@ -5788,7 +5819,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
   };
 
   const TH = ({ children }) => (
-    <th style={{ padding:'8px 4px', fontSize:12.8, fontWeight:700, color:'var(--text2)',
+    <th style={{ padding:'8px 4px', fontSize:14, fontWeight:700, color:'var(--text2)',
       textAlign:'center', whiteSpace:'normal', lineHeight:1.25, verticalAlign:'bottom' }}>{children}</th>
   );
   const moneyInput = (sid, field, val) => (
@@ -5821,7 +5852,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
       <PageHead
         title="העברות לסניפים"
         badge={
-          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700,
+          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:14, fontWeight:700,
             color:'var(--purple)', background:'var(--purple-100)',
             border:'1px solid #D8CEEF', borderRadius:999, padding:'3px 11px' }}>
             <ShieldCheck size={14} strokeWidth={2.4} />לעינייך בלבד
@@ -5907,12 +5938,12 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
               </p>
               <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1.6fr) repeat(4, minmax(0,1fr))', gap:'6px 8px', fontSize:15, alignItems:'center' }}>
                 {['עובד/ת', 'שעות', 'עלות לחודש', 'לפי התחשיב', 'מול התחשיב'].map(h => (
-                  <span key={h} style={{ fontSize:13.2, fontWeight:700, color:'var(--text3)', textAlign: h === 'עובד/ת' ? 'right' : 'center' }}>{h}</span>
+                  <span key={h} style={{ fontSize:14, fontWeight:700, color:'var(--text3)', textAlign: h === 'עובד/ת' ? 'right' : 'center' }}>{h}</span>
                 ))}
                 {list.map(x => (
                   <Fragment key={x.t.id}>
                     <span style={{ fontWeight:600, overflowWrap:'anywhere' }}>{x.t.name}
-                      {(x.principal || x.off) && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }}>{x.principal ? 'מנהלת — מחוץ לתעריף השעה' : 'בחופשה — הפקדות בלבד'}</span>}</span>
+                      {(x.principal || x.off) && <span style={{ display:'block', fontSize:14, fontWeight:500, color:'var(--text3)' }}>{x.principal ? 'מנהלת — מחוץ לתעריף השעה' : 'בחופשה — הפקדות בלבד'}</span>}</span>
                     <span className="num" style={{ textAlign:'center' }}>{x.hours || '—'}</span>
                     <span className="num" style={{ textAlign:'center', fontWeight:700 }}>{num(x.cost)}</span>
                     <span className="num" style={{ textAlign:'center', color:'var(--text2)' }}>{x.plan == null ? '—' : num(x.plan)}</span>
@@ -5928,8 +5959,8 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
           const d = act - sim;
           return (
             <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: d > 0 ? 'var(--danger)' : 'var(--ok)' }}>
-              {Math.round(per(d)) === 0 ? '0' : `${d > 0 ? '+' : '−'}${num(Math.abs(per(d)))}`}
-              <span style={{ fontWeight:600, fontSize:13.4, marginInlineStart:6 }}>({d > 0 ? '+' : '−'}{Math.abs(Math.round(d / sim * 100))}%)</span>
+              {Math.round(per(d)) === 0 ? '0' : <bdi dir="ltr">{d > 0 ? '+' : '−'}{num(Math.abs(per(d)))}</bdi>}
+              <span style={{ fontWeight:600, fontSize:14, marginInlineStart:6 }}><bdi dir="ltr">({d > 0 ? '+' : '−'}{Math.abs(Math.round(d / sim * 100))}%)</bdi></span>
             </span>
           );
         };
@@ -6013,7 +6044,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
             <p style={{ fontSize:15.5, fontWeight:700, color:'var(--text)', marginBottom:2 }}>
               ייבוא עלות שכר לכל עובדת · {fmtMonth(monthKey)}
             </p>
-            <p style={{ fontSize:13.8, color:'var(--text3)', marginBottom:10 }}>
+            <p style={{ fontSize:14, color:'var(--text3)', marginBottom:10 }}>
               עלות בפועל רשומה ל-{withActual} מתוך {paid.length} עובדות בחודש הזה. החודש נקבע בבורר החודשים של המערכת.
               {' '}אחרי הייבוא הטבלה שלמטה מתעדכנת מעצמה.
             </p>
@@ -6046,7 +6077,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
               <TH>סניף</TH><TH>עלות הוראה</TH><TH><Sign c="+" />תוספת 20%</TH>{anyTz && <TH><Sign c="+" />שכר צהרון</TH>}
               <TH><Sign c="−" />משרד החינוך</TH><TH><Sign c="−" />מענק רשת</TH>
               <TH><Sign c="=" />פער {perLbl}</TH>
-              <TH>סוכם לחודש<span style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--text2)' }}>מעוגל — למילוי</span></TH>
+              <TH>סוכם לחודש<span style={{ display:'block', fontSize:14, fontWeight:600, color:'var(--text2)' }}>מעוגל — למילוי</span></TH>
               <TH>להעברה {perLbl}</TH>
             </tr>
           </thead>
@@ -6070,9 +6101,9 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                 <td style={cellC}>
                   {moneyInput(sc.id, 'monthlyTransfer', f.monthlyTransfer)}
                   {agreedMonth == null && transfer > 0 && (
-                    <span style={{ display:'block', fontSize:12.8, fontWeight:700, color:'#8F4E00', marginTop:2, whiteSpace:'nowrap' }}>טרם סוכם · מחושב {num(transfer / 12)}</span>
+                    <span style={{ display:'block', fontSize:14, fontWeight:700, color:'#8F4E00', marginTop:2, whiteSpace:'nowrap' }}>טרם סוכם · מחושב {num(transfer / 12)}</span>
                   )}
-                  {tzMonth > 0 && <span style={{ display:'block', fontSize:12.8, color:'var(--text2)', marginTop:2, whiteSpace:'nowrap' }}>+ צהרון {num(tzMonth)}</span>}
+                  {tzMonth > 0 && <span style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2, whiteSpace:'nowrap' }}>+ צהרון {num(tzMonth)}</span>}
                 </td>
                 <td style={{ ...cellC, fontWeight:800, fontSize:17.4, color:'var(--purple)' }}>
                   {dueYearAll == null || dueYearAll <= 0 ? '—' : num(period === 'month' ? dueMonthAll : dueYearAll)}
@@ -6086,7 +6117,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
               <tr>
                 <td style={{ padding:'10px 12px' }}>סה"כ
                   {skippedRows.length > 0 && (
-                    <span style={{ display:'block', fontSize:12.6, fontWeight:600, color:'var(--text2)' }}>
+                    <span style={{ display:'block', fontSize:14, fontWeight:600, color:'var(--text2)' }}>
                       {nBranches(summedRows.length)} · {nSkipped(skippedRows.length)}
                     </span>
                   )}</td>
@@ -6186,14 +6217,14 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
         </button>
         {periodSeg}
         <button onClick={() => setShowSim(v => !v)} className="apple-btn"
-          style={{ minHeight:36, padding:'0 14px', fontSize:13.8, fontWeight:700, borderRadius:10, cursor:'pointer',
+          style={{ minHeight:36, padding:'0 14px', fontSize:14, fontWeight:700, borderRadius:10, cursor:'pointer',
             border:'1px solid var(--line)', background: showSim ? 'var(--purple)' : 'transparent',
             color: showSim ? '#fff' : 'var(--text3)' }}>
           {showSim ? 'הסתרת התחשיב מהתקציב' : 'הצגת התחשיב מהתקציב'}
         </button>
-        <span className="only-desktop" style={{ fontSize:13.2, color:'var(--text3)' }}>הסכומים בש"ח</span>
+        <span className="only-desktop" style={{ fontSize:14, color:'var(--text3)' }}>הסכומים בש"ח</span>
         {flash > 0 && Date.now() - flash < 4000 && (
-          <span style={{ fontSize:13.8, color:'var(--ok)', fontWeight:700, marginInlineStart:'auto' }}>נשמר ✓</span>
+          <span style={{ fontSize:14, color:'var(--ok)', fontWeight:700, marginInlineStart:'auto' }}>נשמר ✓</span>
         )}
       </div>
 
@@ -6253,7 +6284,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                   : <span style={{ fontSize:14.6 }}>{num(per(f.ministryBudget))}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }} title="מתקציב מבט-רשת">{otherInc ? num(per(otherInc)) : '—'}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, fontWeight:800 }}>{f.ministryBudget == null ? '—' : num(per(incomeAll))}</td>
-                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:600, whiteSpace:'nowrap' }}>{num(period === 'month' ? monthly : annual)}{costFromBudget && <span className="fin-budget-tag" title="אין עדיין עובדות במערכת — עלות ההוראה מתקציב בית הספר">לפי התקציב</span>}{hourlyMonthly > 0 && <span style={{ display:'block', fontSize:12.6, fontWeight:500, color:'var(--text3)' }} title="צהרון ומשרות שעתיות — לא נכללים בהשוואה מול משרד החינוך">+ צהרון {num(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}</span>}</td>
+                <td style={{ textAlign:'center', fontSize:14.6, fontWeight:600, whiteSpace:'nowrap' }}>{num(period === 'month' ? monthly : annual)}{costFromBudget && <span className="fin-budget-tag" title="אין עדיין עובדות במערכת — עלות ההוראה מתקציב בית הספר">לפי התקציב</span>}{hourlyMonthly > 0 && <span style={{ display:'block', fontSize:14, fontWeight:500, color:'var(--text3)' }} title="צהרון ומשרות שעתיות — לא נכללים בהשוואה מול משרד החינוך">+ צהרון {num(period === 'month' ? hourlyMonthly : hourlyMonthly * 12)}</span>}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }}
                   title="כרית ביטחון 10% ומילוי מקום 5%, שניהם על עלות השכר הכוללת השנתית">{num(per(reserve))}</td>
                 <td style={{ textAlign:'center', fontSize:14.6, color:'var(--text2)' }} title="הוצאות שאינן שכר הוראה — מתקציב מבט-רשת">{otherExp ? num(per(otherExp)) : '—'}</td>
@@ -6410,7 +6441,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
           </div>
         )}
       </div>
-      <p style={{ fontSize:13.8, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
+      <p style={{ fontSize:14, color:'var(--text3)', marginTop:10, lineHeight:1.6 }}>
         <b>עלות כוללת</b> — כל עובדי ההוראה של בית הספר: מורות, מנהלת, ייעוץ ושילוב. צהרון ומשרות שעתיות מוצגים בנפרד.
         {' '}<b>סה"כ הכנסות</b> — הכנסות משרד החינוך ועוד ההכנסות הנוספות מתקציב מבט-רשת.
         {' '}<b>סה"כ הוצאות</b> — עלות השכר הכוללת, תוספת ביטחון 10% ומילוי מקום 5% (על עלות השכר השנתית), ועוד ההוצאות הנוספות מתקציב מבט-רשת.
@@ -6491,7 +6522,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
                     const simSum = f.detail.teach.expenses.reduce((a, x) => a + x.amount, 0);
                     return (
                       <div style={{ marginTop:12, padding:'10px 12px', background:'var(--apple-fill, #f5f3fa)', borderRadius:10 }}>
-                        <p style={{ fontSize:13.8, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>עלות ההוראה שחושבה בתקציב</p>
+                        <p style={{ fontSize:14, fontWeight:800, color:'var(--purple)', marginBottom:4 }}>עלות ההוראה שחושבה בתקציב</p>
                         {f.detail.teach.expenses.map((x, i) => <div key={'te' + i}>{dline(x.name, per(x.amount), false, x.amount < 0)}</div>)}
                         {dline('סה"כ מהתקציב', per(simSum), true)}
                         <div style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', fontSize:14.4, fontWeight:800,
@@ -11657,7 +11688,7 @@ function LinkView({ code }) {
               style={{ height:38, width:'auto', objectFit:'contain', flexShrink:0 }} />
             <div style={{ minWidth:0 }}>
               <p style={{ fontSize:16.7, fontWeight:800, color:'var(--text)', lineHeight:1.25 }}>מערכת שכר עובדי הוראה</p>
-              <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.3 }}>רשת חינוך חב״ד</p>
+              <p style={{ fontSize:14, color:'var(--text2)', lineHeight:1.3 }}>רשת חינוך חב״ד</p>
             </div>
           </div>
           <p style={{ fontSize:18.4, fontWeight:800, color:'var(--text)' }}>{me?.schoolName || 'טוען…'}</p>
@@ -12221,7 +12252,7 @@ export default function App() {
             <img src="/logo-chabad.png" alt="לוגו רשת" style={{ height:36, width:'auto', objectFit:'contain' }} />
             <div>
               <p style={{ fontWeight:700, fontSize:16.7, color:'var(--text)', letterSpacing:'-0.01em', lineHeight:1.25 }}>מערכת שכר מורים</p>
-              <p style={{ fontSize:13.2, color:'var(--text3)', lineHeight:1.3 }}>
+              <p style={{ fontSize:14, color:'var(--text2)', lineHeight:1.3 }}>
                 {isCoord ? 'שליח / מנהל רשת' : isClerk ? 'חשבת שכר' : `מנהלת: ${principalSchool?.name || ''}`}
                 <span style={{ opacity:.55 }}>{` · גרסה ${BUILD}`}</span>
               </p>

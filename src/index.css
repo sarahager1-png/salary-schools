@@ -962,7 +962,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .big-table.sticky-first tfoot td:first-child { background: #EDE8F8; }
 .big-table td { white-space: nowrap; }
 .big-table td:first-child { white-space: normal; min-width: 150px; line-height: 1.3; }
-.big-table .fin-input { width: 92px; padding: 5px 4px !important; }
+.big-table .fin-input { width: 112px; padding: 5px 4px !important; }
 /* כרטיסיות המספרים — תמיד אותו רוחב ואותו גובה: שלוש בשורה, שתיים בנייד */
 .kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; margin-top: 12px; }
 @media (max-width: 700px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
@@ -1121,3 +1121,18 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .nav-wrap { gap: 4px 3px; padding-bottom: 7px; }
 .nav-wrap .nav-sep { margin: 0 2px; }
 .nav-btn.nav-main { height: 40px; padding: 0 16px; font-size: 16.5px; }
+.bl-eq.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 700px) { .bl-eq.n3 { grid-template-columns: 1fr; } }
+
+/* ── רצפת גופן: 14px ("תבדוק כל הזמן שגודל הגופן יהיה נגיש וקריא, ולא מאוד מאוד קטן", שרה 6.10) ──
+   חל על המסכים המעוצבים מחדש; גובר על הגדלים הקטנים שהוגדרו למעלה, כולל בחלון של 1000. */
+.bl-tile .l { font-size: 14.4px !important; }
+.bl-tile .s { font-size: 14px !important; line-height: 1.4; }
+.bl-tile .v { font-size: 22px; }
+.bl-ring-num span { font-size: 14px; }
+.bl-fact { font-size: 14.6px; }
+.bl-chip { font-size: 14px; }
+.bl-table thead tr.bl-groups th { font-size: 14.6px !important; }
+.section-sub { font-size: 14.6px; }
+.page-sub { font-size: 15px; }
+.fin-budget-tag { font-size: 14px !important; }
