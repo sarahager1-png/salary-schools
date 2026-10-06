@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 54;
+const BUILD = 55;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4924,6 +4924,11 @@ function BottomLineView({ activeMonth, viewer = false }) {
     balance: summed.some(r => r.balance != null) ? sum('balance') : null,
     staff: sum('staff'), withActual: sum('withActual') };
   const prevCost = prev ? prev.branches.filter(b => b.gap != null).reduce((a, b) => a + b.costWith20, 0) : null;
+  // תקבולי משרד החינוך בפועל — רק לסניפים שהוזן להם, מול התכנון של אותם סניפים בלבד
+  const recv = summed.filter(r => r.ministryReceived != null);
+  const recvN = recv.length;
+  const recvSum = recv.reduce((a, r) => a + r.ministryReceived, 0);
+  const recvPlan = recv.reduce((a, r) => a + (r.ministry || 0), 0);
   const net = tot.due - tot.gap;   // מה שסוכם להעברה מול הפער המחושב: חיובי = עודף לרשת
 
   const Bal = ({ v }) => v == null
@@ -4998,7 +5003,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
 
           <div className="kpi-grid">
             <Kpi kind="cost" label="עלות הוראה + 20%" sub={prevCost != null ? `מול ${fmtMonth(prev.key)}: ${tot.costWith20 - prevCost >= 0 ? '+' : '−'}${num(Math.abs(tot.costWith20 - prevCost))}` : ''}>{num(tot.costWith20)}</Kpi>
-            <Kpi kind="income" label="משרד החינוך + מענק רשת" sub={`משרד ${num(tot.ministry)} · מענק ${num(tot.support)}`}>{num(tot.ministry + tot.support)}</Kpi>
+            <Kpi kind="income" label="משרד החינוך + מענק רשת" sub={recvN
+              ? `התקבל בפועל מהמשרד ${num(recvSum)} ב-${recvN === 1 ? 'סניף אחד' : recvN + ' סניפים'} (לפי התכנון שלהם: ${num(recvPlan)})`
+              : `משרד ${num(tot.ministry)} · מענק ${num(tot.support)}`}>{num(tot.ministry + tot.support)}</Kpi>
             <Kpi kind="result" label="הפער החודשי" color="var(--danger)" sub="העלות פחות ההכנסות">{num(tot.gap)}</Kpi>
             <Kpi kind="income" label="סוכם להעברה מהסניפים">{num(tot.due)}</Kpi>
             <Kpi kind="income" label="הועבר בפועל החודש" sub={tot.paid == null ? 'טרם הוזן' : ''}>{tot.paid == null ? '—' : num(tot.paid)}</Kpi>
@@ -5023,7 +5030,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <td style={{ padding:'9px 12px', fontSize:14.6, fontWeight:700 }}>{r.name}
                       <span style={{ display:'block', fontSize:13.6, fontWeight:600, color: st.c }}>{st.t}</span></td>
                     <td style={td}>{num(r.costWith20)}</td>
-                    <td style={td}>{num(r.ministry)}</td>
+                    <td style={td}>{num(r.ministry)}
+                      {/* מה שהתקבל בפועל באותו חודש, כשהוזן במסך התקבולים */}
+                      {r.ministryReceived != null && (
+                        <span style={{ display:'block', fontSize:13.2, fontWeight:700, color: r.ministryReceived >= (r.ministry || 0) ? 'var(--ok)' : 'var(--danger)' }}>
+                          התקבל {num(r.ministryReceived)}</span>
+                      )}</td>
                     <td style={td}>{num(r.support)}</td>
                     <td style={{ ...td, fontWeight:800 }}>{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : <span style={{ color:'var(--ok)' }}>עודף {num(-r.gap)}</span>}</td>
                     <td style={td}>{r.due == null || r.due <= 0 ? '—' : num(r.due)}
@@ -5055,6 +5067,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <p style={{ fontSize:12.8, fontWeight:600, color: st.c, marginBottom:4 }}>{st.t}</p>
                 <CardRow label="עלות הוראה + 20%">{num(r.costWith20)}</CardRow>
                 <CardRow label="הכנסות משרד החינוך">{num(r.ministry)}</CardRow>
+                {r.ministryReceived != null && (
+                  <CardRow label="התקבל בפועל" color={r.ministryReceived >= (r.ministry || 0) ? 'var(--ok)' : 'var(--danger)'}>{num(r.ministryReceived)}</CardRow>
+                )}
                 <CardRow label="מענק רשת">{num(r.support)}</CardRow>
                 <CardRow label="פער החודש" strong>{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : `עודף ${num(-r.gap)}`}</CardRow>
                 <CardRow label={r.agreed == null ? 'להעברה (מחושב)' : 'סוכם להעברה'}>{r.due == null || r.due <= 0 ? '—' : num(r.due)}</CardRow>
