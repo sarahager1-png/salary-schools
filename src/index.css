@@ -1243,3 +1243,4 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   border: none; background: none; border-radius: 8px; font: inherit; font-size: 15px; font-weight: 700; color: var(--text); cursor: pointer; white-space: nowrap; }
 .month-pick-btn:hover { background: #fff; }
 .month-pick-menu { min-width: 170px; max-height: 60vh; overflow-y: auto; inset-inline-start: auto; inset-inline-end: 0; }
+.mcard-label { font-size: 14px !important; }
