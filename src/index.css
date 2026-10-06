@@ -1038,3 +1038,23 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* סימון פוקוס למקלדת בכל המערכת — לא היה כזה בכלל */
 :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid var(--purple); outline-offset: 2px; }
 .big-table .bl-bar { max-width: 90px; min-width: 44px; }
+
+/* ── טבלת "שורה תחתונה": שלוש קבוצות בצבע — השכר, ההכנסות, מה נשאר (אותה שפה של הטבלה הראשית) ── */
+.bl-table tbody td, .bl-table tbody th[scope="row"] { background: transparent !important; }
+.bl-table col.g-cost { background: #FDF6F6; }
+.bl-table col.g-inc  { background: #F3FBF6; }
+.bl-table col.g-res  { background: #F7F4FC; }
+.bl-table col.g-res.g-sum { background: #EFE9FA; }
+.bl-table tbody tr:hover td, .bl-table tbody tr:hover th[scope="row"] { background: rgba(75,46,131,.045) !important; }
+.bl-table thead tr.bl-groups th { padding: 8px 6px 6px !important; font-size: 13.6px !important; letter-spacing: .01em; border-bottom: none; background: var(--surface); }
+.bl-table thead tr.bl-groups th.gh-cost { color: #B42318; background: #FBEBEB; border-bottom: 2px solid #F0A8A8; }
+.bl-table thead tr.bl-groups th.gh-inc  { color: #15803D; background: #E6F6EC; border-bottom: 2px solid #86CFA0; }
+.bl-table thead tr.bl-groups th.gh-res  { color: var(--purple); background: #EFE9FA; border-bottom: 2px solid #C9B8EC; }
+.bl-chip {
+  display: inline-block; margin-inline-start: 7px; padding: 1px 7px; border-radius: 999px;
+  font-size: 12.6px; font-weight: 800; line-height: 1.5; vertical-align: 1px;
+  color: #15803D; background: #E6F6EC; border: 1px solid #BBE5C8;
+}
+.bl-chip.over { color: #B42318; background: #FBEBEB; border-color: #F0A8A8; }
+.bl-table tfoot td { font-size: 15.8px !important; }
+.bl-table tfoot .bl-chip { margin-inline-start: 5px; }
