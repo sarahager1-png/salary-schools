@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import {
   Briefcase, Calculator, School, Check, ArrowLeft, ArrowRight,
-  ChevronLeft, ChevronRight, Plus, LogOut, BarChart3, ClipboardCheck,
+  ChevronLeft, ChevronRight, Plus, LogOut, BarChart3, ClipboardCheck, MoreHorizontal,
   Printer, Download, Upload, Send, Pencil, Trash2, X, Search,
   Paperclip, Image as ImageIcon, FileText, AlertTriangle, Lightbulb,
   CalendarClock, Bell, Users, FolderOpen, Database, FileSpreadsheet, ShieldAlert,
@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 76;
+const BUILD = 77;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4539,8 +4539,12 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth }) {
   const [err, setErr]     = useState('');
   const [saved, setSaved] = useState(false);
   const monthKeys = Object.keys(months || {}).sort();
-  // ברירת מחדל: החודש הפעיל — המצב שבו רושמים, לא שבו מסכמים
-  const [picked, setPicked] = useState(() => (activeMonth ? [activeMonth] : []));
+  // ברירת מחדל: חודש השכר שבעבודה — הלפני-אחרון ("והחודש הוא ספטמבר!", שרה 6.10):
+  // התקבולים וההעברות שרושמים בתחילת אוקטובר שייכים לספטמבר. חודש יחיד — הוא עצמו.
+  const [picked, setPicked] = useState(() => {
+    const k = monthKeys.length > 1 ? monthKeys[monthKeys.length - 2] : (monthKeys[0] || activeMonth);
+    return k ? [k] : [];
+  });
 
   useEffect(() => {
     let alive = true;
@@ -5809,7 +5813,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
   return (
     <div className="page-wrap" style={{ maxWidth:1380 }}>
       <PageHead
-        title="הכנסות מול הוצאות"
+        title="העברות לסניפים"
         badge={
           <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700,
             color:'var(--purple)', background:'var(--purple-100)',
@@ -5817,7 +5821,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
             <ShieldCheck size={14} strokeWidth={2.4} />לעינייך בלבד
           </span>
         }
-        subtitle="כל ההכנסות מול כל ההוצאות, מענק הרשת והיתרה להשלמת הסניף — לכל בית ספר ולרשת כולה."
+        subtitle="הפער בין עלות השכר בפועל להכנסות משרד החינוך — מה שכל סניף מעביר לרשת, לשנה ולחודש."
       />
 
       {err && (
@@ -5832,11 +5836,6 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
           לחלוקה לחודשים, לכל סניף שרשת חב"ד משלמים" (שרה, 23.9).
           טבלה עצמאית: תוספת אחת של 20% במקום 10%+5%, ושתי עמודות פער —
           שנתי וחודשי — כדי שלא יידרש חישוב אצל מי שמקבל את הקובץ. */}
-      <h2 className="section-head">העברות לסניפים</h2>
-      <p className="section-sub">
-        הפער בין עלות השכר בפועל להכנסות משרד החינוך — מה שעל כל סניף להעביר לרשת, לשנה ולחודש.
-        {' '}נקי: בלי הכנסות נוספות ובלי הוצאות נוספות, ורק סניפים שהרשת משלמת בהם שכר.
-      </p>
 
       <div className="page-toolbar">
         {/* בזמן הטעינה transferRows ריק — בלי fin === null הכפתורים נראים
@@ -11809,6 +11808,16 @@ export default function App() {
   const [teacherModal,  setTeacherModal]  = useState(null);
   const [showApproval,  setShowApproval]  = useState(false);
   const [showBackup,    setShowBackup]    = useState(false);
+  // חלונית "עוד" בתפריט — נסגרת בלחיצה מחוץ לה וב-Escape
+  const [navMore, setNavMore] = useState(false);
+  const navMoreRef = useRef(null);
+  useEffect(() => {
+    if (!navMore) return;
+    const out = e => { if (navMoreRef.current && !navMoreRef.current.contains(e.target)) setNavMore(false); };
+    const esc = e => { if (e.key === 'Escape') setNavMore(false); };
+    document.addEventListener('mousedown', out); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc); };
+  }, [navMore]);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showRelease,   setShowRelease]   = useState(false);
 
@@ -12227,6 +12236,21 @@ export default function App() {
 
           {/* "לא רואים הכל, תציב אחרת" (שרה, 6.10): שורה ראשונה — לוגו, ולצדו חודש, גיבוי ויציאה.
               שורה שנייה — כל המסכים, נשברים לשורה נוספת במקום להיחתך. בנייד נשארת גלילה. */}
+          {/* הכפתור המרכזי בשורת הלוגו — כך שאר המסכים נכנסים בשורה אחת גם בחלון של 1000 */}
+          {isCoord && view !== 'schools' && (
+            <button className="nav-btn" onClick={() => setView('schools')} title="חזרה לרשימת בתי הספר"
+              style={{ padding:'0 10px', fontSize:14.6 }}>
+              <ArrowRight size={15} strokeWidth={2.4} />
+              בתי הספר
+            </button>
+          )}
+          {isCoord && (
+            <button className={`nav-btn nav-main ${view==='bottomline' ? 'active' : ''}`} onClick={() => setView('bottomline')}
+              aria-current={view==='bottomline' ? 'page' : undefined}>
+              <BarChart3 size={18} strokeWidth={2.4} />
+              תמונת מצב חודשית
+            </button>
+          )}
           <div style={{ display:'flex', gap:5, alignItems:'center', flexWrap:'wrap', marginInlineStart:'auto' }}>
             {/* ── מערכת ── */}
 
@@ -12265,10 +12289,12 @@ export default function App() {
               )}
             </div>
 
-            <button className="nav-btn" onClick={() => setShowBackup(true)} title="גיבוי ושחזור">
-              <Database size={15} strokeWidth={2.2} />
-              גיבוי
-            </button>
+            {!(isCoord || isClerk) && (
+              <button className="nav-btn" onClick={() => setShowBackup(true)} title="גיבוי ושחזור">
+                <Database size={15} strokeWidth={2.2} />
+                גיבוי
+              </button>
+            )}
 
             <button className="nav-btn danger" onClick={onSignOut} title="יציאה">
               <LogOut size={15} strokeWidth={2.2} />
@@ -12276,35 +12302,19 @@ export default function App() {
             </button>
           </div>
           <div className="nav-scroll nav-wrap">
-            {/* הדף של המנהל — שרה רואה בדיוק את מה שהוא רואה */}
-            {isCoord && (
-              <button className={`nav-btn nav-main ${view==='bottomline' ? 'active' : ''}`} onClick={() => setView('bottomline')}
-                aria-current={view==='bottomline' ? 'page' : undefined}>
-                <BarChart3 size={19} strokeWidth={2.4} />
-                תמונת מצב חודשית
-              </button>
-            )}
-            {/* הסרגל מקובץ לפי זרימת העבודה: עבודה שוטפת (סימולציה,
-                אישורים, תלושים) · ניתוח (דוח רשת, עלות הוראה) · ניהול
-                (קליטה, התראות) · מערכת (חודש, גיבוי, יציאה). מפריד דק
-                בין קבוצה לקבוצה. */}
-            {isCoord && view !== 'schools' && (
-              <>
-                <button className="nav-btn" onClick={() => setView('schools')}>
-                  <ArrowRight size={15} strokeWidth={2.4} />
-                  ראשי
-                </button>
-                <span className="nav-sep" />
-              </>
-            )}
-
-            {/* ── עבודה שוטפת ── */}
+            {/*
+              התפריט בארבע קבוצות (שרה אישרה, 6.10): תמונת מצב · עבודה חודשית ·
+              כספים · עובדים. מה שלא נפתח כל יום — דוח רשת, תלושים מול תחשיב
+              (אסתר אינה משתמשת בהם), התראות וגיבוי — תחת "עוד". בנייד אין חלונית:
+              הפריטים של "עוד" מופיעים בהמשך השורה הנגללת.
+            */}
+            {/* ── עבודה חודשית ── */}
             {(isCoord || isClerk) && (
               <button className={`nav-btn ${view==='calc' ? 'active' : ''}`} onClick={() => setView('calc')} style={{ position:'relative' }}>
                 <Calculator size={15} strokeWidth={2.2} />
                 סימולציה
                 {needsSimCount > 0 && (
-                  <span style={{ background:'var(--warn-bg)', color:'var(--warn)', border:'1px solid var(--warn-line)',
+                  <span style={{ background:'var(--warn-bg)', color:'#8F4E00', border:'1px solid var(--warn-line)',
                     fontSize:13.2, fontWeight:700, borderRadius:999, minWidth:19, height:19, padding:'0 5px',
                     display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
                     {needsSimCount}
@@ -12312,8 +12322,7 @@ export default function App() {
                 )}
               </button>
             )}
-            {/* "תשתף את אסתר גם באישורים של המורים" (שרה, 3.9) — האישורים
-                ועלות ההוראה נפתחו גם לחשבת השכר */}
+            {/* "תשתף את אסתר גם באישורים של המורים" (שרה, 3.9) */}
             {(isCoord || isClerk) && (
               <button
                 className={`nav-btn ${needsApprovalCount > 0 ? 'active' : ''}`}
@@ -12339,58 +12348,78 @@ export default function App() {
             )}
             {(isCoord || isClerk) && <span className="nav-sep" />}
 
-            {/* ── ניתוח ── */}
-            {isCoord && (
-              <button className={`nav-btn ${view==='report' ? 'active' : ''}`} onClick={() => setView('report')}>
-                <BarChart3 size={15} strokeWidth={2.2} />
-                דוח רשת
-              </button>
-            )}
+            {/* ── כספים ── */}
             {(isCoord || isClerk) && (
               <button className={`nav-btn ${view==='finance' ? 'active' : ''}`} onClick={() => setView('finance')}>
                 <Wallet size={15} strokeWidth={2.2} />
-                עלות הוראה
+                העברות לסניפים
               </button>
             )}
-            {/* "תן אפשרות לרשום בטבלה כל חודש מה התקבל..." (שרה, 23.9) —
-                לעיני שרה בלבד, כמו עלות ההוראה שלצדו */}
+            {/* "תן אפשרות לרשום בטבלה כל חודש מה התקבל..." (שרה, 23.9) — לעיני שרה בלבד */}
             {isCoord && (
               <button className={`nav-btn ${view==='ledger' ? 'active' : ''}`} onClick={() => setView('ledger')}>
                 <Wallet size={15} strokeWidth={2.2} />
-                תקבולים ותשלומים
+                תקבולים
               </button>
             )}
-            {(isCoord || isClerk) && (
-              <button className={`nav-btn ${view==='calibration' ? 'active' : ''}`} onClick={() => setView('calibration')}>
-                <Percent size={15} strokeWidth={2.2} />
-                תלושים מול תחשיב
-              </button>
-            )}
-            {isCoord && <span className="nav-sep" />}
+            {(isCoord || isClerk) && <span className="nav-sep" />}
 
-            {/* ── ניהול ── */}
-            {/* "גם אסתר תראה את הטפסים" (שרה, 10.9) — טפסי 101, המסמכים
-                והחוזים פתוחים לחשבת לצפייה; יצירת קישורים והעלאת חוזה נשארו של שרה */}
+            {/* ── עובדים ── */}
+            {/* "גם אסתר תראה את הטפסים" (שרה, 10.9) */}
             {(isCoord || isClerk) && (
               <button className="nav-btn" onClick={() => setShowOnboarding(true)}>
                 <FileText size={15} strokeWidth={2.2} />
                 קליטה
               </button>
             )}
-            {/* כתב קבלה וסילוק לוותיקים (שרה, 20.9) — אסתר רואה, רק שרה יוצרת ושולחת */}
+            {/* כתב קבלה וסילוק לוותיקים (שרה, 20.9) */}
             {(isCoord || isClerk) && (
               <button className="nav-btn" onClick={() => setShowRelease(true)}>
                 <ClipboardCheck size={15} strokeWidth={2.2} />
                 כתבי סילוק
               </button>
             )}
-            {/* מה שהמערכת אמרה ולמי — הוואטסאפ נבלע בין הודעות, זה נשאר */}
-            {(isCoord || isClerk) && (
-              <button className={`nav-btn ${view==='alerts' ? 'active' : ''}`} onClick={() => setView('alerts')}>
-                <Bell size={15} strokeWidth={2.2} />
-                התראות
-              </button>
-            )}
+
+            {/* ── עוד ── */}
+            {(isCoord || isClerk) && (() => {
+              const items = [
+                isCoord && { key:'report', label:'דוח רשת', Icon: BarChart3, on: () => setView('report'), active: view === 'report' },
+                { key:'calibration', label:'תלושים מול תחשיב', Icon: Percent, on: () => setView('calibration'), active: view === 'calibration' },
+                { key:'alerts', label:'התראות', Icon: Bell, on: () => setView('alerts'), active: view === 'alerts' },
+                { key:'backup', label:'גיבוי ושחזור', Icon: Database, on: () => setShowBackup(true), active: false },
+              ].filter(Boolean);
+              const anyActive = items.some(x => x.active);
+              return (
+                <>
+                  <span className="nav-sep" />
+                  <div className="nav-more" ref={navMoreRef}>
+                    <button className={`nav-btn ${anyActive ? 'active' : ''}`} aria-haspopup="menu" aria-expanded={navMore}
+                      onClick={() => setNavMore(v => !v)}>
+                      <MoreHorizontal size={16} strokeWidth={2.4} />
+                      {anyActive ? items.find(x => x.active).label : 'עוד'}
+                    </button>
+                    {navMore && (
+                      <div className="nav-more-menu" role="menu">
+                        {items.map(({ key, label, Icon, on, active }) => (
+                          <button key={key} role="menuitem" className={`nav-more-item ${active ? 'active' : ''}`}
+                            onClick={() => { setNavMore(false); on(); }}>
+                            <Icon size={16} strokeWidth={2.2} />{label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {/* נייד: בלי חלונית — הפריטים בהמשך השורה */}
+                  <div className="nav-more-inline">
+                    {items.map(({ key, label, Icon, on, active }) => (
+                      <button key={key} className={`nav-btn ${active ? 'active' : ''}`} onClick={on}>
+                        <Icon size={15} strokeWidth={2.2} />{label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       </header>
