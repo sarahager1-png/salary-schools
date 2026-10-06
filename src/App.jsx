@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 92;
+const BUILD = 93;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5330,7 +5330,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 </>
               ) : (
                 <>
-                  <p style={{ flex:'1 1 260px', fontSize:15, color:'var(--text2)' }}>החודש פתוח: המספרים מחושבים מהנתונים הנוכחיים ועשויים להשתנות. הוא נסגר אוטומטית ב-11 בחודש שאחריו.</p>
+                  <p style={{ flex:'1 1 260px', fontSize:15, color:'var(--text2)' }}>החודש פתוח: המספרים מחושבים מהנתונים הנוכחיים ועשויים להשתנות. הוא נסגר אוטומטית ב-10 בחודש שאחריו, בסוף היום.</p>
                   <button className="apple-btn apple-btn-blue" onClick={() => setAskClose('close')} style={{ minHeight:42, fontSize:15 }}>סגירת החודש</button>
                 </>
               )}
@@ -6962,10 +6962,32 @@ function GenderPick({ value, onChange }) {
   );
 }
 
-function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onMarkSlip, onSaveSlipGross, docs = null }) {
+function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onMarkSlip, onSaveSlipGross, docs = null, onPickMonth = null }) {
   // שתי לשוניות: התלושים שהתקבלו מהגזברות, והכנת התלושים לפי חישוב המערכת (שרה אישרה, 6.10)
   const [mode, setMode] = useState(onSaveTeacher ? 'archive' : 'prep');
   const [openSc, setOpenSc] = useState(null);
+  /*
+    "לא רואה את כל התלושים… פה" (שרה, 6.10): גם בהכנת התלושים רואים, לכל
+    עובדת, את התלוש שהתקבל מהגזברות לאותו חודש — ופותחים אותו מהשורה.
+  */
+  const [slipFiles, setSlipFiles] = useState([]);
+  const [slipErr, setSlipErr] = useState('');
+  useEffect(() => {
+    let alive = true;
+    store.loadPayslips().then(r => { if (alive) setSlipFiles(r); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const tzn = v => String(v || '').replace(/\D/g, '').replace(/^0+/, '');
+  const monthFiles = slipFiles.filter(x => x.monthKey === monthKey);
+  const fileBy = new Map();
+  for (const x of monthFiles) { if (x.teacherMonthId) fileBy.set(x.teacherMonthId, x); if (tzn(x.tzId)) fileBy.set(`${x.schoolId}|${tzn(x.tzId)}`, x); }
+  const fileOf = t => fileBy.get(t.id) || (tzn(t.tzId) ? fileBy.get(`${t.schoolId}|${tzn(t.tzId)}`) : null) || null;
+  const lastFilesMonth = [...new Set(slipFiles.map(x => x.monthKey))].sort().pop() || null;
+  const openFile = async x => {
+    const w = window.open('', '_blank'); setSlipErr('');
+    try { const url = await store.payslipUrl(x.path); if (w) w.location.href = url; else window.location.href = url; }
+    catch (e) { if (w) w.close(); setSlipErr(e.message); }
+  };
   const money = v => (v == null ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
   /*
     "לא רואים את התלוש רק עלויות" (שרה, 3.9): שורות הרכיבים המלאות —
@@ -7050,6 +7072,23 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
       </div>
       {mode === 'archive' && <PayslipArchive schools={schools} />}
       {mode === 'archive' && docs}
+      {mode === 'prep' && slipErr && (
+        <div role="alert" style={{ background:'var(--danger-bg)', color:'var(--danger-text)', border:'1px solid var(--danger-line)', borderRadius:12,
+          padding:'10px 14px', fontSize:15, fontWeight:600, marginBottom:10 }}>{slipErr}</div>
+      )}
+      {mode === 'prep' && !monthFiles.length && lastFilesMonth && lastFilesMonth !== monthKey && (
+        <div className="apple-card no-print" style={{ padding:'12px 16px', marginBottom:12, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap',
+          background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>
+          <p style={{ flex:'1 1 260px', fontSize:15.5, fontWeight:600, color:'#8F4E00', lineHeight:1.5 }}>
+            תלושי {fmtMonthFn ? fmtMonthFn(monthKey) : monthKey} עוד לא התקבלו מהגזברות. התלושים האחרונים שהתקבלו הם של {fmtMonthFn ? fmtMonthFn(lastFilesMonth) : lastFilesMonth}.
+          </p>
+          {onPickMonth && (
+            <button className="apple-btn apple-btn-blue" onClick={() => onPickMonth(lastFilesMonth)} style={{ minHeight:42, fontSize:15 }}>
+              מעבר ל{fmtMonthFn ? fmtMonthFn(lastFilesMonth) : lastFilesMonth}
+            </button>
+          )}
+        </div>
+      )}
       {mode === 'prep' && bySchool.map(({ sc, ts: tsAll }) => {
         const paysSupp = sc.chabadSupp !== false;
         /*
@@ -7085,7 +7124,9 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
               {!paysSupp && <span className="bl-tag">תשלום ישיר</span>}
               <span className="st"><b className="num">{live.length}</b> תלושים</span>
               <span className="st">ברוטו <b className="num">{money(tot.gross)}</b></span>
-              <span className={'st' + (live.length && live.every(x => x.t._slipIssuedAt) ? ' ok' : '')}>הוצאו <b className="num">{live.filter(x => x.t._slipIssuedAt).length}/{live.length}</b></span>
+              {monthFiles.some(x => x.schoolId === sc.id)
+                ? <span className={'st' + (live.length && live.every(x => fileOf(x.t)) ? ' ok' : '')} title="תלושים שהתקבלו מהגזברות, מתוך העובדות בסניף">התקבלו <b className="num">{live.filter(x => fileOf(x.t)).length}/{live.length}</b></span>
+                : <span className={'st' + (live.length && live.every(x => x.t._slipIssuedAt) ? ' ok' : '')}>הוצאו <b className="num">{live.filter(x => x.t._slipIssuedAt).length}/{live.length}</b></span>}
             </button>
             <p className="only-print" style={{ fontSize:17.2, fontWeight:800, margin:'10px 16px 8px' }}>{sc.name} · {live.length} תלושים</p>
             <div className="slip-body" style={{ padding:'0 14px 14px' }}>
@@ -7101,7 +7142,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                   <th style={{ textAlign:'center' }} title='תוספת בית חב"ד'>תוספת</th>
                   <th style={{ textAlign:'center' }} title="ברוטו לתשלום">ברוטו</th>
                   <th style={{ textAlign:'center' }} title="הברוטו שיצא בתלוש בפועל — נרשם לצד המספר של המערכת, לא במקומו">יצא בתלוש</th>
-                  <th style={{ textAlign:'center' }} title="וי — התלוש לחודש הזה כבר הוצא">הוצא</th>
+                  <th style={{ textAlign:'center' }} title="התלוש שהתקבל מהגזברות נפתח מכאן; כשעוד לא התקבל — סימון שהתלוש הוצא">התלוש</th>
                 </tr></thead>
                 <tbody>
                   {rows.map(({ t, r }) => r.skip ? (
@@ -7168,7 +7209,14 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                         ) : (t._slipGross ? money(t._slipGross) : '—')}
                       </td>
                       <td style={{ textAlign:'center' }} onClick={e => e.stopPropagation()}>
-                        {onMarkSlip ? (
+                        {fileOf(t) ? (
+                          <button className="apple-btn apple-btn-ghost" title="פתיחת התלוש שהתקבל מהגזברות" aria-label={`פתיחת התלוש של ${t.name}`}
+                            onClick={() => openFile(fileOf(t))} style={{ minHeight:34, padding:'0 10px', fontSize:14, fontWeight:700, color:'var(--purple)' }}>
+                            <FileText size={15} strokeWidth={2.2} />פתיחה
+                          </button>
+                        ) : monthFiles.some(x => x.schoolId === sc.id) ? (
+                          <span className="apple-badge badge-red" title="בקובץ שהתקבל מהגזברות לסניף הזה אין תלוש לעובד/ת">לא התקבל</span>
+                        ) : onMarkSlip ? (
                           <button className="apple-btn apple-btn-ghost"
                             title={t._slipIssuedAt
                               ? `הוצא ${new Date(t._slipIssuedAt).toLocaleDateString('he-IL')} — לחיצה מבטלת`
@@ -7191,7 +7239,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                   <td style={{ textAlign:'center' }}>
                     {(() => { const s = live.reduce((a, x) => a + (Number(x.t._slipGross) || 0), 0); return s ? money(s) : '—'; })()}
                   </td>
-                  <td style={{ textAlign:'center' }}>{live.filter(x => x.t._slipIssuedAt).length}/{live.length}</td>
+                  <td style={{ textAlign:'center' }}>{monthFiles.some(x => x.schoolId === sc.id) ? live.filter(x => fileOf(x.t)).length : live.filter(x => x.t._slipIssuedAt).length}/{live.length}</td>
                 </tr></tfoot>
               </table>
             </div>
@@ -7269,6 +7317,15 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                       </label>
                     </div>
                   )}
+                  {fileOf(t) ? (
+                    <button className="apple-btn apple-btn-ghost" onClick={() => openFile(fileOf(t))}
+                      style={{ width:'100%', marginTop:6, fontSize:14.4, color:'var(--purple)', fontWeight:700 }}>
+                      <FileText size={14} strokeWidth={2.2} />
+                      התלוש שהתקבל מהגזברות
+                    </button>
+                  ) : monthFiles.some(x => x.schoolId === sc.id) ? (
+                    <p style={{ marginTop:6 }}><span className="apple-badge badge-red">תלוש לא התקבל</span></p>
+                  ) : null}
                   {(lines[t.id] || r.principal) && (
                     <button className="apple-btn apple-btn-ghost" onClick={() => setOpenSlip({ t, r })}
                       style={{ width:'100%', marginTop:6, fontSize:14.4 }}>
@@ -12809,7 +12866,7 @@ export default function App() {
         ) : view === 'mm' && (user.role === 'coordinator' || user.role === 'clerk') ? (
           <AbsencesView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} />
         ) : view === 'slips' ? (
-          <SlipsView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth}
+          <SlipsView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} onPickMonth={setActiveMonth}
             docs={(user.role === 'coordinator' || user.role === 'clerk')
               ? <div style={{ marginTop:22 }}><MonthDocuments monthKey={activeMonth} schools={schools} userRole={user.role} userId={user.id} title="מסמכי החודש וקובצי השכר" /></div> : null}
             onSaveTeacher={user.role === 'coordinator' ? onSaveTeacher : null}
