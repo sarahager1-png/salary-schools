@@ -1006,7 +1006,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .bl-bar span {
   display: block; height: 100%; border-radius: 999px;
   background: linear-gradient(270deg, #4B2E83, #00B4CC);
-  transform-origin: right center; animation: blBar .8s cubic-bezier(.2,.8,.2,1) both;
+  /* בלי הנפשה: מילוי שמונפש ב-transform צולם חלקי בתוך הטבלה; פס יציב עדיף על פס זז */
 }
 .bl-bar span[data-over] { background: var(--danger); }
 @keyframes blBar { from { transform: scaleX(0); } }
@@ -1037,3 +1037,4 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .big-table tbody tr:hover th[scope="row"] { background: #F4F0FB; }
 /* סימון פוקוס למקלדת בכל המערכת — לא היה כזה בכלל */
 :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid var(--purple); outline-offset: 2px; }
+.big-table .bl-bar { max-width: 110px; min-width: 60px; }

@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 60;
+const BUILD = 61;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4980,7 +4980,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
     const pc = pctOf(r);
     if (pc == null) return null;
     return (
-      <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:5 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
         <div className="bl-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(pc, 100)}
           aria-label={`${pc}% מהתחשיב הראשוני`} title={`עלות ההוראה ${num(r.cost)} מתוך ${num(r.plan)} שתוכננו`}>
           <span data-over={pc > 100 ? '' : undefined} style={{ width: `${Math.min(pc, 100)}%` }} />
@@ -5046,7 +5046,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     {over ? 'חורגים מהתחשיב' : 'לא חורגים מהתחשיב'}
                   </h2>
                   <p className="bl-line">
-                    עלות ההוראה <b className="num">{num(planCost)}</b> מתוך <b className="num">{num(planSum)}</b> שתוכננו
+                    עלות ההוראה, בלי תוספת 20%: <b className="num">{num(planCost)}</b> מתוך <b className="num">{num(planSum)}</b> שתוכננו
                     {over ? <> — חריגה של <b className="num" style={{ color:'var(--danger)' }}>{num(planCost - planSum)}</b>.</>
                           : <> — נותרו <b className="num" style={{ color:'var(--ok-text)' }}>{num(planSum - planCost)}</b>.</>}
                   </p>
@@ -5093,31 +5093,37 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </div>
 
           <h2 className="section-head">לפי סניף</h2>
-          <p className="section-sub">מהקרוב ביותר לתחשיב ועד הרחוק ממנו. הפס מראה כמה מהתחשיב הראשוני נוצל החודש.</p>
+          <p className="section-sub">מהקרוב ביותר לתחשיב ועד הרחוק ממנו. פער באדום = גבוה מהסכום שסוכם או שלא סוכם סכום; הכנסה בירוק או באדום = התקבל מהמשרד מעל או מתחת למתוכנן.</p>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table" style={{ width:'100%', borderCollapse:'collapse' }}>
               <caption className="sr-only">{`שורה תחתונה לפי סניף, ${fmtMonth(sel)}: עלות, הכנסות, פער, העברה מוסכמת, העברה בפועל ויתרה מצטברת`}</caption>
               <thead>
                 <tr>
-                  <TH>סניף</TH><TH>עלות הוראה + 20%</TH><TH>משרד החינוך + מענק</TH>
+                  <TH>סניף</TH><TH>מול התחשיב<span style={{ display:'block', fontSize:12, fontWeight:600 }}>בלי תוספת 20%</span></TH>
+                  <TH>עלות הוראה + 20%</TH><TH>משרד החינוך + מענק</TH>
                   <TH>פער החודש</TH><TH>סוכם להעברה</TH><TH>הועבר בפועל</TH><TH>יתרה מצטברת</TH>
                 </tr>
               </thead>
               <tbody>
-                {sorted.map(r => { const st = status(r); return (
+                {sorted.map(r => { const st = status(r);
+                  // המצב משתקף בצבע המספר עצמו; הנוסח המלא נשאר לרחף-עכבר ולקורא מסך
+                  const recv = r.ministryReceived;
+                  const recvOk = recv != null && recv >= (r.ministry || 0);
+                  const gapColor = r.gap == null ? undefined : r.gap <= 0 ? 'var(--ok-text)' : (r.agreed == null || r.over > 0) ? 'var(--danger)' : 'var(--text)';
+                  return (
                   <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }}>{r.name}
-                      <Bar r={r} />
-                      <span style={{ display:'block', fontSize:13.4, fontWeight:600, color: st.c, marginTop:3 }}>{st.t}</span></th>
+                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }}>{r.name}</th>
+                    <td style={td}><div style={{ minWidth:120 }}><Bar r={r} /></div>{pctOf(r) == null && '—'}</td>
                     <td style={td}>{num(r.costWith20)}</td>
-                    <td style={td}>{num(income(r))}
-                      {r.ministryReceived != null && (
-                        <span style={{ display:'block', fontSize:13.2, fontWeight:700, color: r.ministryReceived >= (r.ministry || 0) ? 'var(--ok-text)' : 'var(--danger)' }}
-                          title={`מתוכנן ממשרד החינוך לחודש: ${num(r.ministry)}`}>התקבל מהמשרד {num(r.ministryReceived)} · {r.ministryReceived >= (r.ministry || 0) ? 'מעל המתוכנן' : 'מתחת למתוכנן'}</span>
-                      )}</td>
-                    <td style={{ ...td, fontWeight:800 }}>{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : <span style={{ color:'var(--ok-text)' }}>עודף {num(-r.gap)}</span>}</td>
-                    <td style={td}>{r.due == null || r.due <= 0 ? '—' : num(r.due)}
-                      {r.agreed == null && r.due > 0 && <span style={{ display:'block', fontSize:12.6, color:'var(--text2)' }}>מחושב</span>}</td>
+                    <td style={{ ...td, color: recv == null ? undefined : recvOk ? 'var(--ok-text)' : 'var(--danger)', fontWeight: recv == null ? undefined : 700 }}
+                      title={recv == null ? undefined : `התקבל ממשרד החינוך ${num(recv)} מתוך ${num(r.ministry)} שתוכננו`}>
+                      {num(income(r))}
+                      {recv != null && <span className="sr-only"> — התקבל מהמשרד {num(recv)}, {recvOk ? 'מעל המתוכנן' : 'מתחת למתוכנן'}</span>}</td>
+                    <td style={{ ...td, fontWeight:800, color: gapColor }} title={st.t}>
+                      {r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : `עודף ${num(-r.gap)}`}
+                      <span className="sr-only"> — {st.t}</span></td>
+                    <td style={td} title={r.agreed == null && r.due > 0 ? 'טרם סוכם סכום; מוצג הפער המחושב' : undefined}>
+                      {r.due == null || r.due <= 0 ? '—' : r.agreed == null ? <span style={{ color:'var(--text2)', fontStyle:'italic' }}>{num(r.due)}</span> : num(r.due)}</td>
                     <td style={td}>{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</td>
                     <td style={td}><Bal v={r.balance} /></td>
                   </tr>
@@ -5126,6 +5132,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
+                  <td style={td}>{usePct == null ? '—' : `${usePct}%`}</td>
                   <td style={td}>{num(tot.costWith20)}</td>
                   <td style={td}>{num(tot.ministry + tot.support)}</td>
                   <td style={td}>{num(tot.gap)}</td>
@@ -5141,10 +5148,11 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <div className="only-mobile big-cards">
             {sorted.map(r => { const st = status(r); const open = openB === r.id; return (
               <div key={'bl-' + r.id} className="apple-card mcard">
-                <p className="mcard-name" style={{ wordBreak:'keep-all' }}>{r.name}</p>
+                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:6 }}>{r.name}</p>
                 <Bar r={r} />
-                <p style={{ fontSize:13.6, fontWeight:600, color: st.c, margin:'4px 0 6px' }}>{st.t}</p>
-                <CardRow label="פער החודש" strong>{r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : `עודף ${num(-r.gap)}`}</CardRow>
+                <p style={{ fontSize:12.6, color:'var(--text2)', margin:'3px 0 6px' }}>מול התחשיב, בלי תוספת 20%</p>
+                <CardRow label="פער החודש" strong color={r.gap == null ? undefined : r.gap <= 0 ? 'var(--ok-text)' : (r.agreed == null || r.over > 0) ? 'var(--danger)' : undefined}>
+                  {r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : `עודף ${num(-r.gap)}`}<span className="sr-only"> — {st.t}</span></CardRow>
                 <CardRow label="יתרה מצטברת"><Bal v={r.balance} /></CardRow>
                 {open && (
                   <>
