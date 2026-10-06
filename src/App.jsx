@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 86;
+const BUILD = 87;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -12008,6 +12008,16 @@ export default function App() {
   // חלונית "עוד" בתפריט — נסגרת בלחיצה מחוץ לה וב-Escape
   const [navMore, setNavMore] = useState(false);
   const navMoreRef = useRef(null);
+  // בורר החודש: רשימה משלנו במקום רשימה נייטיבית
+  const [monthMenu, setMonthMenu] = useState(false);
+  const monthMenuRef = useRef(null);
+  useEffect(() => {
+    if (!monthMenu) return;
+    const out = e => { if (monthMenuRef.current && !monthMenuRef.current.contains(e.target)) setMonthMenu(false); };
+    const esc = e => { if (e.key === 'Escape') setMonthMenu(false); };
+    document.addEventListener('mousedown', out); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc); };
+  }, [monthMenu]);
   useEffect(() => {
     if (!navMore) return;
     const out = e => { if (navMoreRef.current && !navMoreRef.current.contains(e.target)) setNavMore(false); };
@@ -12477,13 +12487,24 @@ export default function App() {
               {/* שני חצים בלי רשימה — עם עשרה חודשים אין דרך לקפוץ לחודש
                   מסוים, ואין סימן שיש לאן לחזור. */}
               {sortedMonthKeys.length > 1 ? (
-                <select value={activeMonth} onChange={e => setActiveMonth(e.target.value)} title="בחירת חודש"
-                  style={{ fontSize:14.4, fontWeight:700, color:'var(--text)', background:'none', border:'none',
-                    cursor:'pointer', fontFamily:'inherit', textAlign:'center', minWidth:92, appearance:'auto' }}>
-                  {sortedMonthKeys.map(k => (
-                    <option key={k} value={k}>{fmtMonth(k)}{k === firstMonthKey ? ' · ראשון' : ''}</option>
-                  ))}
-                </select>
+                <div className="month-pick" ref={monthMenuRef}>
+                  <button type="button" className="month-pick-btn" aria-haspopup="listbox" aria-expanded={monthMenu} title="בחירת חודש"
+                    onClick={() => setMonthMenu(v => !v)}>
+                    {fmtMonth(activeMonth)}
+                    <ChevronLeft size={14} strokeWidth={2.6} style={{ transform:'rotate(-90deg)' }} />
+                  </button>
+                  {monthMenu && (
+                    <div className="nav-more-menu month-pick-menu" role="listbox" aria-label="בחירת חודש">
+                      {sortedMonthKeys.slice().reverse().map(k => (
+                        <button key={k} role="option" aria-selected={k === activeMonth}
+                          className={`nav-more-item ${k === activeMonth ? 'active' : ''}`}
+                          onClick={() => { setMonthMenu(false); setActiveMonth(k); }}>
+                          {fmtMonth(k)}{k === firstMonthKey ? ' · ראשון' : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ) : (
                 <span style={{ fontSize:14.4, fontWeight:700, color:'var(--text)', minWidth:92, textAlign:'center' }}>{fmtMonth(activeMonth)}</span>
               )}

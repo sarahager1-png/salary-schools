@@ -1236,3 +1236,10 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
   .abs-table td[data-l]::before { content: attr(data-l) ": "; color: var(--text2); font-weight: 600; }
 }
 .abs-table thead th:last-child { width: 34%; } .abs-table thead th:first-child { width: 20%; }
+
+/* בורר החודש בכותרת */
+.month-pick { position: relative; display: inline-flex; }
+.month-pick-btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 132px; height: 32px; padding: 0 8px;
+  border: none; background: none; border-radius: 8px; font: inherit; font-size: 15px; font-weight: 700; color: var(--text); cursor: pointer; white-space: nowrap; }
+.month-pick-btn:hover { background: #fff; }
+.month-pick-menu { min-width: 170px; max-height: 60vh; overflow-y: auto; inset-inline-start: auto; inset-inline-end: 0; }
