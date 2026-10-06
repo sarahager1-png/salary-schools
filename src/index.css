@@ -1068,3 +1068,4 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 }
 .nav-btn.nav-main:hover { background: var(--purple-700); color: #fff; }
 .nav-btn.nav-main.active { background: var(--purple-700); color: #fff; box-shadow: 0 0 0 3px rgba(75,46,131,.22), inset 0 -3px 0 #00B4CC; }
+.big-table tfoot td { font-size: 15.8px !important; }

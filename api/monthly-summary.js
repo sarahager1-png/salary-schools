@@ -94,7 +94,10 @@ export function summarize(schools, rows, finance, ledger, monthsRows) {
     const branches = [];
     for (const s of schools) {
       if (s.pays_salary === false) continue;
-      const ts = mrows.filter(r => r.school_id === s.id).map(toTeacher).filter(t => !emp.isHourlyRow(t));
+      const allTs = mrows.filter(r => r.school_id === s.id).map(toTeacher);
+      const ts = allTs.filter(t => !emp.isHourlyRow(t));
+      // שכר צהרון ומשרות שעתיות: הרשת משלמת, אין מולו הכנסה ממשרד החינוך — כולו על הסניף (שרה, 6.10, גני תקוה)
+      const hourly = allTs.filter(t => emp.isHourlyRow(t)).reduce((a, t) => a + emp.calcEmployer(t).total, 0);
       const cost = ts.reduce((a, t) => a + emp.calcEmployer(t).total, 0);
       // סניף בלי עובדות בחודש — אין עלות בפועל, ולכן אינו בדף (כמו בטבלת ההעברות)
       if (!cost) continue;
@@ -115,6 +118,7 @@ export function summarize(schools, rows, finance, ledger, monthsRows) {
         ministryReceived: n(l.ministry_received), chabadPaid: n(l.chabad_paid),
         // התחשיב הראשוני מהתקציב לחודש — היעד שמולו בודקים חריגה (בלי 20%)
         plan: n(f.teaching_sim) == null ? null : Math.round(n(f.teaching_sim) / 12),
+        hourly: Math.round(hourly),
         staff: paid.length, withActual: paid.filter(t => Number(t._actualEmployerCost)).length,
       });
     }
