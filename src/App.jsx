@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 56;
+const BUILD = 57;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4929,6 +4929,17 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const recvN = recv.length;
   const recvSum = recv.reduce((a, r) => a + r.ministryReceived, 0);
   const recvPlan = recv.reduce((a, r) => a + (r.ministry || 0), 0);
+  /*
+    "מה אני אראה כל חודש שאנחנו לא חורגים?" (שרה, 6.10): עלות ההוראה של
+    החודש מול התחשיב הראשוני מהתקציב (חלק ה-12), לכל סניף ולרשת, וגם
+    במצטבר מהחודש הראשון. 100% ומטה = בתוך התחשיב.
+  */
+  const planned = summed.filter(r => r.plan != null);
+  const planSum = planned.reduce((a, r) => a + r.plan, 0);
+  const planCost = planned.reduce((a, r) => a + r.cost, 0);
+  const usePct = planSum > 0 ? Math.round(planCost / planSum * 100) : null;
+  const cum = upTo.reduce((a, m) => { for (const b of m.branches) if (b.plan != null && b.gap != null) { a.cost += b.cost; a.plan += b.plan; } return a; }, { cost: 0, plan: 0 });
+  const cumPct = cum.plan > 0 ? Math.round(cum.cost / cum.plan * 100) : null;
   const net = tot.due - tot.gap;   // מה שסוכם להעברה מול הפער המחושב: חיובי = עודף לרשת
 
   const Bal = ({ v }) => v == null
@@ -4999,6 +5010,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 : <>הועבר בפועל {num(tot.paid)} מתוך {num(tot.due)} שסוכמו.</>}
               {' '}עלות בפועל מקובץ השכר רשומה ל-{tot.withActual} מתוך {tot.staff} עובדות; לשאר — אומדן של המערכת.
             </p>
+            {usePct != null && (
+              <p style={{ fontSize:16.6, fontWeight:700, marginTop:8, lineHeight:1.5, color: usePct > 100 ? 'var(--danger)' : 'var(--ok)' }}>
+                {usePct > 100 ? 'חריגה מהתחשיב הראשוני' : 'בתוך התחשיב הראשוני'}: עלות ההוראה החודש {num(planCost)} מתוך {num(planSum)} שתוכננו ({usePct}%).
+                {upTo.length > 1 && cumPct != null && <span style={{ color: cumPct > 100 ? 'var(--danger)' : 'var(--ok)' }}> מתחילת השנה: {num(cum.cost)} מתוך {num(cum.plan)} ({cumPct}%).</span>}
+              </p>
+            )}
           </div>
 
           <div className="kpi-grid">
@@ -5029,7 +5046,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <td style={{ padding:'9px 12px', fontSize:14.6, fontWeight:700 }}>{r.name}
                       <span style={{ display:'block', fontSize:13.6, fontWeight:600, color: st.c }}>{st.t}</span></td>
-                    <td style={td}>{num(r.costWith20)}</td>
+                    <td style={td}>{num(r.costWith20)}
+                      {r.plan > 0 && (
+                        <span style={{ display:'block', fontSize:13.2, fontWeight:700, color: r.cost > r.plan ? 'var(--danger)' : 'var(--ok)' }}
+                          title={`עלות ההוראה בלי 20%: ${num(r.cost)} · התחשיב הראשוני לחודש: ${num(r.plan)}`}>
+                          {Math.round(r.cost / r.plan * 100)}% מהתחשיב</span>
+                      )}</td>
                     <td style={td}>{num(r.ministry)}
                       {/* מה שהתקבל בפועל באותו חודש, כשהוזן במסך התקבולים */}
                       {r.ministryReceived != null && (
@@ -5066,6 +5088,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <p className="mcard-name" style={{ marginBottom:2 }}>{r.name}</p>
                 <p style={{ fontSize:12.8, fontWeight:600, color: st.c, marginBottom:4 }}>{st.t}</p>
                 <CardRow label="עלות הוראה + 20%">{num(r.costWith20)}</CardRow>
+                {r.plan > 0 && (
+                  <CardRow label="מול התחשיב הראשוני" color={r.cost > r.plan ? 'var(--danger)' : 'var(--ok)'}>{Math.round(r.cost / r.plan * 100)}% ({num(r.cost)} מתוך {num(r.plan)})</CardRow>
+                )}
                 <CardRow label="הכנסות משרד החינוך">{num(r.ministry)}</CardRow>
                 {r.ministryReceived != null && (
                   <CardRow label="התקבל בפועל" color={r.ministryReceived >= (r.ministry || 0) ? 'var(--ok)' : 'var(--danger)'}>{num(r.ministryReceived)}</CardRow>

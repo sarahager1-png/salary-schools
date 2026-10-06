@@ -54,7 +54,7 @@ export default async function handler(req, res) {
     const [sc, tm, fin, led, mo] = await Promise.all([
       all('schools', '*', 'id'),
       all('teacher_months', '*', 'id'),
-      all('school_finance', 'school_id, ministry_budget, network_support, monthly_transfer', 'school_id'),
+      all('school_finance', 'school_id, ministry_budget, network_support, monthly_transfer, teaching_sim', 'school_id'),
       all('school_payment_ledger', 'school_id, month_key, ministry_received, chabad_paid', 'month_key'),
       all('months', 'key, opened_at, locked, closed_at', 'key'),
     ]);
@@ -113,6 +113,8 @@ export function summarize(schools, rows, finance, ledger, monthsRows) {
         gap: gap == null ? null : Math.round(gap),
         agreed, due: agreed ?? (gap == null ? null : Math.round(gap)),
         ministryReceived: n(l.ministry_received), chabadPaid: n(l.chabad_paid),
+        // התחשיב הראשוני מהתקציב לחודש — היעד שמולו בודקים חריגה (בלי 20%)
+        plan: n(f.teaching_sim) == null ? null : Math.round(n(f.teaching_sim) / 12),
         staff: paid.length, withActual: paid.filter(t => Number(t._actualEmployerCost)).length,
       });
     }
