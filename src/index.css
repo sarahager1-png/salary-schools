@@ -1183,3 +1183,15 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* כרטיסי בתי הספר: המספרים באריחים אינם נשברים לשתי שורות */
 .sc-card .sc-stats .v { white-space: nowrap; font-size: 17px; overflow-wrap: normal; }
 @media (max-width: 1100px) { .sc-card .sc-stats .v { font-size: 16px; } .sc-card .sc-stats > div { padding: 9px 3px; } }
+
+/* שלושה אזורי עבודה — לגזברית, שלי, מנהל הרשת (שרה, 6.10). שלושה חלקים שווים; הפעיל מובחן בצבע בלבד */
+.area-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 3px; border-radius: 13px;
+  background: var(--fill); border: 1px solid var(--line); flex: 0 1 336px; min-width: 0; }
+.area-seg button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 38px; padding: 0 4px;
+  border: none; border-radius: 10px; background: none; color: var(--text2); font: inherit; font-size: 15.5px; font-weight: 700;
+  white-space: nowrap; cursor: pointer; }
+.area-seg button:hover { background: #fff; color: var(--text); }
+.area-seg button.on { background: var(--purple); color: #fff; box-shadow: 0 3px 10px rgba(75,46,131,.26), inset 0 -3px 0 #00B4CC; }
+.area-note { font-size: 14.5px; color: var(--text2); margin-inline-start: 8px; }
+@media (max-width: 720px) { .area-seg { flex: 1 1 100%; order: 2; margin-bottom: 6px; } .nav-wrap { order: 3; } .area-note { display: none; } }
+@media (min-width: 721px) and (max-width: 1100px) { .area-seg { flex-basis: 312px; } .area-seg button { font-size: 15px; gap: 4px; padding: 0 2px; } .area-seg button svg { width: 15px; height: 15px; } }

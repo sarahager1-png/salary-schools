@@ -7,7 +7,7 @@ import {
   Printer, Download, Upload, Send, Pencil, Trash2, X, Search,
   Paperclip, Image as ImageIcon, FileText, AlertTriangle, Lightbulb,
   CalendarClock, Bell, Users, FolderOpen, Database, FileSpreadsheet, ShieldAlert,
-  ExternalLink, ShieldCheck, MessageCircle, Percent, Wallet,
+  ExternalLink, ShieldCheck, MessageCircle, Percent, Wallet, Building2,
 } from 'lucide-react';
 import * as store from './lib/store.js';
 import { readSheet, parseRows, matchRows } from './lib/slipImport.js';
@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 84;
+const BUILD = 85;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -12367,6 +12367,18 @@ export default function App() {
 
   const isCoord = user.role === 'coordinator';
   const isClerk = user.role === 'clerk';
+  /*
+    "תחלק מסכים לגזברית, בשבילי ולעיני מנהל הרשת" (שרה, 6.10): שלושה אזורים.
+    האזור נגזר מהמסך הפתוח, כך שהוא תמיד תואם למה שרואים. החשבת רואה רק את שלה.
+  */
+  const area = view === 'bottomline' ? 'director' : ['calc', 'slips', 'mm', 'calibration'].includes(view) ? 'clerk' : 'mine';
+  const inClerk = isClerk || (isCoord && area === 'clerk');
+  const inMine = isCoord && area === 'mine';
+  const AREAS = [
+    { key:'clerk', label:'גזברית', Icon: Calculator, go:'calc', title:'העבודה החודשית של חשבת השכר' },
+    { key:'mine', label:'שלי', Icon: Wallet, go:'schools', title:'בתי הספר, העברות ותקבולים' },
+    { key:'director', label:'מנהל הרשת', Icon: BarChart3, go:'bottomline', title:'תמונת מצב חודשית — מה שמנהל הרשת רואה' },
+  ];
 
   // החודש הראשון מסומן בבורר החודשים — זה כל תפקידו מעכשיו
   const firstMonthKey = Object.keys(months).sort()[0] || activeMonth;
@@ -12420,19 +12432,15 @@ export default function App() {
           {/* "לא רואים הכל, תציב אחרת" (שרה, 6.10): שורה ראשונה — לוגו, ולצדו חודש, גיבוי ויציאה.
               שורה שנייה — כל המסכים, נשברים לשורה נוספת במקום להיחתך. בנייד נשארת גלילה. */}
           {/* הכפתור המרכזי בשורת הלוגו — כך שאר המסכים נכנסים בשורה אחת גם בחלון של 1000 */}
-          {isCoord && view !== 'schools' && (
-            <button className="nav-btn" onClick={() => setView('schools')} title="חזרה לרשימת בתי הספר"
-              style={{ padding:'0 10px', fontSize:14.6 }}>
-              <ArrowRight size={15} strokeWidth={2.4} />
-              בתי הספר
-            </button>
-          )}
           {isCoord && (
-            <button className={`nav-btn nav-main ${view==='bottomline' ? 'active' : ''}`} onClick={() => setView('bottomline')}
-              aria-current={view==='bottomline' ? 'page' : undefined}>
-              <BarChart3 size={18} strokeWidth={2.4} />
-              תמונת מצב חודשית
-            </button>
+            <div className="area-seg" role="group" aria-label="אזור עבודה">
+              {AREAS.map(({ key, label, Icon, go, title }) => (
+                <button key={key} className={area === key ? 'on' : ''} aria-pressed={area === key} title={title}
+                  onClick={() => setView(go)}>
+                  <Icon size={17} strokeWidth={2.3} />{label}
+                </button>
+              ))}
+            </div>
           )}
           <div style={{ display:'flex', gap:5, alignItems:'center', flexWrap:'wrap', marginInlineStart:'auto' }}>
             {/* ── מערכת ── */}
@@ -12491,8 +12499,23 @@ export default function App() {
               (אסתר אינה משתמשת בהם), התראות וגיבוי — תחת "עוד". בנייד אין חלונית:
               הפריטים של "עוד" מופיעים בהמשך השורה הנגללת.
             */}
+            {isCoord && area === 'director' && (
+              <>
+                <button className="nav-btn active" aria-current="page" onClick={() => setView('bottomline')}>
+                  <BarChart3 size={15} strokeWidth={2.2} />
+                  תמונת מצב חודשית
+                </button>
+                <span className="area-note">זה המסך היחיד שמנהל הרשת רואה — צפייה בלבד, בלי שמות ובלי שכר אישי.</span>
+              </>
+            )}
+            {isCoord && area === 'mine' && (
+              <button className={`nav-btn ${view==='schools' || view==='school' ? 'active' : ''}`} onClick={() => setView('schools')}>
+                <Building2 size={15} strokeWidth={2.2} />
+                בתי הספר
+              </button>
+            )}
             {/* ── עבודה חודשית ── */}
-            {(isCoord || isClerk) && (
+            {inClerk && (
               <button className={`nav-btn ${view==='calc' ? 'active' : ''}`} onClick={() => setView('calc')} style={{ position:'relative' }}>
                 <Calculator size={15} strokeWidth={2.2} />
                 סימולציה
@@ -12506,7 +12529,7 @@ export default function App() {
               </button>
             )}
             {/* "תשתף את אסתר גם באישורים של המורים" (שרה, 3.9) */}
-            {(isCoord || isClerk) && (
+            {(inClerk || inMine) && (
               <button
                 className={`nav-btn ${needsApprovalCount > 0 ? 'active' : ''}`}
                 onClick={() => setShowApproval(true)}
@@ -12517,46 +12540,44 @@ export default function App() {
                 {needsApprovalCount > 0 ? `${needsApprovalCount} לאישור` : 'אישורים'}
               </button>
             )}
-            {(isCoord || isClerk) && (
+            {inClerk && (
               <button className={`nav-btn ${view==='slips' ? 'active' : ''}`} onClick={() => setView('slips')}>
                 <FileText size={15} strokeWidth={2.2} />
                 תלושים
               </button>
             )}
-            {(isCoord || isClerk) && (
+            {inClerk && (
               <button className={`nav-btn ${view==='mm' ? 'active' : ''}`} onClick={() => setView('mm')}>
                 <CalendarClock size={15} strokeWidth={2.2} />
                 היעדרויות
               </button>
             )}
-            {(isCoord || isClerk) && <span className="nav-sep" />}
+            {inClerk && <span className="nav-sep" />}
 
             {/* ── כספים ── */}
-            {(isCoord || isClerk) && (
+            {inMine && (
               <button className={`nav-btn ${view==='finance' ? 'active' : ''}`} onClick={() => setView('finance')}>
                 <Wallet size={15} strokeWidth={2.2} />
                 העברות לסניפים
               </button>
             )}
             {/* "תן אפשרות לרשום בטבלה כל חודש מה התקבל..." (שרה, 23.9) — לעיני שרה בלבד */}
-            {isCoord && (
+            {inMine && (
               <button className={`nav-btn ${view==='ledger' ? 'active' : ''}`} onClick={() => setView('ledger')}>
                 <Wallet size={15} strokeWidth={2.2} />
                 תקבולים
               </button>
             )}
-            {(isCoord || isClerk) && <span className="nav-sep" />}
-
             {/* ── עובדים ── */}
             {/* "גם אסתר תראה את הטפסים" (שרה, 10.9) */}
-            {(isCoord || isClerk) && (
+            {inClerk && (
               <button className="nav-btn" onClick={() => setShowOnboarding(true)}>
                 <FileText size={15} strokeWidth={2.2} />
                 קליטה
               </button>
             )}
             {/* כתב קבלה וסילוק לוותיקים (שרה, 20.9) */}
-            {(isCoord || isClerk) && (
+            {inClerk && (
               <button className="nav-btn" onClick={() => setShowRelease(true)}>
                 <ClipboardCheck size={15} strokeWidth={2.2} />
                 כתבי סילוק
@@ -12564,13 +12585,18 @@ export default function App() {
             )}
 
             {/* ── עוד ── */}
-            {(isCoord || isClerk) && (() => {
-              const items = [
-                isCoord && { key:'report', label:'דוח רשת', Icon: BarChart3, on: () => setView('report'), active: view === 'report' },
+            {(inClerk || inMine) && (() => {
+              const items = (inMine ? [
+                { key:'report', label:'דוח רשת', Icon: BarChart3, on: () => setView('report'), active: view === 'report' },
+                { key:'alerts', label:'התראות', Icon: Bell, on: () => setView('alerts'), active: view === 'alerts' },
+                { key:'backup', label:'גיבוי ושחזור', Icon: Database, on: () => setShowBackup(true), active: false },
+              ] : isClerk ? [
                 { key:'calibration', label:'תלושים מול תחשיב', Icon: Percent, on: () => setView('calibration'), active: view === 'calibration' },
                 { key:'alerts', label:'התראות', Icon: Bell, on: () => setView('alerts'), active: view === 'alerts' },
                 { key:'backup', label:'גיבוי ושחזור', Icon: Database, on: () => setShowBackup(true), active: false },
-              ].filter(Boolean);
+              ] : [
+                { key:'calibration', label:'תלושים מול תחשיב', Icon: Percent, on: () => setView('calibration'), active: view === 'calibration' },
+              ]);
               const anyActive = items.some(x => x.active);
               return (
                 <>
