@@ -1101,6 +1101,34 @@ export async function fetchMonthlySummary() {
   return j;
 }
 
+/* ── דוח נוכחות דיגיטלי לעובדי מנהלה (שרה, 6.10.26) ──
+   העובדת ניגשת בקוד הקישור בלבד, דרך שתי פונקציות במסד; שרה וחשבת השכר קוראות את הטבלאות. */
+export async function attendanceGet(code, month) {
+  const { data, error } = await supabase.rpc('attendance_get', { p_code: code, p_month: month });
+  raise(error, 'טעינת הדוח נכשלה');
+  return data;
+}
+export async function attendanceSave(code, month, days, submit) {
+  const { data, error } = await supabase.rpc('attendance_save', { p_code: code, p_month: month, p_days: days, p_submit: !!submit });
+  if (error) throw new Error(/[\u0590-\u05FF]/.test(error.message || '') ? error.message : 'השמירה נכשלה. נסי שוב בעוד רגע.');
+  return data;
+}
+export async function loadAttendance(month) {
+  const [p, r] = await Promise.all([
+    supabase.from('attendance_people').select('id, code, name, role_title, school_id, active').eq('active', true).order('name'),
+    supabase.from('attendance_reports').select('person_id, month_key, days, total_hours, work_days, submitted_at, updated_at').eq('month_key', month),
+  ]);
+  // לפני שהטבלאות קיימות במסד — אין מה להציג, ולא שגיאה
+  if (p.error || r.error) return [];
+  const by = new Map((r.data || []).map(x => [x.person_id, x]));
+  return (p.data || []).map(x => { const rr = by.get(x.id); return { id: x.id, code: x.code, name: x.name, role: x.role_title, schoolId: x.school_id,
+    days: rr?.days || {}, total: rr ? Number(rr.total_hours) : 0, workDays: rr?.work_days || 0, submittedAt: rr?.submitted_at || null, updatedAt: rr?.updated_at || null, started: !!rr }; });
+}
+export async function reopenAttendance(personId, month) {
+  const { error } = await supabase.from('attendance_reports').update({ submitted_at: null }).eq('person_id', personId).eq('month_key', month);
+  raise(error, 'פתיחת הדוח מחדש נכשלה');
+}
+
 /* סגירת חודש / פתיחה מחדש — רכזת בלבד; השרת שומר את התמונה כפי שהיא מוצגת */
 export async function closeMonthSummary(month, action = 'close') {
   const { data } = await supabase.auth.getSession();

@@ -1244,3 +1244,39 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .month-pick-btn:hover { background: #fff; }
 .month-pick-menu { min-width: 170px; max-height: 60vh; overflow-y: auto; inset-inline-start: auto; inset-inline-end: 0; }
 .mcard-label { font-size: 14px !important; }
+
+/* דוח נוכחות דיגיטלי — נבנה לנייד */
+.att-page { max-width: 640px; margin: 0 auto; padding: 14px 14px 150px; min-height: 100vh; background: #F8F7FB; color: var(--text); }
+.att-top { display: flex; justify-content: space-between; align-items: center; font-size: 15px; color: var(--text2); }
+.att-top b { color: var(--purple); font-size: 16.5px; }
+.att-h1 { font-size: 25px; font-weight: 800; margin-top: 12px; letter-spacing: -.01em; }
+.att-who { font-size: 16px; color: var(--text2); margin-top: 2px; word-break: keep-all; }
+.att-who b { color: var(--text); }
+.att-msg { text-align: center; padding: 60px 10px; font-size: 17px; color: var(--text2); }
+.att-note { font-size: 15.5px; line-height: 1.5; padding: 10px 14px; border-radius: 12px; background: var(--purple-100); color: var(--text); border: 1px solid #D8CEEF; }
+.att-note.late { background: var(--danger-bg); border-color: var(--danger-line); color: var(--danger-text); font-weight: 600; }
+.att-note.ok { background: #E6F6EC; border-color: #BBE5C8; color: #166534; font-weight: 600; }
+.att-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.att-day { display: grid; grid-template-columns: 62px minmax(0,1fr) minmax(0,1fr) 52px; gap: 6px 8px; align-items: end; padding: 10px 12px;
+  background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+.att-day.has { border-color: #BBE5C8; box-shadow: inset -3px 0 0 #22C55E; }
+.att-day.off { background: #EFEBF7; align-items: center; }
+.att-date { display: flex; flex-direction: column; line-height: 1.2; align-self: center; }
+.att-date b { font-size: 17px; } .att-date span { font-size: 14px; color: var(--text2); }
+.att-off { grid-column: 2 / -1; font-size: 15px; color: var(--text2); }
+.att-f { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.att-f span { font-size: 14px; color: var(--text2); font-weight: 600; }
+.att-f input, .att-n { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 8px; font: inherit; font-size: 16px;
+  background: #fff; color: var(--text); }
+.att-f input:disabled, .att-n:disabled { background: #F4F2F9; color: var(--text2); }
+.att-sum { text-align: center; font-size: 17px; font-weight: 800; color: var(--ok-text); min-height: 44px; display: flex; align-items: center; justify-content: center; }
+.att-n { grid-column: 1 / -1; font-size: 15px; min-height: 40px; }
+.att-bar { position: fixed; inset-inline: 0; bottom: 0; z-index: 30; background: #fff; border-top: 1px solid var(--line);
+  box-shadow: 0 -10px 30px -18px rgba(75,46,131,.45); padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); }
+.att-bar > * { max-width: 612px; margin-inline: auto; }
+.att-tot { display: flex; align-items: baseline; gap: 8px; font-size: 15px; color: var(--text2); margin-bottom: 8px; }
+.att-tot b { font-size: 24px; color: var(--text); font-weight: 800; }
+.att-btns, .att-ask { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.att-btns .apple-btn, .att-ask .apple-btn { min-height: 48px; font-size: 16px; justify-content: center; }
+.att-ask p { grid-column: 1 / -1; font-size: 15.5px; line-height: 1.5; font-weight: 600; }
+.att-err { color: var(--danger-text); font-size: 15px; font-weight: 600; margin-bottom: 8px; }

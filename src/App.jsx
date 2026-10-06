@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 94;
+const BUILD = 95;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -6663,7 +6663,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
    "גם אני וגם אסתר יראו" (שרה, 3.9): מה שהמנהלות מדווחות בדשבורד
    החודשי שבקישור מופיע כאן, לכל הרשת, לקריאה בלבד — התיקון נעשה
    אצל המנהלת, לא כאן. */
-function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
+function AbsencesView({ schools, teachers, monthKey, fmtMonthFn, canReopen = false }) {
   const [onlyReported, setOnlyReported] = useState(true);
   const has = t => (t.absenceDays || 0) > 0 || (t.absenceHours || 0) > 0 || (t.mmHours || 0) > 0 || t.mmFor
     || onLeave(t) || t.isTemp || t.absenceReason || t.sickFormPath;
@@ -6808,7 +6808,164 @@ function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
           </div>
         </div>
       )}
+      <AttendanceAdmin monthKey={monthKey} schools={schools} canReopen={canReopen} />
     </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   דוח נוכחות חודשי דיגיטלי — לעובדת מנהלה, בקישור אישי
+   ══════════════════════════════════════════════════════════════
+   "תכין דיגיטלי שתמלא ותשלח עד ה-4 בחודש" (שרה, 6.10.26). נבנה לנייד: שורה
+   לכל יום, שעת כניסה ושעת יציאה, והסיכום מתעדכן תוך כדי. עד ה-10 בחודש
+   הדוח נפתח על החודש הקודם — זה החודש שממלאים עליו.
+*/
+const ATT_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const attMins = (a, b) => { if (!a || !b) return 0; const [h1, m1] = a.split(':').map(Number), [h2, m2] = b.split(':').map(Number); const d = h2 * 60 + m2 - (h1 * 60 + m1); return d > 0 ? d : 0; };
+const attHours = m => { const h = Math.floor(m / 60), r = m % 60; return r ? `${h}:${String(r).padStart(2, '0')}` : String(h); };
+
+function AttendanceView({ code }) {
+  const now = new Date();
+  const key = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const curKey = key(now), prevKey = key(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  const [month, setMonth] = useState(now.getDate() <= 10 ? prevKey : curKey);
+  const [rep, setRep] = useState(undefined);   // undefined טוען · null קישור לא תקין
+  const [days, setDays] = useState({});
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [ask, setAsk] = useState(false);
+  useEffect(() => {
+    let alive = true; setRep(undefined); setErr(''); setSaved(false); setAsk(false);
+    store.attendanceGet(code, month).then(r => { if (!alive) return; setRep(r); setDays(r?.days || {}); setDirty(false); })
+      .catch(e => { if (alive) { setErr(e.message); setRep(null); } });
+    return () => { alive = false; };
+  }, [code, month]);
+  const [Y, M] = month.split('-').map(Number);
+  const n = new Date(Y, M, 0).getDate();
+  const locked = !!rep?.submittedAt;
+  const set = (d, k, v) => { setDays(o => ({ ...o, [d]: { in: '', out: '', note: '', ...(o[d] || {}), [k]: v } })); setDirty(true); setSaved(false); };
+  const totalM = Object.values(days).reduce((a, x) => a + attMins(x.in, x.out), 0);
+  const workDays = Object.values(days).filter(x => attMins(x.in, x.out) > 0).length;
+  const half = Object.entries(days).filter(([, x]) => (x.in && !x.out) || (!x.in && x.out)).length;
+  const dueDate = new Date(Y, M, 4);   // ה-4 בחודש שאחרי
+  const late = !locked && new Date(now.getFullYear(), now.getMonth(), now.getDate()) > dueDate;
+  const send = async submit => {
+    setBusy(submit ? 'send' : 'save'); setErr('');
+    try { const r = await store.attendanceSave(code, month, days, submit); setRep(r); setDays(r?.days || {}); setDirty(false); setSaved(!submit); setAsk(false); }
+    catch (e) { setErr(e.message); setAsk(false); }
+    finally { setBusy(''); }
+  };
+  const shell = body => (
+    <div className="att-page" dir="rtl">
+      <div className="att-top"><span>ב"ה</span><b>רשת גני חב"ד</b></div>
+      {body}
+    </div>
+  );
+  if (rep === undefined) return shell(<p className="att-msg">טוען…</p>);
+  if (rep === null) return shell(<p className="att-msg" role="alert">{err || 'הקישור אינו תקין. בקשי קישור חדש מהמשרד.'}</p>);
+  return shell(
+    <>
+      <h1 className="att-h1">דוח נוכחות חודשי</h1>
+      <p className="att-who"><b>{rep.name}</b>{rep.role ? ` · ${rep.role}` : ''}{rep.school ? ` · ${shortName(rep.school)}` : ''}</p>
+      <div className="apple-seg even-grid" role="group" aria-label="בחירת חודש" style={{ gap:2, margin:'12px 0' }}>
+        {[prevKey, curKey].map(k => (
+          <button key={k} onClick={() => { if (!dirty || window.confirm('יש שינויים שלא נשמרו. לעבור חודש בלי לשמור?')) setMonth(k); }} aria-pressed={month === k}
+            className={['apple-seg-item', month === k ? 'active' : ''].join(' ')} style={{ minHeight:44, fontSize:16 }}>{fmtMonth(k)}</button>
+        ))}
+      </div>
+      {locked ? (
+        <p className="att-note ok">הדוח נשלח ב-<bdi>{new Date(rep.submittedAt).toLocaleDateString('he-IL')}</bdi>. תודה. לתיקון אחרי השליחה פני למשרד.</p>
+      ) : (
+        <p className={'att-note' + (late ? ' late' : '')}>
+          {late ? <>המועד לשליחה היה <bdi>{dueDate.toLocaleDateString('he-IL')}</bdi>. מלאי ושלחי בהקדם.</> : <>ממלאים שעת כניסה ושעת יציאה לכל יום עבודה, ושולחים עד <bdi>{dueDate.toLocaleDateString('he-IL')}</bdi>.</>}
+        </p>
+      )}
+      <div className="att-list">
+        {Array.from({ length: n }, (_, i) => i + 1).map(d => {
+          const iso = `${month}-${String(d).padStart(2, '0')}`, wd = new Date(Y, M - 1, d).getDay();
+          const x = days[iso] || {}, m = attMins(x.in, x.out), shabbat = wd === 6;
+          return (
+            <div key={iso} className={'att-day' + (shabbat ? ' off' : '') + (m ? ' has' : '')}>
+              <div className="att-date"><b className="num">{d}.{M}</b><span>{ATT_DAYS[wd]}</span></div>
+              {shabbat && !x.in && !x.out && !x.note ? <p className="att-off">שבת</p> : (
+                <>
+                  <label className="att-f"><span>כניסה</span>
+                    <input type="time" value={x.in || ''} disabled={locked} onChange={e => set(iso, 'in', e.target.value)} aria-label={`שעת כניסה, ${d}.${M}`} /></label>
+                  <label className="att-f"><span>יציאה</span>
+                    <input type="time" value={x.out || ''} disabled={locked} onChange={e => set(iso, 'out', e.target.value)} aria-label={`שעת יציאה, ${d}.${M}`} /></label>
+                  <div className="att-sum num" aria-label="שעות ביום">{m ? attHours(m) : '—'}</div>
+                  <input className="att-n" type="text" maxLength={200} placeholder="הערה: חופשה, מחלה, חג…" value={x.note || ''} disabled={locked}
+                    onChange={e => set(iso, 'note', e.target.value)} aria-label={`הערה, ${d}.${M}`} />
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="att-bar">
+        <div className="att-tot"><span>סה"כ</span><b className="num">{attHours(totalM)}</b><span>שעות · {workDays} ימים</span></div>
+        {err && <p className="att-err" role="alert">{err}</p>}
+        {locked ? null : ask ? (
+          <div className="att-ask">
+            <p>לשלוח את הדוח של {fmtMonth(month)}? {attHours(totalM)} שעות ב-{workDays} ימים.{half ? ` שימי לב: ב-${half} ימים חסרה שעת כניסה או יציאה, והם לא נספרים.` : ''} אחרי השליחה אי אפשר לשנות.</p>
+            <button className="apple-btn apple-btn-blue" disabled={!!busy} onClick={() => send(true)}>{busy === 'send' ? 'שולח…' : 'כן, לשלוח'}</button>
+            <button className="apple-btn apple-btn-ghost" disabled={!!busy} onClick={() => setAsk(false)}>ביטול</button>
+          </div>
+        ) : (
+          <div className="att-btns">
+            <button className="apple-btn apple-btn-ghost" disabled={!!busy || !dirty} onClick={() => send(false)}>{busy === 'save' ? 'שומר…' : saved ? 'נשמר' : 'שמירה'}</button>
+            <button className="apple-btn apple-btn-blue" disabled={!!busy || !workDays} onClick={() => setAsk(true)}>שליחת הדוח</button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* דוחות הנוכחות — לשרה ולחשבת השכר, בתוך מסך ההיעדרויות */
+function AttendanceAdmin({ monthKey, schools, canReopen }) {
+  const [list, setList] = useState(null);
+  const [open, setOpen] = useState(null);
+  const [copied, setCopied] = useState('');
+  const [err, setErr] = useState('');
+  const loadIt = () => store.loadAttendance(monthKey).then(setList).catch(() => setList([]));
+  useEffect(() => { setList(null); loadIt(); }, [monthKey]);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!list || !list.length) return null;
+  const [Y, M] = monthKey.split('-').map(Number);
+  const copy = async p => { try { await navigator.clipboard.writeText(`${window.location.origin}/?n=${p.code}`); setCopied(p.id); setTimeout(() => setCopied(''), 2500); } catch { setErr('ההעתקה נכשלה'); } };
+  const reopen = async p => { setErr(''); try { await store.reopenAttendance(p.id, monthKey); await loadIt(); } catch (e) { setErr(e.message); } };
+  return (
+    <section style={{ marginTop:26 }} aria-label="דוחות נוכחות">
+      <h2 className="section-head">דוחות נוכחות · {fmtMonth(monthKey)}</h2>
+      <p className="section-sub">עובדי מנהלה ממלאים בקישור אישי ושולחים עד ה-4 בחודש שאחרי.</p>
+      {err && <p className="att-err" role="alert">{err}</p>}
+      {list.map(p => { const sc = schools.find(s => s.id === p.schoolId); const isOpen = open === p.id; const dayKeys = Object.keys(p.days).sort(); return (
+        <div key={p.id} className="apple-card" style={{ padding:0, marginBottom:10, overflow:'hidden' }}>
+          <div className="slip-head" style={{ cursor:'default' }}>
+            <span className="nm">{p.name}<span style={{ display:'block', fontSize:14.5, fontWeight:500, color:'var(--text2)' }}>{[p.role, sc ? shortName(sc.name) : null].filter(Boolean).join(' · ')}</span></span>
+            <span className={'bl-tag' + (p.submittedAt ? ' ok' : '')} style={!p.submittedAt && p.started ? { color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' } : undefined}>
+              {p.submittedAt ? `נשלח ${new Date(p.submittedAt).toLocaleDateString('he-IL')}` : p.started ? 'בטיוטה, טרם נשלח' : 'טרם התחילה'}</span>
+            <span className="st"><b className="num">{p.total}</b> שעות · <b className="num">{p.workDays}</b> ימים</span>
+            <button className="apple-btn apple-btn-ghost" onClick={() => copy(p)} style={{ minHeight:38, fontSize:14.5 }}>{copied === p.id ? 'הקישור הועתק' : 'העתקת קישור'}</button>
+            {dayKeys.length > 0 && <button className="apple-btn apple-btn-ghost" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : p.id)} style={{ minHeight:38, fontSize:14.5 }}>{isOpen ? 'סגירה' : 'פירוט'}</button>}
+            {canReopen && p.submittedAt && <button className="apple-btn apple-btn-ghost" onClick={() => reopen(p)} style={{ minHeight:38, fontSize:14.5 }} title="מאפשר לעובדת לתקן ולשלוח שוב">פתיחה לתיקון</button>}
+          </div>
+          {isOpen && (
+            <div className="table-scroll" style={{ padding:'0 14px 14px' }}>
+              <table className="apple-table abs-table" style={{ fontSize:15.5 }}>
+                <thead><tr><th>תאריך</th><th>יום</th><th style={{ textAlign:'center' }}>כניסה</th><th style={{ textAlign:'center' }}>יציאה</th><th style={{ textAlign:'center' }}>שעות</th><th>הערה</th></tr></thead>
+                <tbody>{dayKeys.map(k => { const x = p.days[k], d = Number(k.slice(8)), m = attMins(x.in, x.out); return (
+                  <tr key={k}><td style={{ fontWeight:700 }} className="num">{d}.{M}</td><td data-l="יום">{ATT_DAYS[new Date(Y, M - 1, d).getDay()]}</td>
+                    <td data-l="כניסה" style={{ textAlign:'center' }} className="num">{x.in || '—'}</td><td data-l="יציאה" style={{ textAlign:'center' }} className="num">{x.out || '—'}</td>
+                    <td data-l="שעות" style={{ textAlign:'center', fontWeight:700 }} className="num">{m ? attHours(m) : '—'}</td><td data-l="הערה">{x.note || ''}</td></tr>); })}</tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ); })}
+    </section>
   );
 }
 
@@ -12091,6 +12248,7 @@ export default function App() {
   const [obCode2] = useState(() => new URLSearchParams(window.location.search).get('f') || '');
   const [rlCode] = useState(() => new URLSearchParams(window.location.search).get('r') || '');
   const [lawyerCode] = useState(() => new URLSearchParams(window.location.search).get('rl') || '');
+  const [attCode] = useState(() => new URLSearchParams(window.location.search).get('n') || '');
   const [user,    setUser]    = useState(null);   // הפרופיל: תפקיד, שם, בית ספר
   const [schools, setSchools] = useState([]);
   const [months,  setMonths]  = useState({});
@@ -12331,6 +12489,7 @@ export default function App() {
   };
 
   // הקישור עוקף את מסך ההתחברות לגמרי — אין למחזיקה בו session להמתין לו
+  if (attCode) return <AttendanceView code={attCode} />;
   if (lawyerCode) return <LawyerView code={lawyerCode} />;
   if (rlCode) return <ReleaseView code={rlCode} />;
   if (obCode2) return <OnboardingView code={obCode2} />;
@@ -12867,7 +13026,7 @@ export default function App() {
         ) : view === 'calibration' && (user.role === 'coordinator' || user.role === 'clerk') ? (
           <CalibrationView schools={schools} teachers={teachers} monthKey={activeMonth} />
         ) : view === 'mm' && (user.role === 'coordinator' || user.role === 'clerk') ? (
-          <AbsencesView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} />
+          <AbsencesView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} canReopen={user.role === 'coordinator'} />
         ) : view === 'slips' ? (
           <SlipsView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} onPickMonth={setActiveMonth}
             docs={(user.role === 'coordinator' || user.role === 'clerk')
