@@ -1100,3 +1100,30 @@ export async function fetchMonthlySummary() {
   if (!r.ok) throw new Error(j.error || `סיכום חודשי: שגיאה ${r.status}`);
   return j;
 }
+
+/* ── התלושים בפועל מהגזברות (שרה, 6.10.26) ─────────────────────
+   קובץ לכל עובדת ולכל חודש, בדלי פרטי. הרישום והקובץ נקראים רק על ידי
+   הרכזת והחשבת (RLS); ההעלאה נעשית מהשרת (scripts/upload-payslips.mjs). */
+export async function loadPayslips() {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from('payslip_files')
+      .select('id, month_key, school_id, tz_id, name, teacher_month_id, path, gross, net, employer_deposits, employer_cost')
+      .order('month_key').order('name').range(from, from + 999);
+    raise(error, 'טעינת התלושים בפועל נכשלה');
+    out.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  return out.map(r => ({
+    id: r.id, monthKey: r.month_key, schoolId: r.school_id, tzId: r.tz_id, name: r.name, teacherMonthId: r.teacher_month_id, path: r.path,
+    gross: r.gross == null ? null : Number(r.gross), net: r.net == null ? null : Number(r.net),
+    deposits: r.employer_deposits == null ? null : Number(r.employer_deposits), cost: r.employer_cost == null ? null : Number(r.employer_cost),
+  }));
+}
+
+/* קישור זמני (10 דקות) לקובץ התלוש — הדלי פרטי, אין קישור קבוע */
+export async function payslipUrl(path) {
+  const { data, error } = await supabase.storage.from('payslips').createSignedUrl(path, 600);
+  raise(error, 'פתיחת התלוש נכשלה');
+  return data.signedUrl;
+}

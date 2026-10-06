@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 80;
+const BUILD = 81;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -6742,6 +6742,148 @@ function AbsencesView({ schools, teachers, monthKey, fmtMonthFn }) {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   התלושים בפועל — לכל סניף ולכל חודש
+   ═══════════════════════════════════════════════════════════════
+   "תעלה את התלושים בפועל לכל מורה, לכל חודש את התלושים שלה, כדי שאני אוכל
+   לראות אותם כל הזמן… ולכל סניף יהיה כל חודש את כל הפירוט, כולל עלות שכר"
+   (שרה, 6.10). הקבצים מהגזברות מפוצלים לתלוש לכל עובדת ונשמרים בדלי פרטי;
+   כאן רואים, לכל סניף ולכל חודש, את מה שכתוב בתלושים — ופותחים את התלוש עצמו.
+
+   הסכומים הם מהתלוש, לא מהחישוב של המערכת. "עלות מעביד" = ברוטו + הפקדות
+   המעסיק שבתלוש + ביטוח לאומי מעסיק ומס שכר, ששניהם אינם מופיעים בתלוש
+   ולכן מחושבים.
+*/
+function PayslipArchive({ schools }) {
+  const [rows, setRows] = useState(null);
+  const [err, setErr]   = useState('');
+  const [month, setMonth] = useState(null);
+  const [open, setOpen] = useState({});
+  const [busy, setBusy] = useState('');
+  useEffect(() => {
+    let alive = true;
+    store.loadPayslips().then(r => {
+      if (!alive) return;
+      setRows(r);
+      const ks = [...new Set(r.map(x => x.monthKey))].sort();
+      setMonth(ks[ks.length - 1] || null);
+    }).catch(e => { if (alive) { setErr(e.message); setRows([]); } });
+    return () => { alive = false; };
+  }, []);
+
+  const num = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL'));
+  const months = [...new Set((rows || []).map(x => x.monthKey))].sort();
+  const cur = (rows || []).filter(x => x.monthKey === month);
+  const groups = schools.map(sc => ({ sc, list: cur.filter(x => x.schoolId === sc.id) })).filter(g => g.list.length);
+  const sum = (list, k) => list.reduce((a, x) => a + (x[k] || 0), 0);
+  // החלון נפתח מיד בלחיצה (אחרת חוסם החלונות בולע אותו), והקישור הזמני נטען לתוכו
+  const openSlip = async (x) => {
+    const w = window.open('', '_blank');
+    setBusy(x.id); setErr('');
+    try { const url = await store.payslipUrl(x.path); if (w) w.location.href = url; else window.location.href = url; }
+    catch (e) { if (w) w.close(); setErr(e.message); }
+    finally { setBusy(''); }
+  };
+  const TH = ({ children }) => <th scope="col" style={{ padding:'10px 6px', textAlign:'center' }}>{children}</th>;
+  const c = { textAlign:'center' };
+
+  if (rows !== null && !rows.length && !err) return null;   // עוד לא הועלו תלושים — הקטע אינו מוצג
+  return (
+    <section className="no-print" style={{ marginBottom:22 }} aria-label="התלושים בפועל מהגזברות">
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
+        <h2 className="section-head" style={{ margin:0 }}>התלושים בפועל</h2>
+        {months.length > 0 && (
+          <div className="apple-seg" role="group" aria-label="בחירת חודש" style={{ flexWrap:'wrap' }}>
+            {months.map(k => (
+              <button key={k} onClick={() => setMonth(k)} aria-pressed={month === k}
+                className={['apple-seg-item', month === k ? 'active' : ''].join(' ')}
+                style={{ padding:'6px 15px', fontSize:15, minHeight:40 }}>{fmtMonth(k)}</button>
+            ))}
+          </div>
+        )}
+      </div>
+      <p className="section-sub" style={{ marginTop:6 }}>
+        התלושים כפי שהתקבלו מהגזברות, לכל סניף ולכל עובד/ת. לחיצה על סניף פותחת את הפירוט; "פתיחה" מציגה את התלוש עצמו.
+      </p>
+      {err && (
+        <div role="alert" style={{ background:'var(--danger-bg)', color:'var(--danger-text)', border:'1px solid var(--danger-line)', borderRadius:12,
+          padding:'10px 14px', fontSize:15, fontWeight:600, marginBottom:10 }}>{err}</div>
+      )}
+      {rows === null && <div className="apple-card" style={{ padding:22, textAlign:'center', fontSize:15, color:'var(--text2)' }}>טוען…</div>}
+
+      {groups.length > 0 && (
+        <div className="bl-eq n3" role="group" aria-label={`סיכום התלושים, ${fmtMonth(month)}`} style={{ marginTop:4, marginBottom:12 }}>
+          <div className="bl-tile"><p className="l">תלושים</p><p className="v num">{cur.length}</p><p className="s">{groups.length === 1 ? 'סניף אחד' : `${groups.length} סניפים`}</p></div>
+          <div className="bl-tile t-cost"><p className="l">ברוטו</p><p className="v num">{num(sum(cur, 'gross'))}</p><p className="s">סה"כ תשלומים בתלושים</p></div>
+          <div className="bl-tile t-res t-final"><p className="l">עלות מעביד</p><p className="v num">{num(sum(cur, 'cost'))}</p><p className="s">כולל הפקדות, ביטוח לאומי ומס שכר</p></div>
+        </div>
+      )}
+
+      {groups.map(({ sc, list }) => { const isOpen = !!open[sc.id]; return (
+        <div key={sc.id} className="apple-card" style={{ padding:0, marginBottom:10, overflow:'hidden' }}>
+          <button onClick={() => setOpen(o => ({ ...o, [sc.id]: !o[sc.id] }))} aria-expanded={isOpen}
+            style={{ display:'flex', alignItems:'center', gap:12, width:'100%', minHeight:56, padding:'10px 16px', background:'none', border:'none',
+              cursor:'pointer', fontFamily:'inherit', textAlign:'start', flexWrap:'wrap' }}>
+            <span aria-hidden="true" style={{ color:'var(--purple)', fontWeight:800, width:14 }}>{isOpen ? '▾' : '◂'}</span>
+            <span style={{ fontSize:17, fontWeight:800, color:'var(--text)', flex:'1 1 160px', wordBreak:'keep-all' }} title={sc.name}>{shortName(sc.name)}</span>
+            <span style={{ fontSize:14.6, color:'var(--text2)', whiteSpace:'nowrap' }}>{list.length} תלושים</span>
+            <span style={{ fontSize:14.6, color:'var(--text2)', whiteSpace:'nowrap' }}>ברוטו <b className="num" style={{ color:'var(--text)' }}>{num(sum(list, 'gross'))}</b></span>
+            <span style={{ fontSize:14.6, color:'var(--text2)', whiteSpace:'nowrap' }}>עלות מעביד <b className="num" style={{ color:'var(--purple)' }}>{num(sum(list, 'cost'))}</b></span>
+          </button>
+          {isOpen && (
+            <>
+              <div className="table-scroll only-desktop" style={{ overflowX:'auto', borderTop:'1px solid var(--line)' }}>
+                <table className="big-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+                  <caption className="sr-only">{`תלושי ${shortName(sc.name)}, ${fmtMonth(month)}`}</caption>
+                  <thead><tr><TH>עובד/ת</TH><TH>ברוטו</TH><TH>נטו</TH><TH>הפקדות מעסיק</TH><TH>עלות מעביד</TH><TH>התלוש</TH></tr></thead>
+                  <tbody>
+                    {list.map(x => (
+                      <tr key={x.id} style={{ borderBottom:'1px solid var(--line)' }}>
+                        <th scope="row" style={{ padding:'9px 16px', textAlign:'start', fontWeight:700, fontSize:16.6, wordBreak:'keep-all' }}>{x.name}
+                          {!x.gross && <span style={{ display:'block', fontSize:14, fontWeight:600, color:'var(--text2)' }}>בלי שכר החודש — הפקדות בלבד</span>}</th>
+                        <td style={c}>{num(x.gross)}</td>
+                        <td style={{ ...c, color:'var(--text2)' }}>{num(x.net)}</td>
+                        <td style={{ ...c, color:'var(--text2)' }}>{num(x.deposits)}</td>
+                        <td style={{ ...c, fontWeight:800 }}>{num(x.cost)}</td>
+                        <td style={c}>
+                          <button className="apple-btn apple-btn-ghost" onClick={() => openSlip(x)} disabled={busy === x.id}
+                            aria-label={`פתיחת התלוש של ${x.name}`} style={{ minHeight:38, fontSize:14.6, padding:'0 14px' }}>
+                            <FileText size={15} strokeWidth={2.2} />{busy === x.id ? 'פותח…' : 'פתיחה'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot><tr>
+                    <td style={{ padding:'10px 16px' }}>סה"כ</td>
+                    <td style={c}>{num(sum(list, 'gross'))}</td><td style={c}>{num(sum(list, 'net'))}</td>
+                    <td style={c}>{num(sum(list, 'deposits'))}</td><td style={c}>{num(sum(list, 'cost'))}</td><td />
+                  </tr></tfoot>
+                </table>
+              </div>
+              <div className="only-mobile big-cards" style={{ padding:'0 10px 10px', borderTop:'1px solid var(--line)' }}>
+                {list.map(x => (
+                  <div key={'m' + x.id} className="mcard" style={{ borderBottom:'1px solid var(--line)' }}>
+                    <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{x.name}</p>
+                    <CardRow label="ברוטו">{num(x.gross)}</CardRow>
+                    <CardRow label="נטו">{num(x.net)}</CardRow>
+                    <CardRow label="הפקדות מעסיק">{num(x.deposits)}</CardRow>
+                    <CardRow label="עלות מעביד" strong>{num(x.cost)}</CardRow>
+                    <button className="apple-btn apple-btn-ghost" onClick={() => openSlip(x)} disabled={busy === x.id}
+                      style={{ minHeight:44, fontSize:15, width:'100%', marginTop:6 }}>
+                      <FileText size={15} strokeWidth={2.2} />{busy === x.id ? 'פותח…' : 'פתיחת התלוש'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      ); })}
+    </section>
+  );
+}
+
 function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onMarkSlip, onSaveSlipGross }) {
   const money = v => (v == null ? '—' : Math.round(v).toLocaleString('he-IL') + ' ₪');
   /*
@@ -6819,6 +6961,8 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
           </button>
         }
       />
+      <PayslipArchive schools={schools} />
+      <h2 className="section-head no-print">התלושים לפי חישוב המערכת</h2>
       {bySchool.map(({ sc, ts: tsAll }) => {
         const paysSupp = sc.chabadSupp !== false;
         /*
