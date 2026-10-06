@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 71;
+const BUILD = 72;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -12222,7 +12222,65 @@ export default function App() {
             </div>
           </div>
 
-          <div className="nav-scroll" style={{ display:'flex', gap:5, alignItems:'center', flexWrap:'nowrap', overflowX:'auto', maxWidth:'100%', paddingBottom:2 }}>
+          {/* "לא רואים הכל, תציב אחרת" (שרה, 6.10): שורה ראשונה — לוגו, ולצדו חודש, גיבוי ויציאה.
+              שורה שנייה — כל המסכים, נשברים לשורה נוספת במקום להיחתך. בנייד נשארת גלילה. */}
+          <div style={{ display:'flex', gap:5, alignItems:'center', flexWrap:'wrap', marginInlineStart:'auto' }}>
+            {/* ── מערכת ── */}
+
+            {/* Month selector */}
+            <div style={{ display:'flex', alignItems:'center', gap:2, background:'var(--fill)', border:'1px solid var(--line)', borderRadius:11, padding:'3px 4px', flexShrink:0 }}>
+              <button title="חודש קודם"
+                onClick={() => { const i=sortedMonthKeys.indexOf(activeMonth); if(i>0) setActiveMonth(sortedMonthKeys[i-1]); }}
+                style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer', display:'flex', padding:4, borderRadius:7 }}>
+                <ChevronRight size={15} strokeWidth={2.5} />
+              </button>
+              {/* שני חצים בלי רשימה — עם עשרה חודשים אין דרך לקפוץ לחודש
+                  מסוים, ואין סימן שיש לאן לחזור. */}
+              {sortedMonthKeys.length > 1 ? (
+                <select value={activeMonth} onChange={e => setActiveMonth(e.target.value)} title="בחירת חודש"
+                  style={{ fontSize:14.4, fontWeight:700, color:'var(--text)', background:'none', border:'none',
+                    cursor:'pointer', fontFamily:'inherit', textAlign:'center', minWidth:92, appearance:'auto' }}>
+                  {sortedMonthKeys.map(k => (
+                    <option key={k} value={k}>{fmtMonth(k)}{k === firstMonthKey ? ' · ראשון' : ''}</option>
+                  ))}
+                </select>
+              ) : (
+                <span style={{ fontSize:14.4, fontWeight:700, color:'var(--text)', minWidth:92, textAlign:'center' }}>{fmtMonth(activeMonth)}</span>
+              )}
+              <button title="חודש הבא"
+                onClick={() => { const i=sortedMonthKeys.indexOf(activeMonth); if(i<sortedMonthKeys.length-1) setActiveMonth(sortedMonthKeys[i+1]); }}
+                style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer', display:'flex', padding:4, borderRadius:7 }}>
+                <ChevronLeft size={15} strokeWidth={2.5} />
+              </button>
+              {isCoord && sortedMonthKeys.indexOf(activeMonth) === sortedMonthKeys.length-1 && (
+                <button onClick={openNewMonth} title="פתיחת חודש חדש"
+                  style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:13.2, padding:'4px 9px', background:'var(--teal)',
+                    border:'none', borderRadius:8, color:'#fff', cursor:'pointer', fontWeight:700, fontFamily:'inherit', marginInlineStart:2 }}>
+                  <Plus size={12} strokeWidth={3} />
+                  {Object.keys(months).length ? 'חודש' : 'פתיחת המערכת'}
+                </button>
+              )}
+            </div>
+
+            <button className="nav-btn" onClick={() => setShowBackup(true)} title="גיבוי ושחזור">
+              <Database size={15} strokeWidth={2.2} />
+              גיבוי
+            </button>
+
+            <button className="nav-btn danger" onClick={onSignOut} title="יציאה">
+              <LogOut size={15} strokeWidth={2.2} />
+              יציאה
+            </button>
+          </div>
+          <div className="nav-scroll nav-wrap">
+            {/* הדף של המנהל — שרה רואה בדיוק את מה שהוא רואה */}
+            {isCoord && (
+              <button className={`nav-btn nav-main ${view==='bottomline' ? 'active' : ''}`} onClick={() => setView('bottomline')}
+                aria-current={view==='bottomline' ? 'page' : undefined}>
+                <BarChart3 size={19} strokeWidth={2.4} />
+                תמונת מצב חודשית
+              </button>
+            )}
             {/* הסרגל מקובץ לפי זרימת העבודה: עבודה שוטפת (סימולציה,
                 אישורים, תלושים) · ניתוח (דוח רשת, עלות הוראה) · ניהול
                 (קליטה, התראות) · מערכת (חודש, גיבוי, יציאה). מפריד דק
@@ -12291,14 +12349,6 @@ export default function App() {
                 עלות הוראה
               </button>
             )}
-            {/* הדף של המנהל — שרה רואה בדיוק את מה שהוא רואה */}
-            {isCoord && (
-              <button className={`nav-btn nav-main ${view==='bottomline' ? 'active' : ''}`} onClick={() => setView('bottomline')}
-                aria-current={view==='bottomline' ? 'page' : undefined}>
-                <BarChart3 size={19} strokeWidth={2.4} />
-                תמונת מצב חודשית
-              </button>
-            )}
             {/* "תן אפשרות לרשום בטבלה כל חודש מה התקבל..." (שרה, 23.9) —
                 לעיני שרה בלבד, כמו עלות ההוראה שלצדו */}
             {isCoord && (
@@ -12338,61 +12388,13 @@ export default function App() {
                 התראות
               </button>
             )}
-            {(isCoord || isClerk) && <span className="nav-sep" />}
-
-            {/* ── מערכת ── */}
-
-            {/* Month selector */}
-            <div style={{ display:'flex', alignItems:'center', gap:2, background:'var(--fill)', border:'1px solid var(--line)', borderRadius:11, padding:'3px 4px', flexShrink:0 }}>
-              <button title="חודש קודם"
-                onClick={() => { const i=sortedMonthKeys.indexOf(activeMonth); if(i>0) setActiveMonth(sortedMonthKeys[i-1]); }}
-                style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer', display:'flex', padding:4, borderRadius:7 }}>
-                <ChevronRight size={15} strokeWidth={2.5} />
-              </button>
-              {/* שני חצים בלי רשימה — עם עשרה חודשים אין דרך לקפוץ לחודש
-                  מסוים, ואין סימן שיש לאן לחזור. */}
-              {sortedMonthKeys.length > 1 ? (
-                <select value={activeMonth} onChange={e => setActiveMonth(e.target.value)} title="בחירת חודש"
-                  style={{ fontSize:14.4, fontWeight:700, color:'var(--text)', background:'none', border:'none',
-                    cursor:'pointer', fontFamily:'inherit', textAlign:'center', minWidth:92, appearance:'auto' }}>
-                  {sortedMonthKeys.map(k => (
-                    <option key={k} value={k}>{fmtMonth(k)}{k === firstMonthKey ? ' · ראשון' : ''}</option>
-                  ))}
-                </select>
-              ) : (
-                <span style={{ fontSize:14.4, fontWeight:700, color:'var(--text)', minWidth:92, textAlign:'center' }}>{fmtMonth(activeMonth)}</span>
-              )}
-              <button title="חודש הבא"
-                onClick={() => { const i=sortedMonthKeys.indexOf(activeMonth); if(i<sortedMonthKeys.length-1) setActiveMonth(sortedMonthKeys[i+1]); }}
-                style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer', display:'flex', padding:4, borderRadius:7 }}>
-                <ChevronLeft size={15} strokeWidth={2.5} />
-              </button>
-              {isCoord && sortedMonthKeys.indexOf(activeMonth) === sortedMonthKeys.length-1 && (
-                <button onClick={openNewMonth} title="פתיחת חודש חדש"
-                  style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:13.2, padding:'4px 9px', background:'var(--teal)',
-                    border:'none', borderRadius:8, color:'#fff', cursor:'pointer', fontWeight:700, fontFamily:'inherit', marginInlineStart:2 }}>
-                  <Plus size={12} strokeWidth={3} />
-                  {Object.keys(months).length ? 'חודש' : 'פתיחת המערכת'}
-                </button>
-              )}
-            </div>
-
-            <button className="nav-btn" onClick={() => setShowBackup(true)} title="גיבוי ושחזור">
-              <Database size={15} strokeWidth={2.2} />
-              גיבוי
-            </button>
-
-            <button className="nav-btn danger" onClick={onSignOut} title="יציאה">
-              <LogOut size={15} strokeWidth={2.2} />
-              יציאה
-            </button>
           </div>
         </div>
       </header>
 
       {(busy || error) && (
         <div className="no-print" style={{
-          position:'sticky', top:62, zIndex:39, padding:'8px 16px', fontSize:14.9, fontWeight:600,
+          position:'sticky', top:0, zIndex:45, padding:'8px 16px', fontSize:14.9, fontWeight:600,
           display:'flex', alignItems:'center', justifyContent:'center', gap:8,
           background: error ? 'var(--danger-bg)' : 'var(--teal-100)',
           color: error ? 'var(--danger)' : 'var(--teal-700)',

@@ -1069,3 +1069,11 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .nav-btn.nav-main:hover { background: var(--purple-700); color: #fff; }
 .nav-btn.nav-main.active { background: var(--purple-700); color: #fff; box-shadow: 0 0 0 3px rgba(75,46,131,.22), inset 0 -3px 0 #00B4CC; }
 .big-table tfoot td { font-size: 15.8px !important; }
+
+/* סרגל המסכים: נשבר לשורות במקום להיחתך; בנייד נשאר נגלל עם הדהייה בקצה */
+.nav-wrap { display: flex; align-items: center; gap: 6px 5px; flex-wrap: wrap; flex: 1 1 100%; overflow: visible; padding-bottom: 8px;
+  -webkit-mask-image: none; mask-image: none; }
+@media (max-width: 760px) {
+  .nav-wrap { flex-wrap: nowrap; overflow-x: auto; max-width: 100%;
+    -webkit-mask-image: linear-gradient(to left, transparent 0, #000 26px); mask-image: linear-gradient(to left, transparent 0, #000 26px); }
+}
