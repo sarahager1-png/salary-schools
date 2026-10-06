@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 66;
+const BUILD = 67;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -12248,8 +12248,9 @@ export default function App() {
             )}
             {/* הדף של המנהל — שרה רואה בדיוק את מה שהוא רואה */}
             {isCoord && (
-              <button className={`nav-btn ${view==='bottomline' ? 'active' : ''}`} onClick={() => setView('bottomline')}>
-                <BarChart3 size={15} strokeWidth={2.2} />
+              <button className={`nav-btn nav-main ${view==='bottomline' ? 'active' : ''}`} onClick={() => setView('bottomline')}
+                aria-current={view==='bottomline' ? 'page' : undefined}>
+                <BarChart3 size={19} strokeWidth={2.4} />
                 שורה תחתונה
               </button>
             )}
