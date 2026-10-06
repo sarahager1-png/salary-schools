@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 61;
+const BUILD = 62;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4976,6 +4976,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const RING = 2 * Math.PI * 52;
   const sorted = rows.slice().sort((x, y) => ((y.plan ? y.cost / y.plan : -1) - (x.plan ? x.cost / x.plan : -1)));
   const pctOf = r => (r.plan > 0 ? Math.round(r.cost / r.plan * 100) : null);
+  const pct20Of = r => (r.plan > 0 ? Math.round(r.costWith20 / r.plan * 100) : null);
+  const usePct20 = planSum > 0 ? Math.round(planned.reduce((x, r) => x + r.costWith20, 0) / planSum * 100) : null;
+  const Pct20 = ({ v }) => v == null ? null : (
+    <span className="num" title="עלות ההוראה עם תוספת 20%, מול התחשיב הראשוני"
+      style={{ fontSize:13.6, fontWeight:800, whiteSpace:'nowrap', color: v > 100 ? 'var(--danger)' : 'var(--text2)' }}>{v}%</span>
+  );
   const Bar = ({ r }) => {
     const pc = pctOf(r);
     if (pc == null) return null;
@@ -5058,6 +5064,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 {upTo.length > 1 && cumPct != null && (
                   <span className="bl-fact">מתחילת השנה <b className="num" style={{ color: cumPct > 100 ? 'var(--danger)' : undefined }}>{cumPct}%</b></span>
                 )}
+                {usePct20 != null && (
+                  <span className="bl-fact" title="עלות ההוראה עם תוספת 20% למילוי מקום וכרית ביטחון, מול התחשיב הראשוני">
+                    עם תוספת 20% <b className="num" style={{ color: usePct20 > 100 ? 'var(--danger)' : undefined }}>{usePct20}%</b></span>
+                )}
                 <span className="bl-fact">
                   מול מה שסוכם עם הסניפים: {net >= 0 ? 'עודף' : 'חסר'} <b className="num" style={{ color: net >= 0 ? 'var(--ok-text)' : 'var(--danger)' }}>{num(Math.abs(net))}</b>
                 </span>
@@ -5099,7 +5109,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <caption className="sr-only">{`שורה תחתונה לפי סניף, ${fmtMonth(sel)}: עלות, הכנסות, פער, העברה מוסכמת, העברה בפועל ויתרה מצטברת`}</caption>
               <thead>
                 <tr>
-                  <TH>סניף</TH><TH>מול התחשיב<span style={{ display:'block', fontSize:12, fontWeight:600 }}>בלי תוספת 20%</span></TH>
+                  <TH>סניף</TH><TH>מול התחשיב<span style={{ display:'block', fontSize:12, fontWeight:600 }}>בלי 20% · עם 20%</span></TH>
                   <TH>עלות הוראה + 20%</TH><TH>משרד החינוך + מענק</TH>
                   <TH>פער החודש</TH><TH>סוכם להעברה</TH><TH>הועבר בפועל</TH><TH>יתרה מצטברת</TH>
                 </tr>
@@ -5113,7 +5123,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   return (
                   <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }}>{r.name}</th>
-                    <td style={td}><div style={{ minWidth:120 }}><Bar r={r} /></div>{pctOf(r) == null && '—'}</td>
+                    <td style={td}>{pctOf(r) == null ? '—' : (
+                      <div style={{ display:'flex', alignItems:'center', gap:8, justifyContent:'center' }}>
+                        <div style={{ flex:'1 1 96px', minWidth:96 }}><Bar r={r} /></div>
+                        <span aria-hidden="true" style={{ color:'var(--line)' }}>|</span>
+                        <Pct20 v={pct20Of(r)} /><span className="sr-only"> עם תוספת 20%</span>
+                      </div>
+                    )}</td>
                     <td style={td}>{num(r.costWith20)}</td>
                     <td style={{ ...td, color: recv == null ? undefined : recvOk ? 'var(--ok-text)' : 'var(--danger)', fontWeight: recv == null ? undefined : 700 }}
                       title={recv == null ? undefined : `התקבל ממשרד החינוך ${num(recv)} מתוך ${num(r.ministry)} שתוכננו`}>
@@ -5132,7 +5148,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  <td style={td}>{usePct == null ? '—' : `${usePct}%`}</td>
+                  <td style={td}>{usePct == null ? '—' : <>{usePct}% <span style={{ color:'var(--text2)', fontWeight:600 }}>·</span> <span style={{ color: usePct20 > 100 ? 'var(--danger)' : undefined }}>{usePct20}%</span></>}</td>
                   <td style={td}>{num(tot.costWith20)}</td>
                   <td style={td}>{num(tot.ministry + tot.support)}</td>
                   <td style={td}>{num(tot.gap)}</td>
@@ -5150,7 +5166,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <div key={'bl-' + r.id} className="apple-card mcard">
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:6 }}>{r.name}</p>
                 <Bar r={r} />
-                <p style={{ fontSize:12.6, color:'var(--text2)', margin:'3px 0 6px' }}>מול התחשיב, בלי תוספת 20%</p>
+                <p style={{ fontSize:12.6, color:'var(--text2)', margin:'3px 0 6px' }}>מול התחשיב, בלי תוספת 20%
+                  {pct20Of(r) != null && <> · עם התוספת: <b style={{ color: pct20Of(r) > 100 ? 'var(--danger)' : 'var(--text)' }}>{pct20Of(r)}%</b></>}</p>
                 <CardRow label="פער החודש" strong color={r.gap == null ? undefined : r.gap <= 0 ? 'var(--ok-text)' : (r.agreed == null || r.over > 0) ? 'var(--danger)' : undefined}>
                   {r.gap == null ? '—' : r.gap > 0 ? num(r.gap) : `עודף ${num(-r.gap)}`}<span className="sr-only"> — {st.t}</span></CardRow>
                 <CardRow label="יתרה מצטברת"><Bal v={r.balance} /></CardRow>

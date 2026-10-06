@@ -1037,4 +1037,4 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .big-table tbody tr:hover th[scope="row"] { background: #F4F0FB; }
 /* סימון פוקוס למקלדת בכל המערכת — לא היה כזה בכלל */
 :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid var(--purple); outline-offset: 2px; }
-.big-table .bl-bar { max-width: 110px; min-width: 60px; }
+.big-table .bl-bar { max-width: 90px; min-width: 44px; }
