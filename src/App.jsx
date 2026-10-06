@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 67;
+const BUILD = 68;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5021,7 +5021,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   return (
     <div className="fade-in page-wrap" style={{ maxWidth:1180 }} dir="rtl">
       <PageHead
-        title="שורה תחתונה"
+        title="תמונת מצב חודשית"
         badge={viewer ? (
           <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13.8, fontWeight:700, color:'var(--purple)',
             background:'var(--purple-100)', border:'1px solid #D8CEEF', borderRadius:999, padding:'3px 11px' }}>
@@ -5130,7 +5130,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <p className="section-sub">כל שורה היא תרגיל אחד, מימין לשמאל: בפועל − משרד החינוך − מענק רשת − מה שהסניף מעביר = נותר לפני הכרית. ועוד כרית 20% = נותר כולל הכרית. אדום = חסר, ירוק = עודף.</p>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{`שורה תחתונה לפי סניף, ${fmtMonth(sel)}: תוכנן, בפועל, משרד החינוך, מענק רשת, הסניף מעביר, נותר לפני הכרית, כרית 20% ונותר כולל הכרית`}</caption>
+              <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: תוכנן, בפועל, משרד החינוך, מענק רשת, הסניף מעביר, נותר לפני הכרית, כרית 20% ונותר כולל הכרית`}</caption>
               <colgroup>
                 <col /><col className="g-cost" /><col className="g-cost" />
                 <col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
@@ -12251,7 +12251,7 @@ export default function App() {
               <button className={`nav-btn nav-main ${view==='bottomline' ? 'active' : ''}`} onClick={() => setView('bottomline')}
                 aria-current={view==='bottomline' ? 'page' : undefined}>
                 <BarChart3 size={19} strokeWidth={2.4} />
-                שורה תחתונה
+                תמונת מצב חודשית
               </button>
             )}
             {/* "תן אפשרות לרשום בטבלה כל חודש מה התקבל..." (שרה, 23.9) —
