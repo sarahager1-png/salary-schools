@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 109;
+const BUILD = 110;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5437,7 +5437,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
                       {r.chabadPaid != null ? <span style={{ fontWeight:800 }}>{num(r.chabadPaid)}<span className="bl-tag ok">בפועל</span></span>
                         : r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
                     <td style={td}><Left v={leftOf(r)} /></td>
-                    <td style={td}><ResBar left={leftOf(r)} cushion={r.add20} /></td>
+                    <td style={td}><ResBar left={leftOf(r)} cushion={r.add20} />
+                      {/* "לא רשום כמה יוצא ה-20 אחוז" (שרה, 7.10): הסכום מתחת לפס */}
+                      <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(r.add20)}</span></td>
                     {multi && <td style={{ ...td, fontWeight:800 }} title={`מהחודש הקודם ${num(openingOf(r.id))}, והחודש ${num(resultOf(r))} (תכנון ${num(planOf(r))} פחות בפועל ${num(costAll(r))})`}><Credit v={runningOf(r.id)} /></td>}
                   </tr>
                 ); })}
@@ -5451,7 +5453,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={td}>{num(tot.support)}</td>
                   <td style={td}>{num(dealSum)}</td>
                   <td style={td}><Left v={-beforeSum} /></td>
-                  <td style={td}><ResBar left={-beforeSum} cushion={sum('add20')} /></td>
+                  <td style={td}><ResBar left={-beforeSum} cushion={sum('add20')} />
+                    <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(sum('add20'))}</span></td>
                   {multi && <td style={td}><Credit v={runningRows} /></td>}
                 </tr>
               </tfoot>
@@ -5465,7 +5468,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag">לפי התלושים</span>}</p>
                 <CardRow label="בפועל" strong>{num(costAll(r))}{pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
                 <CardRow label="נשאר" strong><Left v={leftOf(r)} /></CardRow>
-                <CardRow label="כרית 20%" strong><ResBar left={leftOf(r)} cushion={r.add20} /></CardRow>
+                <CardRow label="כרית 20%" strong><ResBar left={leftOf(r)} cushion={r.add20} /><span className="num" style={{ fontSize:14, color:'var(--text2)', marginInlineStart:8 }}>{num(r.add20)}</span></CardRow>
                 {multi && <CardRow label="יתרה מצטברת" strong><Credit v={runningOf(r.id)} /></CardRow>}
                 {open && (
                   <>
