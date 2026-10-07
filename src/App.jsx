@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 121;
+const BUILD = 123;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5232,9 +5232,18 @@ function BottomLineView({ activeMonth, viewer = false }) {
     "יש צורך להראות האם עמד מול התכנון — ירוק, צהוב, אדום — כל חודש" (שרה, 8.10):
     ירוק = נשאר לא פחות מבספטמבר; צהוב = חסר עד 5% מעלות השכר בבסיס; אדום = יותר.
   */
+  /*
+    "תחשוב איך ישתקף הכי טוב. ישנם סכומים שלא נוגעים בהם — בעיקר העברות מבית חב"ד"
+    (שרה, 8.10): ההעברה שסוכמה עם הסניף קבועה. מה שמשתנה הוא רק השלמת הרשת:
+    המענק ועוד חובה (חוסר), או פחות זכות — אבל לא פחות מאפס: סניף בלי מענק
+    שנשאר לו עודף אינו "מחזיר" לרשת, הזכות שלו נשמרת לחודשים הבאים.
+  */
+  const completeOf = (support, bal) => Math.max(0, (support || 0) - (bal || 0));
+  const completeIn = m => (m ? m.branches.reduce((a, b) => a + completeOf(b.support, m.key === baseMonth?.key ? 0 : (resultOf({ ...b, _key: m.key }) || 0)), 0) : 0);
+  const completeRows = summed.reduce((a, r) => a + completeOf(r.support, isBase ? 0 : (runningOf(r.id) || 0)), 0);
   const baseCostOf = id => { const b = baseMonth?.branches.find(x => x.id === id); return b ? costAll(b) : 0; };
   const baseCostNet = (baseMonth?.branches || []).reduce((a, b) => a + costAll(b), 0);
-  const statusOf = (v, baseCost) => (v == null ? null : v >= 0 ? 'ok' : -v <= baseCost * 0.05 ? 'mid' : 'bad');
+  const statusOf = (v, baseCost, left) => (v == null ? null : left != null && left < 0 ? 'bad' : v >= 0 ? 'ok' : -v <= baseCost * 0.05 ? 'mid' : 'bad');
   const Pill = ({ s }) => s == null ? null : (
     <span style={{ display:'inline-block', fontSize:14, fontWeight:700, borderRadius:999, padding:'1px 9px', marginBottom:3, lineHeight:1.5,
       ...(s === 'ok' ? { background:'#E6F6EC', color:'#166534' } : s === 'mid' ? { background:'var(--warn-bg)', color:'#8F4E00' } : { background:'var(--danger-bg)', color:'var(--danger-text)' }) }}>
@@ -5261,21 +5270,22 @@ function BottomLineView({ activeMonth, viewer = false }) {
   */
   const ResBar = ({ left, cushion }) => {
     if (left == null || cushion == null) return <span>—</span>;
-    const ok = Math.round(left) >= Math.round(cushion);
-    const p = cushion > 0 ? left / cushion : (ok ? 1 : 0), w = Math.max(0, Math.min(1, p));
-    const state = ok ? 'ok' : (cushion > 0 && left < 0 ? 'bad' : 'mid');
-    const label = ok ? `לא פחות מהבסיס: נשארו ${num(left)}, בבסיס ${num(cushion)}`
-      : cushion > 0 && left < 0 ? `חסרים ${num(-left)} לשכר עצמו; בבסיס נשארו ${num(cushion)}`
-      : cushion > 0 ? `${Math.min(99, Math.round(p * 100))}% מהבסיס: נשארו ${num(left)} מתוך ${num(cushion)}`
-      : `פחות מהבסיס: נשארו ${num(left)} מול ${num(cushion)} בבסיס`;
+    const ok = left >= 0 && Math.round(left) >= Math.round(cushion);
+    const state = left < 0 ? 'bad' : ok ? 'ok' : 'mid';
+    const p = state === 'mid' && cushion > 0 ? left / cushion : (ok ? 1 : 0), w = Math.max(0, Math.min(1, p));
+    const label = state === 'bad' ? `לא עמד: חסרים ${num(-left)} לשכר עצמו`
+      : ok ? `עמד: נשארו ${num(left)} (בבסיס ${num(cushion)})`
+      : `${Math.min(99, Math.round(p * 100))}% מהבסיס: נשארו ${num(left)} מתוך ${num(cushion)}`;
     return (
       <span className={'resbar ' + state} role="img" aria-label={label} title={label}>
         <span className="track"><span className="fill" style={{ width: `${w * 100}%` }} /></span>
-        {state === 'ok' ? <Check size={17} strokeWidth={3.2} /> : state === 'bad' || cushion <= 0 ? <AlertTriangle size={16} strokeWidth={2.4} />
+        {state === 'ok' ? <Check size={17} strokeWidth={3.2} /> : state === 'bad' ? <AlertTriangle size={16} strokeWidth={2.4} />
           : <span className="num pc">{Math.min(99, Math.round(p * 100))}%</span>}
       </span>
     );
   };
+  // כמה חסר: עד אפס כשנשאר שלילי, ועד הבסיס כשהבסיס חיובי
+  const shortOf = (left, cushion) => (left == null ? 0 : Math.max(Math.max(cushion || 0, 0) - left, 0));
   // סימן החשבון ליד שם העמודה — כדי שהשורה תיקרא כתרגיל
   const Op = ({ c }) => <span aria-hidden="true" style={{ color:'var(--text3)', fontWeight:800, marginInlineEnd:4 }}>{c}</span>;
 
@@ -5400,8 +5410,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <p className="s num">{num(cushionSum)}</p></div>
             {/* "איפה כמה הרשת צריכה השלמה לכל חודש כולל המענק" (שרה, 8.10): המענק פחות היתרה — מה שהרשת מעבירה בפועל החודש */}
             <div className="bl-tile t-res t-final"><p className="l">הרשת משלימה החודש</p>
-              <p className="v num">{num(tot.support - (isBase ? 0 : runningRows))}</p>
-              <p className="s">{isBase ? 'המענק — חודש הבסיס' : `מענק ${num(tot.support)} ${runningRows >= 0 ? '− זכות' : '+ חובה'} ${num(Math.abs(runningRows))}`}</p></div>
+              <p className="v num">{num(completeRows)}</p>
+              <p className="s">{isBase ? 'המענק — חודש הבסיס' : `מענק ${num(tot.support)}; חוסר מתווסף, עודף מקטין (לא מתחת לאפס)`}</p></div>
           </div>
 
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:6 }}>
@@ -5416,7 +5426,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             )}
           </div>
           <p className="section-sub">{mode === 'compare'
-            ? `מה נשאר בכל חודש אחרי השכר (משרד החינוך לפי תקבול בפועל בלבד), ומתחתיו ההפרש מול ${fmtMonth(baseMonth.key)}: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות. היתרה המצטברת = סכום ההפרשים. ירוק = עמד (לא פחות מבספטמבר), צהוב = חסר עד 5% מהשכר, אדום = יותר מזה.`
+            ? `מה נשאר בכל חודש אחרי השכר (משרד החינוך לפי תקבול בפועל בלבד), ומתחתיו ההפרש מול ${fmtMonth(baseMonth.key)}: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות. היתרה המצטברת = סכום ההפרשים. ירוק = עמד (נשאר חיובי ולא פחות מבספטמבר), צהוב = חסר עד 5% מהשכר, אדום = נשאר שלילי או חסר יותר מזה.`
             : <>בפועל − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. הפס מראה כמה נשאר מול ספטמבר (הבסיס = 100%).{multi ? ` יתרה מצטברת = מה שנשאר החודש פחות מה שנשאר ב${fmtMonth(baseMonth.key)}, מצטבר מחודש לחודש: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות.` : ''}</>}</p>
           {mode === 'compare' ? (
           <>
@@ -5446,10 +5456,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
                     {months.map(m => { const l = leftIn(m, r.id), v = resultIn(m, r.id); return (
                       <td key={m.key} style={{ ...td, fontWeight: m.key === sel ? 800 : 500 }}>
-                        {m.key !== baseMonth.key && <span style={{ display:'block' }}><Pill s={statusOf(v, baseCostOf(r.id))} /></span>}
+                        <span style={{ display:'block' }}><Pill s={m.key === baseMonth.key ? (l == null ? null : l < 0 ? 'bad' : 'ok') : statusOf(v, baseCostOf(r.id), l)} /></span>
                         <Left v={l} />
                         <span style={{ display:'block', fontSize:14, marginTop:2 }}>{m.key === baseMonth.key ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={v} />}</span>
-                        {(() => { const bm = m.branches.find(x => x.id === r.id); return bm ? <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--purple)', marginTop:2 }} title="הרשת משלימה: המענק פחות היתרה">הרשת {num(bm.support - (m.key === baseMonth.key ? 0 : (v || 0)))}</span> : null; })()}
                       </td>); })}
                     <td style={{ ...td, fontWeight:800 }}><Credit v={totalOf(r.id)} /></td>
                   </tr>
@@ -5458,13 +5467,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  {months.map(m => <td key={m.key} style={td}>{m.key !== baseMonth.key && <span style={{ display:'block' }}><Pill s={statusOf(netResult(m), baseCostNet)} /></span>}<Left v={netLeft(m)} /><span style={{ display:'block', fontSize:14, marginTop:2 }}>{m.key === baseMonth.key ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={netResult(m)} />}</span></td>)}
+                  {months.map(m => <td key={m.key} style={td}><span style={{ display:'block' }}><Pill s={m.key === baseMonth.key ? (netLeft(m) < 0 ? 'bad' : 'ok') : statusOf(netResult(m), baseCostNet, netLeft(m))} /></span><Left v={netLeft(m)} /><span style={{ display:'block', fontSize:14, marginTop:2 }}>{m.key === baseMonth.key ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={netResult(m)} />}</span></td>)}
                   <td style={td}><Credit v={totalNet} /></td>
                 </tr>
                 <tr>
                   <td style={{ padding:'10px 12px', color:'var(--purple)' }}>הרשת משלימה<span style={{ display:'block', fontSize:14, fontWeight:600 }}>מענק − יתרה</span></td>
-                  {months.map(m => { const sup = m.branches.reduce((a, b) => a + (b.support || 0), 0); const comp = sup - (m.key === baseMonth.key ? 0 : netResult(m)); return <td key={m.key} style={{ ...td, fontWeight:800, color:'var(--purple)' }} title={`מענק ${num(sup)}`}>{num(comp)}</td>; })}
-                  <td style={{ ...td, fontWeight:800, color:'var(--purple)' }} title="סך ההשלמות של הרשת בכל החודשים">{num(months.reduce((a, m) => a + m.branches.reduce((x, b) => x + (b.support || 0), 0) - (m.key === baseMonth.key ? 0 : netResult(m)), 0))}</td>
+                  {months.map(m => { const sup = m.branches.reduce((a, b) => a + (b.support || 0), 0); return <td key={m.key} style={{ ...td, fontWeight:800, color:'var(--purple)' }} title={`מענק ${num(sup)}; חוסר מתווסף, עודף מקטין, לא מתחת לאפס לסניף`}>{num(completeIn(m))}</td>; })}
+                  <td style={{ ...td, fontWeight:800, color:'var(--purple)' }} title="סך ההשלמות של הרשת בכל החודשים">{num(months.reduce((a, m) => a + completeIn(m), 0))}</td>
                 </tr>
               </tfoot>
             </table>
@@ -5475,7 +5484,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
                 {months.map(m => { const l = leftIn(m, r.id), v = resultIn(m, r.id); return (
                   <CardRow key={m.key} label={fmtMonth(m.key)} strong={m.key === sel}>
-                    {m.key !== baseMonth.key && <span style={{ marginInlineEnd:8 }}><Pill s={statusOf(v, baseCostOf(r.id))} /></span>}
+                    <span style={{ marginInlineEnd:8 }}><Pill s={m.key === baseMonth.key ? (l == null ? null : l < 0 ? 'bad' : 'ok') : statusOf(v, baseCostOf(r.id), l)} /></span>
                     <Left v={l} />
                     <span style={{ fontSize:14, marginInlineStart:8 }}>{m.key === baseMonth.key ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={v} />}</span>
                   </CardRow>); })}
@@ -5525,9 +5534,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
                         : minInfo(r).key === 'none'
                           ? <span style={{ color:'#8F4E00', fontWeight:700 }}>0<span className="bl-tag" style={{ color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>טרם התקבל</span></span>
                           : <span style={{ fontWeight:700 }}>{num(minOf(r))}<span className="bl-tag" style={{ display:'block', width:'fit-content', margin:'3px auto 0' }}>לפי {fmtMonth(minInfo(r).key)}</span></span>}</td>
-                    <td style={td} title={isBase ? undefined : `הרשת צריכה להעביר החודש: המענק ${num(r.support)} פחות היתרה ${num(runningOf(r.id))}`}>{num(r.support)}
+                    <td style={td} title={isBase ? undefined : `הרשת צריכה להעביר החודש: המענק ${num(r.support)} פחות היתרה ${num(runningOf(r.id))}, ולא פחות מאפס`}>{num(r.support)}
                       {/* "כמה הרשת צריכה להעביר כל חודש: המענק מינוס יתרה" (שרה, 8.10) */}
-                      {!isBase && runningOf(r.id) != null && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--purple)', marginTop:2 }}>להעביר {num(r.support - runningOf(r.id))}</span>}</td>
+                      {!isBase && runningOf(r.id) != null && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--purple)', marginTop:2 }}>להעביר {num(completeOf(r.support, runningOf(r.id)))}</span>}</td>
                     <td style={td} title={r.chabadPaid != null ? `הועבר בפועל. סוכם: ${r.agreed == null ? 'טרם' : num(sendOf(r))}` : r.agreed != null ? 'הסכום שסוכם עם הסניף — כולל משרות שעתיות (מזכירה, צהרון)' : undefined}>
                       {r.chabadPaid != null ? <span style={{ fontWeight:800 }}>{num(r.chabadPaid)}<span className="bl-tag ok">בפועל</span></span>
                         : r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
@@ -5535,7 +5544,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <td style={td}><ResBar left={leftOf(r)} cushion={cushionOf(r)} />
                       {/* "לא רשום כמה יוצא ה-20 אחוז" (שרה, 7.10): הסכום מתחת לפס — 20% מהתכנון */}
                       <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(cushionOf(r))}</span>
-                      {leftOf(r) != null && Math.round(leftOf(r)) < Math.round(cushionOf(r)) && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'#8F4E00' }}>חסר {num(cushionOf(r) - leftOf(r))}</span>}</td>
+                      {Math.round(shortOf(leftOf(r), cushionOf(r))) > 0 && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color: leftOf(r) < 0 ? 'var(--danger-text)' : '#8F4E00' }}>חסר {num(shortOf(leftOf(r), cushionOf(r)))}</span>}</td>
                     {multi && !isBase && <td style={{ ...td, fontWeight:800 }} title={`מהחודש הקודם ${num(openingOf(r.id))}, והחודש ${num(resultOf(r))} (נשאר ${num(leftOf(r))} מול ${num(cushionOf(r))} ב${fmtMonth(baseMonth.key)})`}><Credit v={runningOf(r.id)} /></td>}
                   </tr>
                 ); })}
@@ -5547,12 +5556,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={td} title={usePct == null || isBase ? undefined : `${usePct}% מ${fmtMonth(baseMonth.key)}`}>{num(sum('cost') + tzSum)}</td>
                   <td style={td}>{num(minSum)}</td>
                   <td style={td}>{num(tot.support)}
-                    {!isBase && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--purple)', marginTop:2 }}>להעביר {num(tot.support - runningRows)}</span>}</td>
+                    {!isBase && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--purple)', marginTop:2 }}>להעביר {num(completeRows)}</span>}</td>
                   <td style={td}>{num(dealSum)}</td>
                   <td style={td}><Left v={-beforeSum} /></td>
                   <td style={td}><ResBar left={Math.round(-beforeSum)} cushion={Math.round(cushionSum)} />
                     <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(cushionSum)}</span>
-                    {Math.round(-beforeSum) < Math.round(cushionSum) && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'#8F4E00' }}>חסר {num(cushionSum + beforeSum)}</span>}</td>
+                    {Math.round(shortOf(-beforeSum, cushionSum)) > 0 && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color: -beforeSum < 0 ? 'var(--danger-text)' : '#8F4E00' }}>חסר {num(shortOf(-beforeSum, cushionSum))}</span>}</td>
                   {multi && !isBase && <td style={td}><Credit v={runningRows} /></td>}
                 </tr>
               </tfoot>
@@ -5566,7 +5575,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag">לפי התלושים</span>}</p>
                 <CardRow label="בפועל" strong>{num(costAll(r))}{!isBase && pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
                 <CardRow label="נשאר" strong><Left v={leftOf(r)} /></CardRow>
-                <CardRow label="הכרית מול ספטמבר" strong><ResBar left={leftOf(r)} cushion={cushionOf(r)} /><span className="num" style={{ fontSize:14, color:'var(--text2)', marginInlineStart:8 }}>{num(cushionOf(r))}</span>{leftOf(r) != null && leftOf(r) < cushionOf(r) && <span className="num" style={{ fontSize:14, fontWeight:700, color:'#8F4E00', marginInlineStart:8 }}>חסר {num(cushionOf(r) - leftOf(r))}</span>}</CardRow>
+                <CardRow label="הכרית מול ספטמבר" strong><ResBar left={leftOf(r)} cushion={cushionOf(r)} /><span className="num" style={{ fontSize:14, color:'var(--text2)', marginInlineStart:8 }}>{num(cushionOf(r))}</span>{Math.round(shortOf(leftOf(r), cushionOf(r))) > 0 && <span className="num" style={{ fontSize:14, fontWeight:700, color: leftOf(r) < 0 ? 'var(--danger-text)' : '#8F4E00', marginInlineStart:8 }}>חסר {num(shortOf(leftOf(r), cushionOf(r)))}</span>}</CardRow>
                 {multi && !isBase && <CardRow label="יתרה מצטברת" strong><Credit v={runningOf(r.id)} /></CardRow>}
                 {open && (
                   <>
@@ -5575,7 +5584,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <CardRow label="נשאר בספטמבר (הבסיס)">{num(cushionOf(r))}</CardRow>
                     <CardRow label={r.ministryReceived != null ? 'משרד החינוך — בפועל' : minInfo(r).key === 'none' ? 'משרד החינוך — טרם התקבל' : `משרד החינוך — לפי ${fmtMonth(minInfo(r).key)}`}>{num(minOf(r))}</CardRow>
                     <CardRow label="מענק רשת">{num(r.support)}</CardRow>
-                    {!isBase && runningOf(r.id) != null && <CardRow label="הרשת מעבירה החודש (מענק − יתרה)" strong color="var(--purple)">{num(r.support - runningOf(r.id))}</CardRow>}
+                    {!isBase && runningOf(r.id) != null && <CardRow label="הרשת מעבירה החודש (מענק − יתרה)" strong color="var(--purple)">{num(completeOf(r.support, runningOf(r.id)))}</CardRow>}
                     <CardRow label={r.chabadPaid != null ? 'הסניף העביר — בפועל' : 'הסניף מעביר — סוכם'}>{r.chabadPaid != null ? num(r.chabadPaid) : r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
                   </>
                 )}
@@ -5710,8 +5719,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
           {showNote && (
             <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
               <b>הבסיס</b> — עלות השכר בפועל בחודש הראשון במערכת (ספטמבר 2026); היא ה-100% שמולו נמדדים החודשים הבאים, והכרית היא 20% ממנה. <b>בפועל</b> — עלות המעביד של כל עובדי בית הספר בחודש, כולל מנהלת, הנהלה וצהרון; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
-              {' '}<b>הכרית</b> — מה שנשאר בסניף אחרי השכר בחודש הבסיס (ספטמבר) הוא ה-100%; הפס מראה כמה מזה נשאר החודש. מלא = לא פחות מספטמבר; "חסר" = נשאר פחות מבספטמבר. <b>משרד החינוך</b> — רק מה שהתקבל בפועל (הוזן במסך "תקבולים"); תקבול שהוזן נשאר בתוקף לחודשים הבאים עד שמוזן חדש, וסניף שטרם התקבל לו דבר נספר 0 — לא "מתוכנן". <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
-              {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו, סכום אחד כולל משרות שעתיות; "טרם סוכם" נספר כאפס. <b>להעביר</b> (מתחת למענק) ו<b>הרשת משלימה החודש</b> (ברצועה למעלה ובשורת הסיכום של ההשוואה) — כמה הרשת צריכה להעביר החודש: המענק פחות היתרה המצטברת (זכות מקטינה, חובה מגדילה). בחודש הבסיס — המענק. כשנרשמה במסך התקבולים העברה בפועל — היא שמוצגת ונספרת ("בפועל"). <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
+              {' '}<b>הכרית</b> — ירוק = עמד ביעד: נשאר חיובי ולא פחות מבספטמבר (הבסיס); כתום = נשאר חיובי אך פחות מבספטמבר; אדום = נשאר שלילי, חסר כסף לשכר עצמו. "חסר" = כמה חסר עד אפס, או עד הבסיס. <b>משרד החינוך</b> — רק מה שהתקבל בפועל (הוזן במסך "תקבולים"); תקבול שהוזן נשאר בתוקף לחודשים הבאים עד שמוזן חדש, וסניף שטרם התקבל לו דבר נספר 0 — לא "מתוכנן". <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
+              {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו, סכום אחד כולל משרות שעתיות; "טרם סוכם" נספר כאפס. <b>להעביר</b> (מתחת למענק) ו<b>הרשת משלימה החודש</b> (ברצועה למעלה ובשורת הסיכום של ההשוואה) — כמה הרשת צריכה להעביר החודש: המענק פחות היתרה המצטברת (חובה מגדילה, זכות מקטינה — אך לא מתחת לאפס; סניף בלי מענק שומר את הזכות לחודשים הבאים). ההעברה שסוכמה עם הסניף אינה משתנה. בחודש הבסיס — המענק. כשנרשמה במסך התקבולים העברה בפועל — היא שמוצגת ונספרת ("בפועל"). <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
               {anyTz && <>{' '}<b>הנהלה וצהרון</b> — המשרות השעתיות מגולמות בשכר (לפי המחשבון ובפועל); אין מולן הכנסה ממשרד החינוך, והן כולן על הסניף: הסכום ש"הסניף מעביר" כולל אותן, וכרית ה-20% מחושבת גם עליהן.</>}
               {' '}<b>יתרה מצטברת</b> — מה שנשאר החודש פחות מה שנשאר בספטמבר (הבסיס), מצטבר: "זכות" כשנשאר יותר (שכר נמוך יותר, או תקבול ממשרד החינוך שהגיע), "חובה" כשנשאר פחות; היתרה עוברת מחודש לחודש.
               {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
