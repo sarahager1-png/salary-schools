@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 119;
+const BUILD = 120;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5152,7 +5152,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const anyTz = summed.some(r => r.hourly > 0);
   const tzSum = sum('hourly');
   // מה שהסניף מעביר = הסכום שסוכם על ההוראה ועוד שכר הצהרון — בדיוק כמו בטבלת ההעברות לסניפים
-  const sendOf = r => (r.agreed || 0) + (r.hourly || 0);
+  /*
+    "תעגל לקרית ביאליק ל-55,000 העברה חודשית" (שרה, 8.10; וכן גני תקוה 93,000 "כולל
+    הצהרון", 7.10): הסכום שסוכם הוא סכום אחד, כולל המשרות השעתיות (מזכירה, צהרון).
+    לא מוסיפים עליו את השעתיות לפי הנוכחות — הן רק כשלא סוכם סכום.
+  */
+  const sendOf = r => (r.agreed != null ? r.agreed : (r.hourly || 0));
   /*
     כמו בעמודת משרד החינוך (שרה, 6.10: "זה מה שהועבר בפועל?"): סניף שנרשמה לו
     העברה בפועל במסך התקבולים — היא שמוצגת ונספרת בחשבון החודש, במקום הסכום
@@ -5223,6 +5228,17 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const lastKey = months[months.length - 1]?.key;
   const totalOf = id => sumKnown(months.map(m => resultIn(m, id)));
   const totalNet = months.reduce((a, m) => a + netResult(m), 0);
+  /*
+    "יש צורך להראות האם עמד מול התכנון — ירוק, צהוב, אדום — כל חודש" (שרה, 8.10):
+    ירוק = נשאר לא פחות מבספטמבר; צהוב = חסר עד 5% מעלות השכר בבסיס; אדום = יותר.
+  */
+  const baseCostOf = id => { const b = baseMonth?.branches.find(x => x.id === id); return b ? costAll(b) : 0; };
+  const baseCostNet = (baseMonth?.branches || []).reduce((a, b) => a + costAll(b), 0);
+  const statusOf = (v, baseCost) => (v == null ? null : v >= 0 ? 'ok' : -v <= baseCost * 0.05 ? 'mid' : 'bad');
+  const Pill = ({ s }) => s == null ? null : (
+    <span style={{ display:'inline-block', fontSize:14, fontWeight:700, borderRadius:999, padding:'1px 9px', marginBottom:3, lineHeight:1.5,
+      ...(s === 'ok' ? { background:'#E6F6EC', color:'#166534' } : s === 'mid' ? { background:'var(--warn-bg)', color:'#8F4E00' } : { background:'var(--danger-bg)', color:'var(--danger-text)' }) }}>
+      {s === 'ok' ? 'עמד' : s === 'mid' ? 'כמעט' : 'לא עמד'}</span>);
   // שורת הסיכום של טבלת החודש מסתכמת מהשורות שמוצגות בה
   const openingRows = summed.reduce((a, r) => a + (openingOf(r.id) ?? 0), 0);
   const runningRows = summed.reduce((a, r) => a + (runningOf(r.id) ?? 0), 0);
@@ -5396,7 +5412,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             )}
           </div>
           <p className="section-sub">{mode === 'compare'
-            ? `מה נשאר בכל חודש אחרי השכר (משרד החינוך לפי תקבול בפועל בלבד), ומתחתיו ההפרש מול ${fmtMonth(baseMonth.key)}: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות. היתרה המצטברת = סכום ההפרשים.`
+            ? `מה נשאר בכל חודש אחרי השכר (משרד החינוך לפי תקבול בפועל בלבד), ומתחתיו ההפרש מול ${fmtMonth(baseMonth.key)}: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות. היתרה המצטברת = סכום ההפרשים. ירוק = עמד (לא פחות מבספטמבר), צהוב = חסר עד 5% מהשכר, אדום = יותר מזה.`
             : <>בפועל − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. הפס מראה כמה נשאר מול ספטמבר (הבסיס = 100%).{multi ? ` יתרה מצטברת = מה שנשאר החודש פחות מה שנשאר ב${fmtMonth(baseMonth.key)}, מצטבר מחודש לחודש: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות.` : ''}</>}</p>
           {mode === 'compare' ? (
           <>
@@ -5426,6 +5442,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
                     {months.map(m => { const l = leftIn(m, r.id), v = resultIn(m, r.id); return (
                       <td key={m.key} style={{ ...td, fontWeight: m.key === sel ? 800 : 500 }}>
+                        {m.key !== baseMonth.key && <span style={{ display:'block' }}><Pill s={statusOf(v, baseCostOf(r.id))} /></span>}
                         <Left v={l} />
                         <span style={{ display:'block', fontSize:14, marginTop:2 }}>{m.key === baseMonth.key ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={v} />}</span>
                       </td>); })}
@@ -5436,7 +5453,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  {months.map(m => <td key={m.key} style={td}><Left v={netLeft(m)} /><span style={{ display:'block', fontSize:14, marginTop:2 }}>{m.key === baseMonth.key ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={netResult(m)} />}</span></td>)}
+                  {months.map(m => <td key={m.key} style={td}>{m.key !== baseMonth.key && <span style={{ display:'block' }}><Pill s={statusOf(netResult(m), baseCostNet)} /></span>}<Left v={netLeft(m)} /><span style={{ display:'block', fontSize:14, marginTop:2 }}>{m.key === baseMonth.key ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={netResult(m)} />}</span></td>)}
                   <td style={td}><Credit v={totalNet} /></td>
                 </tr>
               </tfoot>
@@ -5448,6 +5465,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
                 {months.map(m => { const l = leftIn(m, r.id), v = resultIn(m, r.id); return (
                   <CardRow key={m.key} label={fmtMonth(m.key)} strong={m.key === sel}>
+                    {m.key !== baseMonth.key && <span style={{ marginInlineEnd:8 }}><Pill s={statusOf(v, baseCostOf(r.id))} /></span>}
                     <Left v={l} />
                     <span style={{ fontSize:14, marginInlineStart:8 }}>{m.key === baseMonth.key ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={v} />}</span>
                   </CardRow>); })}
@@ -5497,8 +5515,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
                         : minInfo(r).key === 'none'
                           ? <span style={{ color:'#8F4E00', fontWeight:700 }}>0<span className="bl-tag" style={{ color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>טרם התקבל</span></span>
                           : <span style={{ fontWeight:700 }}>{num(minOf(r))}<span className="bl-tag" style={{ display:'block', width:'fit-content', margin:'3px auto 0' }}>לפי {fmtMonth(minInfo(r).key)}</span></span>}</td>
-                    <td style={td}>{num(r.support)}</td>
-                    <td style={td} title={r.chabadPaid != null ? `הועבר בפועל. סוכם: ${r.agreed == null ? 'טרם' : num(sendOf(r))}` : r.hourly > 0 && r.agreed != null ? `${num(r.agreed)} על ההוראה ועוד ${num(r.hourly)} שכר צהרון ומנהלה` : undefined}>
+                    <td style={td} title={isBase ? undefined : `הרשת צריכה להעביר החודש: המענק ${num(r.support)} פחות היתרה ${num(runningOf(r.id))}`}>{num(r.support)}
+                      {/* "כמה הרשת צריכה להעביר כל חודש: המענק מינוס יתרה" (שרה, 8.10) */}
+                      {!isBase && runningOf(r.id) != null && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--purple)', marginTop:2 }}>להעביר {num(r.support - runningOf(r.id))}</span>}</td>
+                    <td style={td} title={r.chabadPaid != null ? `הועבר בפועל. סוכם: ${r.agreed == null ? 'טרם' : num(sendOf(r))}` : r.agreed != null ? 'הסכום שסוכם עם הסניף — כולל משרות שעתיות (מזכירה, צהרון)' : undefined}>
                       {r.chabadPaid != null ? <span style={{ fontWeight:800 }}>{num(r.chabadPaid)}<span className="bl-tag ok">בפועל</span></span>
                         : r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
                     <td style={td}><Left v={leftOf(r)} /></td>
@@ -5516,7 +5536,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   {!isBase && <td style={td}>{summed.some(r => planOf(r) != null) ? num(summed.reduce((x, r) => x + (planOf(r) || 0), 0)) : '—'}</td>}
                   <td style={td} title={usePct == null || isBase ? undefined : `${usePct}% מ${fmtMonth(baseMonth.key)}`}>{num(sum('cost') + tzSum)}</td>
                   <td style={td}>{num(minSum)}</td>
-                  <td style={td}>{num(tot.support)}</td>
+                  <td style={td}>{num(tot.support)}
+                    {!isBase && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--purple)', marginTop:2 }}>להעביר {num(tot.support - runningRows)}</span>}</td>
                   <td style={td}>{num(dealSum)}</td>
                   <td style={td}><Left v={-beforeSum} /></td>
                   <td style={td}><ResBar left={Math.round(-beforeSum)} cushion={Math.round(cushionSum)} />
@@ -5544,6 +5565,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <CardRow label="נשאר בספטמבר (הבסיס)">{num(cushionOf(r))}</CardRow>
                     <CardRow label={r.ministryReceived != null ? 'משרד החינוך — בפועל' : minInfo(r).key === 'none' ? 'משרד החינוך — טרם התקבל' : `משרד החינוך — לפי ${fmtMonth(minInfo(r).key)}`}>{num(minOf(r))}</CardRow>
                     <CardRow label="מענק רשת">{num(r.support)}</CardRow>
+                    {!isBase && runningOf(r.id) != null && <CardRow label="הרשת מעבירה החודש (מענק − יתרה)" strong color="var(--purple)">{num(r.support - runningOf(r.id))}</CardRow>}
                     <CardRow label={r.chabadPaid != null ? 'הסניף העביר — בפועל' : 'הסניף מעביר — סוכם'}>{r.chabadPaid != null ? num(r.chabadPaid) : r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
                   </>
                 )}
@@ -5679,7 +5701,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
               <b>הבסיס</b> — עלות השכר בפועל בחודש הראשון במערכת (ספטמבר 2026); היא ה-100% שמולו נמדדים החודשים הבאים, והכרית היא 20% ממנה. <b>בפועל</b> — עלות המעביד של כל עובדי בית הספר בחודש, כולל מנהלת, הנהלה וצהרון; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
               {' '}<b>הכרית</b> — מה שנשאר בסניף אחרי השכר בחודש הבסיס (ספטמבר) הוא ה-100%; הפס מראה כמה מזה נשאר החודש. מלא = לא פחות מספטמבר; "חסר" = נשאר פחות מבספטמבר. <b>משרד החינוך</b> — רק מה שהתקבל בפועל (הוזן במסך "תקבולים"); תקבול שהוזן נשאר בתוקף לחודשים הבאים עד שמוזן חדש, וסניף שטרם התקבל לו דבר נספר 0 — לא "מתוכנן". <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
-              {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו; "טרם סוכם" נספר כאפס. כשנרשמה במסך התקבולים העברה בפועל — היא שמוצגת ונספרת ("בפועל"). <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
+              {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו, סכום אחד כולל משרות שעתיות; "טרם סוכם" נספר כאפס. <b>להעביר</b> (מתחת למענק) — כמה הרשת צריכה להעביר לסניף החודש: המענק פחות היתרה המצטברת (זכות מקטינה, חובה מגדילה). כשנרשמה במסך התקבולים העברה בפועל — היא שמוצגת ונספרת ("בפועל"). <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
               {anyTz && <>{' '}<b>הנהלה וצהרון</b> — המשרות השעתיות מגולמות בשכר (לפי המחשבון ובפועל); אין מולן הכנסה ממשרד החינוך, והן כולן על הסניף: הסכום ש"הסניף מעביר" כולל אותן, וכרית ה-20% מחושבת גם עליהן.</>}
               {' '}<b>יתרה מצטברת</b> — מה שנשאר החודש פחות מה שנשאר בספטמבר (הבסיס), מצטבר: "זכות" כשנשאר יותר (שכר נמוך יותר, או תקבול ממשרד החינוך שהגיע), "חובה" כשנשאר פחות; היתרה עוברת מחודש לחודש.
               {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
@@ -5957,8 +5979,9 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
       ולכן כולו מצטרף למה שהסניף מעביר, מעל הסכום שסוכם על ההוראה.
     */
     const tzMonth     = hourlyMonthly || 0;
-    const dueMonthAll = dueMonth == null ? (tzMonth || null) : Math.max(0, dueMonth) + tzMonth;
-    const dueYearAll  = dueYear  == null ? (tzMonth ? tzMonth * 12 : null) : Math.max(0, dueYear) + tzMonth * 12;
+    // סכום שסוכם = סכום אחד כולל המשרות השעתיות (שרה, 8.10: קרית ביאליק 55,000); השעתיות מתווספות רק למחושב
+    const dueMonthAll = agreedMonth != null ? Math.max(0, agreedMonth) : (dueMonth == null ? (tzMonth || null) : Math.max(0, dueMonth) + tzMonth);
+    const dueYearAll  = agreedYear  != null ? Math.max(0, agreedYear)  : (dueYear  == null ? (tzMonth ? tzMonth * 12 : null) : Math.max(0, dueYear) + tzMonth * 12);
     return { sc, f, fromSlips, monthly, costFromBudget, hourlyMonthly, annual, mmCost, bufferCost, reserve, total, otherInc, otherExp, incomeAll, expenseAll, gap, left: leftAll, needed, simGap, hoursOverQ, perHourSim, perHourActual, chabadTransfer,
       cover, coverPct, remains, add20, costWith20, transfer, agreedMonth, agreedYear, dueYear, dueMonth, tzMonth, dueMonthAll, dueYearAll };
   })
