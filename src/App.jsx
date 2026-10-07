@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 124;
+const BUILD = 125;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4969,6 +4969,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const [askClose, setAskClose] = useState(null);   // 'close' | 'reopen' — אישור בתוך הדף
   const [closing, setClosing] = useState(false);
   const [mode, setMode] = useState('month');   // 'month' — החודש שנבחר | 'compare' — השוואה בין החודשים
+  const [cmpKind, setCmpKind] = useState('salary');   // בהשוואה: 'salary' — עמידה ביעד (שכר) | 'cash' — מזומן
   const doClose = async action => {
     setClosing(true); setErr('');
     try { await store.closeMonthSummary(sel, action); setData(await store.fetchMonthlySummary()); setAskClose(null); }
@@ -5209,6 +5210,11 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const resultOf = b => { const l = leftOf(b), bl = baseLeftOf(b.id); return l == null || bl == null ? null : l - bl; };
   // undefined = הסניף אינו בחודש הזה (נספר 0); null = הסניף בחודש אבל התוצאה לא ידועה (אין תקציב משרד החינוך)
   const resultIn = (m, id) => { const b = m?.branches.find(x => x.id === id); return b ? resultOf({ ...b, _key: m.key }) : undefined; };
+  // סה"כ חסך/חרג מול ספטמבר, מאוקטובר ואילך (שכר בלבד)
+  const saveTotalOf = id => months.filter(m => m.key !== baseMonth?.key).reduce((a, m) => { const c = costIn(m, id); return c == null ? a : a + (baseCostOf(id) - c); }, 0);
+  const saveTotalNet = () => months.filter(m => m.key !== baseMonth?.key).reduce((a, m) => a + (baseCostNet - netCost(m)), 0);   // פונקציה — baseCostNet מוגדר אחר כך
+  const Saved = ({ v }) => v == null ? <span>—</span> : Math.round(v) === 0 ? <span style={{ color:'var(--text2)', fontWeight:600 }}>כמו בבסיס</span>
+    : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--ok-text)' : 'var(--danger-text)' }}>{v > 0 ? 'חסך ' : 'חרג '}{num(Math.abs(v))}</span>;
   const costIn = (m, id) => { const b = m?.branches.find(x => x.id === id); return b ? costAll(b) : null; };
   const netCost = m => (m ? m.branches.reduce((a, b) => a + costAll(b), 0) : 0);
   const leftIn = (m, id) => { const b = m?.branches.find(x => x.id === id); return b ? leftOf({ ...b, _key: m.key }) : null; };
@@ -5462,55 +5468,78 @@ function BottomLineView({ activeMonth, viewer = false }) {
             )}
           </div>
           <p className="section-sub">{mode === 'compare'
-            ? `מה נשאר בכל חודש אחרי השכר (משרד החינוך לפי תקבול בפועל בלבד), ומתחתיו ההפרש מול ${fmtMonth(baseMonth.key)}: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות. היתרה המצטברת = סכום ההפרשים. התג לכל חודש = עמידה ביעד של השכר מול ספטמבר: ירוק לא יותר, כתום חריגה עד 5%, אדום יותר.`
+            ? (cmpKind === 'salary' ? `השכר של כל סניף בכל חודש מול ${fmtMonth(baseMonth.key)} (הבסיס): ירוק לא יותר, כתום חריגה עד 5%, אדום יותר; ומתחת — כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.` : `מה נשאר בכל חודש אחרי השכר (משרד החינוך לפי תקבול בפועל בלבד), ומתחתיו ההפרש מול ${fmtMonth(baseMonth.key)}: זכות כשנשאר יותר, חובה כשנשאר פחות. היתרה המצטברת = סכום ההפרשים; בשורה האחרונה — כמה הרשת משלימה בכל חודש.`)
             : <>בפועל − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. "עמד ביעד?" = השכר של הסניף מול ספטמבר: ירוק לא יותר, כתום חריגה עד 5%, אדום יותר. "נשאר" הוא מזומן — משרד החינוך רק לפי תקבול בפועל.{multi ? ` יתרה מצטברת = מה שנשאר החודש פחות מה שנשאר ב${fmtMonth(baseMonth.key)}, מצטבר מחודש לחודש: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות.` : ''}</>}</p>
           {mode === 'compare' ? (
           <>
           {/*
-            "סכום חודשי שנוכל לערוך השוואה בין החודשים" (שרה, 7.10): שורה לסניף,
-            עמודה לחודש — מה שנשאר באותו חודש; השינוי מול החודש הקודם; והיתרה
-            המצטברת עד החודש שנבחר. החודש שנבחר מודגש.
+            "עכשיו תחשוב על השוואת החודשים" (שרה, 8.10): שני מבטים נפרדים, כמו בטבלת
+            החודש — "עמידה ביעד" (השכר של כל סניף בכל חודש מול ספטמבר) ו"מזומן" (מה
+            נשאר, היתרה מול ספטמבר, והשלמת הרשת). לא מערבבים אותם בתא אחד.
           */}
+          <div className="apple-seg no-print" role="group" aria-label="מה משווים" style={{ marginBottom:10 }}>
+            <button onClick={() => setCmpKind('salary')} aria-pressed={cmpKind === 'salary'}
+              className={['apple-seg-item', cmpKind === 'salary' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>עמידה ביעד · שכר</button>
+            <button onClick={() => setCmpKind('cash')} aria-pressed={cmpKind === 'cash'}
+              className={['apple-seg-item', cmpKind === 'cash' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>מזומן · נשאר והשלמה</button>
+          </div>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">השוואה בין החודשים לפי סניף: מה נשאר בכל חודש, השינוי מול החודש הקודם והיתרה המצטברת</caption>
+              <caption className="sr-only">{cmpKind === 'salary' ? 'השוואה בין החודשים לפי סניף: השכר בכל חודש מול ספטמבר, וסך החיסכון או החריגה' : 'השוואה בין החודשים לפי סניף: מה נשאר בכל חודש, ההפרש מול ספטמבר, היתרה המצטברת והשלמת הרשת'}</caption>
               <colgroup>
                 <col />{months.map(m => <col key={m.key} className={m.key === sel ? 'g-res' : undefined} />)}
-                <col className="g-res" /><col className="g-res g-sum" />
+                <col className="g-res g-sum" />
               </colgroup>
               <thead>
                 <tr>
                   <TH>סניף</TH>
-                  {months.map(m => <TH key={m.key}>{fmtMonth(m.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{m.frozenAt ? 'סגור' : 'פתוח'}</span></TH>)}
-                  <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>מול ספטמבר, עד {fmtMonth(lastKey)}</span></TH>
+                  {months.map(m => <TH key={m.key}>{fmtMonth(m.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{m.key === baseMonth.key ? 'הבסיס' : m.frozenAt ? 'סגור' : 'פתוח'}</span></TH>)}
+                  {cmpKind === 'salary'
+                    ? <TH>סה"כ מול {fmtMonth(baseMonth.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>חסך / חרג, עד {fmtMonth(lastKey)}</span></TH>
+                    : <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>מול {fmtMonth(baseMonth.key)}, עד {fmtMonth(lastKey)}</span></TH>}
                 </tr>
               </thead>
               <tbody>
-                {/* בכל חודש: מה נשאר, ומתחתיו ההפרש מול ספטמבר (זכות/חובה) */}
                 {cmpRows.map(r => (
                   <tr key={'cmp-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
-                    {months.map(m => { const l = leftIn(m, r.id), v = resultIn(m, r.id); return (
+                    {months.map(m => { const isB = m.key === baseMonth.key; return cmpKind === 'salary' ? (
                       <td key={m.key} style={{ ...td, fontWeight: m.key === sel ? 800 : 500 }}>
-                        {m.key !== baseMonth.key && <span style={{ display:'block' }}><Pill s={statusOf(costIn(m, r.id), baseCostOf(r.id))} /></span>}
-                        <Left v={l} />
-                        <span style={{ display:'block', fontSize:14, marginTop:2 }}>{m.key === baseMonth.key ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={v} />}</span>
-                      </td>); })}
-                    <td style={{ ...td, fontWeight:800 }}><Credit v={totalOf(r.id)} /></td>
+                        {!isB && <span style={{ display:'block' }}><Pill s={statusOf(costIn(m, r.id), baseCostOf(r.id))} /></span>}
+                        <span className="num">{costIn(m, r.id) == null ? '—' : num(costIn(m, r.id))}</span>
+                        <TargetNote cost={costIn(m, r.id)} base={baseCostOf(r.id)} isBaseMonth={isB} />
+                      </td>
+                    ) : (
+                      <td key={m.key} style={{ ...td, fontWeight: m.key === sel ? 800 : 500 }}>
+                        <Left v={leftIn(m, r.id)} />
+                        <span style={{ display:'block', fontSize:14, marginTop:2 }}>{isB ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={resultIn(m, r.id)} />}</span>
+                      </td>
+                    ); })}
+                    <td style={{ ...td, fontWeight:800 }}>{cmpKind === 'salary' ? <Saved v={saveTotalOf(r.id)} /> : <Credit v={totalOf(r.id)} />}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  {months.map(m => <td key={m.key} style={td}>{m.key !== baseMonth.key && <span style={{ display:'block' }}><Pill s={statusOf(netCost(m), baseCostNet)} /></span>}<Left v={netLeft(m)} /><span style={{ display:'block', fontSize:14, marginTop:2 }}>{m.key === baseMonth.key ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={netResult(m)} />}</span></td>)}
-                  <td style={td}><Credit v={totalNet} /></td>
+                  {months.map(m => { const isB = m.key === baseMonth.key; return cmpKind === 'salary' ? (
+                    <td key={m.key} style={td}>
+                      {!isB && <span style={{ display:'block' }}><Pill s={statusOf(netCost(m), baseCostNet)} /></span>}
+                      <span className="num">{num(netCost(m))}</span>
+                      <TargetNote cost={netCost(m)} base={baseCostNet} isBaseMonth={isB} />
+                    </td>
+                  ) : (
+                    <td key={m.key} style={td}><Left v={netLeft(m)} /><span style={{ display:'block', fontSize:14, marginTop:2 }}>{isB ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={netResult(m)} />}</span></td>
+                  ); })}
+                  <td style={td}>{cmpKind === 'salary' ? <Saved v={saveTotalNet()} /> : <Credit v={totalNet} />}</td>
                 </tr>
+                {cmpKind === 'cash' && (
                 <tr>
                   <td style={{ padding:'10px 12px', color:'var(--purple)' }}>הרשת משלימה<span style={{ display:'block', fontSize:14, fontWeight:600 }}>מענק − יתרה</span></td>
                   {months.map(m => { const sup = m.branches.reduce((a, b) => a + (b.support || 0), 0); return <td key={m.key} style={{ ...td, fontWeight:800, color:'var(--purple)' }} title={`מענק ${num(sup)}; חוסר מתווסף, עודף מקטין, לא מתחת לאפס לסניף`}>{num(completeIn(m))}</td>; })}
                   <td style={{ ...td, fontWeight:800, color:'var(--purple)' }} title="סך ההשלמות של הרשת בכל החודשים">{num(months.reduce((a, m) => a + completeIn(m), 0))}</td>
                 </tr>
+                )}
               </tfoot>
             </table>
           </div>
@@ -5518,13 +5547,21 @@ function BottomLineView({ activeMonth, viewer = false }) {
             {cmpRows.map(r => (
               <div key={'cmpm-' + r.id} className="apple-card mcard">
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
-                {months.map(m => { const l = leftIn(m, r.id), v = resultIn(m, r.id); return (
+                {months.map(m => { const isB = m.key === baseMonth.key; return cmpKind === 'salary' ? (
                   <CardRow key={m.key} label={fmtMonth(m.key)} strong={m.key === sel}>
-                    {m.key !== baseMonth.key && <span style={{ marginInlineEnd:8 }}><Pill s={statusOf(costIn(m, r.id), baseCostOf(r.id))} /></span>}
-                    <Left v={l} />
-                    <span style={{ fontSize:14, marginInlineStart:8 }}>{m.key === baseMonth.key ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={v} />}</span>
-                  </CardRow>); })}
-                <CardRow label={`יתרה מצטברת עד ${fmtMonth(lastKey)}`} strong><Credit v={totalOf(r.id)} /></CardRow>
+                    {!isB && <span style={{ marginInlineEnd:8 }}><Pill s={statusOf(costIn(m, r.id), baseCostOf(r.id))} /></span>}
+                    {costIn(m, r.id) == null ? '—' : num(costIn(m, r.id))}
+                    <TargetNote cost={costIn(m, r.id)} base={baseCostOf(r.id)} isBaseMonth={isB} block={false} />
+                  </CardRow>
+                ) : (
+                  <CardRow key={m.key} label={fmtMonth(m.key)} strong={m.key === sel}>
+                    <Left v={leftIn(m, r.id)} />
+                    <span style={{ fontSize:14, marginInlineStart:8 }}>{isB ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={resultIn(m, r.id)} />}</span>
+                  </CardRow>
+                ); })}
+                {cmpKind === 'salary'
+                  ? <CardRow label={`סה"כ מול ${fmtMonth(baseMonth.key)}`} strong><Saved v={saveTotalOf(r.id)} /></CardRow>
+                  : <CardRow label={`יתרה מצטברת עד ${fmtMonth(lastKey)}`} strong><Credit v={totalOf(r.id)} /></CardRow>}
               </div>
             ))}
           </div>
