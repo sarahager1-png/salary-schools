@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 112;
+const BUILD = 113;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5080,7 +5080,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
     אחריה ששת המספרים בשתי קבוצות, ובסוף הסניפים, מהקרוב ביותר לתחשיב.
   */
   // חריגה לפי הסכומים ולא לפי האחוז המעוגל — 100.1% הציג "לא חורגים… נמוך ב-−1,108"
-  const over = usePct != null && planCost > planSum;
+  // "למה אדום" (שרה, 7.10): חריגה של 0.1% אינה חריגה. אדום רק מעל 1% מהתכנון; עד 1% — "עומדים בתכנון"
+  const over = usePct != null && planCost > planSum * 1.01;
+  const onPlan = usePct != null && !over && Math.abs(planCost - planSum) <= planSum * 0.01;
   const RING = 2 * Math.PI * 52;
   const sorted = rows.slice().sort((x, y) => ((y.plan ? y.cost / y.plan : -1) - (x.plan ? x.cost / x.plan : -1)));
   const pctOf = r => (planOf(r) > 0 && !r.simOnly ? Math.round(costAll(r) / planOf(r) * 100) : null);
@@ -5271,11 +5273,11 @@ function BottomLineView({ activeMonth, viewer = false }) {
               {usePct != null ? (
                 <>
                   <h2 className="bl-verdict" style={{ color: over ? 'var(--danger-text)' : 'var(--text)' }}>
-                    {over ? 'חורגים מהתכנון המשוער' : 'לא חורגים מהתכנון המשוער'}
+                    {over ? 'חורגים מהתכנון המשוער' : onPlan ? 'עומדים בתכנון המשוער' : 'מתחת לתכנון המשוער'}
                   </h2>
                   <p className="bl-line">
                     עלות השכר בפועל <b className="num">{num(planCost)}</b>, מול <b className="num">{num(planSum)}</b> לפי התכנון המשוער
-                    {over ? <> — חריגה של <b className="num" style={{ color:'var(--danger-text)' }}>{num(planCost - planSum)}</b>.</>
+                    {planCost > planSum ? <> — גבוה ב-<b className="num" style={{ color: over ? 'var(--danger-text)' : 'var(--text)' }}>{num(planCost - planSum)}</b>{over ? '' : ' (בתוך 1%)'}.</>
                           : <> — נמוך ב-<b className="num" style={{ color:'var(--ok-text)' }}>{num(planSum - planCost)}</b>.</>}
                   </p>
                 </>
