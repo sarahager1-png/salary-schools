@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 115;
+const BUILD = 116;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5032,11 +5032,15 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const baseOf = id => { const b = baseMonth?.branches.find(x => x.id === id); return b ? costAll(b) : null; };
   const planOf  = r => baseOf(r.id);
   // הכרית היא 20% מהתכנון (בדוח: "תוספת 20%" לשנה ÷ 12) — סכום קבוע שאינו זז עם התלושים; לא 20% מהבפועל
-  const cushionOf = r => (planOf(r) != null ? Math.round(planOf(r) * 0.2) : r.add20);
+  /*
+    "ספטמבר הבסיס להכל" (שרה, 8.10): גם הכרית נמדדת מול ספטמבר — מה שנשאר בסניף
+    אחרי השכר בחודש הבסיס הוא ה-100%; בחודש אחר הפס מראה כמה מזה נשאר. לא 20% מוחלט.
+  */
+  const baseLeftOf = id => { const b = baseMonth?.branches.find(x => x.id === id); return b ? leftOf(b) : null; };
+  const cushionOf = r => (baseLeftOf(r.id) ?? r.add20);
   const costAll = r => (r.cost || 0) + (r.hourly || 0);
   // הסיכום רק על סניפים שיש להם פער לחשב — כדי שהחיסור בשורה יסתדר
   const summed = rows.filter(r => r.gap != null);
-  const cushionSum = summed.reduce((a, r) => a + cushionOf(r), 0);
   const sum = k => summed.reduce((a, r) => a + (r[k] || 0), 0);
   const tot = { costWith20: sum('costWith20'), ministry: sum('ministry'), support: sum('support'), gap: sum('gap'),
     due: summed.reduce((a, r) => a + Math.max(0, r.due || 0), 0),
@@ -5162,6 +5166,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
     פס ירוק מלא עם וי = הכרית מלאה; פס כתום חלקי = חלק ממנה; פס ריק אדום = חסר לשכר עצמו.
   */
   const leftOf = r => { const b = beforeOf(r); return b == null ? null : -b; };
+  // אחרי leftOf — הכרית נגזרת ממנו (ספטמבר הבסיס)
+  const cushionSum = summed.reduce((a, r) => a + cushionOf(r), 0);
   /*
     "הפער כל חודש יעבור לחודש הבא" (שרה, 7.10). היתרה המתגלגלת של הסניף:
     מה שנשאר בכל חודש — הכסף בפועל, בלי הכרית (שרה: "הכסף בפועל, בלי
@@ -5346,7 +5352,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             <div className="bl-tile t-res"><p className="l"><span className="op" aria-hidden="true">=</span>נשאר</p>
               <p className="v"><Left v={-beforeSum} /></p>
               <p className="s">אחרי השכר של החודש</p></div>
-            <div className="bl-tile t-res t-final"><p className="l">כרית 20%</p>
+            <div className="bl-tile t-res t-final"><p className="l">הכרית מול {fmtMonth(baseMonth.key)}</p>
               <p className="v" style={{ display:'flex', alignItems:'center' }}><ResBar left={-beforeSum} cushion={cushionSum} /></p>
               <p className="s num">{num(cushionSum)}</p></div>
           </div>
@@ -5364,7 +5370,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </div>
           <p className="section-sub">{mode === 'compare'
             ? `${fmtMonth(baseMonth.key)} (הבסיס) פחות בפועל בכל חודש — זכות כששילמנו פחות מהבסיס, חובה כששילמנו יותר — השינוי מול החודש הקודם, והיתרה המצטברת.`
-            : <>בפועל − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. הפס מראה כמה מכרית ה-20% התמלא.{multi ? ` יתרה מצטברת = ${fmtMonth(baseMonth.key)} (הבסיס) פחות בפועל, מצטבר מחודש לחודש: זכות כששילמנו פחות מהבסיס, חובה כששילמנו יותר.` : ''}</>}</p>
+            : <>בפועל − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. הפס מראה כמה נשאר מול ספטמבר (הבסיס = 100%).{multi ? ` יתרה מצטברת = ${fmtMonth(baseMonth.key)} (הבסיס) פחות בפועל, מצטבר מחודש לחודש: זכות כששילמנו פחות מהבסיס, חובה כששילמנו יותר.` : ''}</>}</p>
           {mode === 'compare' ? (
           <>
           {/*
@@ -5444,7 +5450,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <tr>
                   <TH>סניף</TH>{!isBase && <TH>{fmtMonth(baseMonth.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>הבסיס</span></TH>}<TH>בפועל</TH>
                   <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או מתוכנן</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />הסניף מעביר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או שסוכם</span></TH>
-                  <TH><Op c="=" />נשאר</TH><TH>כרית 20%</TH>
+                  <TH><Op c="=" />נשאר</TH><TH>הכרית<span style={{ display:'block', fontSize:14, fontWeight:600 }}>מול {fmtMonth(baseMonth.key)}</span></TH>
                   {multi && <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{fmtMonth(baseMonth.key)} − בפועל</span></TH>}
                 </tr>
               </thead>
@@ -5500,13 +5506,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag">לפי התלושים</span>}</p>
                 <CardRow label="בפועל" strong>{num(costAll(r))}{!isBase && pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
                 <CardRow label="נשאר" strong><Left v={leftOf(r)} /></CardRow>
-                <CardRow label="כרית 20%" strong><ResBar left={leftOf(r)} cushion={cushionOf(r)} /><span className="num" style={{ fontSize:14, color:'var(--text2)', marginInlineStart:8 }}>{num(cushionOf(r))}</span>{leftOf(r) != null && leftOf(r) < cushionOf(r) && <span className="num" style={{ fontSize:14, fontWeight:700, color:'#8F4E00', marginInlineStart:8 }}>חסר {num(cushionOf(r) - leftOf(r))}</span>}</CardRow>
+                <CardRow label="הכרית מול ספטמבר" strong><ResBar left={leftOf(r)} cushion={cushionOf(r)} /><span className="num" style={{ fontSize:14, color:'var(--text2)', marginInlineStart:8 }}>{num(cushionOf(r))}</span>{leftOf(r) != null && leftOf(r) < cushionOf(r) && <span className="num" style={{ fontSize:14, fontWeight:700, color:'#8F4E00', marginInlineStart:8 }}>חסר {num(cushionOf(r) - leftOf(r))}</span>}</CardRow>
                 {multi && !isBase && <CardRow label="יתרה מצטברת" strong><Credit v={runningOf(r.id)} /></CardRow>}
                 {open && (
                   <>
                     {!isBase && <CardRow label={`${fmtMonth(baseMonth.key)} — הבסיס`}>{planOf(r) == null ? '—' : num(planOf(r))}</CardRow>}
                     {r.hourly > 0 && <CardRow label="מתוכו הנהלה וצהרון">{num(r.hourly)}</CardRow>}
-                    <CardRow label="כרית 20%">{num(cushionOf(r))}</CardRow>
+                    <CardRow label="נשאר בספטמבר (הבסיס)">{num(cushionOf(r))}</CardRow>
                     <CardRow label={r.ministryReceived != null ? 'משרד החינוך — בפועל' : 'משרד החינוך — מתוכנן'}>{num(minOf(r))}</CardRow>
                     <CardRow label="מענק רשת">{num(r.support)}</CardRow>
                     <CardRow label={r.chabadPaid != null ? 'הסניף העביר — בפועל' : 'הסניף מעביר — סוכם'}>{r.chabadPaid != null ? num(r.chabadPaid) : r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
@@ -5643,7 +5649,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           {showNote && (
             <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
               <b>הבסיס</b> — עלות השכר בפועל בחודש הראשון במערכת (ספטמבר 2026); היא ה-100% שמולו נמדדים החודשים הבאים, והכרית היא 20% ממנה. <b>בפועל</b> — עלות המעביד של כל עובדי בית הספר בחודש, כולל מנהלת, הנהלה וצהרון; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
-              {' '}<b>כרית 20%</b> — 20% מעלות השכר בבסיס (ספטמבר), סכום קבוע למילוי מקום וביטחון; הפס מראה כמה ממנו נשאר אחרי השכר בפועל. <b>משרד החינוך</b> — מה שהתקבל בפועל באותו חודש ("בפועל"); כשהתקבול טרם הוזן במסך "תקבולים", מוצג החלק ה-12 מהתקציב השנתי ("מתוכנן"). <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
+              {' '}<b>הכרית</b> — מה שנשאר בסניף אחרי השכר בחודש הבסיס (ספטמבר) הוא ה-100%; הפס מראה כמה מזה נשאר החודש. מלא = לא פחות מספטמבר; "חסר" = נשאר פחות מבספטמבר. <b>משרד החינוך</b> — מה שהתקבל בפועל באותו חודש ("בפועל"); כשהתקבול טרם הוזן במסך "תקבולים", מוצג החלק ה-12 מהתקציב השנתי ("מתוכנן"). <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
               {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו; "טרם סוכם" נספר כאפס. כשנרשמה במסך התקבולים העברה בפועל — היא שמוצגת ונספרת ("בפועל"). <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
               {anyTz && <>{' '}<b>הנהלה וצהרון</b> — המשרות השעתיות מגולמות בשכר (לפי המחשבון ובפועל); אין מולן הכנסה ממשרד החינוך, והן כולן על הסניף: הסכום ש"הסניף מעביר" כולל אותן, וכרית ה-20% מחושבת גם עליהן.</>}
               {' '}<b>יתרה מצטברת</b> — התכנון פחות הבפועל, מצטבר מספטמבר 2026: "זכות" כששילמנו פחות ממה שתוכנן, "חובה" כששילמנו יותר; היתרה עוברת מחודש לחודש.
