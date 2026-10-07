@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 125;
+const BUILD = 126;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4932,6 +4932,12 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth, tabs = null
   השכר שתוכנן" — שרה, 7.10). מספרים קבועים, לא חישוב: הדוח הוא המסמך שסוכם
   עם הסניפים, והוא מוצג בדף המנכ"ל בדיוק כמו שהודפס. שינוי — רק בהנחיית שרה, כאן.
 */
+// החודש שבעבודה: עד ה-10 בחודש — החודש הקודם (השכר משולם בדיעבד); מה-10 — החודש הנוכחי
+function workMonthKey(now = new Date()) {
+  const d = new Date(now.getFullYear(), now.getMonth() - (now.getDate() <= 10 ? 1 : 0), 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 const CEO_TRANSFERS_REPORT = {
   title: 'העברות לסניפים — עלות הוראה שנתית',
   sub: 'רשת חינוך חב״ד · נכון ל־23 בספטמבר 2026 · עלות ההוראה לפי חודש 2026-09 · הדוח שסוכם: השיקים המועברים והשכר שתוכנן קבועים ואינם משתנים',
@@ -4980,7 +4986,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
     let alive = true;
     store.fetchMonthlySummary().then(d => {
       if (!alive) return;
-      const keys = (d.months || []).filter(m => m.branches.length).map(m => m.key);
+      const keys = (d.months || []).filter(m => m.branches.length && m.key <= workMonthKey()).map(m => m.key);
       setData(d);
       /*
         "והחודש הוא ספטמבר!" (שרה, 6.10). השכר משולם בדיעבד: בתחילת אוקטובר
@@ -4988,13 +4994,19 @@ function BottomLineView({ activeMonth, viewer = false }) {
         שהועתקו מקודמו. לכן הדף נפתח על חודש השכר שבעבודה — הלפני-אחרון —
         ולא על החודש הקלנדרי. כשיש חודש אחד בלבד, נפתחים עליו.
       */
-      setSel(keys.length > 1 ? keys[keys.length - 2] : (keys[0] || null));
+      setSel(keys[keys.length - 1] || null);   // החודש שבעבודה — האחרון שאינו עתידי
     }).catch(e => { if (alive) setErr(e.message); });
     return () => { alive = false; };
   }, [activeMonth]);
 
   const num = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL'));
-  const months = (data?.months || []).filter(m => m.branches.length);
+  /*
+    "עכשיו אנחנו בספטמבר" (שרה, 8.10): החודש שנפתח זה עתה (אוקטובר) נושא רק העתק
+    של התכנון — הוא לא קרה עדיין, ולכן אינו מוצג בבורר ובהשוואה. עד ה-10 בחודש
+    החודש שבעבודה הוא הקודם; מה-10 — החודש הקלנדרי. חודשים אחריו מוסתרים.
+  */
+  const allMonths = (data?.months || []).filter(m => m.branches.length);
+  const months = allMonths.filter(m => m.key <= workMonthKey()).length ? allMonths.filter(m => m.key <= workMonthKey()) : allMonths;
   const idx  = months.findIndex(m => m.key === sel);
   const cur  = idx >= 0 ? months[idx] : null;
   const prev = idx > 0 ? months[idx - 1] : null;
