@@ -98,7 +98,7 @@ export async function readAll(sb) {
     all('months', 'key, opened_at, locked, closed_at', 'key'),
     all('month_sim_snapshot', 'school_id, month_key, sim_cost, source', 'month_key'),
     // התלושים הם השלמה בלבד — כשל בקריאתם לא מפיל את הדף
-    all('payslip_files', 'id, school_id, month_key, employer_cost', 'id').catch(e => { console.error('monthly-summary payslips', e); return []; }),
+    all('payslip_files', 'id, school_id, month_key, employer_cost, teacher_month_id, tz_id', 'id').catch(e => { console.error('monthly-summary payslips', e); return []; }),
     // חודשים שנסגרו. לפני שהטבלה קיימת — אין חודש סגור, והדף מחושב חי
     // רק "הטבלה עוד לא קיימת" נחשב כאין חודש סגור; כל כשל אחר מפיל את הבקשה, כדי שחודש סגור לא יוצג בטעות חי
     all('month_summary', 'month_key, school_id, data, closed_at', 'month_key').catch(e => {
@@ -149,17 +149,36 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
     if (!Number(p.employer_cost)) continue;
     o.n++; o.cost += Number(p.employer_cost); slipBy.set(k, o);
   }
+  /*
+    "התלוש נכון" (שרה, 7.10; "לך על ההמלצה"): לעובדת שיש לה תלוש בקובץ הגזברות,
+    "עלות מעביד" שבקובץ היא העלות בפועל — אחד-לאחד, בלי שהמערכת תחשב מחדש.
+    המודל משמש רק למי שאין לה תלוש. הקישור: לפי שורת העובדת, ואם אין — לפי ת"ז.
+    (בבדיקה 7.10: המודל הציג 10,190 ₪ יותר מהקבצים ברשת, כמעט כולו בקרית
+    ביאליק ובעפולה, שלקבצים שלהן לא נקלטו הפרשות מעביד.)
+  */
+  const slipByTm = new Map(), slipByTz = new Map();
+  for (const p of (slips || [])) {
+    if (!(Number(p.employer_cost) > 0)) continue;
+    if (p.teacher_month_id) slipByTm.set(p.teacher_month_id, Number(p.employer_cost));
+    if (p.tz_id) slipByTz.set(`${p.month_key}|${p.school_id}|${String(p.tz_id).trim()}`, Number(p.employer_cost));
+  }
+  const costT = t => (t._slipCost > 0 ? t._slipCost : emp.calcEmployer(t).total);
 
   const months = keys.map(key => {
     const mrows = rows.filter(r => r.month_key === key);
     const branches = [];
     for (const s of schools) {
       if (s.pays_salary === false) continue;
-      const allTs = mrows.filter(r => r.school_id === s.id).map(toTeacher);
+      const allTs = mrows.filter(r => r.school_id === s.id).map(r => {
+        const t = toTeacher(r);
+        const v = slipByTm.get(r.id) ?? slipByTz.get(`${key}|${s.id}|${String(r.tz_id || '').trim()}`);
+        if (v > 0) t._slipCost = v;
+        return t;
+      });
       const ts = allTs.filter(t => !emp.isHourlyRow(t));
       // שכר צהרון ומשרות שעתיות: הרשת משלמת, אין מולו הכנסה ממשרד החינוך — כולו על הסניף (שרה, 6.10, גני תקוה)
-      const hourly = allTs.filter(t => emp.isHourlyRow(t)).reduce((a, t) => a + emp.calcEmployer(t).total, 0);
-      let cost = ts.reduce((a, t) => a + emp.calcEmployer(t).total, 0);
+      const hourly = allTs.filter(t => emp.isHourlyRow(t)).reduce((a, t) => a + costT(t), 0);
+      let cost = ts.reduce((a, t) => a + costT(t), 0);
       // סניף בלי שורות שכר בחודש: אם הגיעו תלושים, העלות היא סכום התלושים; אחרת אינו בדף
       const sl = !allTs.length ? slipBy.get(`${key}|${s.id}`) : null;
       if (sl) cost = sl.cost;
@@ -184,7 +203,7 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
         budgetPlan: n(f.teaching_sim) == null ? null : Math.round(n(f.teaching_sim) / 12),
         plan: null,   // מתמלא למטה: העלות לפי מחשבון המשרד
         hourly: Math.round(hourly),
-        staff: sl ? sl.n : paid.length, withActual: sl ? sl.n : paid.filter(t => Number(t._actualEmployerCost)).length,
+        staff: sl ? sl.n : paid.length, withActual: sl ? sl.n : paid.filter(t => t._slipCost > 0 || Number(t._actualEmployerCost)).length,
         fromSlips: !!sl,
       });
     }
