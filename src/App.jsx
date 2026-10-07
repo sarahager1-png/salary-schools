@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 105;
+const BUILD = 106;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4926,6 +4926,28 @@ function PaymentLedgerView({ schools, teachers, months, activeMonth, tabs = null
   );
 }
 
+/*
+  דוח ההעברות לסניפים כפי שירד ב-23.9.2026 ("זה דוח שירד… את הטבלה שהבאתי
+  בהתחלה תשאיר כפי שהיא"; "לא משתנה לעולם סכום השיקים המועברים והסכום של
+  השכר שתוכנן" — שרה, 7.10). מספרים קבועים, לא חישוב: הדוח הוא המסמך שסוכם
+  עם הסניפים, והוא מוצג בדף המנכ"ל בדיוק כמו שהודפס. שינוי — רק בהנחיית שרה, כאן.
+*/
+const CEO_TRANSFERS_REPORT = {
+  title: 'העברות לסניפים — עלות הוראה שנתית',
+  sub: 'רשת חינוך חב״ד · נכון ל־23 בספטמבר 2026 · עלות ההוראה לפי חודש 2026-09 · הדוח שסוכם: השיקים המועברים והשכר שתוכנן קבועים ואינם משתנים',
+  rows: [
+    { name: 'בית חינוך עפולה',     note: 'סכום מעוגל שסוכם', annual:   951528, add20: 190306, total: 1141834, ministry: 505440, support: 250000, gap:  386394, month:  36000, year:  432000 },
+    { name: 'בית חינוך רעננה',     note: 'סכום מעוגל שסוכם', annual:  2092308, add20: 418462, total: 2510770, ministry: 528110, support:      0, gap: 1982660, month: 172000, year: 2064000 },
+    { name: 'שלהבות אור עקיבא',    note: 'סכום מעוגל שסוכם', annual:  1187616, add20: 237523, total: 1425139, ministry: 347510, support: 370000, gap:  707629, month:  63000, year:  756000 },
+    { name: 'שלהבות אשקלון',       note: 'סכום מעוגל שסוכם', annual:  1422456, add20: 284491, total: 1706947, ministry: 574990, support: 800000, gap:  331957, month:  34000, year:  408000 },
+    { name: 'שלהבות גני תקוה',     note: 'סכום מעוגל שסוכם', annual:  2300616, add20: 460123, total: 2760739, ministry: 911030, support: 800000, gap: 1049709, month:  93000, year: 1116000 },
+    { name: 'שלהבות ירושלים',      note: 'סכום מעוגל שסוכם', annual:  1091460, add20: 218292, total: 1309752, ministry: 279560, support: 800000, gap:  230192, month:  25000, year:  300000 },
+    { name: 'שלהבות מזכרת בתיה',   note: 'סכום מעוגל שסוכם', annual:   941832, add20: 188366, total: 1130198, ministry: 291010, support: 500000, gap:  339188, month:  34000, year:  408000 },
+    { name: 'שלהבות רמת ישי',      note: 'סכום מעוגל שסוכם', annual:  1106496, add20: 221299, total: 1327795, ministry: 284720, support: 800000, gap:  243075, month:  24000, year:  288000 },
+  ],
+  total: { annual: 11094312, add20: 2218862, total: 13313174, ministry: 3722370, support: 4320000, gap: 5270804, month: 481000, year: 5772000 },
+};
+
 /* ═══════════════════════════════════════════════════════════════
    שורה תחתונה לחודש — דף המנהל
    ═══════════════════════════════════════════════════════════════
@@ -5149,11 +5171,6 @@ function BottomLineView({ activeMonth, viewer = false }) {
       </span>
     );
   };
-  // הראייה השנתית של טבלת ההעברות: משרד החינוך והמענק כפי שהוזנו לשנה; העלות — החודש כפול 12
-  const yMin = r => (r.ministryYear ?? (r.ministry == null ? null : r.ministry * 12));
-  const ySup = r => (r.supportYear ?? (r.support || 0) * 12);
-  const yGap = r => (yMin(r) == null ? null : r.costWith20 * 12 - yMin(r) - ySup(r));
-  const YGap = ({ r }) => { const g = yGap(r); return g == null ? '—' : g > 0 ? num(g) : g === 0 ? '0' : <span style={{ color:'var(--ok-text)' }}>עודף {num(-g)}</span>; };
   // סימן החשבון ליד שם העמודה — כדי שהשורה תיקרא כתרגיל
   const Op = ({ c }) => <span aria-hidden="true" style={{ color:'var(--text3)', fontWeight:800, marginInlineEnd:4 }}>{c}</span>;
 
@@ -5454,16 +5471,17 @@ function BottomLineView({ activeMonth, viewer = false }) {
           )}
 
           {/*
-            "את הטבלה הזו תעצב ותכניס לדוח המנכ"ל" (שרה, 7.10): טבלת ההעברות
-            לסניפים בראייה שנתית — החודש שנבחר כפול 12 — כמו הקובץ שיורד
-            ממסך "עלות הוראה". "להעברה" הוא הסכום שסוכם עם הסניף במערכת
-            (ועוד שכר צהרון ומנהלה היכן שיש); סניף שסוכם איתו 0 מוצג 0.
+            "את הטבלה הזו תעצב ותכניס לדוח המנכ"ל… את הטבלה שהבאתי בהתחלה
+            תשאיר כפי שהיא, רק את הטבלה מהמערכת תעדכן"; "לא משתנה לעולם סכום
+            השיקים המועברים והסכום של השכר שתוכנן" (שרה, 7.10): דוח ההעברות
+            לסניפים כפי שירד ב-23.9.2026 — מספרים קבועים (CEO_TRANSFERS_REPORT),
+            לא חישוב חי. טבלת החודש שמעליו היא שמתעדכנת מהמערכת.
           */}
-          <h2 className="section-head" style={{ marginTop:26 }}>העברות לסניפים — עלות הוראה שנתית</h2>
-          <p className="section-sub">לפי {fmtMonth(sel)}, כפול 12. עלות + 20% − משרד החינוך − מענק הרשת = הפער המחושב; "להעברה" הוא הסכום שסוכם עם הסניף.</p>
+          <h2 className="section-head" style={{ marginTop:26 }}>{CEO_TRANSFERS_REPORT.title}</h2>
+          <p className="section-sub">{CEO_TRANSFERS_REPORT.sub}</p>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{`העברות לסניפים, עלות הוראה שנתית לפי ${fmtMonth(sel)}: עלות הוראה, תוספת 20%, סך העלות, הכנסות משרד החינוך, מענק רשת, פער מחושב, והסכום להעברה לחודש ולשנה`}</caption>
+              <caption className="sr-only">{`${CEO_TRANSFERS_REPORT.title}, ${CEO_TRANSFERS_REPORT.sub}: עלות הוראה לשנה, תוספת 20%, סך העלות, הכנסות משרד החינוך, מענק רשת, פער מחושב, והסכום להעברה לחודש ולשנה`}</caption>
               <colgroup>
                 <col /><col className="g-cost" /><col className="g-cost" /><col className="g-cost" />
                 <col className="g-inc" /><col className="g-inc" /><col className="g-res" />
@@ -5483,50 +5501,53 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
-                  <tr key={'tr-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
-                    <td style={td}>{num(r.cost * 12)}</td>
-                    <td style={{ ...td, color:'var(--text2)' }}>{num(r.add20 * 12)}</td>
-                    <td style={{ ...td, fontWeight:800 }}>{num(r.costWith20 * 12)}</td>
-                    <td style={td}>{yMin(r) == null ? '—' : num(yMin(r))}</td>
-                    <td style={td}>{num(ySup(r))}</td>
-                    <td style={td}><YGap r={r} /></td>
-                    <td style={{ ...td, fontWeight:800, color:'var(--purple)' }} title={r.hourly > 0 && r.agreed != null ? `${num(r.agreed)} על ההוראה ועוד ${num(r.hourly)} שכר צהרון ומנהלה` : undefined}>
-                      {r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
-                    <td style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{r.agreed == null ? '—' : num(sendOf(r) * 12)}</td>
+                {CEO_TRANSFERS_REPORT.rows.map(r => (
+                  <tr key={'rep-' + r.name} style={{ borderBottom:'1px solid var(--line)' }}>
+                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }}>{r.name}<span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3, color:'#8a6d1f', background:'#FBF6E6', borderColor:'#EBDDA8' }}>{r.note}</span></th>
+                    <td style={td}>{num(r.annual)}</td>
+                    <td style={{ ...td, color:'var(--text2)' }}>{num(r.add20)}</td>
+                    <td style={{ ...td, fontWeight:800 }}>{num(r.total)}</td>
+                    <td style={td}>{num(r.ministry)}</td>
+                    <td style={td}>{num(r.support)}</td>
+                    <td style={td}>{num(r.gap)}</td>
+                    <td style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{num(r.month)}</td>
+                    <td style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{num(r.year)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  <td style={td}>{num(sum('cost') * 12)}</td>
-                  <td style={td}>{num(sum('add20') * 12)}</td>
-                  <td style={td}>{num(tot.costWith20 * 12)}</td>
-                  <td style={td}>{num(summed.reduce((x, r) => x + yMin(r), 0))}</td>
-                  <td style={td}>{num(summed.reduce((x, r) => x + ySup(r), 0))}</td>
-                  <td style={td}>{num(summed.reduce((x, r) => x + (yGap(r) || 0), 0))}</td>
-                  <td style={td}>{num(dealSum)}</td>
-                  <td style={td}>{num(dealSum * 12)}</td>
+                  {['annual', 'add20', 'total', 'ministry', 'support', 'gap', 'month', 'year'].map(k => <td key={k} style={td}>{num(CEO_TRANSFERS_REPORT.total[k])}</td>)}
                 </tr>
               </tfoot>
             </table>
           </div>
           <div className="only-mobile big-cards">
-            {rows.map(r => (
-              <div key={'trm-' + r.id} className="apple-card mcard">
-                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
-                <CardRow label="להעברה לחודש" strong color="var(--purple)">{r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
-                <CardRow label="להעברה לשנה" strong color="var(--purple)">{r.agreed == null ? '—' : num(sendOf(r) * 12)}</CardRow>
-                <CardRow label="עלות הוראה לשנה">{num(r.cost * 12)}</CardRow>
-                <CardRow label="תוספת 20%">{num(r.add20 * 12)}</CardRow>
-                <CardRow label="משרד החינוך">{yMin(r) == null ? '—' : num(yMin(r))}</CardRow>
-                <CardRow label="מענק רשת">{num(ySup(r))}</CardRow>
-                <CardRow label="פער מחושב לשנה"><YGap r={r} /></CardRow>
+            {CEO_TRANSFERS_REPORT.rows.map(r => (
+              <div key={'repm-' + r.name} className="apple-card mcard">
+                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{r.name}<span className="bl-tag" style={{ color:'#8a6d1f', background:'#FBF6E6', borderColor:'#EBDDA8' }}>{r.note}</span></p>
+                <CardRow label="להעברה לחודש" strong color="var(--purple)">{num(r.month)}</CardRow>
+                <CardRow label="להעברה לשנה" strong color="var(--purple)">{num(r.year)}</CardRow>
+                <CardRow label="עלות הוראה לשנה">{num(r.annual)}</CardRow>
+                <CardRow label="תוספת 20%">{num(r.add20)}</CardRow>
+                <CardRow label="סה״כ עלות">{num(r.total)}</CardRow>
+                <CardRow label="משרד החינוך">{num(r.ministry)}</CardRow>
+                <CardRow label="מענק רשת">{num(r.support)}</CardRow>
+                <CardRow label="פער מחושב">{num(r.gap)}</CardRow>
               </div>
             ))}
+            <div className="apple-card mcard"><p className="mcard-name" style={{ marginBottom:4 }}>סה"כ</p>
+              <CardRow label="להעברה לחודש" strong color="var(--purple)">{num(CEO_TRANSFERS_REPORT.total.month)}</CardRow>
+              <CardRow label="להעברה לשנה" strong color="var(--purple)">{num(CEO_TRANSFERS_REPORT.total.year)}</CardRow>
+              <CardRow label="סה״כ עלות">{num(CEO_TRANSFERS_REPORT.total.total)}</CardRow>
+              <CardRow label="פער מחושב">{num(CEO_TRANSFERS_REPORT.total.gap)}</CardRow>
+            </div>
           </div>
+          <p style={{ fontSize:14.6, color:'var(--text2)', marginTop:10, lineHeight:1.7 }}>
+            <b>עלות הוראה לשנה</b> — עלות המעביד המלאה של עובדי ההוראה בבית הספר, כולל מנהלת, ייעוץ ושילוב, כפול 12. <b>תוספת 20%</b> — מילוי מקום וכרית ביטחון.
+            {' '}<b>פער מחושב</b> — סה״כ העלות פחות הכנסות משרד החינוך ופחות מענק הרשת. <b>להעברה</b> — הסכום שסוכם בפועל: הפער המחושב מעוגל לסכום חודשי, והשנתי הוא כפול 12. כל הסכומים בשקלים חדשים. הסכומים שסוכמו — השיקים המועברים והשכר שתוכנן — קבועים ואינם משתנים.
+          </p>
 
           {/* סגירת החודש — לשרה בלבד. האישור בתוך הדף, עם מה שייקרה */}
           {!viewer && cur && data?.canClose && (
