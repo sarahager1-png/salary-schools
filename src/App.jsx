@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 110;
+const BUILD = 111;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5006,10 +5006,27 @@ function BottomLineView({ activeMonth, viewer = false }) {
     והאחוז משווה שכר מלא לשכר מלא. השרת ממשיך להחזיר אותן בנפרד (hourly,
     planHourly), כי ההעברה לסניף והכרית מחושבות עליהן אחרת.
   */
-  const planOf  = r => (r.plan == null ? null : r.plan + (r.planHourly || 0));
+  /*
+    "פה תכניס עלות שנתית מתוכננת על סמך הטבלה השנייה"; "אתה לא מחשב נכון"
+    (שרה, 7.10): התכנון המשוער הוא עלות ההוראה מהדוח מ-23.9 (הטבלה השנייה
+    בדף, CEO_TRANSFERS_REPORT) — לשנה חלקי 12 — ועוד ההנהלה והצהרון לפי שעות
+    המשרה. לא הסימולציה של המערכת: היא חושבה על שורות שכבר עודכנו לתלושים,
+    ולכן לא יכלה להראות חריגה. סניף שאינו בדוח (קרית ביאליק) נשאר לפי
+    הסימולציה, ומסומן.
+  */
+  const reportPlanOf = name => {
+    const n = String(name || '').replace(/\s+/g, ' ');
+    const row = CEO_TRANSFERS_REPORT.rows.find(x => n.includes(x.name.replace(/^(בית חינוך|שלהבות)\s+/, '')));
+    return row ? Math.round(row.annual / 12) : null;
+  };
+  const fromReport = r => reportPlanOf(r.name) != null;
+  const planOf  = r => { const rp = reportPlanOf(r.name); return rp != null ? rp + (r.planHourly || 0) : (r.plan == null ? null : r.plan + (r.planHourly || 0)); };
+  // הכרית היא 20% מהתכנון (בדוח: "תוספת 20%" לשנה ÷ 12) — סכום קבוע שאינו זז עם התלושים; לא 20% מהבפועל
+  const cushionOf = r => (planOf(r) != null ? Math.round(planOf(r) * 0.2) : r.add20);
   const costAll = r => (r.cost || 0) + (r.hourly || 0);
   // הסיכום רק על סניפים שיש להם פער לחשב — כדי שהחיסור בשורה יסתדר
   const summed = rows.filter(r => r.gap != null);
+  const cushionSum = summed.reduce((a, r) => a + cushionOf(r), 0);
   const sum = k => summed.reduce((a, r) => a + (r[k] || 0), 0);
   const tot = { costWith20: sum('costWith20'), ministry: sum('ministry'), support: sum('support'), gap: sum('gap'),
     due: summed.reduce((a, r) => a + Math.max(0, r.due || 0), 0),
@@ -5279,9 +5296,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   </span>
                 )}
                 {usePct != null && (
-                  <span className="bl-fact" title="הסימולציה: העלות שחושבה ממחשבון משרד החינוך, לפני התלושים">
-                    {summed.length && summed.every(r => r.planSource === 'auto') ? 'הסימולציה נשמרה לפני התלושים'
-                      : summed.some(r => r.planSource === 'live') ? 'הסימולציה כרגע; תישמר בסגירת החודש' : 'הסימולציה שוחזרה'}
+                  <span className="bl-fact" title="התכנון המשוער: עלות ההוראה לשנה מהדוח מ-23.9.2026 חלקי 12, ועוד הנהלה וצהרון לפי שעות המשרה">
+                    {planned.every(fromReport) ? 'התכנון: הדוח מ-23.9 לחודש' : `התכנון: הדוח מ-23.9 לחודש; ${planned.filter(r => !fromReport(r)).map(r => shortName(r.name)).join(', ')} לפי הסימולציה`}
                   </span>
                 )}
                 {simN > 0 && (
@@ -5317,8 +5333,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <p className="v"><Left v={-beforeSum} /></p>
               <p className="s">אחרי השכר של החודש</p></div>
             <div className="bl-tile t-res t-final"><p className="l">כרית 20%</p>
-              <p className="v" style={{ display:'flex', alignItems:'center' }}><ResBar left={-beforeSum} cushion={sum('add20')} /></p>
-              <p className="s num">{num(sum('add20'))}</p></div>
+              <p className="v" style={{ display:'flex', alignItems:'center' }}><ResBar left={-beforeSum} cushion={cushionSum} /></p>
+              <p className="s num">{num(cushionSum)}</p></div>
           </div>
 
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:6 }}>
@@ -5412,7 +5428,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <th colSpan={multi ? 3 : 2} scope="colgroup" className="gh-res">מה נשאר</th>
                 </tr>
                 <tr>
-                  <TH>סניף</TH><TH>תכנון משוער</TH><TH>בפועל</TH>
+                  <TH>סניף</TH><TH>תכנון משוער<span style={{ display:'block', fontSize:14, fontWeight:600 }}>הדוח לשנה ÷ 12</span></TH><TH>בפועל</TH>
                   <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או מתוכנן</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />הסניף מעביר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או שסוכם</span></TH>
                   <TH><Op c="=" />נשאר</TH><TH>כרית 20%</TH>
                   {multi && <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>תכנון − בפועל</span></TH>}
@@ -5424,7 +5440,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   return (
                   <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3, color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }} title={`${r.pendingFixes} תיקוני ברוטו לפי התלושים ממתינים לאישור. עד אז העלות מוצגת לפי הסימולציה`}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3 }} title="הסניף עוד לא הוזן למערכת בחודש הזה; העלות היא סכום התלושים שהתקבלו מהגזברות">לפי התלושים</span>}</th>
-                    <td style={{ ...td, color:'var(--text2)' }} title={r.planFrom ? `הסימולציה הראשונה של הסניף, מ-${fmtMonth(r.planFrom)}` : undefined}>{planOf(r) == null ? '—' : num(planOf(r))}</td>
+                    <td style={{ ...td, color:'var(--text2)' }} title={fromReport(r) ? `הדוח מ-23.9: ${num(reportPlanOf(r.name) * 12)} לשנה, ${num(reportPlanOf(r.name))} לחודש` + (r.planHourly ? `, ועוד הנהלה וצהרון ${num(r.planHourly)}` : '') : 'הסניף אינו בדוח מ-23.9 — לפי הסימולציה של המערכת'}>{planOf(r) == null ? '—' : num(planOf(r))}{!fromReport(r) && planOf(r) != null && <span className="bl-tag" style={{ display:'block', width:'fit-content', margin:'3px auto 0' }}>סימולציה</span>}</td>
                     <td style={{ ...td, fontWeight:800 }} title={pc == null ? undefined : `${pc}% מהתכנון המשוער`}>
                       {num(costAll(r))}
                       {pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</td>
@@ -5437,9 +5453,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
                       {r.chabadPaid != null ? <span style={{ fontWeight:800 }}>{num(r.chabadPaid)}<span className="bl-tag ok">בפועל</span></span>
                         : r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
                     <td style={td}><Left v={leftOf(r)} /></td>
-                    <td style={td}><ResBar left={leftOf(r)} cushion={r.add20} />
-                      {/* "לא רשום כמה יוצא ה-20 אחוז" (שרה, 7.10): הסכום מתחת לפס */}
-                      <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(r.add20)}</span></td>
+                    <td style={td}><ResBar left={leftOf(r)} cushion={cushionOf(r)} />
+                      {/* "לא רשום כמה יוצא ה-20 אחוז" (שרה, 7.10): הסכום מתחת לפס — 20% מהתכנון */}
+                      <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(cushionOf(r))}</span></td>
                     {multi && <td style={{ ...td, fontWeight:800 }} title={`מהחודש הקודם ${num(openingOf(r.id))}, והחודש ${num(resultOf(r))} (תכנון ${num(planOf(r))} פחות בפועל ${num(costAll(r))})`}><Credit v={runningOf(r.id)} /></td>}
                   </tr>
                 ); })}
@@ -5453,8 +5469,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={td}>{num(tot.support)}</td>
                   <td style={td}>{num(dealSum)}</td>
                   <td style={td}><Left v={-beforeSum} /></td>
-                  <td style={td}><ResBar left={-beforeSum} cushion={sum('add20')} />
-                    <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(sum('add20'))}</span></td>
+                  <td style={td}><ResBar left={-beforeSum} cushion={cushionSum} />
+                    <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(cushionSum)}</span></td>
                   {multi && <td style={td}><Credit v={runningRows} /></td>}
                 </tr>
               </tfoot>
@@ -5468,13 +5484,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag">לפי התלושים</span>}</p>
                 <CardRow label="בפועל" strong>{num(costAll(r))}{pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
                 <CardRow label="נשאר" strong><Left v={leftOf(r)} /></CardRow>
-                <CardRow label="כרית 20%" strong><ResBar left={leftOf(r)} cushion={r.add20} /><span className="num" style={{ fontSize:14, color:'var(--text2)', marginInlineStart:8 }}>{num(r.add20)}</span></CardRow>
+                <CardRow label="כרית 20%" strong><ResBar left={leftOf(r)} cushion={cushionOf(r)} /><span className="num" style={{ fontSize:14, color:'var(--text2)', marginInlineStart:8 }}>{num(cushionOf(r))}</span></CardRow>
                 {multi && <CardRow label="יתרה מצטברת" strong><Credit v={runningOf(r.id)} /></CardRow>}
                 {open && (
                   <>
-                    <CardRow label="תכנון משוער">{planOf(r) == null ? '—' : num(planOf(r))}</CardRow>
+                    <CardRow label={fromReport(r) ? 'תכנון משוער (הדוח ÷ 12)' : 'תכנון משוער (סימולציה)'}>{planOf(r) == null ? '—' : num(planOf(r))}</CardRow>
                     {r.hourly > 0 && <CardRow label="מתוכו הנהלה וצהרון">{num(r.hourly)}</CardRow>}
-                    <CardRow label="כרית 20%">{num(r.add20)}</CardRow>
+                    <CardRow label="כרית 20%">{num(cushionOf(r))}</CardRow>
                     <CardRow label={r.ministryReceived != null ? 'משרד החינוך — בפועל' : 'משרד החינוך — מתוכנן'}>{num(minOf(r))}</CardRow>
                     <CardRow label="מענק רשת">{num(r.support)}</CardRow>
                     <CardRow label={r.chabadPaid != null ? 'הסניף העביר — בפועל' : 'הסניף מעביר — סוכם'}>{r.chabadPaid != null ? num(r.chabadPaid) : r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
@@ -5610,8 +5626,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </button>
           {showNote && (
             <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
-              <b>תכנון משוער</b> — העלות שהמערכת חישבה לכל עובדת ממחשבון משרד החינוך (הסימולציה), לפני שהגיעו התלושים, כולל משרות ההנהלה והצהרון לפי שעות המשרה. <b>בפועל</b> — עלות המעביד של כל עובדי בית הספר בחודש, כולל מנהלת, הנהלה וצהרון; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
-              {' '}<b>כרית 20%</b> — תוספת של 20% על העלות בפועל, למילוי מקום וביטחון. <b>משרד החינוך</b> — מה שהתקבל בפועל באותו חודש ("בפועל"); כשהתקבול טרם הוזן במסך "תקבולים", מוצג החלק ה-12 מהתקציב השנתי ("מתוכנן"). <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
+              <b>תכנון משוער</b> — עלות ההוראה המתוכננת מהדוח מ-23.9.2026 (הטבלה למטה): לשנה חלקי 12, ועוד משרות ההנהלה והצהרון לפי שעות המשרה. סניף שאינו בדוח מוצג לפי הסימולציה של המערכת. <b>בפועל</b> — עלות המעביד של כל עובדי בית הספר בחודש, כולל מנהלת, הנהלה וצהרון; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
+              {' '}<b>כרית 20%</b> — 20% מהתכנון המשוער (בדוח: "תוספת 20%" לשנה חלקי 12), סכום קבוע למילוי מקום וביטחון; הפס מראה כמה ממנו נשאר אחרי השכר בפועל. <b>משרד החינוך</b> — מה שהתקבל בפועל באותו חודש ("בפועל"); כשהתקבול טרם הוזן במסך "תקבולים", מוצג החלק ה-12 מהתקציב השנתי ("מתוכנן"). <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
               {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו; "טרם סוכם" נספר כאפס. כשנרשמה במסך התקבולים העברה בפועל — היא שמוצגת ונספרת ("בפועל"). <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
               {anyTz && <>{' '}<b>הנהלה וצהרון</b> — המשרות השעתיות מגולמות בשכר (לפי המחשבון ובפועל); אין מולן הכנסה ממשרד החינוך, והן כולן על הסניף: הסכום ש"הסניף מעביר" כולל אותן, וכרית ה-20% מחושבת גם עליהן.</>}
               {' '}<b>יתרה מצטברת</b> — התכנון פחות הבפועל, מצטבר מספטמבר 2026: "זכות" כששילמנו פחות ממה שתוכנן, "חובה" כששילמנו יותר; היתרה עוברת מחודש לחודש.
