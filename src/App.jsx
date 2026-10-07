@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 116;
+const BUILD = 117;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5438,20 +5438,20 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <col />{!isBase && <col className="g-cost" />}<col className="g-cost" />
                 <col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
                 <col className="g-res" /><col className="g-res g-sum" />
-                {multi && <col className="g-res g-sum" />}
+                {multi && !isBase && <col className="g-res g-sum" />}
               </colgroup>
               <thead>
                 <tr className="bl-groups">
                   <th />
                   <th colSpan={isBase ? 1 : 2} scope="colgroup" className="gh-cost">השכר</th>
                   <th colSpan={3} scope="colgroup" className="gh-inc">הכיסוי</th>
-                  <th colSpan={multi ? 3 : 2} scope="colgroup" className="gh-res">מה נשאר</th>
+                  <th colSpan={multi && !isBase ? 3 : 2} scope="colgroup" className="gh-res">מה נשאר</th>
                 </tr>
                 <tr>
                   <TH>סניף</TH>{!isBase && <TH>{fmtMonth(baseMonth.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>הבסיס</span></TH>}<TH>בפועל</TH>
                   <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או מתוכנן</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />הסניף מעביר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או שסוכם</span></TH>
                   <TH><Op c="=" />נשאר</TH><TH>הכרית<span style={{ display:'block', fontSize:14, fontWeight:600 }}>מול {fmtMonth(baseMonth.key)}</span></TH>
-                  {multi && <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{fmtMonth(baseMonth.key)} − בפועל</span></TH>}
+                  {multi && !isBase && <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{fmtMonth(baseMonth.key)} − בפועל</span></TH>}
                 </tr>
               </thead>
               <tbody>
@@ -5477,7 +5477,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                       {/* "לא רשום כמה יוצא ה-20 אחוז" (שרה, 7.10): הסכום מתחת לפס — 20% מהתכנון */}
                       <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(cushionOf(r))}</span>
                       {leftOf(r) != null && leftOf(r) < cushionOf(r) && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'#8F4E00' }}>חסר {num(cushionOf(r) - leftOf(r))}</span>}</td>
-                    {multi && <td style={{ ...td, fontWeight:800 }} title={isBase ? 'חודש הבסיס' : `מהחודש הקודם ${num(openingOf(r.id))}, והחודש ${num(resultOf(r))} (${fmtMonth(baseMonth.key)} ${num(planOf(r))} פחות בפועל ${num(costAll(r))})`}>{isBase ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={runningOf(r.id)} />}</td>}
+                    {multi && !isBase && <td style={{ ...td, fontWeight:800 }} title={`מהחודש הקודם ${num(openingOf(r.id))}, והחודש ${num(resultOf(r))} (${fmtMonth(baseMonth.key)} ${num(planOf(r))} פחות בפועל ${num(costAll(r))})`}><Credit v={runningOf(r.id)} /></td>}
                   </tr>
                 ); })}
               </tbody>
@@ -5493,7 +5493,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={td}><ResBar left={-beforeSum} cushion={cushionSum} />
                     <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(cushionSum)}</span>
                     {-beforeSum < cushionSum && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'#8F4E00' }}>חסר {num(cushionSum + beforeSum)}</span>}</td>
-                  {multi && <td style={td}>{isBase ? <span style={{ color:'var(--text2)' }}>בסיס</span> : <Credit v={runningRows} />}</td>}
+                  {multi && !isBase && <td style={td}><Credit v={runningRows} /></td>}
                 </tr>
               </tfoot>
             </table>
