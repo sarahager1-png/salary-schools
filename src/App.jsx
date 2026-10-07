@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 104;
+const BUILD = 105;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4946,6 +4946,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const [openB, setOpenB] = useState(null);   // הסניף שפירוטו פתוח בנייד
   const [askClose, setAskClose] = useState(null);   // 'close' | 'reopen' — אישור בתוך הדף
   const [closing, setClosing] = useState(false);
+  const [mode, setMode] = useState('month');   // 'month' — החודש שנבחר | 'compare' — השוואה בין החודשים
   const doClose = async action => {
     setClosing(true); setErr('');
     try { await store.closeMonthSummary(sel, action); setData(await store.fetchMonthlySummary()); setAskClose(null); }
@@ -4975,19 +4976,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const cur  = idx >= 0 ? months[idx] : null;
   const prev = idx > 0 ? months[idx - 1] : null;
   const upTo = idx >= 0 ? months.slice(0, idx + 1) : [];
-  // יתרה מצטברת לסניף: מה שהיה עליו להעביר עד החודש הזה פחות מה שהעביר.
-  // חיובי = חובה (הסניף חייב לרשת), שלילי = זכות. בלי אף העברה רשומה — אין יתרה להציג.
-  const balanceOf = id => {
-    let due = 0, paid = 0, any = false;
-    for (const m of upTo) {
-      const b = m.branches.find(x => x.id === id);
-      if (!b) continue;
-      if (b.chabadPaid != null) any = true;
-      due += Math.max(0, b.due || 0); paid += b.chabadPaid || 0;
-    }
-    return any ? due - paid : null;
-  };
-  const rows = (cur?.branches || []).map(b => ({ ...b, balance: balanceOf(b.id),
+  const rows = (cur?.branches || []).map(b => ({ ...b,
     over: b.gap != null && b.agreed != null ? b.gap - b.agreed : null }));
   // הסיכום רק על סניפים שיש להם פער לחשב — כדי שהחיסור בשורה יסתדר
   const summed = rows.filter(r => r.gap != null);
@@ -4995,7 +4984,6 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const tot = { costWith20: sum('costWith20'), ministry: sum('ministry'), support: sum('support'), gap: sum('gap'),
     due: summed.reduce((a, r) => a + Math.max(0, r.due || 0), 0),
     paid: summed.some(r => r.chabadPaid != null) ? sum('chabadPaid') : null,
-    balance: summed.some(r => r.balance != null) ? sum('balance') : null,
     staff: sum('staff'), withActual: sum('withActual') };
   const prevCost = prev ? prev.branches.filter(b => b.gap != null).reduce((a, b) => a + b.costWith20, 0) : null;
   // תקבולי משרד החינוך בפועל — רק לסניפים שהוזן להם, מול התכנון של אותם סניפים בלבד
@@ -5019,11 +5007,6 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const cumPct = cum.plan > 0 ? Math.round(cum.cost / cum.plan * 100) : null;
   const net = tot.due - tot.gap;   // מה שסוכם להעברה מול הפער המחושב: חיובי = עודף לרשת
 
-  const Bal = ({ v }) => v == null
-    ? <span style={{ color:'var(--text2)', fontSize:14.4 }}>טרם הוזן</span>
-    : Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>מאוזן</span>
-    : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>
-        {v > 0 ? 'חובה ' : 'זכות '}{num(Math.abs(v))}</span>;
   // גוון הכרטיסייה לפי סוג המספר — אותה שפה של הטבלה הראשית: הכנסה ירקרק, הוצאה ורדרד, תוצאה סגלגל
   const TINT = { cost:['#FDF3F4','#F3D5D9'], income:['#F1F9F3','#CFE8D5'], result:['#F5F1FC','#D8CEEF'], plain:['var(--surface)','var(--line)'] };
   const Kpi = ({ label, children, sub, color, kind = 'plain' }) => (
@@ -5092,12 +5075,19 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const tzSum = sum('hourly');
   // מה שהסניף מעביר = הסכום שסוכם על ההוראה ועוד שכר הצהרון — בדיוק כמו בטבלת ההעברות לסניפים
   const sendOf = r => (r.agreed || 0) + (r.hourly || 0);
-  const openOf = r => (r.gap == null ? null : r.gap + minAdj(r) + (r.hourly || 0) - sendOf(r));
-  const dealSum = summed.reduce((x, r) => x + sendOf(r), 0);
+  /*
+    כמו בעמודת משרד החינוך (שרה, 6.10: "זה מה שהועבר בפועל?"): סניף שנרשמה לו
+    העברה בפועל במסך התקבולים — היא שמוצגת ונספרת בחשבון החודש, במקום הסכום
+    שסוכם; סניף שטרם — הסכום שסוכם, מסומן. כך יש חשבון אחד, לא שניים.
+  */
+  const sendReal = r => (r.chabadPaid != null ? r.chabadPaid : sendOf(r));
+  const payN = summed.filter(r => r.chabadPaid != null).length;
+  const openOf = r => (r.gap == null ? null : r.gap + minAdj(r) + (r.hourly || 0) - sendReal(r));
+  const dealSum = summed.reduce((x, r) => x + sendReal(r), 0);
   const noDeal = summed.filter(r => r.agreed == null && r.gap > 0).length;
   const openSum = tot.gap + adjSum + tzSum - dealSum;
   // לפני הכרית: בפועל − משרד החינוך − מענק − מה שהסניף מעביר. אחרי הכרית = זה ועוד 20%.
-  const beforeOf = r => (r.gap == null ? null : r.gap + minAdj(r) + (r.hourly || 0) - r.add20 - sendOf(r));
+  const beforeOf = r => (r.gap == null ? null : r.gap + minAdj(r) + (r.hourly || 0) - r.add20 - sendReal(r));
   const beforeSum = openSum - sum('add20');
   const hasPay = upTo.some(m => m.branches.some(br => br.chabadPaid != null));
   const Remain = ({ v }) => v == null ? <span>—</span>
@@ -5112,6 +5102,36 @@ function BottomLineView({ activeMonth, viewer = false }) {
     פס ירוק מלא עם וי = הכרית מלאה; פס כתום חלקי = חלק ממנה; פס ריק אדום = חסר לשכר עצמו.
   */
   const leftOf = r => { const b = beforeOf(r); return b == null ? null : -b; };
+  /*
+    "הפער כל חודש יעבור לחודש הבא" (שרה, 7.10). היתרה המתגלגלת של הסניף:
+    מה שנשאר בכל חודש — הכסף בפועל, בלי הכרית (שרה: "הכסף בפועל, בלי
+    הכרית") — מצטרף למה שנשאר מהחודשים שלפניו. ספטמבר 2026, החודש הראשון
+    במערכת, מתחיל מאפס. כשנרשמה העברה בפועל במסך התקבולים — היא שנספרת
+    במקום הסכום שסוכם, כך שיש יתרה אחת ולא שתיים. חודש סגור קפוא, ולכן
+    היתרה של חודש שנסגר אינה זזה.
+  */
+  // התוצאה של סניף בחודש — אותו "נשאר" של הטבלה (leftOf), גם לחודשים אחרים
+  const resultOf = b => (b.gap == null ? null : -(b.gap + minAdj(b) + (b.hourly || 0) - b.add20 - sendReal(b)));
+  // undefined = הסניף אינו בחודש הזה (נספר 0); null = הסניף בחודש אבל התוצאה לא ידועה (אין תקציב משרד החינוך)
+  const resultIn = (m, id) => { const b = m?.branches.find(x => x.id === id); return b ? resultOf(b) : undefined; };
+  // סכום שמוותר כשאחד המרכיבים לא ידוע — יתרה חלקית נראית כמו יתרה מלאה, ולכן מוצג "—"
+  const sumKnown = vals => vals.reduce((a, v) => (a == null || v === null ? null : a + (v || 0)), 0);
+  const openingOf = id => sumKnown(upTo.slice(0, -1).map(m => resultIn(m, id)));
+  const runningOf = id => sumKnown([openingOf(id), resultIn(cur, id)]);
+  // הרשת: כל הסניפים של כל חודש, גם סניף שאינו בחודש שנבחר; תוצאה לא ידועה אינה נספרת — כמו בשאר הדף
+  const netResult = m => (m ? m.branches.reduce((a, b) => a + (resultOf(b) || 0), 0) : 0);
+  const openingNet = upTo.slice(0, -1).reduce((a, m) => a + netResult(m), 0);
+  const runningNet = openingNet + netResult(cur);
+  // שורת הסיכום של טבלת החודש מסתכמת מהשורות שמוצגות בה
+  const openingRows = summed.reduce((a, r) => a + (openingOf(r.id) ?? 0), 0);
+  const runningRows = summed.reduce((a, r) => a + (runningOf(r.id) ?? 0), 0);
+  const multi = months.length > 1;   // עמודות ההעברה מחודש לחודש וההשוואה — רק כשיש יותר מחודש אחד
+  // ההשוואה: כל סניף שהיה באחד החודשים, גם אם אינו בחודש שנבחר — אחרת היתרה שלו נעלמת מהטבלה
+  const cmpRows = [...sorted.map(r => ({ id: r.id, name: r.name })),
+    ...[...new Set(months.flatMap(m => m.branches.map(b => b.id)))].filter(id => !rows.some(r => r.id === id))
+      .map(id => ({ id, name: months.map(m => m.branches.find(b => b.id === id)).find(Boolean)?.name || '' }))];
+  const Delta = ({ v }) => Math.round(v) === 0 ? <span style={{ color:'var(--text2)', fontSize:14.4 }}>ללא שינוי</span>
+    : <bdi dir="ltr" className="num" style={{ fontWeight:700, whiteSpace:'nowrap', color: v > 0 ? 'var(--ok-text)' : 'var(--danger-text)' }}>{v > 0 ? '+' : '−'}{num(Math.abs(v))}</bdi>;
   const Left = ({ v }) => v == null ? <span>—</span>
     : <bdi dir="ltr" className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v < 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>{v < 0 ? '−' : ''}{num(Math.abs(v))}</bdi>;
   const ResBar = ({ left, cushion }) => {
@@ -5210,6 +5230,11 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 {upTo.length > 1 && cumPct != null && (
                   <span className="bl-fact">מתחילת השנה <b className="num" style={{ color: cumPct > 100 ? 'var(--danger-text)' : undefined }}>{cumPct}%</b></span>
                 )}
+                {upTo.length > 1 && (
+                  <span className="bl-fact" title="מה שנשאר בכל החודשים עד החודש הזה, יחד: הכסף בפועל, בלי הכרית">
+                    מתחילת השנה נשאר <Left v={runningNet} />
+                  </span>
+                )}
                 {usePct != null && (
                   <span className="bl-fact" title="הסימולציה: העלות שחושבה ממחשבון משרד החינוך, לפני התלושים">
                     {summed.length && summed.every(r => r.planSource === 'auto') ? 'הסימולציה נשמרה לפני התלושים'
@@ -5225,7 +5250,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <span className="bl-fact" title="עובדות שעלותן נלקחה מקובץ השכר; לשאר — אומדן של המערכת">
                   עלות מקובץ השכר: <b className="num">{tot.withActual}</b> מתוך {tot.staff}
                 </span>
-                {tot.paid != null && <span className="bl-fact">הועבר <b className="num">{num(tot.paid)}</b> מתוך {num(dealSum)}</span>}
+                {payN > 0 && <span className="bl-fact" title="בסניפים האלה נרשמה במסך התקבולים ההעברה בפועל, והיא שנספרת במקום הסכום שסוכם">הועבר בפועל ב-<b className="num">{payN}</b> מתוך {summed.length} סניפים</span>}
               </div>
             </div>
           </section>
@@ -5253,30 +5278,101 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <p className="s num">{num(sum('add20'))}</p></div>
           </div>
 
-          <h2 className="section-head">לפי סניף</h2>
-          <p className="section-sub">בפועל{anyTz ? ' + שכר צהרון ומנהלה' : ''} − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. הפס מראה כמה מכרית ה-20% התמלא.</p>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:6 }}>
+            <h2 className="section-head" style={{ margin:0 }}>לפי סניף</h2>
+            {multi && (
+              <div className="apple-seg no-print" role="group" aria-label="תצוגת הסניפים">
+                <button onClick={() => setMode('month')} aria-pressed={mode === 'month'}
+                  className={['apple-seg-item', mode === 'month' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>החודש</button>
+                <button onClick={() => setMode('compare')} aria-pressed={mode === 'compare'}
+                  className={['apple-seg-item', mode === 'compare' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>השוואה בין חודשים</button>
+              </div>
+            )}
+          </div>
+          <p className="section-sub">{mode === 'compare'
+            ? 'מה נשאר בכל חודש — הכסף בפועל, בלי הכרית — השינוי מול החודש הקודם, והיתרה המצטברת מספטמבר 2026. ירוק = נשאר, אדום = חסר.'
+            : <>בפועל{anyTz ? ' + שכר צהרון ומנהלה' : ''} − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. הפס מראה כמה מכרית ה-20% התמלא.{multi ? ' מה שנשאר עובר לחודש הבא: "מהחודש הקודם" + נשאר = "יתרה מצטברת".' : ''}</>}</p>
+          {mode === 'compare' ? (
+          <>
+          {/*
+            "סכום חודשי שנוכל לערוך השוואה בין החודשים" (שרה, 7.10): שורה לסניף,
+            עמודה לחודש — מה שנשאר באותו חודש; השינוי מול החודש הקודם; והיתרה
+            המצטברת עד החודש שנבחר. החודש שנבחר מודגש.
+          */}
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: לפי מחשבון המשרד, בפועל, משרד החינוך, מענק רשת, הסניף מעביר, נותר לפני הכרית, כרית 20% ונותר כולל הכרית`}</caption>
+              <caption className="sr-only">השוואה בין החודשים לפי סניף: מה נשאר בכל חודש, השינוי מול החודש הקודם והיתרה המצטברת</caption>
+              <colgroup>
+                <col />{months.map(m => <col key={m.key} className={m.key === sel ? 'g-res' : undefined} />)}
+                <col className="g-res" /><col className="g-res g-sum" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <TH>סניף</TH>
+                  {months.map(m => <TH key={m.key}>{fmtMonth(m.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{m.frozenAt ? 'סגור' : 'פתוח'}</span></TH>)}
+                  <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>עד {fmtMonth(sel)}</span></TH>
+                </tr>
+              </thead>
+              <tbody>
+                {/* מתחת לכל חודש — השינוי מול החודש שלפניו, כדי שההשוואה תיראה בלי לבחור חודש */}
+                {cmpRows.map(r => (
+                  <tr key={'cmp-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
+                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
+                    {months.map((m, i) => { const v = resultIn(m, r.id), p = i > 0 ? resultIn(months[i - 1], r.id) : null; return (
+                      <td key={m.key} style={{ ...td, fontWeight: m.key === sel ? 800 : 500 }}>
+                        {v == null ? '—' : <Left v={v} />}
+                        {v != null && p != null && <span style={{ display:'block', fontSize:14, marginTop:2 }}><Delta v={v - p} /></span>}
+                      </td>); })}
+                    <td style={{ ...td, fontWeight:800 }}><Left v={runningOf(r.id)} /></td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td style={{ padding:'10px 12px' }}>סה"כ</td>
+                  {months.map((m, i) => <td key={m.key} style={td}><Left v={netResult(m)} />{i > 0 && <span style={{ display:'block', fontSize:14, marginTop:2 }}><Delta v={netResult(m) - netResult(months[i - 1])} /></span>}</td>)}
+                  <td style={td}><Left v={runningNet} /></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="only-mobile big-cards">
+            {cmpRows.map(r => (
+              <div key={'cmpm-' + r.id} className="apple-card mcard">
+                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
+                {months.map((m, i) => { const v = resultIn(m, r.id), p = i > 0 ? resultIn(months[i - 1], r.id) : null; return (
+                  <CardRow key={m.key} label={fmtMonth(m.key)} strong={m.key === sel}>
+                    {v == null ? '—' : <Left v={v} />}
+                    {v != null && p != null && <span style={{ fontSize:14, marginInlineStart:8 }}><Delta v={v - p} /></span>}
+                  </CardRow>); })}
+                <CardRow label={`יתרה מצטברת עד ${fmtMonth(sel)}`} strong><Left v={runningOf(r.id)} /></CardRow>
+              </div>
+            ))}
+          </div>
+          </>
+          ) : (
+          <>
+          <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
+            <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+              <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: לפי מחשבון המשרד, בפועל, משרד החינוך, מענק רשת, הסניף מעביר, נשאר, כרית 20%${multi ? ', מהחודש הקודם ויתרה מצטברת' : ''}`}</caption>
               <colgroup>
                 <col /><col className="g-cost" /><col className="g-cost" />{anyTz && <col className="g-cost" />}
                 <col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
                 <col className="g-res" /><col className="g-res g-sum" />
-                {hasPay && <><col /><col /></>}
+                {multi && <><col className="g-res" /><col className="g-res g-sum" /></>}
               </colgroup>
               <thead>
                 <tr className="bl-groups">
                   <th />
                   <th colSpan={anyTz ? 3 : 2} scope="colgroup" className="gh-cost">השכר</th>
                   <th colSpan={3} scope="colgroup" className="gh-inc">הכיסוי</th>
-                  <th colSpan={2} scope="colgroup" className="gh-res">מה נשאר</th>
-                  {hasPay && <th colSpan={2} scope="colgroup">העברות בפועל</th>}
+                  <th colSpan={multi ? 4 : 2} scope="colgroup" className="gh-res">מה נשאר</th>
                 </tr>
                 <tr>
                   <TH>סניף</TH><TH>לפי המחשבון</TH><TH>בפועל</TH>{anyTz && <TH><Op c="+" />שכר צהרון ומנהלה</TH>}
-                  <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או מתוכנן</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />הסניף מעביר</TH>
+                  <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או מתוכנן</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />הסניף מעביר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או שסוכם</span></TH>
                   <TH><Op c="=" />נשאר</TH><TH>כרית 20%</TH>
-                  {hasPay && <><TH>הועבר</TH><TH>יתרה מצטברת</TH></>}
+                  {multi && <><TH><Op c="+" />מהחודש הקודם</TH><TH><Op c="=" />יתרה מצטברת</TH></>}
                 </tr>
               </thead>
               <tbody>
@@ -5295,11 +5391,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
                         ? <span style={{ color:'var(--text2)' }}>{num(r.ministry)}<span className="bl-tag">מתוכנן</span></span>
                         : <span style={{ fontWeight:800 }}>{num(recv)}<span className="bl-tag ok">בפועל</span></span>}</td>
                     <td style={td}>{num(r.support)}</td>
-                    <td style={td} title={r.hourly > 0 && r.agreed != null ? `${num(r.agreed)} על ההוראה ועוד ${num(r.hourly)} שכר צהרון ומנהלה` : undefined}>
-                      {r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
+                    <td style={td} title={r.chabadPaid != null ? `הועבר בפועל. סוכם: ${r.agreed == null ? 'טרם' : num(sendOf(r))}` : r.hourly > 0 && r.agreed != null ? `${num(r.agreed)} על ההוראה ועוד ${num(r.hourly)} שכר צהרון ומנהלה` : undefined}>
+                      {r.chabadPaid != null ? <span style={{ fontWeight:800 }}>{num(r.chabadPaid)}<span className="bl-tag ok">בפועל</span></span>
+                        : r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
                     <td style={td}><Left v={leftOf(r)} /></td>
                     <td style={td}><ResBar left={leftOf(r)} cushion={r.add20} /></td>
-                    {hasPay && <><td style={td}>{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</td><td style={td}><Bal v={r.balance} /></td></>}
+                    {multi && <><td style={td}><Left v={openingOf(r.id)} /></td><td style={{ ...td, fontWeight:800 }}><Left v={runningOf(r.id)} /></td></>}
                   </tr>
                 ); })}
               </tbody>
@@ -5314,7 +5411,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={td}>{num(dealSum)}</td>
                   <td style={td}><Left v={-beforeSum} /></td>
                   <td style={td}><ResBar left={-beforeSum} cushion={sum('add20')} /></td>
-                  {hasPay && <><td style={td}>{tot.paid == null ? '—' : num(tot.paid)}</td><td style={td}><Bal v={tot.balance} /></td></>}
+                  {multi && <><td style={td}><Left v={openingRows} /></td><td style={td}><Left v={runningRows} /></td></>}
                 </tr>
               </tfoot>
             </table>
@@ -5328,6 +5425,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <CardRow label="בפועל" strong>{num(r.cost)}{pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
                 <CardRow label="נשאר" strong><Left v={leftOf(r)} /></CardRow>
                 <CardRow label="כרית 20%" strong><ResBar left={leftOf(r)} cushion={r.add20} /></CardRow>
+                {multi && <CardRow label="יתרה מצטברת" strong><Left v={runningOf(r.id)} /></CardRow>}
                 {open && (
                   <>
                     <CardRow label="לפי מחשבון המשרד">{r.plan == null ? '—' : num(r.plan)}</CardRow>
@@ -5335,9 +5433,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <CardRow label="כרית 20%">{num(r.add20)}</CardRow>
                     <CardRow label={r.ministryReceived != null ? 'משרד החינוך — בפועל' : 'משרד החינוך — מתוכנן'}>{num(minOf(r))}</CardRow>
                     <CardRow label="מענק רשת">{num(r.support)}</CardRow>
-                    <CardRow label="הסניף מעביר">{r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
-                    {hasPay && <CardRow label="הועבר">{r.chabadPaid == null ? '—' : num(r.chabadPaid)}</CardRow>}
-                    {hasPay && <CardRow label="יתרה מצטברת"><Bal v={r.balance} /></CardRow>}
+                    <CardRow label={r.chabadPaid != null ? 'הסניף העביר — בפועל' : 'הסניף מעביר — סוכם'}>{r.chabadPaid != null ? num(r.chabadPaid) : r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
+                    {multi && <CardRow label="מהחודש הקודם"><Left v={openingOf(r.id)} /></CardRow>}
                   </>
                 )}
                 <button onClick={() => setOpenB(open ? null : r.id)} aria-expanded={open}
@@ -5347,10 +5444,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
               </div>
             ); })}
           </div>
+          </>
+          )}
 
           {!hasPay && (
             <p style={{ fontSize:14.6, color:'var(--text2)', marginTop:10, lineHeight:1.6 }}>
-              העברות הסניפים בפועל טרם הוזנו. כשיוזנו במסך "תקבולים ותשלומים", יתווספו כאן "הועבר" ו"יתרה מצטברת" (חובה או זכות).
+              העברות הסניפים בפועל טרם הוזנו. כשיוזנו במסך "תקבולים ותשלומים", עמודת "הסניף מעביר" תציג את מה שהועבר בפועל (מסומן "בפועל"), והוא שייספר ב"נשאר" וביתרה המצטברת.
             </p>
           )}
 
@@ -5466,8 +5565,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
             <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
               <b>לפי המחשבון</b> — העלות שהמערכת חישבה לכל עובדת ממחשבון משרד החינוך (הסימולציה), לפני שהגיעו התלושים. <b>בפועל</b> — עלות המעביד של עובדי ההוראה בחודש, כולל מנהלת; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
               {' '}<b>כרית 20%</b> — תוספת של 20% על העלות בפועל, למילוי מקום וביטחון. <b>משרד החינוך</b> — מה שהתקבל בפועל באותו חודש ("בפועל"); כשהתקבול טרם הוזן במסך "תקבולים", מוצג החלק ה-12 מהתקציב השנתי ("מתוכנן"). <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
-              {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו; "טרם סוכם" נספר כאפס. <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
+              {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו; "טרם סוכם" נספר כאפס. כשנרשמה במסך התקבולים העברה בפועל — היא שמוצגת ונספרת ("בפועל"). <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
               {anyTz && <>{' '}<b>שכר צהרון ומנהלה</b> — עלות עובדות הצהרון והמנהלה (משרות שעתיות) שהרשת משלמת; אין מולה הכנסה ממשרד החינוך, והיא כולה על הסניף; כרית ה-20% מחושבת גם עליה: הסכום ש"הסניף מעביר" כולל אותה.</>}
+              {' '}<b>מהחודש הקודם</b> — מה שנשאר (או חסר) בכל החודשים שלפני החודש הזה, יחד; ספטמבר 2026 מתחיל מאפס. <b>יתרה מצטברת</b> — מהחודש הקודם ועוד מה שנשאר החודש; היא עוברת לחודש הבא. הכרית אינה נספרת בה. כשנרשמה העברה בפועל — היא שנספרת, ולא הסכום שסוכם.
               {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
             </p>
           )}

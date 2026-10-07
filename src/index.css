@@ -1091,6 +1091,13 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .bl-tile .v { font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--text); margin-top: 5px; line-height: 1.15; overflow-wrap: anywhere; }
 .bl-tile .s { font-size: 12.6px; color: var(--text2); margin-top: 3px; line-height: 1.35; min-height: 17px; }
 @media (max-width: 1100px) { .bl-tile { padding: 10px 11px; } .bl-tile .v { font-size: 19.5px; } .bl-tile .l { font-size: 13px; } }
+/* בחלון של שרה (1000 רוחב) טבלת החודש עם עמודות ההעברה מחודש לחודש נכנסת רק עם ריפוד צר */
+@media (max-width: 1100px) {
+  .bl-table tbody td, .bl-table tfoot td, .bl-table thead th { padding-left: 3px !important; padding-right: 3px !important; }
+  .bl-table tbody th[scope="row"], .bl-table tfoot td:first-child, .bl-table thead th:first-child { padding-left: 8px !important; padding-right: 10px !important; }
+  .bl-table .resbar { gap: 5px; } .bl-table .resbar .track { width: 52px; flex-basis: 52px; }
+  .bl-table .resbar .pc, .bl-table .resbar svg { min-width: 30px; }
+}
 @media (max-width: 700px) { .bl-eq { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bl-tile .v { font-size: 21px; } }
 /* אדום לטקסט: #DC2626 נותן 4.0:1 על רקע סגלגל; #B91C1C עובר AA גם שם */
 :root { --danger-text: #B91C1C; }
