@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 107;
+const BUILD = 108;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5152,6 +5152,15 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const netResult = m => (m ? m.branches.reduce((a, b) => a + (resultOf(b) || 0), 0) : 0);
   const openingNet = upTo.slice(0, -1).reduce((a, m) => a + netResult(m), 0);
   const runningNet = openingNet + netResult(cur);
+  /*
+    "עמוד 1 ו-3 אותם עמודים" (שרה, 7.10): בהשוואה בין החודשים העמודה
+    "יתרה מצטברת עד ספטמבר" הייתה זהה לעמודת ספטמבר, כי ספטמבר הוא
+    החודש הראשון. בהשוואה כל החודשים מוצגים, ולכן היתרה שם היא עד החודש
+    האחרון שמוצג — לא עד החודש שנבחר.
+  */
+  const lastKey = months[months.length - 1]?.key;
+  const totalOf = id => sumKnown(months.map(m => resultIn(m, id)));
+  const totalNet = months.reduce((a, m) => a + netResult(m), 0);
   // שורת הסיכום של טבלת החודש מסתכמת מהשורות שמוצגות בה
   const openingRows = summed.reduce((a, r) => a + (openingOf(r.id) ?? 0), 0);
   const runningRows = summed.reduce((a, r) => a + (runningOf(r.id) ?? 0), 0);
@@ -5335,7 +5344,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <tr>
                   <TH>סניף</TH>
                   {months.map(m => <TH key={m.key}>{fmtMonth(m.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{m.frozenAt ? 'סגור' : 'פתוח'}</span></TH>)}
-                  <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>עד {fmtMonth(sel)}</span></TH>
+                  <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>עד {fmtMonth(lastKey)}</span></TH>
                 </tr>
               </thead>
               <tbody>
@@ -5348,7 +5357,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                         {v == null ? '—' : <Left v={v} />}
                         {v != null && p != null && <span style={{ display:'block', fontSize:14, marginTop:2 }}><Delta v={v - p} /></span>}
                       </td>); })}
-                    <td style={{ ...td, fontWeight:800 }}><Left v={runningOf(r.id)} /></td>
+                    <td style={{ ...td, fontWeight:800 }}><Left v={totalOf(r.id)} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -5356,7 +5365,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
                   {months.map((m, i) => <td key={m.key} style={td}><Left v={netResult(m)} />{i > 0 && <span style={{ display:'block', fontSize:14, marginTop:2 }}><Delta v={netResult(m) - netResult(months[i - 1])} /></span>}</td>)}
-                  <td style={td}><Left v={runningNet} /></td>
+                  <td style={td}><Left v={totalNet} /></td>
                 </tr>
               </tfoot>
             </table>
@@ -5370,7 +5379,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     {v == null ? '—' : <Left v={v} />}
                     {v != null && p != null && <span style={{ fontSize:14, marginInlineStart:8 }}><Delta v={v - p} /></span>}
                   </CardRow>); })}
-                <CardRow label={`יתרה מצטברת עד ${fmtMonth(sel)}`} strong><Left v={runningOf(r.id)} /></CardRow>
+                <CardRow label={`יתרה מצטברת עד ${fmtMonth(lastKey)}`} strong><Left v={totalOf(r.id)} /></CardRow>
               </div>
             ))}
           </div>
