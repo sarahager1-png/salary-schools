@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 108;
+const BUILD = 109;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5140,8 +5140,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
     במקום הסכום שסוכם, כך שיש יתרה אחת ולא שתיים. חודש סגור קפוא, ולכן
     היתרה של חודש שנסגר אינה זזה.
   */
-  // התוצאה של סניף בחודש — אותו "נשאר" של הטבלה (leftOf), גם לחודשים אחרים
-  const resultOf = b => (b.gap == null ? null : -(b.gap + minAdj(b) + (b.hourly || 0) - b.add20 - sendReal(b)));
+  /*
+    "אם תכננו יותר ושילמנו פחות נותרה יתרת זכות" (שרה, 7.10): התוצאה של סניף
+    בחודש היא התכנון פחות הבפועל. חיובי = זכות (שילמנו פחות ממה שתוכנן),
+    שלילי = חובה (שילמנו יותר). היא מצטברת מחודש לחודש, מספטמבר 2026.
+    (מחליף את ההגדרה מאותו ערב — "הכסף בפועל בלי הכרית" — לפי הבהרתה.)
+  */
+  const resultOf = b => (planOf(b) == null ? null : planOf(b) - costAll(b));
   // undefined = הסניף אינו בחודש הזה (נספר 0); null = הסניף בחודש אבל התוצאה לא ידועה (אין תקציב משרד החינוך)
   const resultIn = (m, id) => { const b = m?.branches.find(x => x.id === id); return b ? resultOf(b) : undefined; };
   // סכום שמוותר כשאחד המרכיבים לא ידוע — יתרה חלקית נראית כמו יתרה מלאה, ולכן מוצג "—"
@@ -5169,6 +5174,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const cmpRows = [...sorted.map(r => ({ id: r.id, name: r.name })),
     ...[...new Set(months.flatMap(m => m.branches.map(b => b.id)))].filter(id => !rows.some(r => r.id === id))
       .map(id => ({ id, name: months.map(m => m.branches.find(b => b.id === id)).find(Boolean)?.name || '' }))];
+  // זכות / חובה — התכנון פחות הבפועל
+  const Credit = ({ v }) => v == null ? <span>—</span>
+    : Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>מאוזן</span>
+    : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--ok-text)' : 'var(--danger-text)' }}>{v > 0 ? 'זכות ' : 'חובה '}{num(Math.abs(v))}</span>;
   const Delta = ({ v }) => Math.round(v) === 0 ? <span style={{ color:'var(--text2)', fontSize:14.4 }}>ללא שינוי</span>
     : <bdi dir="ltr" className="num" style={{ fontWeight:700, whiteSpace:'nowrap', color: v > 0 ? 'var(--ok-text)' : 'var(--danger-text)' }}>{v > 0 ? '+' : '−'}{num(Math.abs(v))}</bdi>;
   const Left = ({ v }) => v == null ? <span>—</span>
@@ -5223,7 +5232,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           {/* התשובה */}
           <section className="bl-hero" data-state={over || (usePct == null && net < 0) ? 'over' : 'ok'} aria-live="polite">
             {usePct != null && (
-              <div className="bl-ring" role="img" aria-label={`עלות ההוראה בפועל היא ${usePct}% מהעלות לפי מחשבון המשרד`}>
+              <div className="bl-ring" role="img" aria-label={`עלות השכר בפועל היא ${usePct}% מהתכנון המשוער`}>
                 <svg viewBox="0 0 120 120" aria-hidden="true">
                   <defs>
                     <linearGradient id="blGrad" x1="0" y1="0" x2="1" y2="1">
@@ -5235,7 +5244,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     stroke={over ? 'var(--danger-text)' : 'url(#blGrad)'}
                     strokeDasharray={RING} strokeDashoffset={RING * (1 - Math.min(usePct, 100) / 100)} />
                 </svg>
-                <div className="bl-ring-num"><b className="num">{usePct}%</b><span>מהסימולציה</span></div>
+                <div className="bl-ring-num"><b className="num">{usePct}%</b><span>מהתכנון המשוער</span></div>
               </div>
             )}
             <div style={{ minWidth:0, flex:'1 1 320px' }}>
@@ -5243,10 +5252,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
               {usePct != null ? (
                 <>
                   <h2 className="bl-verdict" style={{ color: over ? 'var(--danger-text)' : 'var(--text)' }}>
-                    {over ? 'חורגים מהסימולציה' : 'לא חורגים מהסימולציה'}
+                    {over ? 'חורגים מהתכנון המשוער' : 'לא חורגים מהתכנון המשוער'}
                   </h2>
                   <p className="bl-line">
-                    עלות השכר בפועל <b className="num">{num(planCost)}</b>, מול <b className="num">{num(planSum)}</b> לפי מחשבון המשרד
+                    עלות השכר בפועל <b className="num">{num(planCost)}</b>, מול <b className="num">{num(planSum)}</b> לפי התכנון המשוער
                     {over ? <> — חריגה של <b className="num" style={{ color:'var(--danger-text)' }}>{num(planCost - planSum)}</b>.</>
                           : <> — נמוך ב-<b className="num" style={{ color:'var(--ok-text)' }}>{num(planSum - planCost)}</b>.</>}
                   </p>
@@ -5265,8 +5274,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <span className="bl-fact">מתחילת השנה <b className="num" style={{ color: cumPct > 100 ? 'var(--danger-text)' : undefined }}>{cumPct}%</b></span>
                 )}
                 {upTo.length > 1 && (
-                  <span className="bl-fact" title="מה שנשאר בכל החודשים עד החודש הזה, יחד: הכסף בפועל, בלי הכרית">
-                    מתחילת השנה נשאר <Left v={runningNet} />
+                  <span className="bl-fact" title="התכנון פחות הבפועל בכל החודשים עד החודש הזה, יחד: זכות כששילמנו פחות מהתכנון, חובה כששילמנו יותר">
+                    מתחילת השנה <Credit v={runningNet} />
                   </span>
                 )}
                 {usePct != null && (
@@ -5324,8 +5333,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
             )}
           </div>
           <p className="section-sub">{mode === 'compare'
-            ? 'מה נשאר בכל חודש — הכסף בפועל, בלי הכרית — השינוי מול החודש הקודם, והיתרה המצטברת מספטמבר 2026. ירוק = נשאר, אדום = חסר.'
-            : <>בפועל − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. הפס מראה כמה מכרית ה-20% התמלא.{multi ? ' מה שנשאר עובר לחודש הבא: "מהחודש הקודם" + נשאר = "יתרה מצטברת".' : ''}</>}</p>
+            ? 'תכנון פחות בפועל בכל חודש — זכות כששילמנו פחות מהתכנון, חובה כששילמנו יותר — השינוי מול החודש הקודם, והיתרה המצטברת מספטמבר 2026.'
+            : <>בפועל − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. הפס מראה כמה מכרית ה-20% התמלא.{multi ? ' יתרה מצטברת = תכנון פחות בפועל, מצטבר מחודש לחודש: זכות כששילמנו פחות מהתכנון, חובה כששילמנו יותר.' : ''}</>}</p>
           {mode === 'compare' ? (
           <>
           {/*
@@ -5354,18 +5363,18 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
                     {months.map((m, i) => { const v = resultIn(m, r.id), p = i > 0 ? resultIn(months[i - 1], r.id) : null; return (
                       <td key={m.key} style={{ ...td, fontWeight: m.key === sel ? 800 : 500 }}>
-                        {v == null ? '—' : <Left v={v} />}
+                        <Credit v={v} />
                         {v != null && p != null && <span style={{ display:'block', fontSize:14, marginTop:2 }}><Delta v={v - p} /></span>}
                       </td>); })}
-                    <td style={{ ...td, fontWeight:800 }}><Left v={totalOf(r.id)} /></td>
+                    <td style={{ ...td, fontWeight:800 }}><Credit v={totalOf(r.id)} /></td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  {months.map((m, i) => <td key={m.key} style={td}><Left v={netResult(m)} />{i > 0 && <span style={{ display:'block', fontSize:14, marginTop:2 }}><Delta v={netResult(m) - netResult(months[i - 1])} /></span>}</td>)}
-                  <td style={td}><Left v={totalNet} /></td>
+                  {months.map((m, i) => <td key={m.key} style={td}><Credit v={netResult(m)} />{i > 0 && <span style={{ display:'block', fontSize:14, marginTop:2 }}><Delta v={netResult(m) - netResult(months[i - 1])} /></span>}</td>)}
+                  <td style={td}><Credit v={totalNet} /></td>
                 </tr>
               </tfoot>
             </table>
@@ -5376,10 +5385,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
                 {months.map((m, i) => { const v = resultIn(m, r.id), p = i > 0 ? resultIn(months[i - 1], r.id) : null; return (
                   <CardRow key={m.key} label={fmtMonth(m.key)} strong={m.key === sel}>
-                    {v == null ? '—' : <Left v={v} />}
+                    <Credit v={v} />
                     {v != null && p != null && <span style={{ fontSize:14, marginInlineStart:8 }}><Delta v={v - p} /></span>}
                   </CardRow>); })}
-                <CardRow label={`יתרה מצטברת עד ${fmtMonth(lastKey)}`} strong><Left v={totalOf(r.id)} /></CardRow>
+                <CardRow label={`יתרה מצטברת עד ${fmtMonth(lastKey)}`} strong><Credit v={totalOf(r.id)} /></CardRow>
               </div>
             ))}
           </div>
@@ -5388,25 +5397,25 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: לפי מחשבון המשרד, בפועל, משרד החינוך, מענק רשת, הסניף מעביר, נשאר, כרית 20%${multi ? ', מהחודש הקודם ויתרה מצטברת' : ''}`}</caption>
+              <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: תכנון משוער, בפועל, משרד החינוך, מענק רשת, הסניף מעביר, נשאר, כרית 20%${multi ? ', מהחודש הקודם ויתרה מצטברת' : ''}`}</caption>
               <colgroup>
                 <col /><col className="g-cost" /><col className="g-cost" />
                 <col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
                 <col className="g-res" /><col className="g-res g-sum" />
-                {multi && <><col className="g-res" /><col className="g-res g-sum" /></>}
+                {multi && <col className="g-res g-sum" />}
               </colgroup>
               <thead>
                 <tr className="bl-groups">
                   <th />
                   <th colSpan={2} scope="colgroup" className="gh-cost">השכר</th>
                   <th colSpan={3} scope="colgroup" className="gh-inc">הכיסוי</th>
-                  <th colSpan={multi ? 4 : 2} scope="colgroup" className="gh-res">מה נשאר</th>
+                  <th colSpan={multi ? 3 : 2} scope="colgroup" className="gh-res">מה נשאר</th>
                 </tr>
                 <tr>
-                  <TH>סניף</TH><TH>לפי המחשבון</TH><TH>בפועל</TH>
+                  <TH>סניף</TH><TH>תכנון משוער</TH><TH>בפועל</TH>
                   <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או מתוכנן</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />הסניף מעביר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או שסוכם</span></TH>
                   <TH><Op c="=" />נשאר</TH><TH>כרית 20%</TH>
-                  {multi && <><TH><Op c="+" />מהחודש הקודם</TH><TH><Op c="=" />יתרה מצטברת</TH></>}
+                  {multi && <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>תכנון − בפועל</span></TH>}
                 </tr>
               </thead>
               <tbody>
@@ -5416,7 +5425,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3, color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }} title={`${r.pendingFixes} תיקוני ברוטו לפי התלושים ממתינים לאישור. עד אז העלות מוצגת לפי הסימולציה`}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3 }} title="הסניף עוד לא הוזן למערכת בחודש הזה; העלות היא סכום התלושים שהתקבלו מהגזברות">לפי התלושים</span>}</th>
                     <td style={{ ...td, color:'var(--text2)' }} title={r.planFrom ? `הסימולציה הראשונה של הסניף, מ-${fmtMonth(r.planFrom)}` : undefined}>{planOf(r) == null ? '—' : num(planOf(r))}</td>
-                    <td style={{ ...td, fontWeight:800 }} title={pc == null ? undefined : `${pc}% מהעלות לפי מחשבון המשרד`}>
+                    <td style={{ ...td, fontWeight:800 }} title={pc == null ? undefined : `${pc}% מהתכנון המשוער`}>
                       {num(costAll(r))}
                       {pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</td>
                     <td style={td} title={recv == null ? 'מתוכנן: החלק ה-12 מהתקציב השנתי. התקבול בפועל טרם הוזן' : `התקבל בפועל. מתוכנן: ${num(r.ministry)}`}>
@@ -5429,7 +5438,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                         : r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
                     <td style={td}><Left v={leftOf(r)} /></td>
                     <td style={td}><ResBar left={leftOf(r)} cushion={r.add20} /></td>
-                    {multi && <><td style={td}><Left v={openingOf(r.id)} /></td><td style={{ ...td, fontWeight:800 }}><Left v={runningOf(r.id)} /></td></>}
+                    {multi && <td style={{ ...td, fontWeight:800 }} title={`מהחודש הקודם ${num(openingOf(r.id))}, והחודש ${num(resultOf(r))} (תכנון ${num(planOf(r))} פחות בפועל ${num(costAll(r))})`}><Credit v={runningOf(r.id)} /></td>}
                   </tr>
                 ); })}
               </tbody>
@@ -5437,13 +5446,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
                   <td style={td}>{summed.some(r => r.plan != null) ? num(summed.reduce((x, r) => x + (planOf(r) || 0), 0)) : '—'}</td>
-                  <td style={td} title={usePct == null ? undefined : `${usePct}% מהעלות לפי מחשבון המשרד`}>{num(sum('cost') + tzSum)}</td>
+                  <td style={td} title={usePct == null ? undefined : `${usePct}% מהתכנון המשוער`}>{num(sum('cost') + tzSum)}</td>
                   <td style={td}>{num(minSum)}</td>
                   <td style={td}>{num(tot.support)}</td>
                   <td style={td}>{num(dealSum)}</td>
                   <td style={td}><Left v={-beforeSum} /></td>
                   <td style={td}><ResBar left={-beforeSum} cushion={sum('add20')} /></td>
-                  {multi && <><td style={td}><Left v={openingRows} /></td><td style={td}><Left v={runningRows} /></td></>}
+                  {multi && <td style={td}><Credit v={runningRows} /></td>}
                 </tr>
               </tfoot>
             </table>
@@ -5457,16 +5466,15 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <CardRow label="בפועל" strong>{num(costAll(r))}{pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
                 <CardRow label="נשאר" strong><Left v={leftOf(r)} /></CardRow>
                 <CardRow label="כרית 20%" strong><ResBar left={leftOf(r)} cushion={r.add20} /></CardRow>
-                {multi && <CardRow label="יתרה מצטברת" strong><Left v={runningOf(r.id)} /></CardRow>}
+                {multi && <CardRow label="יתרה מצטברת" strong><Credit v={runningOf(r.id)} /></CardRow>}
                 {open && (
                   <>
-                    <CardRow label="לפי מחשבון המשרד">{planOf(r) == null ? '—' : num(planOf(r))}</CardRow>
+                    <CardRow label="תכנון משוער">{planOf(r) == null ? '—' : num(planOf(r))}</CardRow>
                     {r.hourly > 0 && <CardRow label="מתוכו הנהלה וצהרון">{num(r.hourly)}</CardRow>}
                     <CardRow label="כרית 20%">{num(r.add20)}</CardRow>
                     <CardRow label={r.ministryReceived != null ? 'משרד החינוך — בפועל' : 'משרד החינוך — מתוכנן'}>{num(minOf(r))}</CardRow>
                     <CardRow label="מענק רשת">{num(r.support)}</CardRow>
                     <CardRow label={r.chabadPaid != null ? 'הסניף העביר — בפועל' : 'הסניף מעביר — סוכם'}>{r.chabadPaid != null ? num(r.chabadPaid) : r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
-                    {multi && <CardRow label="מהחודש הקודם"><Left v={openingOf(r.id)} /></CardRow>}
                   </>
                 )}
                 <button onClick={() => setOpenB(open ? null : r.id)} aria-expanded={open}
@@ -5599,11 +5607,11 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </button>
           {showNote && (
             <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
-              <b>לפי המחשבון</b> — העלות שהמערכת חישבה לכל עובדת ממחשבון משרד החינוך (הסימולציה), לפני שהגיעו התלושים, כולל משרות ההנהלה והצהרון לפי שעות המשרה. <b>בפועל</b> — עלות המעביד של כל עובדי בית הספר בחודש, כולל מנהלת, הנהלה וצהרון; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
+              <b>תכנון משוער</b> — העלות שהמערכת חישבה לכל עובדת ממחשבון משרד החינוך (הסימולציה), לפני שהגיעו התלושים, כולל משרות ההנהלה והצהרון לפי שעות המשרה. <b>בפועל</b> — עלות המעביד של כל עובדי בית הספר בחודש, כולל מנהלת, הנהלה וצהרון; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
               {' '}<b>כרית 20%</b> — תוספת של 20% על העלות בפועל, למילוי מקום וביטחון. <b>משרד החינוך</b> — מה שהתקבל בפועל באותו חודש ("בפועל"); כשהתקבול טרם הוזן במסך "תקבולים", מוצג החלק ה-12 מהתקציב השנתי ("מתוכנן"). <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
               {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו; "טרם סוכם" נספר כאפס. כשנרשמה במסך התקבולים העברה בפועל — היא שמוצגת ונספרת ("בפועל"). <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
               {anyTz && <>{' '}<b>הנהלה וצהרון</b> — המשרות השעתיות מגולמות בשכר (לפי המחשבון ובפועל); אין מולן הכנסה ממשרד החינוך, והן כולן על הסניף: הסכום ש"הסניף מעביר" כולל אותן, וכרית ה-20% מחושבת גם עליהן.</>}
-              {' '}<b>מהחודש הקודם</b> — מה שנשאר (או חסר) בכל החודשים שלפני החודש הזה, יחד; ספטמבר 2026 מתחיל מאפס. <b>יתרה מצטברת</b> — מהחודש הקודם ועוד מה שנשאר החודש; היא עוברת לחודש הבא. הכרית אינה נספרת בה. כשנרשמה העברה בפועל — היא שנספרת, ולא הסכום שסוכם.
+              {' '}<b>יתרה מצטברת</b> — התכנון פחות הבפועל, מצטבר מספטמבר 2026: "זכות" כששילמנו פחות ממה שתוכנן, "חובה" כששילמנו יותר; היתרה עוברת מחודש לחודש.
               {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
             </p>
           )}
