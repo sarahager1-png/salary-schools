@@ -642,8 +642,9 @@ export async function obDownload(path) {
 
 // ─── צד הצוות ───
 export async function listOnboarding() {
+  // רשומה שבוטלה (עובד שהוסר מהמערכת) אינה מוצגת; המסמכים שלה נשארים שמורים
   const { data, error } = await supabase.from('teacher_onboarding')
-    .select('*, schools(name)').order('name');
+    .select('*, schools(name)').eq('revoked', false).order('name');
   raise(error, 'טעינת הקליטה נכשלה');
   return data || [];
 }
