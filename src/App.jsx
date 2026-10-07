@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 103;
+const BUILD = 104;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5129,6 +5129,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
       </span>
     );
   };
+  // הראייה השנתית של טבלת ההעברות: משרד החינוך והמענק כפי שהוזנו לשנה; העלות — החודש כפול 12
+  const yMin = r => (r.ministryYear != null ? r.ministryYear : (r.ministry || 0) * 12);
+  const ySup = r => (r.supportYear != null ? r.supportYear : (r.support || 0) * 12);
+  const yGap = r => (r.ministry == null ? null : r.costWith20 * 12 - yMin(r) - ySup(r));
   // סימן החשבון ליד שם העמודה — כדי שהשורה תיקרא כתרגיל
   const Op = ({ c }) => <span aria-hidden="true" style={{ color:'var(--text3)', fontWeight:800, marginInlineEnd:4 }}>{c}</span>;
 
@@ -5348,6 +5352,81 @@ function BottomLineView({ activeMonth, viewer = false }) {
               העברות הסניפים בפועל טרם הוזנו. כשיוזנו במסך "תקבולים ותשלומים", יתווספו כאן "הועבר" ו"יתרה מצטברת" (חובה או זכות).
             </p>
           )}
+
+          {/*
+            "את הטבלה הזו תעצב ותכניס לדוח המנכ"ל" (שרה, 7.10): טבלת ההעברות
+            לסניפים בראייה שנתית — החודש שנבחר כפול 12 — כמו הקובץ שיורד
+            ממסך "עלות הוראה". "להעברה" הוא הסכום שסוכם עם הסניף במערכת
+            (ועוד שכר צהרון ומנהלה היכן שיש); סניף שסוכם איתו 0 מוצג 0.
+          */}
+          <h2 className="section-head" style={{ marginTop:26 }}>העברות לסניפים — עלות הוראה שנתית</h2>
+          <p className="section-sub">לפי {fmtMonth(sel)}, כפול 12. עלות + 20% − משרד החינוך − מענק הרשת = הפער המחושב; "להעברה" הוא הסכום שסוכם עם הסניף.</p>
+          <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
+            <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
+              <caption className="sr-only">{`העברות לסניפים, עלות הוראה שנתית לפי ${fmtMonth(sel)}: עלות הוראה, תוספת 20%, סך העלות, הכנסות משרד החינוך, מענק רשת, פער מחושב, והסכום להעברה לחודש ולשנה`}</caption>
+              <colgroup>
+                <col /><col className="g-cost" /><col className="g-cost" /><col className="g-cost" />
+                <col className="g-inc" /><col className="g-inc" /><col className="g-res" />
+                <col className="g-res g-sum" /><col className="g-res g-sum" />
+              </colgroup>
+              <thead>
+                <tr className="bl-groups">
+                  <th />
+                  <th colSpan={3} scope="colgroup" className="gh-cost">העלות לשנה</th>
+                  <th colSpan={2} scope="colgroup" className="gh-inc">הכיסוי לשנה</th>
+                  <th colSpan={3} scope="colgroup" className="gh-res">הסניף מעביר</th>
+                </tr>
+                <tr>
+                  <TH>סניף</TH><TH>עלות הוראה</TH><TH><Op c="+" />תוספת 20%</TH><TH><Op c="=" />סה"כ עלות</TH>
+                  <TH><Op c="−" />משרד החינוך</TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="=" />פער מחושב</TH>
+                  <TH>להעברה לחודש</TH><TH>להעברה לשנה</TH>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => (
+                  <tr key={'tr-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
+                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
+                    <td style={td}>{num(r.cost * 12)}</td>
+                    <td style={{ ...td, color:'var(--text2)' }}>{num(r.add20 * 12)}</td>
+                    <td style={{ ...td, fontWeight:800 }}>{num(r.costWith20 * 12)}</td>
+                    <td style={td}>{r.ministry == null ? '—' : num(yMin(r))}</td>
+                    <td style={td}>{num(ySup(r))}</td>
+                    <td style={td}>{yGap(r) == null ? '—' : yGap(r) > 0 ? num(yGap(r)) : <span style={{ color:'var(--ok-text)' }}>עודף {num(-yGap(r))}</span>}</td>
+                    <td style={{ ...td, fontWeight:800, color:'var(--purple)' }} title={r.hourly > 0 && r.agreed != null ? `${num(r.agreed)} על ההוראה ועוד ${num(r.hourly)} שכר צהרון ומנהלה` : undefined}>
+                      {r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
+                    <td style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{r.agreed == null ? '—' : num(sendOf(r) * 12)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td style={{ padding:'10px 12px' }}>סה"כ</td>
+                  <td style={td}>{num(sum('cost') * 12)}</td>
+                  <td style={td}>{num(sum('add20') * 12)}</td>
+                  <td style={td}>{num(tot.costWith20 * 12)}</td>
+                  <td style={td}>{num(summed.reduce((x, r) => x + yMin(r), 0))}</td>
+                  <td style={td}>{num(summed.reduce((x, r) => x + ySup(r), 0))}</td>
+                  <td style={td}>{num(summed.reduce((x, r) => x + yGap(r), 0))}</td>
+                  <td style={td}>{num(dealSum)}</td>
+                  <td style={td}>{num(dealSum * 12)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="only-mobile big-cards">
+            {rows.map(r => (
+              <div key={'trm-' + r.id} className="apple-card mcard">
+                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
+                <CardRow label="להעברה לחודש" strong color="var(--purple)">{r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
+                <CardRow label="להעברה לשנה" strong color="var(--purple)">{r.agreed == null ? '—' : num(sendOf(r) * 12)}</CardRow>
+                <CardRow label="עלות הוראה לשנה">{num(r.cost * 12)}</CardRow>
+                <CardRow label="תוספת 20%">{num(r.add20 * 12)}</CardRow>
+                <CardRow label="משרד החינוך">{r.ministry == null ? '—' : num(yMin(r))}</CardRow>
+                <CardRow label="מענק רשת">{num(ySup(r))}</CardRow>
+                <CardRow label="פער מחושב לשנה">{yGap(r) == null ? '—' : yGap(r) > 0 ? num(yGap(r)) : `עודף ${num(-yGap(r))}`}</CardRow>
+              </div>
+            ))}
+          </div>
 
           {/* סגירת החודש — לשרה בלבד. האישור בתוך הדף, עם מה שייקרה */}
           {!viewer && cur && data?.canClose && (

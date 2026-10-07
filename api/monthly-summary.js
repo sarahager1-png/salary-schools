@@ -268,5 +268,11 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
         chabadPaid: n(l.chabad_paid) ?? f.data.chabadPaid ?? null };
     });
   }
+  // הסכומים השנתיים כפי שהוזנו — לטבלת ההעברות השנתית בדף; חודשי מעוגל כפול 12 אינו מחזיר אותם בדיוק
+  for (const mo of months) for (const b of mo.branches) {
+    const f = finBy.get(b.id) || {};
+    b.ministryYear = n(f.ministry_budget);
+    b.supportYear  = n(f.network_support) || 0;
+  }
   return { months };
 }
