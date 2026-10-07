@@ -203,6 +203,13 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
     for (const b of mo.branches) {
       const ts = mrows.filter(r => r.school_id === b.id).map(toTeacher).filter(t => !emp.isHourlyRow(t));
       b.plan = Math.round(ts.reduce((a, t) => a + emp.calcEmployer({ ...t, _actualEmployerCost: null }).total, 0)) || null;
+      /*
+        "את עלות הנהלה והצהרון תגלם בשכר התוכנן" (שרה, 7.10): המשרות השעתיות לפי
+        התכנון — שעות המשרה כפול התעריף — בלי דוח הנוכחות של החודש (מפתח חודש
+        שאינו קיים מנתק את הדוח), ובלי עלות בפועל. מוחזר בנפרד; הדף מחבר.
+      */
+      const hs = mrows.filter(r => r.school_id === b.id).map(toTeacher).filter(t => emp.isHourlyRow(t));
+      b.planHourly = Math.round(hs.reduce((a, t) => a + emp.calcEmployer({ ...t, _actualEmployerCost: null, monthKey: '__plan__' }).total, 0));
       b.planSource = 'live';   // מחושב עכשיו מהנתונים הנוכחיים — עוד לא צולם
     }
   }
@@ -221,7 +228,7 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
     if (!b.fromSlips || b.plan != null) continue;
     for (let j = i + 1; j < months.length; j++) {
       const nx = months[j].branches.find(x => x.id === b.id && x.plan != null && !x.fromSlips);
-      if (nx) { b.plan = nx.plan; b.planSource = 'first-sim'; b.planFrom = months[j].key; break; }
+      if (nx) { b.plan = nx.plan; b.planHourly = nx.planHourly; b.planSource = 'first-sim'; b.planFrom = months[j].key; break; }
     }
   }
   /*
