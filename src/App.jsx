@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 114;
+const BUILD = 115;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5469,7 +5469,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <td style={td}><Left v={leftOf(r)} /></td>
                     <td style={td}><ResBar left={leftOf(r)} cushion={cushionOf(r)} />
                       {/* "לא רשום כמה יוצא ה-20 אחוז" (שרה, 7.10): הסכום מתחת לפס — 20% מהתכנון */}
-                      <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(cushionOf(r))}</span></td>
+                      <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(cushionOf(r))}</span>
+                      {leftOf(r) != null && leftOf(r) < cushionOf(r) && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'#8F4E00' }}>חסר {num(cushionOf(r) - leftOf(r))}</span>}</td>
                     {multi && <td style={{ ...td, fontWeight:800 }} title={isBase ? 'חודש הבסיס' : `מהחודש הקודם ${num(openingOf(r.id))}, והחודש ${num(resultOf(r))} (${fmtMonth(baseMonth.key)} ${num(planOf(r))} פחות בפועל ${num(costAll(r))})`}>{isBase ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={runningOf(r.id)} />}</td>}
                   </tr>
                 ); })}
@@ -5484,7 +5485,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={td}>{num(dealSum)}</td>
                   <td style={td}><Left v={-beforeSum} /></td>
                   <td style={td}><ResBar left={-beforeSum} cushion={cushionSum} />
-                    <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(cushionSum)}</span></td>
+                    <span className="num" style={{ display:'block', fontSize:14, color:'var(--text2)', marginTop:2 }}>{num(cushionSum)}</span>
+                    {-beforeSum < cushionSum && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'#8F4E00' }}>חסר {num(cushionSum + beforeSum)}</span>}</td>
                   {multi && <td style={td}>{isBase ? <span style={{ color:'var(--text2)' }}>בסיס</span> : <Credit v={runningRows} />}</td>}
                 </tr>
               </tfoot>
@@ -5498,7 +5500,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag">לפי התלושים</span>}</p>
                 <CardRow label="בפועל" strong>{num(costAll(r))}{!isBase && pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
                 <CardRow label="נשאר" strong><Left v={leftOf(r)} /></CardRow>
-                <CardRow label="כרית 20%" strong><ResBar left={leftOf(r)} cushion={cushionOf(r)} /><span className="num" style={{ fontSize:14, color:'var(--text2)', marginInlineStart:8 }}>{num(cushionOf(r))}</span></CardRow>
+                <CardRow label="כרית 20%" strong><ResBar left={leftOf(r)} cushion={cushionOf(r)} /><span className="num" style={{ fontSize:14, color:'var(--text2)', marginInlineStart:8 }}>{num(cushionOf(r))}</span>{leftOf(r) != null && leftOf(r) < cushionOf(r) && <span className="num" style={{ fontSize:14, fontWeight:700, color:'#8F4E00', marginInlineStart:8 }}>חסר {num(cushionOf(r) - leftOf(r))}</span>}</CardRow>
                 {multi && !isBase && <CardRow label="יתרה מצטברת" strong><Credit v={runningOf(r.id)} /></CardRow>}
                 {open && (
                   <>
