@@ -5130,9 +5130,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
     );
   };
   // הראייה השנתית של טבלת ההעברות: משרד החינוך והמענק כפי שהוזנו לשנה; העלות — החודש כפול 12
-  const yMin = r => (r.ministryYear != null ? r.ministryYear : (r.ministry || 0) * 12);
-  const ySup = r => (r.supportYear != null ? r.supportYear : (r.support || 0) * 12);
-  const yGap = r => (r.ministry == null ? null : r.costWith20 * 12 - yMin(r) - ySup(r));
+  const yMin = r => (r.ministryYear ?? (r.ministry == null ? null : r.ministry * 12));
+  const ySup = r => (r.supportYear ?? (r.support || 0) * 12);
+  const yGap = r => (yMin(r) == null ? null : r.costWith20 * 12 - yMin(r) - ySup(r));
+  const YGap = ({ r }) => { const g = yGap(r); return g == null ? '—' : g > 0 ? num(g) : g === 0 ? '0' : <span style={{ color:'var(--ok-text)' }}>עודף {num(-g)}</span>; };
   // סימן החשבון ליד שם העמודה — כדי שהשורה תיקרא כתרגיל
   const Op = ({ c }) => <span aria-hidden="true" style={{ color:'var(--text3)', fontWeight:800, marginInlineEnd:4 }}>{c}</span>;
 
@@ -5389,9 +5390,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <td style={td}>{num(r.cost * 12)}</td>
                     <td style={{ ...td, color:'var(--text2)' }}>{num(r.add20 * 12)}</td>
                     <td style={{ ...td, fontWeight:800 }}>{num(r.costWith20 * 12)}</td>
-                    <td style={td}>{r.ministry == null ? '—' : num(yMin(r))}</td>
+                    <td style={td}>{yMin(r) == null ? '—' : num(yMin(r))}</td>
                     <td style={td}>{num(ySup(r))}</td>
-                    <td style={td}>{yGap(r) == null ? '—' : yGap(r) > 0 ? num(yGap(r)) : <span style={{ color:'var(--ok-text)' }}>עודף {num(-yGap(r))}</span>}</td>
+                    <td style={td}><YGap r={r} /></td>
                     <td style={{ ...td, fontWeight:800, color:'var(--purple)' }} title={r.hourly > 0 && r.agreed != null ? `${num(r.agreed)} על ההוראה ועוד ${num(r.hourly)} שכר צהרון ומנהלה` : undefined}>
                       {r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
                     <td style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{r.agreed == null ? '—' : num(sendOf(r) * 12)}</td>
@@ -5406,7 +5407,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={td}>{num(tot.costWith20 * 12)}</td>
                   <td style={td}>{num(summed.reduce((x, r) => x + yMin(r), 0))}</td>
                   <td style={td}>{num(summed.reduce((x, r) => x + ySup(r), 0))}</td>
-                  <td style={td}>{num(summed.reduce((x, r) => x + yGap(r), 0))}</td>
+                  <td style={td}>{num(summed.reduce((x, r) => x + (yGap(r) || 0), 0))}</td>
                   <td style={td}>{num(dealSum)}</td>
                   <td style={td}>{num(dealSum * 12)}</td>
                 </tr>
@@ -5421,9 +5422,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <CardRow label="להעברה לשנה" strong color="var(--purple)">{r.agreed == null ? '—' : num(sendOf(r) * 12)}</CardRow>
                 <CardRow label="עלות הוראה לשנה">{num(r.cost * 12)}</CardRow>
                 <CardRow label="תוספת 20%">{num(r.add20 * 12)}</CardRow>
-                <CardRow label="משרד החינוך">{r.ministry == null ? '—' : num(yMin(r))}</CardRow>
+                <CardRow label="משרד החינוך">{yMin(r) == null ? '—' : num(yMin(r))}</CardRow>
                 <CardRow label="מענק רשת">{num(ySup(r))}</CardRow>
-                <CardRow label="פער מחושב לשנה">{yGap(r) == null ? '—' : yGap(r) > 0 ? num(yGap(r)) : `עודף ${num(-yGap(r))}`}</CardRow>
+                <CardRow label="פער מחושב לשנה"><YGap r={r} /></CardRow>
               </div>
             ))}
           </div>
