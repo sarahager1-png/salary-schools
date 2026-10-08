@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 175;
+const BUILD = 176;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -6272,7 +6272,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             </div>
           </div>
           {help === 'base' && (
-            <p style={helpBox}>בכל תצוגה כל העמודות באותה יחידה: ב"חודשי" הסכום לחודש, וב"שנתי" אותו סכום כפול 12. <b>עלות ההוראה</b> — ספטמבר בפועל (חודש המוצא). <b>הכרית</b> — 15% ממנה. <b>משרד החינוך</b> — התקבול האחרון שהוזן לסניף. <b>מענק הרשת והעברת הסניף</b> — הסכומים שבתוקף עכשיו; {canEditBase ? 'את המענק משנים בתצוגה השנתית ואת העברת הסניף בתצוגה החודשית, והשינוי נכנס מיד לטבלת החודש.' : 'רק מנהל הרשת משנה אותם.'} <b>הפער</b> — עלות + כרית − משרד החינוך − מענק − העברה.</p>
+            <p style={helpBox}>בכל תצוגה כל העמודות באותה יחידה: ב"חודשי" הסכום לחודש, וב"שנתי" אותו סכום כפול 12. <b>עלות ההוראה</b> — ספטמבר בפועל (חודש המוצא). <b>הכרית</b> — 15% ממנה. <b>משרד החינוך</b> — התקבול האחרון שהוזן לסניף. <b>מענק הרשת והעברת הסניף</b> — הסכומים שבתוקף עכשיו; {canEditBase ? 'אפשר לשנות אותם כאן בשתי התצוגות, והשינוי נכנס מיד לטבלת החודש.' : 'רק מנהל הרשת משנה אותם.'} <b>הפער</b> — עלות + כרית − משרד החינוך − מענק − העברה.</p>
           )}
           {/*
             נתוני הבסיס (שרה, 8.10, לילה: "לא כל הנתונים פה שנתיים. וכשמעבירים לחודשי, אז זה אמור להיות מחולק ל-12.
@@ -6287,8 +6287,24 @@ function BottomLineView({ activeMonth, viewer = false }) {
               const grant = r.supportYear / 12, tr = r.month || 0;
               return { r, cost, cush, min, wait, grant, tr, gap: cost + cush - min - grant - tr }; });
             const T = lines.reduce((a, x) => ({ cost: a.cost + x.cost, cush: a.cush + x.cush, min: a.min + x.min, grant: a.grant + x.grant, tr: a.tr + x.tr, gap: a.gap + x.gap }), { cost: 0, cush: 0, min: 0, grant: 0, tr: 0, gap: 0 });
-            const grantCell = x => (!mo && canEditBase ? baseInput(x.r.id, 'supportYear', x.r.supportYear, `מענק הרשת לשנה, ${x.r.name}`) : num(x.grant * k));
-            const trCell = x => (mo && canEditBase ? baseInput(x.r.id, 'transfer', x.r.month, `העברת הסניף לחודש, ${x.r.name}`) : num(x.tr * k));
+            /*
+              "תפתח למנכ"ל את האפשרות לשינוי בשנתי" (שרה, 8.10): מנהל הרשת משנה את המענק ואת העברת הסניף בשתי
+              התצוגות. הסכום נשמר תמיד באותו אופן — מענק לשנה, העברה לחודש — ומה שהוקלד ביחידה האחרת מומר (× 12 / ÷ 12).
+            */
+            const scaled = (id, field, stored, mult, label) => (
+              <input type="number" min="0" dir="ltr" className="apple-input nospin" inputMode="numeric" aria-label={label}
+                key={`bs-${id}-${field}-${mult}-${stored ?? ''}`} defaultValue={stored == null ? '' : Math.round(stored * mult)} placeholder="—" disabled={baseBusy === id}
+                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                onBlur={e => { if (e.target.value === '') { if (stored != null) saveBase(id, { [field]: null }); return; }
+                  const shown = Math.round(Number(e.target.value)); if (!Number.isFinite(shown) || shown < 0) return;
+                  if (shown === Math.round((stored ?? NaN) * mult)) return;            // לא השתנה — לא נוגעים בסכום השמור
+                  const next = Math.round(shown / mult);
+                  e.target.value = Math.round(next * mult);                             // מה שמוצג = מה שנשמר, אחרי העיגול
+                  if (next !== stored) saveBase(id, { [field]: next }); }}
+                style={{ width:'100%', maxWidth:120, textAlign:'center', fontWeight:800, fontSize:15, padding:'5px 4px', color:'var(--purple)' }} />
+            );
+            const grantCell = x => (canEditBase ? scaled(x.r.id, 'supportYear', x.r.supportYear, mo ? 1 / 12 : 1, `מענק הרשת ${per}, ${x.r.name}`) : num(x.grant * k));
+            const trCell = x => (canEditBase ? scaled(x.r.id, 'transfer', x.r.month, mo ? 1 : 12, `העברת הסניף ${per}, ${x.r.name}`) : num(x.tr * k));
             const minCell = x => (x.wait ? <span style={{ color:'#8F4E00', fontWeight:700 }}>טרם התקבל</span> : <span className="num" style={{ fontWeight:700 }}>{num(x.min * k)}</span>);
             return (<>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
