@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 146;
+const BUILD = 147;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5648,6 +5648,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
       {Math.round(d) !== 0 && <bdi dir="ltr" className="num" style={{ display:'block', fontSize:14, fontWeight:700, color: c }}>{d > 0 ? '+' : '−'}{num(Math.abs(d))}</bdi>}
     </span>); };
   // פער: חיובי = חסר (העלות גבוהה מהכיסוי), שלילי = עודף
+  // בטבלה: מספר ומתחתיו "חסר"/"עודף" — אותה צורה של שאר התאים
+  const GapCell = ({ v }) => Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>מאוזן</span>
+    : <span style={{ display:'block', color: v > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}><span className="num" style={{ fontWeight:800 }}>{num(Math.abs(v))}</span><span style={{ display:'block', fontSize:14, fontWeight:700 }}>{v > 0 ? 'חסר' : 'עודף'}</span></span>;
   const GapV = ({ v }) => Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>מאוזן</span>
     : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>{v > 0 ? 'חסר ' : 'עודף '}{num(Math.abs(v))}</span>;
   /*
@@ -5887,7 +5890,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           ) : (
           <>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
-            <table className="sticky-first big-table bl-table pva" style={{ width:'100%', borderCollapse:'collapse' }}>
+            <table className="sticky-first big-table bl-table pva pvam" style={{ width:'100%', borderCollapse:'collapse' }}>
               <caption className="sr-only">{`תכנון מול ביצוע לפי סניף, ${fmtMonth(sel)}: עלות השכר, ה-20%, משרד החינוך, מענק הרשת, העברת הסניף והפער לחודש`}</caption>
               <colgroup>
                 <col /><col className="g-cost" /><col className="g-cost" /><col className="g-cost" /><col className="g-cost" />
@@ -5895,18 +5898,19 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <col className="g-res" /><col className="g-res g-sum" />
               </colgroup>
               <thead>
+                {/* "תסדר" (שרה, 8.10): סימן החשבון בכותרת הקבוצה בלבד; מתחתיה תכנון | ביצוע; עמודות ברוחב שווה */}
                 <tr className="bl-groups">
                   <th />
                   <th colSpan={2} scope="colgroup" className="gh-cost">עלות השכר</th>
-                  <th colSpan={2} scope="colgroup" className="gh-cost">ה-20%</th>
-                  <th colSpan={2} scope="colgroup" className="gh-inc">משרד החינוך</th>
-                  <th colSpan={2} scope="colgroup" className="gh-inc">מהבסיס</th>
-                  <th colSpan={2} scope="colgroup" className="gh-res">הפער לחודש</th>
+                  <th colSpan={2} scope="colgroup" className="gh-cost"><Op c="+" />ה-20%</th>
+                  <th colSpan={2} scope="colgroup" className="gh-inc"><Op c="−" />משרד החינוך</th>
+                  <th colSpan={2} scope="colgroup" className="gh-inc"><Op c="−" />קבועים מהבסיס</th>
+                  <th colSpan={2} scope="colgroup" className="gh-res"><Op c="=" />הפער לחודש</th>
                 </tr>
                 <tr>
-                  <TH>סניף</TH><TH>תכנון</TH><TH>ביצוע</TH><TH><Op c="+" />תכנון</TH><TH><Op c="+" />ביצוע</TH>
-                  <TH><Op c="−" />תכנון</TH><TH><Op c="−" />ביצוע</TH><TH><Op c="−" />מענק הרשת</TH><TH><Op c="−" />העברת הסניף</TH>
-                  <TH><Op c="=" />תכנון</TH><TH><Op c="=" />ביצוע</TH>
+                  <TH>סניף</TH><TH>תכנון</TH><TH>ביצוע</TH><TH>תכנון</TH><TH>ביצוע</TH>
+                  <TH>תכנון</TH><TH>ביצוע</TH><TH>מענק הרשת</TH><TH>העברת סניף</TH>
+                  <TH>תכנון</TH><TH>ביצוע</TH>
                 </tr>
               </thead>
               <tbody>
@@ -5920,12 +5924,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
                       <td className={cellCls(actSt(p.act20, p.plan20))} style={tdP}><Act v={p.act20} plan={p.plan20} /></td>
                       <td style={tdP}>{num(p.planMin)}</td>
                       <td className={cellCls(p.noMin ? 'mid' : actSt(p.actMin, p.planMin, true))} style={tdP}>{p.noMin
-                        ? <span style={{ color:'#8F4E00', fontWeight:700 }}>0<span className="bl-tag" style={{ display:'block', width:'fit-content', margin:'3px auto 0', color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>טרם התקבל</span></span>
+                        ? <span style={{ display:'block', color:'#8F4E00' }}><span className="num" style={{ fontWeight:800 }}>0</span><span style={{ display:'block', fontSize:14, fontWeight:700 }}>טרם התקבל</span></span>
                         : <Act v={p.actMin} plan={p.planMin} income />}</td>
                       <td style={tdP}>{num(p.grant)}</td>
                       <td style={{ ...tdP, fontWeight:700, color:'var(--purple)' }}>{num(p.transfer)}</td>
-                      <td className={cellCls(gapSt(p.planGap))} style={tdP}><GapV v={p.planGap} /></td>
-                      <td className={cellCls(gapSt(p.actGap))} style={tdP}><GapV v={p.actGap} /></td>
+                      <td className={cellCls(gapSt(p.planGap))} style={tdP}><GapCell v={p.planGap} /></td>
+                      <td className={cellCls(gapSt(p.actGap))} style={tdP}><GapCell v={p.actGap} /></td>
                     </>)}
                   </tr>
                 ))}
@@ -5941,8 +5945,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td className={cellCls(actSt(pvaTot.actMin, pvaTot.planMin, true))} style={tdP}><Act v={pvaTot.actMin} plan={pvaTot.planMin} income /></td>
                   <td style={tdP}>{num(pvaTot.grant)}</td>
                   <td style={tdP}>{num(pvaTot.transfer)}</td>
-                  <td className={cellCls(gapSt(pvaTot.planGap))} style={tdP}><GapV v={pvaTot.planGap} /></td>
-                  <td className={cellCls(gapSt(pvaTot.actGap))} style={tdP}><GapV v={pvaTot.actGap} /></td>
+                  <td className={cellCls(gapSt(pvaTot.planGap))} style={tdP}><GapCell v={pvaTot.planGap} /></td>
+                  <td className={cellCls(gapSt(pvaTot.actGap))} style={tdP}><GapCell v={pvaTot.actGap} /></td>
                 </tr>
               </tfoot>
             </table>
