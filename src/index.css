@@ -1419,3 +1419,11 @@ input.nospin { -moz-appearance: textfield; appearance: textfield; }
 .big-table.pvaf td.tgt-ok  { background: #DDF3E4 !important; }
 .big-table.pvaf td.tgt-mid { background: #FCEBC8 !important; }
 .big-table.pvaf td.tgt-bad { background: #FBDCDC !important; }
+/* "יש חתוך" (8.10): עמודות התוצאה רחבות יותר, אותו גודל גופן, ו"חסר/עודף" יורד שורה כשצר — סכום של שבע ספרות לא נחתך */
+.big-table.pvaf col { width: 8.3%; }
+.big-table.pvaf col.c-name { width: 11.2%; }
+.big-table.pvaf col:nth-child(9) { width: 10.6%; }
+.big-table.pvaf col:nth-child(11) { width: 11.4%; }
+.big-table.pvaf tbody td > span, .big-table.pvaf tfoot td > span { white-space: normal !important; line-height: 1.2; }
+.big-table.pvaf td span.num { font-size: 14.2px !important; white-space: nowrap; }
+.big-table.pvaf tbody th[scope="row"] { min-width: 0; }
