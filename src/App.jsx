@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 143;
+const BUILD = 144;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5196,6 +5196,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const [closing, setClosing] = useState(false);
   const [mode, setMode] = useState('month');   // 'month' — החודש שנבחר | 'compare' — השוואה בין החודשים
   const [cmpKind, setCmpKind] = useState('salary');
+  const [baseBusy, setBaseBusy] = useState('');
   const [copied, setCopied] = useState(false);   // "סיכום להעברה" הועתק   // בהשוואה: 'salary' — עמידה ביעד (שכר) | 'cash' — מזומן
   const doClose = async action => {
     setClosing(true); setErr('');
@@ -5320,6 +5321,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
     <th scope="col" style={{ padding:'8px 4px', fontSize:14, fontWeight:700, color:'var(--text2)', textAlign:'center', lineHeight:1.25, verticalAlign:'bottom' }}>{children}</th>
   );
   const td = { textAlign:'center', fontSize:14.6 };
+  const tdP = { textAlign:'center', fontSize:14, paddingInline:3 };   // טבלת תכנון מול ביצוע — 11 עמודות ב-1000px
 
   /*
     "תנגיש הכי יפה שאפשר, נוח, ממוקד וברור" (שרה, 6.10). הדף עונה על שאלה
@@ -5577,6 +5579,70 @@ function BottomLineView({ activeMonth, viewer = false }) {
     return t.over < 0 ? <span className="num" style={{ ...st, color:'var(--ok-text)' }}>חסך {num(-t.over)}</span>
       : <span className="num" style={{ ...st, color: t.state === 'bad' ? 'var(--danger-text)' : '#8F4E00' }}>חרג {num(t.over)}</span>;
   };
+  /*
+    מנהל הרשת (שרה, 8.10.26): "הטבלה למטה תהיה מדויקת ותשקף נתוני בסיס. הטבלה למעלה — כל חלק
+    יציג תכנון מול ביצוע: עלות השכר, ה-20%, העברות משרד החינוך, ואז ישתקף הפער לחודש. מנהל הרשת
+    יוכל, ורק הוא, לשנות את סכום מענק הרשת והעברות הסניף בכל עת. והטבלה למעלה תוזן מלמטה."
+    הכרעות שרה באותו יום: בסיס השכר = הדוח מ-23.9 כפי שהוא; קרית ביאליק נכנסת (אינה בדוח,
+    ולכן הבסיס שלה הוא ספטמבר בפועל × 12); ה-20% בביצוע = 20% מעלות השכר בפועל; עורך: הרב קריצבסקי בלבד.
+    נתוני הבסיס (baseRows): השכר ומשרד החינוך מהדוח; מענק הרשת והעברת הסניף חיים מהמסד.
+    טבלת החודש (pva): התכנון = נתוני הבסיס חלקי 12; הביצוע = מה שקרה בחודש.
+  */
+  const repRow = name => { const n = String(name || '').replace(/\s+/g, ' ');
+    return CEO_TRANSFERS_REPORT.rows.find(x => n.includes(x.name.replace(/^(בית חינוך|שלהבות)\s+/, ''))) || null; };
+  const liveBase = new Map((data?.base || []).map(x => [x.id, x]));
+  const baseBranches = (() => { const seen = new Map();
+    for (const m of [...allMonths].reverse()) for (const b of m.branches) if (!seen.has(b.id)) seen.set(b.id, b);
+    return [...seen.values()]; })();
+  const baseRows = baseBranches.map(b => {
+    const rp = repRow(b.name), lb = liveBase.get(b.id) || {};
+    const annual = rp ? rp.annual : Math.round(baseCostOf(b.id) * 12);
+    if (!annual) return null;
+    const add20 = rp ? rp.add20 : Math.round(annual * 0.2);
+    const ministry = rp ? rp.ministry : Math.round(lb.ministryYear ?? (b.ministry || 0) * 12);
+    const supportYear = lb.supportYear ?? (b.support || 0) * 12;
+    const month = lb.transfer !== undefined ? lb.transfer : (b.agreed ?? null);
+    const total = annual + add20;
+    return { id: b.id, name: rp ? rp.name : shortName(b.name), ord: rp ? CEO_TRANSFERS_REPORT.rows.indexOf(rp) : 99, fromSeptember: !rp,
+      annual, add20, total, ministry, supportYear, gap: total - ministry - supportYear, month, year: month == null ? null : month * 12 };
+  }).filter(Boolean).sort((a, b) => a.ord - b.ord);
+  const baseById = new Map(baseRows.map(x => [x.id, x]));
+  const baseTot = baseRows.reduce((a, x) => { for (const k of ['annual', 'add20', 'total', 'ministry', 'supportYear', 'gap', 'month', 'year']) a[k] += x[k] || 0; return a; },
+    { annual: 0, add20: 0, total: 0, ministry: 0, supportYear: 0, gap: 0, month: 0, year: 0 });
+  const canEditBase = Boolean(data?.canEditBase) && !viewer;
+  const saveBase = async (id, patch) => {
+    setBaseBusy(id); setErr('');
+    try { await store.setBaseData(id, patch); setData(await store.fetchMonthlySummary()); }
+    catch (e) { setErr(e.message); }
+    finally { setBaseBusy(''); }
+  };
+  const baseInput = (id, field, val, label) => (
+    <input type="number" min="0" dir="ltr" className="apple-input" inputMode="numeric" aria-label={label}
+      key={`base-${id}-${field}-${val ?? ''}`} defaultValue={val ?? ''} placeholder="—" disabled={baseBusy === id}
+      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      onBlur={e => { const v = e.target.value === '' ? null : Math.round(Number(e.target.value)); if (v !== (val ?? null)) saveBase(id, { [field]: v }); }}
+      style={{ width:112, textAlign:'center', fontWeight:800, fontSize:14.6, padding:'5px 6px', color:'var(--purple)' }} />
+  );
+  // תכנון מול ביצוע לסניף בחודש שנבחר — התכנון מוזן מנתוני הבסיס
+  const pvaOf = r => { const bd = baseById.get(r.id); if (!bd) return null;
+    const actSal = costAll(r), act20 = Math.round(actSal * 0.2), actMin = minOf(r) || 0;
+    const planSal = bd.annual / 12, plan20 = bd.add20 / 12, planMin = bd.ministry / 12;
+    const grant = bd.supportYear / 12, transfer = bd.month || 0;
+    return { planSal, actSal, plan20, act20, planMin, actMin, grant, transfer, noMin: minInfo(r).key === 'none',
+      planGap: planSal + plan20 - planMin - grant - transfer, actGap: actSal + act20 - actMin - grant - transfer }; };
+  const pvaRows = rows.map(r => ({ r, p: pvaOf(r) })).sort((a, b) => (baseById.get(a.r.id)?.ord ?? 99) - (baseById.get(b.r.id)?.ord ?? 99));
+  const pvaTot = pvaRows.reduce((a, { p }) => { if (p) for (const k of Object.keys(a)) a[k] += p[k] || 0; return a; },
+    { planSal: 0, actSal: 0, plan20: 0, act20: 0, planMin: 0, actMin: 0, grant: 0, transfer: 0, planGap: 0, actGap: 0 });
+  // הוצאה: ירוק כשהביצוע אינו מעל התכנון (עד חצי אחוז נחשב עמידה); הכנסה: ירוק כשאינה מתחתיו
+  const Act = ({ v, plan, income = false }) => { const d = v - plan, tol = Math.abs(plan) * 0.005;
+    const good = income ? d >= -tol : d <= tol;
+    return (<span title={`${d >= 0 ? '+' : '−'}${num(Math.abs(d))} מול התכנון`} style={{ display:'block' }}>
+      <span className="num" style={{ fontWeight:800, color: good ? 'var(--ok-text)' : 'var(--danger-text)' }}>{num(v)}</span>
+      {Math.round(d) !== 0 && <bdi dir="ltr" className="num" style={{ display:'block', fontSize:14, fontWeight:600, color:'var(--text2)' }}>{d > 0 ? '+' : '−'}{num(Math.abs(d))}</bdi>}
+    </span>); };
+  // פער: חיובי = חסר (העלות גבוהה מהכיסוי), שלילי = עודף
+  const GapV = ({ v }) => Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>מאוזן</span>
+    : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>{v > 0 ? 'חסר ' : 'עודף '}{num(Math.abs(v))}</span>;
   // סימן החשבון ליד שם העמודה — כדי שהשורה תיקרא כתרגיל
   const Op = ({ c }) => <span aria-hidden="true" style={{ color:'var(--text3)', fontWeight:800, marginInlineEnd:4 }}>{c}</span>;
 
@@ -5730,7 +5796,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </div>
           <p className="section-sub">{mode === 'compare'
             ? (cmpKind === 'salary' ? `השכר של כל סניף בכל חודש מול ${fmtMonth(baseMonth.key)} (הבסיס); המשבצת צבועה לפי עמידה ביעד: ירוק לא יותר, כתום חריגה עד 5%, אדום יותר; ומתחת — כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.` : `מה נשאר בכל חודש אחרי השכר (משרד החינוך לפי תקבול בפועל בלבד), ומתחתיו ההפרש מול ${fmtMonth(baseMonth.key)}: זכות כשנשאר יותר, חובה כשנשאר פחות. היתרה המצטברת = סכום ההפרשים; בשורה האחרונה — כמה חסר לאיפוס בכל חודש.`)
-            : <>בפועל − משרד החינוך − מענק הרשת − העברת סניף קבועה = נשאר. "עמד ביעד?" = השכר של הסניף מול ספטמבר: ירוק לא יותר, כתום חריגה עד 5%, אדום יותר. "נשאר" הוא מזומן — משרד החינוך רק לפי תקבול בפועל.{multi ? ` יתרה מצטברת = מה שנשאר החודש פחות מה שנשאר ב${fmtMonth(baseMonth.key)}, מצטבר מחודש לחודש: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות.` : ''}</>}</p>
+            : <>לכל חלק תכנון מול ביצוע. התכנון מוזן מטבלת נתוני הבסיס שלמטה, חלקי 12. שכר + 20% − משרד החינוך − מענק הרשת − העברת הסניף = הפער לחודש: "חסר" כשהעלות גבוהה מהכיסוי, "עודף" כשנשאר. ביצוע ירוק = עמד בתכנון; אדום = חרג, ומתחתיו ההפרש. משרד החינוך בביצוע — רק מה שהתקבל בפועל.</>}</p>
           {mode === 'compare' ? (
           <>
           <div className="apple-seg no-print" role="group" aria-label="מה משווים" style={{ marginBottom:10 }}>
@@ -5824,100 +5890,92 @@ function BottomLineView({ activeMonth, viewer = false }) {
           ) : (
           <>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
-            <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: תכנון משוער, בפועל, משרד החינוך, מענק רשת, העברת סניף קבועה, נשאר, עמד ביעד${multi ? ', מהחודש הקודם ויתרה מצטברת' : ''}`}</caption>
+            <table className="sticky-first big-table bl-table pva" style={{ width:'100%', borderCollapse:'collapse' }}>
+              <caption className="sr-only">{`תכנון מול ביצוע לפי סניף, ${fmtMonth(sel)}: עלות השכר, ה-20%, משרד החינוך, מענק הרשת, העברת הסניף והפער לחודש`}</caption>
               <colgroup>
-                <col />{!isBase && <col className="g-cost" />}<col className="g-cost" />
-                <col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
+                <col /><col className="g-cost" /><col className="g-cost" /><col className="g-cost" /><col className="g-cost" />
+                <col className="g-inc" /><col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
                 <col className="g-res" /><col className="g-res g-sum" />
-                {multi && !isBase && <col className="g-res g-sum" />}
               </colgroup>
               <thead>
                 <tr className="bl-groups">
                   <th />
-                  <th colSpan={isBase ? 1 : 2} scope="colgroup" className="gh-cost">השכר</th>
-                  <th colSpan={3} scope="colgroup" className="gh-inc">הכיסוי</th>
-                  <th colSpan={multi && !isBase ? 3 : 2} scope="colgroup" className="gh-res">מה נשאר</th>
+                  <th colSpan={2} scope="colgroup" className="gh-cost">עלות השכר</th>
+                  <th colSpan={2} scope="colgroup" className="gh-cost">ה-20%</th>
+                  <th colSpan={2} scope="colgroup" className="gh-inc">משרד החינוך</th>
+                  <th colSpan={2} scope="colgroup" className="gh-inc">מהבסיס</th>
+                  <th colSpan={2} scope="colgroup" className="gh-res">הפער לחודש</th>
                 </tr>
                 <tr>
-                  <TH>סניף</TH>{!isBase && <TH>{fmtMonth(baseMonth.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>הבסיס</span></TH>}<TH>בפועל</TH>
-                  <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל בלבד</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />העברת סניף קבועה</TH>
-                  <TH><Op c="=" />נשאר</TH><TH>עמד ביעד?<span style={{ display:'block', fontSize:14, fontWeight:600 }}>שכר מול {fmtMonth(baseMonth.key)}</span></TH>
-                  {multi && !isBase && <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>נשאר מול {fmtMonth(baseMonth.key)}</span></TH>}
+                  <TH>סניף</TH><TH>תכנון</TH><TH>ביצוע</TH><TH><Op c="+" />תכנון</TH><TH><Op c="+" />ביצוע</TH>
+                  <TH><Op c="−" />תכנון</TH><TH><Op c="−" />ביצוע</TH><TH><Op c="−" />מענק הרשת</TH><TH><Op c="−" />העברת הסניף</TH>
+                  <TH><Op c="=" />תכנון</TH><TH><Op c="=" />ביצוע</TH>
                 </tr>
               </thead>
               <tbody>
-                {sorted.map(r => {
-                  const pc = pctOf(r), recv = r.ministryReceived;
-                  return (
-                  <tr key={r.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3, color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }} title={`${r.pendingFixes} תיקוני ברוטו לפי התלושים ממתינים לאישור. עד אז העלות מוצגת לפי הסימולציה`}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3 }} title="הסניף עוד לא הוזן למערכת בחודש הזה; העלות היא סכום התלושים שהתקבלו מהגזברות">לפי התלושים</span>}</th>
-                    {!isBase && <td style={{ ...td, color:'var(--text2)' }} title={`עלות השכר בפועל ב${fmtMonth(baseMonth.key)} — הבסיס`}>{planOf(r) == null ? '—' : num(planOf(r))}</td>}
-                    <td style={{ ...td, fontWeight:800 }} title={pc == null || isBase ? undefined : `${pc}% מ${fmtMonth(baseMonth.key)}`}>
-                      {num(costAll(r))}
-                      {!isBase && pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</td>
-                    <td style={td} title={recv != null ? `התקבל בפועל. מתוכנן: ${num(r.ministry)}` : minInfo(r).key === 'none' ? `טרם הוזן תקבול — נספר 0. מתוכנן: ${num(r.ministry)}` : `התקבול האחרון שהוזן (${fmtMonth(minInfo(r).key)}) נשאר בתוקף עד שיוזן חדש`}>
-                      {recv != null
-                        ? <span style={{ fontWeight:800 }}>{num(recv)}<span className="bl-tag ok">בפועל</span></span>
-                        : minInfo(r).key === 'none'
-                          ? <span style={{ color:'#8F4E00', fontWeight:700 }}>0<span className="bl-tag" style={{ color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>טרם התקבל</span></span>
-                          : <span style={{ fontWeight:700 }}>{num(minOf(r))}<span className="bl-tag" style={{ display:'block', width:'fit-content', margin:'3px auto 0' }}>לפי {fmtMonth(minInfo(r).key)}</span></span>}</td>
-                    <td style={td} title={leftOf(r) < 0 ? `כדי לאפס את החודש בסניף: להעביר ${num(zeroOf(leftOf(r)))} מעבר למענק` : undefined}>{num(r.support)}
-                      {/* "כמה הרשת צריכה להעביר כל חודש: המענק מינוס יתרה" (שרה, 8.10) */}
-                      {leftOf(r) < 0 && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--danger-text)', marginTop:2 }}>לאיפוס {num(zeroOf(leftOf(r)))}</span>}</td>
-                    <td style={td} title={r.agreed != null ? 'הסכום הקבוע שסוכם עם הסניף — סכום אחד, כולל משרות שעתיות (מזכירה, צהרון)' : undefined}>
-                      {r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
-                    <td style={td}><Left v={leftOf(r)} /></td>
-                    <td style={td}><TargetBar cost={costAll(r)} base={baseCostOf(r.id)} isBaseMonth={isBase} />
-                      <TargetNote cost={costAll(r)} base={baseCostOf(r.id)} isBaseMonth={isBase} /></td>
-                    {multi && !isBase && <td style={{ ...td, fontWeight:800 }} title={`מהחודש הקודם ${num(openingOf(r.id))}, והחודש ${num(resultOf(r))} (נשאר ${num(leftOf(r))} מול ${num(cushionOf(r))} ב${fmtMonth(baseMonth.key)})`}><Credit v={runningOf(r.id)} /></td>}
+                {pvaRows.map(({ r, p }) => (
+                  <tr key={'pva-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
+                    <th scope="row" style={{ padding:'10px 8px', fontWeight:700, textAlign:'start', fontSize:15.5 }} title={r.name}>{shortName(r.name).replace(/^שלהבות /, '')}</th>
+                    {!p ? <td colSpan={10} style={{ ...tdP, color:'var(--text2)' }}>אין לסניף נתוני בסיס</td> : (<>
+                      <td style={tdP}>{num(p.planSal)}</td>
+                      <td style={tdP}><Act v={p.actSal} plan={p.planSal} /></td>
+                      <td style={{ ...tdP, color:'var(--text2)' }}>{num(p.plan20)}</td>
+                      <td style={tdP}><Act v={p.act20} plan={p.plan20} /></td>
+                      <td style={tdP}>{num(p.planMin)}</td>
+                      <td style={tdP}>{p.noMin
+                        ? <span style={{ color:'#8F4E00', fontWeight:700 }}>0<span className="bl-tag" style={{ display:'block', width:'fit-content', margin:'3px auto 0', color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>טרם התקבל</span></span>
+                        : <Act v={p.actMin} plan={p.planMin} income />}</td>
+                      <td style={tdP}>{num(p.grant)}</td>
+                      <td style={{ ...tdP, fontWeight:700, color:'var(--purple)' }}>{num(p.transfer)}</td>
+                      <td style={tdP}><GapV v={p.planGap} /></td>
+                      <td style={tdP}><GapV v={p.actGap} /></td>
+                    </>)}
                   </tr>
-                ); })}
+                ))}
               </tbody>
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  {!isBase && <td style={td}>{summed.some(r => planOf(r) != null) ? num(summed.reduce((x, r) => x + (planOf(r) || 0), 0)) : '—'}</td>}
-                  <td style={td} title={usePct == null || isBase ? undefined : `${usePct}% מ${fmtMonth(baseMonth.key)}`}>{num(sum('cost') + tzSum)}</td>
-                  <td style={td}>{num(minSum)}</td>
-                  <td style={td}>{num(tot.support)}
-                    {zeroRows > 0 && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--danger-text)', marginTop:2 }}>לאיפוס {num(zeroRows)}</span>}</td>
-                  <td style={td}>{num(dealSum)}</td>
-                  <td style={td}><Left v={-beforeSum} /></td>
-                  <td style={td}><TargetBar cost={sum('cost') + tzSum} base={baseCostNet} isBaseMonth={isBase} />
-                    <TargetNote cost={sum('cost') + tzSum} base={baseCostNet} isBaseMonth={isBase} /></td>
-                  {multi && !isBase && <td style={td}><Credit v={runningRows} /></td>}
+                  <td style={tdP}>{num(pvaTot.planSal)}</td>
+                  <td style={tdP}><Act v={pvaTot.actSal} plan={pvaTot.planSal} /></td>
+                  <td style={tdP}>{num(pvaTot.plan20)}</td>
+                  <td style={tdP}><Act v={pvaTot.act20} plan={pvaTot.plan20} /></td>
+                  <td style={tdP}>{num(pvaTot.planMin)}</td>
+                  <td style={tdP}><Act v={pvaTot.actMin} plan={pvaTot.planMin} income /></td>
+                  <td style={tdP}>{num(pvaTot.grant)}</td>
+                  <td style={tdP}>{num(pvaTot.transfer)}</td>
+                  <td style={tdP}><GapV v={pvaTot.planGap} /></td>
+                  <td style={tdP}><GapV v={pvaTot.actGap} /></td>
                 </tr>
               </tfoot>
             </table>
           </div>
 
-          {/* נייד: אותו חשבון, מלמעלה למטה */}
+          {/* נייד: אותו חשבון, מלמעלה למטה — תכנון מול ביצוע */}
           <div className="only-mobile big-cards">
-            {sorted.map(r => { const pc = pctOf(r); const open = openB === r.id; return (
-              <div key={'bl-' + r.id} className="apple-card mcard">
-                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}{r.simOnly && <span className="bl-tag" style={{ color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>לפי הסימולציה</span>}{r.fromSlips && <span className="bl-tag">לפי התלושים</span>}</p>
-                <CardRow label="בפועל" strong>{num(costAll(r))}{!isBase && pc != null && <span className={'bl-chip' + (pc > 100 ? ' over' : '')}>{pc}%</span>}</CardRow>
-                <CardRow label="נשאר" strong><Left v={leftOf(r)} /></CardRow>
-                <CardRow label="עמד ביעד? (שכר מול ספטמבר)" strong><TargetBar cost={costAll(r)} base={baseCostOf(r.id)} isBaseMonth={isBase} /><TargetNote cost={costAll(r)} base={baseCostOf(r.id)} isBaseMonth={isBase} block={false} /></CardRow>
-                {multi && !isBase && <CardRow label="יתרה מצטברת" strong><Credit v={runningOf(r.id)} /></CardRow>}
-                {open && (
-                  <>
-                    {!isBase && <CardRow label={`${fmtMonth(baseMonth.key)} — הבסיס`}>{planOf(r) == null ? '—' : num(planOf(r))}</CardRow>}
-                    {r.hourly > 0 && <CardRow label="מתוכו הנהלה וצהרון">{num(r.hourly)}</CardRow>}
-                    <CardRow label="השכר בספטמבר (הבסיס)">{num(baseCostOf(r.id))}</CardRow>
-                    <CardRow label={r.ministryReceived != null ? 'משרד החינוך — בפועל' : minInfo(r).key === 'none' ? 'משרד החינוך — טרם התקבל' : `משרד החינוך — לפי ${fmtMonth(minInfo(r).key)}`}>{num(minOf(r))}</CardRow>
-                    <CardRow label="מענק רשת">{num(r.support)}</CardRow>
-                    {leftOf(r) < 0 && <CardRow label="לאיפוס החודש" strong color="var(--danger-text)">{num(zeroOf(leftOf(r)))}</CardRow>}
-                    <CardRow label="העברת סניף קבועה">{r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
-                  </>
-                )}
-                <button onClick={() => setOpenB(open ? null : r.id)} aria-expanded={open}
-                  style={{ background:'none', border:'none', padding:'10px 0 4px', minHeight:44, width:'100%', textAlign:'start', cursor:'pointer', fontSize:15, fontWeight:700, color:'var(--purple)' }}>
-                  {open ? 'הסתרת החשבון' : 'החשבון המלא'}
-                </button>
+            {pvaRows.map(({ r, p }) => (
+              <div key={'pvam-' + r.id} className="apple-card mcard">
+                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
+                {!p ? <p style={{ fontSize:14, color:'var(--text2)' }}>אין לסניף נתוני בסיס</p> : (<>
+                  <CardRow label="הפער לחודש — ביצוע" strong><GapV v={p.actGap} /></CardRow>
+                  <CardRow label="הפער לחודש — תכנון"><GapV v={p.planGap} /></CardRow>
+                  <CardRow label="עלות השכר — תכנון">{num(p.planSal)}</CardRow>
+                  <CardRow label="עלות השכר — ביצוע"><Act v={p.actSal} plan={p.planSal} /></CardRow>
+                  <CardRow label="ה-20% — תכנון">{num(p.plan20)}</CardRow>
+                  <CardRow label="ה-20% — ביצוע"><Act v={p.act20} plan={p.plan20} /></CardRow>
+                  <CardRow label="משרד החינוך — תכנון">{num(p.planMin)}</CardRow>
+                  <CardRow label="משרד החינוך — ביצוע">{p.noMin ? <span style={{ color:'#8F4E00', fontWeight:700 }}>0 · טרם התקבל</span> : <Act v={p.actMin} plan={p.planMin} income />}</CardRow>
+                  <CardRow label="מענק הרשת">{num(p.grant)}</CardRow>
+                  <CardRow label="העברת הסניף" color="var(--purple)">{num(p.transfer)}</CardRow>
+                </>)}
               </div>
-            ); })}
+            ))}
+            <div className="apple-card mcard"><p className="mcard-name" style={{ marginBottom:4 }}>סה"כ הרשת</p>
+              <CardRow label="הפער לחודש — ביצוע" strong><GapV v={pvaTot.actGap} /></CardRow>
+              <CardRow label="הפער לחודש — תכנון"><GapV v={pvaTot.planGap} /></CardRow>
+              <CardRow label="עלות השכר — תכנון / ביצוע">{num(pvaTot.planSal)} / {num(pvaTot.actSal)}</CardRow>
+              <CardRow label="משרד החינוך — תכנון / ביצוע">{num(pvaTot.planMin)} / {num(pvaTot.actMin)}</CardRow>
+            </div>
           </div>
           </>
           )}
@@ -5935,11 +5993,11 @@ function BottomLineView({ activeMonth, viewer = false }) {
             לסניפים כפי שירד ב-23.9.2026 — מספרים קבועים (CEO_TRANSFERS_REPORT),
             לא חישוב חי. טבלת החודש שמעליו היא שמתעדכנת מהמערכת.
           */}
-          <h2 className="section-head" style={{ marginTop:26 }}>{CEO_TRANSFERS_REPORT.title}</h2>
-          <p className="section-sub">{CEO_TRANSFERS_REPORT.sub}</p>
+          <h2 className="section-head" style={{ marginTop:26 }}>נתוני הבסיס — עלות הוראה שנתית והעברות לסניפים</h2>
+          <p className="section-sub">מכאן מוזן התכנון שבטבלת החודש. עלות ההוראה, ה-20% ומשרד החינוך — לפי הדוח שסוכם ב-23.9.2026. מענק הרשת והעברת הסניף — הסכומים שבתוקף עכשיו; {canEditBase ? 'אפשר לשנות אותם כאן בכל עת, והשינוי נכנס מיד לטבלת החודש.' : 'רק מנהל הרשת משנה אותם.'}</p>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{`${CEO_TRANSFERS_REPORT.title}, ${CEO_TRANSFERS_REPORT.sub}: עלות הוראה לשנה, תוספת 20%, סך העלות, הכנסות משרד החינוך, מענק רשת, פער מחושב, והסכום להעברה לחודש ולשנה`}</caption>
+              <caption className="sr-only">נתוני הבסיס לכל סניף: עלות הוראה לשנה, תוספת 20%, סך העלות, משרד החינוך, מענק הרשת, פער מחושב, העברת הסניף לחודש ולשנה</caption>
               <colgroup>
                 <col /><col className="g-cost" /><col className="g-cost" /><col className="g-cost" />
                 <col className="g-inc" /><col className="g-inc" /><col className="g-res" />
@@ -5954,21 +6012,22 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 </tr>
                 <tr>
                   <TH>סניף</TH><TH>עלות הוראה</TH><TH><Op c="+" />תוספת 20%</TH><TH><Op c="=" />סה"כ עלות</TH>
-                  <TH><Op c="−" />משרד החינוך</TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="=" />פער מחושב</TH>
-                  <TH>להעברה לחודש</TH><TH>להעברה לשנה</TH>
+                  <TH><Op c="−" />משרד החינוך</TH><TH><Op c="−" />מענק הרשת</TH><TH><Op c="=" />פער מחושב</TH>
+                  <TH>העברה לחודש</TH><TH>העברה לשנה</TH>
                 </tr>
               </thead>
               <tbody>
-                {CEO_TRANSFERS_REPORT.rows.map(r => (
-                  <tr key={'rep-' + r.name} style={{ borderBottom:'1px solid var(--line)' }}>
-                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }}>{r.name}<span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3, color:'#8a6d1f', background:'#FBF6E6', borderColor:'#EBDDA8' }}>{r.note}</span></th>
+                {baseRows.map(r => (
+                  <tr key={'base-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
+                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }}>{r.name}
+                      {r.fromSeptember && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3, color:'#8a6d1f', background:'#FBF6E6', borderColor:'#EBDDA8' }}>אינו בדוח — לפי ספטמבר בפועל</span>}</th>
                     <td style={td}>{num(r.annual)}</td>
                     <td style={{ ...td, color:'var(--text2)' }}>{num(r.add20)}</td>
                     <td style={{ ...td, fontWeight:800 }}>{num(r.total)}</td>
                     <td style={td}>{num(r.ministry)}</td>
-                    <td style={td}>{num(r.support)}</td>
+                    <td style={td}>{canEditBase ? baseInput(r.id, 'supportYear', r.supportYear, `מענק הרשת לשנה, ${r.name}`) : num(r.supportYear)}</td>
                     <td style={td}>{num(r.gap)}</td>
-                    <td style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{num(r.month)}</td>
+                    <td style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{canEditBase ? baseInput(r.id, 'transfer', r.month, `העברת הסניף לחודש, ${r.name}`) : num(r.month)}</td>
                     <td style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{num(r.year)}</td>
                   </tr>
                 ))}
@@ -5976,35 +6035,36 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  {['annual', 'add20', 'total', 'ministry', 'support', 'gap', 'month', 'year'].map(k => <td key={k} style={td}>{num(CEO_TRANSFERS_REPORT.total[k])}</td>)}
+                  {['annual', 'add20', 'total', 'ministry', 'supportYear', 'gap', 'month', 'year'].map(k => <td key={k} style={td}>{num(baseTot[k])}</td>)}
                 </tr>
               </tfoot>
             </table>
           </div>
           <div className="only-mobile big-cards">
-            {CEO_TRANSFERS_REPORT.rows.map(r => (
-              <div key={'repm-' + r.name} className="apple-card mcard">
-                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{r.name}<span className="bl-tag" style={{ color:'#8a6d1f', background:'#FBF6E6', borderColor:'#EBDDA8' }}>{r.note}</span></p>
-                <CardRow label="להעברה לחודש" strong color="var(--purple)">{num(r.month)}</CardRow>
-                <CardRow label="להעברה לשנה" strong color="var(--purple)">{num(r.year)}</CardRow>
+            {baseRows.map(r => (
+              <div key={'basem-' + r.id} className="apple-card mcard">
+                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{r.name}{r.fromSeptember && <span className="bl-tag" style={{ color:'#8a6d1f', background:'#FBF6E6', borderColor:'#EBDDA8' }}>לפי ספטמבר בפועל</span>}</p>
+                <CardRow label="העברת הסניף לחודש" strong color="var(--purple)">{canEditBase ? baseInput(r.id, 'transfer', r.month, `העברת הסניף לחודש, ${r.name}`) : num(r.month)}</CardRow>
+                <CardRow label="העברה לשנה" color="var(--purple)">{num(r.year)}</CardRow>
+                <CardRow label="מענק הרשת לשנה">{canEditBase ? baseInput(r.id, 'supportYear', r.supportYear, `מענק הרשת לשנה, ${r.name}`) : num(r.supportYear)}</CardRow>
                 <CardRow label="עלות הוראה לשנה">{num(r.annual)}</CardRow>
                 <CardRow label="תוספת 20%">{num(r.add20)}</CardRow>
                 <CardRow label="סה״כ עלות">{num(r.total)}</CardRow>
                 <CardRow label="משרד החינוך">{num(r.ministry)}</CardRow>
-                <CardRow label="מענק רשת">{num(r.support)}</CardRow>
                 <CardRow label="פער מחושב">{num(r.gap)}</CardRow>
               </div>
             ))}
             <div className="apple-card mcard"><p className="mcard-name" style={{ marginBottom:4 }}>סה"כ</p>
-              <CardRow label="להעברה לחודש" strong color="var(--purple)">{num(CEO_TRANSFERS_REPORT.total.month)}</CardRow>
-              <CardRow label="להעברה לשנה" strong color="var(--purple)">{num(CEO_TRANSFERS_REPORT.total.year)}</CardRow>
-              <CardRow label="סה״כ עלות">{num(CEO_TRANSFERS_REPORT.total.total)}</CardRow>
-              <CardRow label="פער מחושב">{num(CEO_TRANSFERS_REPORT.total.gap)}</CardRow>
+              <CardRow label="העברה לחודש" strong color="var(--purple)">{num(baseTot.month)}</CardRow>
+              <CardRow label="העברה לשנה" color="var(--purple)">{num(baseTot.year)}</CardRow>
+              <CardRow label="מענק הרשת לשנה">{num(baseTot.supportYear)}</CardRow>
+              <CardRow label="סה״כ עלות">{num(baseTot.total)}</CardRow>
+              <CardRow label="פער מחושב">{num(baseTot.gap)}</CardRow>
             </div>
           </div>
           <p style={{ fontSize:14.6, color:'var(--text2)', marginTop:10, lineHeight:1.7 }}>
-            <b>עלות הוראה לשנה</b> — עלות המעביד המלאה של עובדי ההוראה בבית הספר, כולל מנהלת, ייעוץ ושילוב, כפול 12. <b>תוספת 20%</b> — מילוי מקום וכרית ביטחון.
-            {' '}<b>פער מחושב</b> — סה״כ העלות פחות הכנסות משרד החינוך ופחות מענק הרשת. <b>להעברה</b> — הסכום שסוכם בפועל: הפער המחושב מעוגל לסכום חודשי, והשנתי הוא כפול 12. כל הסכומים בשקלים חדשים. הסכומים שסוכמו — השיקים המועברים והשכר שתוכנן — קבועים ואינם משתנים.
+            <b>פער מחושב</b> — סה״כ העלות פחות משרד החינוך ופחות מענק הרשת. <b>העברה לשנה</b> — ההעברה החודשית × 12.
+            {' '}סניף שהעברתו נמוכה מהפער המחושב חלקי 12 יופיע בטבלת החודש עם "חסר" כבר בתכנון.
           </p>
 
           {/* סגירת החודש — לשרה בלבד. האישור בתוך הדף, עם מה שייקרה */}
@@ -6599,7 +6659,10 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
     <th style={{ padding:'8px 4px', fontSize:14, fontWeight:700, color:'var(--text2)',
       textAlign:'center', whiteSpace:'normal', lineHeight:1.25, verticalAlign:'bottom' }}>{children}</th>
   );
-  const moneyInput = (sid, field, val) => (
+  // מענק הרשת והעברת הסניף משתנים רק בידי מנהל הרשת, בדף המנכ"ל (שרה, 8.10.26) — כאן הם לקריאה בלבד
+  const moneyInput = (sid, field, val) => (field === 'monthlyTransfer' || field === 'networkSupport') ? (
+    <span className="num" title='משתנה רק בידי מנהל הרשת, בדף המנכ"ל' style={{ fontWeight:700 }}>{val == null ? '—' : Math.round(val).toLocaleString('he-IL')}</span>
+  ) : (
     <input type="number" min="0" dir="ltr" className="apple-input fin-input"
       inputMode="decimal" key={`fin-${sid}-${field}-${val ?? ''}`}
       defaultValue={val ?? ''}

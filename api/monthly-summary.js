@@ -24,6 +24,12 @@ import { rowToTeacher as toTeacher } from '../src/lib/teacherFields.js';
 const TRANSFER_PCT = 0.20;
 const ALLOWED = new Set(['coordinator', 'director']);
 const n = v => (v == null ? null : Number(v));
+/*
+  "מנהל הרשת יוכל, ורק הוא, לשנות את סכום מענק הרשת והעברות הסניף בכל עת" (שרה, 8.10.26;
+  "הרב קריצבסקי בלבד"). הזהות נבדקת כאן בשרת לפי מזהה המשתמש — לא לפי תפקיד, כי גם
+  רכזות אחרות הן coordinator.
+*/
+const NETWORK_DIRECTOR_ID = '8a945d5d-612e-4e81-8bc6-ec5122421b37';
 
 export default async function handler(req, res) {
   try {
@@ -38,6 +44,31 @@ export default async function handler(req, res) {
     if (!ALLOWED.has(prof?.role)) return res.status(403).json({ error: 'אין הרשאה לדף הזה' });
     if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'שיטה לא נתמכת' });
     const isPost = req.method === 'POST';
+    const canEditBase = userData.user.id === NETWORK_DIRECTOR_ID;
+    // עדכון נתוני הבסיס (מענק הרשת, העברת הסניף) — מנהל הרשת בלבד
+    if (isPost) {
+      let b0 = req.body;
+      if (typeof b0 === 'string') { try { b0 = JSON.parse(b0 || '{}'); } catch { return res.status(400).json({ error: 'בקשה לא תקינה' }); } }
+      if (!b0 || typeof b0 !== 'object' || Array.isArray(b0)) return res.status(400).json({ error: 'בקשה לא תקינה' });
+      if (b0.action === 'setBase') {
+        if (!canEditBase) return res.status(403).json({ error: 'רק מנהל הרשת משנה את מענק הרשת ואת העברות הסניף' });
+        const patch = {};
+        for (const [k, col] of [['supportYear', 'network_support'], ['transfer', 'monthly_transfer']]) {
+          if (b0[k] === undefined) continue;
+          // רק מספר, או null לניקוי; סכומים בשקלים שלמים
+          if (b0[k] !== null && typeof b0[k] !== 'number') return res.status(400).json({ error: 'סכום לא תקין' });
+          const v = b0[k];
+          if (v != null && (!Number.isFinite(v) || v < 0 || v > 50000000)) return res.status(400).json({ error: 'סכום לא תקין' });
+          patch[col] = v == null ? null : Math.round(v);
+        }
+        if (typeof b0.schoolId !== 'string' || !/^[0-9a-f-]{36}$/i.test(b0.schoolId) || !Object.keys(patch).length) return res.status(400).json({ error: 'חסר סניף או סכום' });
+        const { data: up, error } = await sb.from('school_finance').update({ ...patch, updated_at: new Date().toISOString() })
+          .eq('school_id', b0.schoolId).select('school_id');
+        if (error) throw new Error(`school_finance: ${error.message}`);
+        if (!up?.length) return res.status(404).json({ error: 'לסניף אין שורת כספים' });
+        return res.status(200).json({ ok: true });
+      }
+    }
     // סגירה ופתיחה מחדש של חודש — רכזת בלבד; מנהל בצפייה אינו כותב דבר
     if (isPost && prof.role !== 'coordinator') return res.status(403).json({ error: 'רק הרכזת סוגרת חודש' });
 
@@ -65,7 +96,10 @@ export default async function handler(req, res) {
     }
 
     res.setHeader('cache-control', 'no-store');
-    return res.status(200).json({ ...summarize(...args, frozen), canClose, fetchedAt: new Date().toISOString() });
+    // נתוני הבסיס החיים לכל סניף — תמיד מהמסד, גם כשהחודש המוצג סגור
+    const base = (args[2] || []).map(f => ({ id: f.school_id,
+      supportYear: n(f.network_support) || 0, transfer: n(f.monthly_transfer), ministryYear: n(f.ministry_budget) }));
+    return res.status(200).json({ ...summarize(...args, frozen), base, canEditBase, canClose, fetchedAt: new Date().toISOString() });
   } catch (e) {
     // הפרטים ליומן השרת בלבד — מי שנכנס לצפייה מקבל הודעה כללית
     console.error('monthly-summary', e);

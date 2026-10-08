@@ -1312,3 +1312,8 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .slip-table.sim thead th:nth-child(2), .slip-table.sim thead th:nth-child(3), .slip-table.sim thead th:nth-child(9), .slip-table.sim thead th:nth-child(10),
 .slip-table.sim tbody tr:not(.sk) td:nth-child(2), .slip-table.sim tbody tr:not(.sk) td:nth-child(3), .slip-table.sim tbody tr:not(.sk) td:nth-child(9), .slip-table.sim tbody tr:not(.sk) td:nth-child(10),
 .slip-table.sim tfoot td:nth-child(5), .slip-table.sim tfoot td:nth-child(6) { display: none; }
+
+/* טבלת תכנון מול ביצוע בדף המנכ"ל (8.10): 11 עמודות שנכנסות ב-1000px בלי גלילה */
+.big-table.pva tbody td, .big-table.pva tfoot td { font-size: 14.6px !important; padding-inline: 3px; }
+.big-table.pva tbody th[scope="row"] { min-width: 104px; padding-inline-start: 10px !important; }
+.big-table.pva thead th:first-child, .big-table.pva tfoot td:first-child { padding-inline-start: 10px !important; }
