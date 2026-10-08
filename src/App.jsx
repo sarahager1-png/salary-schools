@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 132;
+const BUILD = 133;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5464,10 +5464,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
             <div className="bl-tile t-inc" title={summed.filter(r => minInfo(r).key === 'none').length ? `טרם התקבל: ${summed.filter(r => minInfo(r).key === 'none').map(r => shortName(r.name)).join(', ')}` : undefined}>
               <p className="l">משרד החינוך — התקבל</p><p className="v num">{num(minSum)}</p>
               <p className="s">{recvN === summed.length ? 'בכל הסניפים' : `ב-${recvN} מתוך ${summed.length} סניפים; ${summed.length - recvN} טרם`}</p></div>
-            <div className="bl-tile t-inc"><p className="l">מענק הרשת</p><p className="v num">{num(tot.support)}</p>
-              <p className="s">קבוע — החלק ה-12 מהסכום השנתי</p></div>
-            <div className="bl-tile t-inc"><p className="l">העברות הסניפים — קבוע</p><p className="v num">{num(dealSum)}</p>
-              <p className="s">{summed.some(r => r.chabadPaid != null) ? `העבירו ${summed.filter(r => r.chabadPaid != null).length} מתוך ${summed.length}` : 'מי העביר — מסומן במסך התקבולים'}</p></div>
+            {/* "מה עם מה שנשאר?" (שרה, 8.10): שני הקבועים אוחדו לכרטיס אחד, ו"נשאר" חזר */}
+            <div className="bl-tile t-inc" title={`מענק הרשת ${num(tot.support)} (החלק ה-12) + העברות הסניפים ${num(dealSum)} (הסכומים שסוכמו)`}>
+              <p className="l">כיסוי קבוע — מענק + סניפים</p><p className="v num">{num(tot.support + dealSum)}</p>
+              <p className="s">מענק {num(tot.support)} · סניפים {num(dealSum)}{summed.some(r => r.chabadPaid != null) ? ` · העבירו ${summed.filter(r => r.chabadPaid != null).length} מתוך ${summed.length}` : ''}</p></div>
+            <div className="bl-tile t-res"><p className="l"><span className="op" aria-hidden="true">=</span>נשאר</p>
+              <p className="v"><Left v={-beforeSum} /></p>
+              <p className="s">אחרי השכר של החודש{summed.filter(r => minInfo(r).key === 'none').length ? `; ${summed.filter(r => minInfo(r).key === 'none').length} סניפים עוד בלי תקבול` : ''}</p></div>
             <div className="bl-tile t-res"><p className="l">הרשת משלימה החודש</p>
               <p className="v num">{num(completeRows)}</p>
               <p className="s">{isBase ? 'המענק — חודש הבסיס' : `מענק ${num(tot.support)}; חוסר מתווסף, עודף מקטין (לא מתחת לאפס)`}</p></div>
