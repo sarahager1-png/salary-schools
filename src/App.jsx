@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 151;
+const BUILD = 152;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5605,14 +5605,21 @@ function BottomLineView({ activeMonth, viewer = false }) {
     return [...seen.values()]; })();
   const baseRows = baseBranches.map(b => {
     const rp = repRow(b.name), lb = liveBase.get(b.id) || {};
-    const annual = rp ? rp.annual : Math.round(baseCostOf(b.id) * 12);
-    if (!annual) return null;
-    const add20 = rp ? rp.add20 : Math.round(annual * 0.2);
+    /*
+      "תבדוק את גני תקוה — לא מסתדר"; "תכניס לתכנון צהרונים" (שרה, 8.10): הביצוע כולל את המשרות השעתיות
+      (צהרון), והדוח מ-23.9 הוא עלות הוראה בלבד — ולכן גני תקוה נראתה חורגת. התכנון כולל עכשיו גם את
+      הצהרון לפי שעות המשרה (planHourly מהשרת, × 12), וה-20% מחושב גם עליו ("20 אחוז על הכל", 7.10).
+    */
+    const hourlyYear = Math.round((b.planHourly || 0) * 12);
+    const annual0 = rp ? rp.annual : Math.round(baseCostOf(b.id) * 12);
+    if (!annual0) return null;
+    const annual = annual0 + hourlyYear;
+    const add20 = (rp ? rp.add20 : Math.round(annual0 * 0.2)) + Math.round(hourlyYear * 0.2);
     const ministry = rp ? rp.ministry : Math.round(lb.ministryYear ?? (b.ministry || 0) * 12);
     const supportYear = lb.supportYear ?? (b.support || 0) * 12;
     const month = lb.transfer !== undefined ? lb.transfer : (b.agreed ?? null);
     const total = annual + add20;
-    return { id: b.id, name: rp ? rp.name : shortName(b.name), ord: rp ? (CEO_TRANSFERS_REPORT.rows.indexOf(rp) + 1 || 50) : 99, fromSeptember: !rp, src: rp?.src || null,
+    return { id: b.id, name: rp ? rp.name : shortName(b.name), ord: rp ? (CEO_TRANSFERS_REPORT.rows.indexOf(rp) + 1 || 50) : 99, fromSeptember: !rp, src: rp?.src || null, hourlyYear,
       annual, add20, total, ministry, supportYear, gap: total - ministry - supportYear, month, year: month == null ? null : month * 12 };
   }).filter(Boolean).sort((a, b) => a.ord - b.ord);
   const baseById = new Map(baseRows.map(x => [x.id, x]));
@@ -6044,7 +6051,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 {baseRows.map(r => (
                   <tr key={'base-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }}>{r.name}
-                      {(r.fromSeptember || r.src) && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3, color:'#8a6d1f', background:'#FBF6E6', borderColor:'#EBDDA8' }}>{r.src || 'אינו בדוח — לפי ספטמבר בפועל'}</span>}</th>
+                      {(r.fromSeptember || r.src) && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3, color:'#8a6d1f', background:'#FBF6E6', borderColor:'#EBDDA8' }}>{r.src || 'אינו בדוח — לפי ספטמבר בפועל'}</span>}
+                      {r.hourlyYear > 0 && <span className="bl-tag" title="הדוח מ-23.9 הוא עלות הוראה בלבד; הצהרון נוסף לתכנון לפי שעות המשרה" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3 }}>כולל צהרון {num(r.hourlyYear)} לשנה</span>}</th>
                     <td style={td}>{num(r.annual)}</td>
                     <td style={{ ...td, color:'var(--text2)' }}>{num(r.add20)}</td>
                     <td style={{ ...td, fontWeight:800 }}>{num(r.total)}</td>
@@ -6072,7 +6080,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <CardRow label="העברת הסניף לחודש" strong color="var(--purple)">{canEditBase ? baseInput(r.id, 'transfer', r.month, `העברת הסניף לחודש, ${r.name}`) : num(r.month)}</CardRow>
                 <CardRow label="העברה לשנה" color="var(--purple)">{num(r.year)}</CardRow>
                 <CardRow label="מענק הרשת לשנה">{canEditBase ? baseInput(r.id, 'supportYear', r.supportYear, `מענק הרשת לשנה, ${r.name}`) : num(r.supportYear)}</CardRow>
-                <CardRow label="עלות הוראה לשנה">{num(r.annual)}</CardRow>
+                <CardRow label={r.hourlyYear > 0 ? `עלות הוראה לשנה (כולל צהרון ${num(r.hourlyYear)})` : 'עלות הוראה לשנה'}>{num(r.annual)}</CardRow>
                 <CardRow label="תוספת 20%">{num(r.add20)}</CardRow>
                 <CardRow label="סה״כ עלות">{num(r.total)}</CardRow>
                 <CardRow label="משרד החינוך">{num(r.ministry)}</CardRow>
