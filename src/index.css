@@ -1367,3 +1367,9 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* כשהטבלה רחבה מהמסך — עמודת הסניף נשארת במקום בגלילה לצדדים */
 .big-table.pvam tbody tr th[scope="row"], .big-table.pvam tbody tr:nth-child(even) th[scope="row"] { position: sticky; inset-inline-start: 0; z-index: 2; background: #fff !important; box-shadow: -1px 0 0 #E3DCF2; }
 .big-table.pvam thead tr:not(.bl-groups) th:first-child, .big-table.pvam tfoot td:first-child { position: sticky; inset-inline-start: 0; z-index: 2; }
+
+/* שלוש כרטיסיות נקיות בדף המנכ"ל (שרה, 8.10: "עמוססס") — לבן, בלי גוונים, רק המספר בצבע */
+.bl-tile.t-clean { background: #fff; border-color: var(--line); box-shadow: 0 1px 2px rgba(40,20,90,.04); padding: 14px 18px; }
+.bl-tile.t-clean .v { font-size: 26px; margin-top: 4px; }
+.bl-tile.t-clean .s { margin-top: 4px; }
+@media (max-width: 1100px) { .bl-tile.t-clean .v { font-size: 24px; } }
