@@ -1385,3 +1385,6 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .big-table.pva tbody th[scope="row"], .big-table.pva thead th:first-child, .big-table.pva tfoot td:first-child {
   text-align: center !important; padding-inline: 6px !important; }
 .big-table.pva tbody th[scope="row"] .bl-tag { margin-inline: auto !important; }
+
+/* שורת "ממה נובע החוסר" מתחת לפער — התא האחרון גבוה מעט יותר, וכל השורות נשארות באותו גובה */
+.big-table.pvam tbody td { height: 58px; }

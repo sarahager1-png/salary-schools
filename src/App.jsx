@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 163;
+const BUILD = 164;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5690,6 +5690,16 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const Diff = ({ v, plan, income = false, cushion = false }) => { const d = v - plan;
     if (Math.round(d) === 0) return <span style={{ color:'var(--text3)' }}>—</span>;
     return <span style={{ fontWeight:700, whiteSpace:'nowrap', color: cushion ? (d > 0 ? ST_COLOR.bad : v > 0 ? ST_COLOR.mid : ST_COLOR.ok) : ST_COLOR[actSt(v, plan, income)] }}>{cushion ? (d > 0 ? 'חרג' : 'נשאר') : income ? (d > 0 ? 'יותר' : 'פחות') : (d > 0 ? 'חרג' : 'חסך')} <span className="num">{num(Math.abs(d))}</span></span>; };
+  /*
+    "הפער ברעננה הוא מול הכנסות משרד החינוך ולא מול ההוראה" (שרה, 8.10): ליד כל "חסר" כתוב ממה הוא נובע —
+    משרד החינוך שלא התקבל (או התקבל פחות מהתכנון), חריגה בשכר מעבר לכרית, או פער שקיים כבר בתכנון.
+    מוצג הגורם הגדול ביותר, עם הסכום שלו.
+  */
+  const gapCause = p => { if (!p || Math.round(p.actGap) <= 0) return null;
+    const c = [['משרד החינוך', Math.max(0, p.planMin - p.actMin)], ['חריגה בשכר', Math.max(0, p.act20 - p.plan20)], ['כבר בתכנון', Math.max(0, p.planGap)]]
+      .sort((a, b) => b[1] - a[1])[0];
+    return c[1] > 0 ? { t: c[0], v: c[1] } : null; };
+  const Cause = ({ p }) => { const c = gapCause(p); return c ? <span style={{ display:'block', fontSize:14, fontWeight:600, color:'var(--text2)', whiteSpace:'nowrap', marginTop:1 }}>{c.t}</span> : null; };
   // הכרית: לא נוצלה — ירוק; נוצלה בחלקה — כתום; נוצלה כולה ויותר — אדום
   const cushSt = (used, cushion) => (used > cushion ? 'bad' : used > 0 ? 'mid' : 'ok');
   const Act = ({ v, plan, income = false }) => { const d = v - plan, c = ST_COLOR[actSt(v, plan, income)];
@@ -5857,7 +5867,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 s:<>תכנון {num(pvaTot.planMin)}{noMinN ? ` · ${noMinN} סניפים טרם קיבלו` : ''}</>,
                 title: noMinN ? `טרם התקבל: ${pvaRows.filter(x => x.p?.noMin).map(x => shortName(x.r.name)).join(', ')}` : undefined },
               { l:'הפער לחודש', v:<GapV v={pvaTot.actGap} />,
-                s:<>תכנון: <GapV v={pvaTot.planGap} />{upTo.length > 1 && <> · מתחילת השנה: <GapV v={pvaCum.actGap} /></>}</> },
+                s:<>תכנון: <GapV v={pvaTot.planGap} />{gapCause(pvaTot) && <> · עיקר החוסר: {gapCause(pvaTot).t}</>}{upTo.length > 1 && <> · מתחילת השנה: <GapV v={pvaCum.actGap} /></>}</> },
             ].map(x => (
               <div key={x.l} className="bl-tile t-clean" title={x.title}>
                 <p className="l">{x.l}</p>
@@ -6032,7 +6042,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                       <td style={{ ...tdP, color:'var(--purple)', fontWeight:700 }}>{num(p.transfer)}</td>
                       <td className={p.paid == null ? undefined : cellCls(actSt(p.paid, p.transfer, true))} style={tdP} title={p.paid == null ? 'טרם נרשם במסך "תקבולים ותשלומים" מה שהסניף העביר' : undefined}>
                         {p.paid == null ? <span style={{ color:'var(--text3)' }}>—</span> : <span className="num" style={{ fontWeight:800, color: ST_COLOR[actSt(p.paid, p.transfer, true)] }}>{num(p.paid)}</span>}</td>
-                      <td className={cellCls(gapSt(p.actGap))} style={tdP} title={`בתכנון: ${Math.round(p.planGap) === 0 ? 'מאוזן' : (p.planGap > 0 ? 'חסר ' : 'עודף ') + num(Math.abs(p.planGap))}`}><GapCell v={p.actGap} big /></td>
+                      <td className={cellCls(gapSt(p.actGap))} style={tdP} title={`בתכנון: ${Math.round(p.planGap) === 0 ? 'מאוזן' : (p.planGap > 0 ? 'חסר ' : 'עודף ') + num(Math.abs(p.planGap))}${gapCause(p) ? ` · עיקר החוסר: ${gapCause(p).t} ${num(gapCause(p).v)}` : ''}`}><GapCell v={p.actGap} big /><Cause p={p} /></td>
                     </>)}
                   </tr>
                 ))}
@@ -6047,7 +6057,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={tdP}>{pvaRows.some(x => x.p?.grantPaid != null) ? num(pvaRows.reduce((a, x) => a + (x.p?.grantPaid || 0), 0)) : <span style={{ color:'var(--text3)' }}>—</span>}</td>
                   <td style={tdP}>{num(pvaTot.transfer)}</td>
                   <td style={tdP}>{pvaRows.some(x => x.p?.paid != null) ? num(pvaRows.reduce((a, x) => a + (x.p?.paid || 0), 0)) : <span style={{ color:'var(--text3)' }}>—</span>}</td>
-                  <td className={cellCls(gapSt(pvaTot.actGap))} style={tdP} title={`בתכנון: ${(pvaTot.planGap > 0 ? 'חסר ' : 'עודף ') + num(Math.abs(pvaTot.planGap))}`}><GapCell v={pvaTot.actGap} big /></td>
+                  <td className={cellCls(gapSt(pvaTot.actGap))} style={tdP} title={`בתכנון: ${(pvaTot.planGap > 0 ? 'חסר ' : 'עודף ') + num(Math.abs(pvaTot.planGap))}`}><GapCell v={pvaTot.actGap} big /><Cause p={pvaTot} /></td>
                 </tr>
               </tfoot>
             </table>
@@ -6060,6 +6070,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
                 {!p ? <p style={{ fontSize:14, color:'var(--text2)' }}>אין לסניף נתוני בסיס</p> : (<>
                   <CardRow label="הפער לחודש — ביצוע" strong><GapV v={p.actGap} /></CardRow>
+                  {gapCause(p) && <CardRow label="עיקר החוסר">{gapCause(p).t} · {num(gapCause(p).v)}</CardRow>}
                   <CardRow label="הפער לחודש — תכנון"><GapV v={p.planGap} /></CardRow>
                   <CardRow label="עלות השכר — תכנון">{num(p.planSal)}</CardRow>
                   <CardRow label="עלות השכר — ביצוע"><Act v={p.actSal} plan={p.planSal} /></CardRow>
