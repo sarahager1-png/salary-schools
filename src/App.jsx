@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 157;
+const BUILD = 158;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5874,98 +5874,103 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <div style={{ margin:'2px 0 8px' }}><HelpBtn id="month" /></div>
           {help === 'month' && (
             <p style={helpBox}>{mode === 'compare'
-            ? (cmpKind === 'salary' ? 'התכנון השנתי של עלות ההוראה לכל סניף, החלק החודשי שלו (השנתי ÷ 12), ועלות ההוראה בפועל בכל חודש מולו. ירוק — עומד בתכנון; כתום — כמעט (חריגה עד 5%); אדום — לא עומד. מתחת: כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.' : 'הפער של כל סניף בכל חודש בביצוע: שכר + 20% − משרד החינוך שהתקבל − מענק הרשת − העברת הסניף. "חסר" כשהעלות גבוהה מהכיסוי, "עודף" כשנשאר. בסוף: הפער המצטבר.')
+            ? (cmpKind === 'cash' ? 'הפער של כל סניף בכל חודש בביצוע: שכר + 20% − משרד החינוך שהתקבל − מענק הרשת − העברת הסניף. "חסר" כשהעלות גבוהה מהכיסוי, "עודף" כשנשאר. בסוף: הפער המצטבר.' : `התכנון השנתי של ${cmpKind === 'ministry' ? 'הכנסות משרד החינוך' : 'עלות ההוראה'} לכל סניף, החלק החודשי שלו (השנתי ÷ 12), ו${cmpKind === 'ministry' ? 'מה שהתקבל' : 'העלות בפועל'} בכל חודש מולו. ירוק — עומד בתכנון; כתום — חריגה עד 5% או שטרם התקבל; אדום — מעבר לזה. בסוף: המצטבר מתחילת השנה מול התכנון.`)
             : <>תכנון = נתוני הבסיס שלמטה ÷ 12. פער ירוק — לטובה · כתום — חריגה עד 5% · אדום — מעבר לזה.</>}
               {mode !== 'compare' && <> מענק הרשת והעברת הסניף נכנסים לחשבון לפי התכנון; הביצוע שלהם למעקב: את המענק ששולם רושם מנהל הרשת בטבלה, ואת העברת הסניף — במסך "תקבולים ותשלומים".</>}</p>
           )}
           {mode === 'compare' ? (
           <>
-          <div className="apple-seg no-print" role="group" aria-label="מה משווים" style={{ marginBottom:10 }}>
-            <button onClick={() => setCmpKind('salary')} aria-pressed={cmpKind === 'salary'}
-              className={['apple-seg-item', cmpKind === 'salary' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>עלות ההוראה מול התכנון</button>
-            <button onClick={() => setCmpKind('cash')} aria-pressed={cmpKind === 'cash'}
-              className={['apple-seg-item', cmpKind === 'cash' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>הפער לחודש</button>
+          {/*
+            "גם תכנון מול ביצוע במשרד החינוך" (שרה, 8.10): אותה טבלת שנה, שלוש תצוגות — עלות ההוראה, משרד
+            החינוך, והפער. בשתי הראשונות: תכנון שנתי, החלק החודשי, וכל חודש מולו; בסוף המצטבר מול התכנון.
+          */}
+          <div className="apple-seg no-print" role="group" aria-label="מה משווים" style={{ marginBottom:10, flexWrap:'wrap' }}>
+            {[['salary', 'עלות ההוראה'], ['ministry', 'משרד החינוך'], ['cash', 'הפער לחודש']].map(([k, l]) => (
+              <button key={k} onClick={() => setCmpKind(k)} aria-pressed={cmpKind === k}
+                className={['apple-seg-item', cmpKind === k ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>{l}</button>
+            ))}
           </div>
+          {(() => {
+            const gapView = cmpKind === 'cash', inc = cmpKind === 'ministry';
+            const annOf = bd => (inc ? bd.ministry : bd.annual);
+            const actOf = p => (inc ? p.actMin : p.actSal), planOf2 = p => (inc ? p.planMin : p.planSal);
+            const what = inc ? 'משרד החינוך' : 'עלות ההוראה';
+            const cumOf = id => months.reduce((a, m) => { const p = pvaIn(m, id); return p ? { act: a.act + actOf(p), plan: a.plan + planOf2(p), gap: a.gap + p.actGap, n: a.n + 1, wait: a.wait + (inc && p.noMin ? 1 : 0) } : a; }, { act: 0, plan: 0, gap: 0, n: 0, wait: 0 });
+            const cumNet = months.reduce((a, m) => { const x = pvaNet(m); return { act: a.act + actOf(x), plan: a.plan + planOf2(x), gap: a.gap + x.actGap }; }, { act: 0, plan: 0, gap: 0 });
+            const annTot = baseRows.reduce((a, bd) => a + annOf(bd), 0);
+            const planGapOf = bd => (bd.annual + bd.add20 - bd.ministry - bd.supportYear) / 12 - (bd.month || 0);
+            const MonthCell = ({ p, bold }) => {
+              if (gapView) return <><GapV v={p.actGap} />{p.noMin && <span style={{ display:'block', fontSize:14, fontWeight:600, color:'#8F4E00', marginTop:2 }}>טרם התקבל</span>}</>;
+              const wait = inc && p.noMin;
+              return <>
+                <span className="num" style={{ display:'block', fontWeight:800 }}>{num(actOf(p))}</span>
+                <span style={{ display:'block', fontSize:14 }}>{wait ? <span style={{ fontWeight:700, color:'#8F4E00' }}>טרם התקבל</span>
+                  : Math.round(actOf(p) - planOf2(p)) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>עומד</span>
+                  : <Diff v={actOf(p)} plan={planOf2(p)} income={inc} />}</span>
+              </>;
+            };
+            const monthCls = p => (gapView ? cellCls(gapSt(p.actGap)) : cellCls(inc && p.noMin ? 'mid' : actSt(actOf(p), planOf2(p), inc)));
+            const TotCell = ({ c }) => gapView ? <GapV v={c.gap} /> : Math.round(c.act - c.plan) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>עומד</span> : <Diff v={c.act} plan={c.plan} income={inc} />;
+            const totCls = c => (gapView ? cellCls(gapSt(c.gap)) : cellCls(actSt(c.act, c.plan, inc)));
+            return (<>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table pva" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{cmpKind === 'salary' ? 'מיפוי השנה לפי סניף: השכר בכל חודש מול התכנון, וסך החיסכון או החריגה' : 'מיפוי השנה לפי סניף: הפער בכל חודש בביצוע, והפער המצטבר'}</caption>
+              <caption className="sr-only">{gapView ? 'מיפוי השנה לפי סניף: הפער בכל חודש בביצוע, והפער המצטבר' : `מיפוי השנה לפי סניף: ${what} — תכנון שנתי, החלק החודשי, כל חודש מול התכנון, והמצטבר`}</caption>
               <colgroup>
-                <col />{cmpKind === 'salary' && <col className="g-cost" />}<col className="g-cost" />{yearCols.map(c => <col key={c.key} className={c.key === sel ? 'g-res' : undefined} />)}
+                <col />{!gapView && <col className="g-cost" />}<col className="g-cost" />{yearCols.map(c => <col key={c.key} className={c.key === sel ? 'g-res' : undefined} />)}
                 <col className="g-res g-sum" />
               </colgroup>
               <thead>
                 <tr>
                   <TH>סניף</TH>
-                  {/* "הוא רוצה לראות תכנון שנתי של עלות ההוראה, וכל חודש ביחס לחודש — אם עומדים בו" (שרה, 8.10) */}
-                  {cmpKind === 'salary' && <TH>תכנון שנתי<span style={{ display:'block', fontSize:14, fontWeight:600 }}>עלות ההוראה</span></TH>}
-                  <TH>תכנון לחודש<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{cmpKind === 'salary' ? 'השנתי ÷ 12' : 'הפער'}</span></TH>
+                  {!gapView && <TH>תכנון שנתי<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{what}</span></TH>}
+                  <TH>תכנון לחודש<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{gapView ? 'הפער' : 'השנתי ÷ 12'}</span></TH>
                   {yearCols.map(c => <TH key={c.key}>{c.m ? shortMonth(c.key) : shortMonth(c.key).slice(0, 3) + "'"}{c.m && <span style={{ display:'block', fontSize:14, fontWeight:600 }}>{c.m.frozenAt ? 'סגור' : 'פתוח'}</span>}</TH>)}
-                  {cmpKind === 'salary'
-                    ? <TH>סה"כ השנה<span style={{ display:'block', fontSize:14, fontWeight:600 }}>חסך / חרג מול התכנון</span></TH>
-                    : <TH>פער מצטבר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>ביצוע</span></TH>}
+                  {gapView ? <TH>פער מצטבר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>ביצוע</span></TH>
+                    : <TH>סה"כ השנה<span style={{ display:'block', fontSize:14, fontWeight:600 }}>מול התכנון</span></TH>}
                 </tr>
               </thead>
               <tbody>
-                {cmpRows.map(r => { const bd = baseById.get(r.id); const y = yearOf(r.id); return (
+                {cmpRows.map(r => { const bd = baseById.get(r.id); const c = cumOf(r.id); return (
                   <tr key={'cmp-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <th scope="row" style={{ padding:'10px 8px', fontWeight:700, textAlign:'start', fontSize:15.5 }} title={r.name}>{shortName(r.name).replace(/^שלהבות /, '').replace(/ קטמון$/, '')}</th>
-                    {cmpKind === 'salary' && <td style={{ ...td, fontWeight:800 }}>{bd ? num(bd.annual) : '—'}</td>}
-                    <td style={{ ...td, color:'var(--text2)' }}>{!bd ? '—' : cmpKind === 'salary' ? num(bd.annual / 12) : <GapV v={(bd.annual + bd.add20 - bd.ministry - bd.supportYear) / 12 - (bd.month || 0)} />}</td>
-                    {yearCols.map(({ key, m }) => { const p = m ? pvaIn(m, r.id) : null; if (!p) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; return cmpKind === 'salary' ? (
-                      <td key={key} className={cellCls(actSt(p.actSal, p.planSal))} style={td}
-                        title={({ ok:'עומד בתכנון', mid:'כמעט — חריגה עד 5%', bad:'לא עומד בתכנון' })[actSt(p.actSal, p.planSal)]}>
-                        <span className="num" style={{ display:'block', fontWeight:800 }}>{num(p.actSal)}</span>
-                        <span style={{ display:'block', fontSize:14 }}>{Math.round(p.actSal - p.planSal) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>עומד</span> : <Diff v={p.actSal} plan={p.planSal} />}</span>
-                      </td>
-                    ) : (
-                      <td key={key} className={cellCls(gapSt(p.actGap))} style={{ ...td, fontWeight: key === sel ? 800 : 500 }} title={p.noMin ? 'משרד החינוך טרם התקבל' : undefined}>
-                        <GapV v={p.actGap} />
-                        {p.noMin && <span style={{ display:'block', fontSize:14, fontWeight:600, color:'#8F4E00', marginTop:2 }}>טרם התקבל</span>}
-                      </td>
-                    ); })}
-                    <td className={cmpKind === 'salary' ? yearCls(y) : cellCls(gapSt(y.gap))} style={{ ...td, fontWeight:800 }}>{cmpKind === 'salary' ? <SavedP v={y.sal} /> : <GapV v={y.gap} />}</td>
+                    {!gapView && <td style={{ ...td, fontWeight:800 }}>{bd ? num(annOf(bd)) : '—'}</td>}
+                    <td style={{ ...td, color:'var(--text2)' }}>{!bd ? '—' : gapView ? <GapV v={planGapOf(bd)} /> : num(annOf(bd) / 12)}</td>
+                    {yearCols.map(({ key, m }) => { const p = m ? pvaIn(m, r.id) : null; if (!p) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>;
+                      return <td key={key} className={monthCls(p)} style={td}><MonthCell p={p} /></td>; })}
+                    <td className={c.n ? totCls(c) : undefined} style={{ ...td, fontWeight:800 }}>{c.n ? (inc && c.wait === c.n ? <span style={{ fontWeight:700, color:'#8F4E00' }}>טרם התקבל</span> : <TotCell c={c} />) : '—'}</td>
                   </tr>
                 ); })}
               </tbody>
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  {cmpKind === 'salary' && <td style={td}>{num(baseTot.annual)}</td>}
-                  <td style={td}>{cmpKind === 'salary' ? num(baseTot.annual / 12) : <GapV v={(baseTot.annual + baseTot.add20 - baseTot.ministry - baseTot.supportYear) / 12 - baseTot.month} />}</td>
-                  {yearCols.map(({ key, m }) => { if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; const x = pvaNet(m); return cmpKind === 'salary' ? (
-                    <td key={key} className={cellCls(actSt(x.actSal, x.planSal))} style={td}>
-                      <span className="num" style={{ display:'block' }}>{num(x.actSal)}</span>
-                      <span style={{ display:'block', fontSize:14 }}><Diff v={x.actSal} plan={x.planSal} /></span>
-                    </td>
-                  ) : (
-                    <td key={key} className={cellCls(gapSt(x.actGap))} style={td}><GapV v={x.actGap} /></td>
-                  ); })}
-                  <td className={cmpKind === 'salary' ? yearCls(yearNet) : cellCls(gapSt(yearNet.gap))} style={td}>{cmpKind === 'salary' ? <SavedP v={yearNet.sal} /> : <GapV v={yearNet.gap} />}</td>
+                  {!gapView && <td style={td}>{num(annTot)}</td>}
+                  <td style={td}>{gapView ? <GapV v={(baseTot.annual + baseTot.add20 - baseTot.ministry - baseTot.supportYear) / 12 - baseTot.month} /> : num(annTot / 12)}</td>
+                  {yearCols.map(({ key, m }) => { if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; const x = pvaNet(m);
+                    return <td key={key} className={gapView ? cellCls(gapSt(x.actGap)) : cellCls(actSt(actOf(x), planOf2(x), inc))} style={td}>
+                      {gapView ? <GapV v={x.actGap} /> : <><span className="num" style={{ display:'block' }}>{num(actOf(x))}</span><span style={{ display:'block', fontSize:14 }}><Diff v={actOf(x)} plan={planOf2(x)} income={inc} /></span></>}</td>; })}
+                  <td className={totCls(cumNet)} style={td}><TotCell c={cumNet} /></td>
                 </tr>
               </tfoot>
             </table>
           </div>
           <div className="only-mobile big-cards">
-            {cmpRows.map(r => { const y = yearOf(r.id); return (
+            {cmpRows.map(r => { const bd = baseById.get(r.id); const c = cumOf(r.id); return (
               <div key={'cmpm-' + r.id} className="apple-card mcard">
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
-                {cmpKind === 'salary' && baseById.get(r.id) && <CardRow label="תכנון שנתי — עלות ההוראה" strong>{num(baseById.get(r.id).annual)}</CardRow>}
-                {cmpKind === 'salary' && baseById.get(r.id) && <CardRow label="תכנון לחודש (השנתי ÷ 12)">{num(baseById.get(r.id).annual / 12)}</CardRow>}
-                {yearCols.filter(c => c.m).map(({ key, m }) => { const p = pvaIn(m, r.id); if (!p) return null; return cmpKind === 'salary' ? (
+                {!gapView && bd && <CardRow label={`תכנון שנתי — ${what}`} strong>{num(annOf(bd))}</CardRow>}
+                {!gapView && bd && <CardRow label="תכנון לחודש (השנתי ÷ 12)">{num(annOf(bd) / 12)}</CardRow>}
+                {yearCols.filter(c => c.m).map(({ key, m }) => { const p = pvaIn(m, r.id); if (!p) return null; return (
                   <CardRow key={key} label={shortMonth(key)} strong={key === sel}>
-                    <span style={{ marginInlineEnd:8 }}><Pill s={statusOf(p.actSal, p.planSal)} /></span>
-                    {num(p.actSal)}
-                    <PlanNote cost={p.actSal} plan={p.planSal} block={false} />
+                    {gapView ? <GapV v={p.actGap} /> : <>{num(actOf(p))}<span style={{ marginInlineStart:8, fontSize:14 }}>{inc && p.noMin ? <span style={{ fontWeight:700, color:'#8F4E00' }}>טרם התקבל</span> : <Diff v={actOf(p)} plan={planOf2(p)} income={inc} />}</span></>}
                   </CardRow>
-                ) : (
-                  <CardRow key={key} label={shortMonth(key)} strong={key === sel}><GapV v={p.actGap} /></CardRow>
                 ); })}
-                {cmpKind === 'salary'
-                  ? <CardRow label="סה&quot;כ השנה מול התכנון" strong><SavedP v={y.sal} /></CardRow>
-                  : <CardRow label="פער מצטבר" strong><GapV v={y.gap} /></CardRow>}
+                <CardRow label={gapView ? 'פער מצטבר' : 'סה"כ השנה מול התכנון'} strong>{!c.n ? '—' : inc && c.wait === c.n ? <span style={{ fontWeight:700, color:'#8F4E00' }}>טרם התקבל</span> : <TotCell c={c} />}</CardRow>
               </div>
             ); })}
           </div>
+            </>); })()}
           </>
           ) : (
           <>
