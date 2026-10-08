@@ -590,6 +590,31 @@ export async function queueMessage({ kind, to_phone, to_name, body }) {
   raise(error, 'הכנסת ההודעה לתור נכשלה');
 }
 
+/*
+  דחיית דיווח של מנהלת (שרה, 8.10.26: "תוסיף אפשרות דחיה"). הדיווח נשאר כפי
+  שהוא ונשאר "ממתין" — כך שאינו עובר לסימולציה ולשכר — ונרשם סימון דחייה
+  עם הסיבה. הסימון הוא שורת inapp בתור ההודעות (אינה נשלחת), מקושרת לשורת
+  העובדת. כשהמנהלת מתקנת ושומרת, מועד הדיווח מתעדכן והסימון מפסיק לחול.
+  ההודעה למנהלת נכנסת לתור הוואטסאפ, אחת לכל דחייה.
+*/
+export async function listReportRejections(monthKey) {
+  const { data, error } = await supabase.from('notifications')
+    .select('teacher_id, body, created_at').eq('kind', 'report_rejected').eq('month_key', monthKey);
+  raise(error, 'טעינת הדחיות נכשלה');
+  return data || [];
+}
+export async function rejectReports({ ids, reason, monthKey, principal, message }) {
+  const marks = ids.map(id => ({ kind: 'report_rejected', channel: 'inapp', status: 'sent', sent_at: new Date().toISOString(),
+    to_phone: principal?.phone || '-', to_name: principal?.fullName || null, teacher_id: id, month_key: monthKey, body: reason }));
+  const { error } = await supabase.from('notifications').insert(marks);
+  raise(error, 'רישום הדחייה נכשל');
+  if (principal?.phone && message) {
+    const { error: e2 } = await supabase.from('notifications').insert({ kind: 'report_rejected_msg', to_phone: principal.phone,
+      to_name: principal.fullName, month_key: monthKey, body: message });
+    raise(e2, 'הדחייה נרשמה, אבל ההודעה למנהלת לא נכנסה לתור');
+  }
+}
+
 export async function principalsOfSchool(schoolId) {
   const { data, error } = await supabase.from('profiles')
     .select('id, full_name, phone').eq('role', 'principal').eq('school_id', schoolId);

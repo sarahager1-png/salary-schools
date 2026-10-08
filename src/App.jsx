@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 136;
+const BUILD = 137;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -283,6 +283,43 @@ const replacedRows = (t, name, all) => (String(name || '').trim()
 const absenceHoursOf = list => list.reduce((s, x) => s + (Number(x.absenceHours) || 0), 0);
 // מילוי מקום מוחזק: לנעדרת יש היעדרות בלי אישור. מחזיר את שורת הנעדרת, או null
 const mmHeldBy = (t, all) => replacedRows(t, t.mmFor, all).find(missingDoc) || null;
+/*
+  "דיווחי היעדרות לא יישלחו לאישור בלי מסמכים, ממ"מ לא יישלח לאישור אם הנעדרת
+  לא הביאה אישורים… ממ"מ שלא משובצת צריך להעלות טופס 101, צילום ת.ז. ופרטי
+  בנק" (שרה, 8.10.26). דיווח שחסר בו מסמך אינו נכנס לתור האישור של שרה: הוא
+  מוצג בנפרד כ"מוחזק", עם מה שחסר. הכלל חל על כל דיווח שממתין לאישור.
+*/
+const reportsAbsence = t => (t.absenceDays || 0) > 0 || (t.absenceHours || 0) > 0 || Boolean(t.absenceReason) || onLeave(t);
+const reportsMm = t => (Number(t.mmHours) || 0) > 0 || Boolean(String(t.mmFor || '').trim());
+// ממלאת מקום שאינה משובצת: שיבוץ זמני, או בלי שעות הוראה קבועות
+const isUnassignedSub = t => reportsMm(t) && (Boolean(t.isTemp) || !(Number(t.frontalHours) > 0));
+const onbOf = (t, onb) => (onb || []).find(o => t.tzId && o.tz_id && String(o.tz_id).trim() === String(t.tzId).trim())
+  || (onb || []).find(o => o.school_id === t.schoolId && sameName(o.name, t.name)) || null;
+const subDocsMissing = (t, onb) => {
+  if (!isUnassignedSub(t)) return [];
+  const o = onbOf(t, onb);
+  return [
+    !(o && (o.form101_signed_at || o.form101_file_path)) && 'טופס 101',
+    !(o && o.id_doc_path) && 'צילום ת.ז.',
+    !(o && o.bank_saved_at) && 'פרטי בנק',
+  ].filter(Boolean);
+};
+const reportHoldReasons = (t, all, onb) => {
+  const out = [];
+  if (reportsAbsence(t) && !t.sickFormPath) out.push('חסר אישור היעדרות');
+  if (reportsMm(t)) {
+    const noDoc = replacedRows(t, t.mmFor, all).find(x => reportsAbsence(x) && !x.sickFormPath);
+    if (noDoc) out.push(`חסר אישור היעדרות של ${noDoc.name}`);
+    const miss = subDocsMissing(t, onb);
+    if (miss.length) out.push(`ממלאת מקום שאינה משובצת — חסר: ${miss.join(', ')}`);
+  }
+  return out;
+};
+// הדחייה חלה עד שהמנהלת שומרת שוב (מועד הדיווח מתעדכן)
+const rejectionOf = (t, rejections) => {
+  const r = (rejections || []).filter(x => x.teacher_id === t.id).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+  return r && (!t._reportPendingAt || new Date(r.created_at) >= new Date(t._reportPendingAt)) ? r : null;
+};
 // שעות מילוי מקום שכבר דווחו במקום אותו שם, בלי השורה שנערכת עכשיו
 const mmReportedFor = (name, like, all, exceptId) => all
   .filter(x => x.id !== exceptId && x.schoolId === like.schoolId
@@ -717,6 +754,9 @@ function LoginScreen({ onSignedIn, initialError = '' }) {
 function TeacherDiff({ t }) {
   const diffs = diffT(t);
   const isNew = !t._snapshot;
+  // "הן לא עובדות חדשות" (שרה, 8.10): שורה בלי תמונת-לפני שיש בה דיווח היעדרות או מילוי מקום היא דיווח, לא עובדת חדשה
+  if (isNew && (reportsAbsence(t) || reportsMm(t)))
+    return <span className="apple-badge badge-purple">{reportsAbsence(t) ? 'דיווח היעדרות' : 'דיווח מילוי מקום'}</span>;
   if (isNew) return <span className="apple-badge badge-blue">עובד/ת הוראה חדש/ה</span>;
   if (diffs.length === 0) {
     const hasScopeChanges = t.scopeChanges?.some(c => !c._approved);
@@ -927,9 +967,80 @@ function RejectDialog({ t, schoolName, onCancel, onConfirm }) {
   );
 }
 
-function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose, fixes = [], onDecideFix, monthLabel = '', otherFixes = 0 }) {
+/*
+  דחיית דיווח — "תוסיף אפשרות דחיה" (שרה, 8.10.26). סיבה חובה; ההודעה למנהלת
+  מוצגת לפני השליחה, ויוצאת מתור הוואטסאפ. הדיווח נשאר אצל המנהלת לתיקון.
+*/
+function ReportRejectDialog({ rows, label, monthLabel, schoolName, onCancel, onConfirm }) {
+  const REASONS = ['חסרים אישורי היעדרות', 'שעות מילוי המקום אינן תואמות לשעות ההיעדרות', 'חסרים מסמכים של ממלאת המקום (טופס 101, צילום ת.ז., פרטי בנק)', 'הדיווח אינו תקין — יש לדווח מחדש לפי הנוהל', 'אחר'];
+  const [reason, setReason] = useState('');
+  const [other, setOther] = useState('');
+  const [principal, setPrincipal] = useState(undefined);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const schoolId = rows[0]?.schoolId;
+  useEffect(() => {
+    let alive = true;
+    store.principalsOfSchool(schoolId).then(ps => { if (alive) setPrincipal(ps.find(p => p.phone) || null); })
+      .catch(() => { if (alive) setPrincipal(null); });
+    return () => { alive = false; };
+  }, [schoolId]);
+  const why = (reason === 'אחר' ? other : reason).trim();
+  const names = rows.map(t => t.name).join(', ');
+  const message = `הדיווח על ${monthLabel} לא אושר${rows.length === 1 ? ` (${names})` : ` — ${rows.length} דיווחים: ${names}`}.\n` +
+    `הסיבה: ${why}\n\n` +
+    `יש לתקן ולשמור מחדש בקישור הדיווח. דיווח היעדרות נשלח לאישור רק עם אישור מצורף, ומילוי מקום רק כשלנעדרת יש אישור.`;
+  const send = async () => {
+    setBusy(true); setErr('');
+    try { await onConfirm({ rows, reason: why, principal, message }); }
+    catch (e) { setErr(e.message); setBusy(false); }
+  };
+  return (
+    <div className="apple-card" role="dialog" aria-label="דחיית דיווח" style={{ padding:16, marginBottom:16, border:'2px solid var(--danger)' }}>
+      <p style={{ fontWeight:700, fontSize:16.1, marginBottom:8 }}>דחיית דיווח — {label}</p>
+      <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+        {REASONS.map(r => (
+          <button key={r} onClick={() => setReason(r)} aria-pressed={reason === r}
+            style={{ textAlign:'start', padding:'9px 12px', minHeight:42, borderRadius:10, fontSize:15, cursor:'pointer', fontFamily:'inherit',
+              border: reason === r ? '2px solid var(--purple)' : '1px solid var(--line, #e5e5ea)', background: reason === r ? 'var(--purple-100)' : 'var(--surface, #fff)', fontWeight: reason === r ? 700 : 500 }}>{r}</button>
+        ))}
+      </div>
+      {reason === 'אחר' && (
+        <textarea value={other} onChange={e => setOther(e.target.value)} rows={2} placeholder="הסיבה"
+          style={{ width:'100%', fontSize:15.5, padding:10, borderRadius:10, border:'1px solid var(--line, #e5e5ea)', fontFamily:'inherit', marginBottom:8 }} />
+      )}
+      {why && (
+        <div style={{ background:'var(--fill, #f5f3fa)', borderRadius:10, padding:'10px 12px', marginBottom:8 }}>
+          <p style={{ fontSize:14, color:'var(--apple-text2)', marginBottom:4 }}>
+            {principal === undefined ? 'טוען את פרטי המנהלת…' : principal ? `ההודעה שתישלח בוואטסאפ אל ${principal.fullName}:` : 'אין למנהלת מספר נייד במערכת — הדחייה תירשם, בלי הודעה.'}
+          </p>
+          {principal && <p style={{ fontSize:14.6, whiteSpace:'pre-wrap', lineHeight:1.55 }}>{message}</p>}
+        </div>
+      )}
+      {err && <p role="alert" style={{ color:'var(--danger-text)', fontSize:14.6, fontWeight:600, marginBottom:8 }}>{err}</p>}
+      <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+        <button className="apple-btn apple-btn-ghost" onClick={onCancel} disabled={busy} style={{ fontSize:14.9 }}>ביטול</button>
+        <button className="apple-btn" onClick={send} disabled={!why || busy || principal === undefined}
+          style={{ fontSize:14.9, background:'var(--danger)', color:'#fff', opacity: !why || busy ? 0.5 : 1 }}>{busy ? 'דוחה…' : `דחייה (${rows.length})`}</button>
+      </div>
+    </div>
+  );
+}
+
+function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose, fixes = [], onDecideFix, monthLabel = '', otherFixes = 0, onb = [], rejections = [], onRejectReports = null }) {
   // דיווחי מנהלות — השלב הראשון: בלי אישורה אין סימולציה ואין שכר (21.9.26)
-  const reports = onApproveReport ? teachers.filter(reportPending) : [];
+  // מה-8.10.26: דיווח שחסר בו מסמך מוחזק ואינו בתור האישור; דיווח שנדחה ממתין לתיקון המנהלת
+  const pendingAll = onApproveReport ? teachers.filter(reportPending) : [];
+  const rejected = pendingAll.filter(t => rejectionOf(t, rejections));
+  const heldReports = pendingAll.filter(t => !rejectionOf(t, rejections) && reportHoldReasons(t, teachers, onb).length);
+  const reports = pendingAll.filter(t => !rejectionOf(t, rejections) && !reportHoldReasons(t, teachers, onb).length);
+  const [rejRep, setRejRep] = useState(null);   // { rows, label } — הדיווחים שנדחים עכשיו
+  const openBySchool = schools.map(sc => ({ sc, rows: [...reports, ...heldReports].filter(t => t.schoolId === sc.id) })).filter(g => g.rows.length);
+  const repLine = t => [Number(t.absenceDays) > 0 ? `${t.absenceDays} ימי היעדרות` : '',
+    Number(t.absenceHours) > 0 ? `${t.absenceHours} שעות היעדרות` : '',
+    reasonLabel(t.absenceReason),
+    Number(t.mmHours) > 0 ? `${t.mmHours} שעות מילוי מקום${t.mmFor ? ` במקום ${t.mmFor}` : ''}` : (t.mmFor ? `מילוי מקום במקום ${t.mmFor}` : ''),
+    onLeave(t) ? leaveText(t) : ''].filter(Boolean).join(' · ');
   const [rejecting, setRejecting] = useState(null);
   const schoolName = id => schools.find(s => s.id === id)?.name || '';
   // רק מורים שהנתונים הושלמו (יש שכר רשמי) → ממתינים לאישור שרה
@@ -1038,10 +1149,16 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
                         {t._reportPendingAt ? ` · דווח ${new Date(t._reportPendingAt).toLocaleDateString('he-IL')}` : ''}
                       </p>
                     </div>
-                    <button className="apple-btn apple-btn-green" onClick={() => onApproveReport([t])}
-                      style={{ fontSize:14.9, padding:'7px 16px', flexShrink:0 }}>
-                      אשרי דיווח
-                    </button>
+                    <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                      {onRejectReports && (
+                        <button className="apple-btn apple-btn-ghost" onClick={() => setRejRep({ rows: [t], label: t.name })}
+                          style={{ fontSize:14.9, padding:'7px 14px', color:'var(--danger)' }}>דחייה</button>
+                      )}
+                      <button className="apple-btn apple-btn-green" onClick={() => onApproveReport([t])}
+                        style={{ fontSize:14.9, padding:'7px 16px' }}>
+                        אשרי דיווח
+                      </button>
+                    </div>
                   </div>
                   <TeacherDiff t={t} />
                   {(Number(t.absenceDays) > 0 || Number(t.absenceHours) > 0 || Number(t.mmHours) > 0 || onLeave(t)) && (
@@ -1059,6 +1176,73 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
               ))}
             </div>
           </div>
+        )}
+
+        {/* מוחזקים — חסרים מסמכים; לא בתור האישור (שרה, 8.10.26) */}
+        {heldReports.length > 0 && (
+          <div className="apple-card" style={{ padding:16, marginBottom:16, borderRight:'3px solid var(--apple-orange)' }}>
+            <p style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-text)', marginBottom:4 }}>
+              {heldReports.length === 1 ? 'דיווח אחד מוחזק' : `${heldReports.length} דיווחים מוחזקים`} — חסרים מסמכים
+            </p>
+            <p style={{ fontSize:14, color:'var(--apple-text2)', marginBottom:12 }}>
+              לא נשלחו לאישור. ייכנסו לתור מעצמם כשהמנהלת תצרף את מה שחסר.
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {heldReports.map(t => (
+                <div key={t.id} style={{ border:'1px solid var(--warn-line)', borderRadius:12, padding:12, background:'var(--warn-bg)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10 }}>
+                    <div style={{ minWidth:0 }}>
+                      <p style={{ fontWeight:600, fontSize:16.1, color:'var(--apple-text)' }}>{t.name}</p>
+                      <p style={{ fontSize:14, color:'var(--apple-text2)' }}>{shortName(schoolName(t.schoolId))}{repLine(t) ? ` · ${repLine(t)}` : ''}</p>
+                      {reportHoldReasons(t, teachers, onb).map(x => (
+                        <p key={x} style={{ fontSize:14.4, fontWeight:700, color:'#8F4E00', marginTop:3 }}>{x}</p>
+                      ))}
+                    </div>
+                    {onRejectReports && (
+                      <button className="apple-btn apple-btn-ghost" onClick={() => setRejRep({ rows: [t], label: t.name })}
+                        style={{ fontSize:14.9, padding:'7px 14px', color:'var(--danger)', flexShrink:0 }}>דחייה</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* דחיית כל הדיווחים הפתוחים של בית ספר */}
+        {onRejectReports && openBySchool.length > 0 && (
+          <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:16 }}>
+            {openBySchool.map(({ sc, rows }) => (
+              <button key={sc.id} className="apple-btn apple-btn-ghost" onClick={() => setRejRep({ rows, label: `כל הדיווחים של ${shortName(sc.name)} (${rows.length})` })}
+                style={{ fontSize:14.6, color:'var(--danger)' }}>
+                דחיית כל הדיווחים של {shortName(sc.name)} ({rows.length})
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* נדחו — ממתינים לתיקון המנהלת */}
+        {rejected.length > 0 && (
+          <div className="apple-card" style={{ padding:16, marginBottom:16, borderRight:'3px solid var(--danger)' }}>
+            <p style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-text)', marginBottom:4 }}>
+              {rejected.length === 1 ? 'דיווח אחד נדחה' : `${rejected.length} דיווחים נדחו`} — ממתינים לתיקון המנהלת
+            </p>
+            <p style={{ fontSize:14, color:'var(--apple-text2)', marginBottom:10 }}>כשהמנהלת תתקן ותשמור, הדיווח יחזור לכאן לבדיקה.</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {rejected.map(t => { const r = rejectionOf(t, rejections); return (
+                <div key={t.id} style={{ border:'1px solid var(--line, #e5e5ea)', borderRadius:12, padding:'9px 12px', background:'var(--surface, #fff)' }}>
+                  <p style={{ fontWeight:600, fontSize:15.5 }}>{t.name} <span style={{ fontWeight:400, color:'var(--apple-text2)', fontSize:14 }}>· {shortName(schoolName(t.schoolId))}{repLine(t) ? ` · ${repLine(t)}` : ''}</span></p>
+                  <p style={{ fontSize:14.4, color:'var(--danger-text)', marginTop:2 }}>נדחה {new Date(r.created_at).toLocaleDateString('he-IL')}: {r.body}</p>
+                </div>
+              ); })}
+            </div>
+          </div>
+        )}
+
+        {rejRep && onRejectReports && (
+          <ReportRejectDialog rows={rejRep.rows} label={rejRep.label} monthLabel={monthLabel} schoolName={schoolName}
+            onCancel={() => setRejRep(null)}
+            onConfirm={async (payload) => { await onRejectReports(payload); setRejRep(null); }} />
         )}
 
         {/* ממתינים לסימולציה */}
@@ -7152,7 +7336,7 @@ function TeachingCostView({ schools, teachers, monthKey, onSaveSchool, onSaveTea
    "גם אני וגם אסתר יראו" (שרה, 3.9): מה שהמנהלות מדווחות בדשבורד
    החודשי שבקישור מופיע כאן, לכל הרשת, לקריאה בלבד — התיקון נעשה
    אצל המנהלת, לא כאן. */
-function AbsencesView({ schools, teachers, monthKey, fmtMonthFn, canReopen = false }) {
+function AbsencesView({ schools, teachers, monthKey, fmtMonthFn, canReopen = false, onb = [], rejections = [] }) {
   const [onlyReported, setOnlyReported] = useState(true);
   const has = t => (t.absenceDays || 0) > 0 || (t.absenceHours || 0) > 0 || (t.mmHours || 0) > 0 || t.mmFor
     || onLeave(t) || t.isTemp || t.absenceReason || t.sickFormPath;
@@ -7222,6 +7406,73 @@ function AbsencesView({ schools, teachers, monthKey, fmtMonthFn, canReopen = fal
           </div>
         }
       />
+      {/*
+        "יוצג אצלי ממ"מ מול ההיעדרות" (שרה, 8.10.26): לכל נעדרת — ההיעדרות, האישור,
+        מי מילאה את מקומה וכמה שעות, הפער, והמצב (מוכן לאישור / מוחזק / נדחה).
+        ממ"מ שנרשם מול שם שאין לו היעדרות מדווחת מוצג בסוף, מסומן.
+      */}
+      {(() => {
+        const absentOf = sc => teachers.filter(t => t.schoolId === sc.id && reportsAbsence(t));
+        const subsOf = a => teachers.filter(x => x.id !== a.id && x.schoolId === a.schoolId && sameName(x.mmFor, a.name));
+        const stateOf = rows => rows.some(t => rejectionOf(t, rejections)) ? { k:'rej', t:'נדחה — ממתין לתיקון' }
+          // "מוחזק" רק לדיווח שממתין לאישור; שורה שאינה ממתינה (חופשה ותיקה, דיווח שאושר) מוצגת כמות שהיא, עם מה שחסר
+          : !rows.some(reportPending) ? { k:'ok', t:'לא ממתין לאישור' }
+          : rows.filter(reportPending).flatMap(t => reportHoldReasons(t, teachers, onb)).length ? { k:'held', t:'מוחזק — חסרים מסמכים' }
+          : { k:'ready', t:'מוכן לאישור' };
+        const COLOR = { rej:'var(--danger-text)', held:'#8F4E00', ready:'var(--purple)', ok:'var(--ok-text)' };
+        const groups = schools.map(sc => {
+          const pairs = absentOf(sc).map(a => ({ a, subs: subsOf(a) }));
+          const orphan = teachers.filter(t => t.schoolId === sc.id && reportsMm(t) && !replacedRows(t, t.mmFor, teachers).some(reportsAbsence));
+          return { sc, pairs, orphan };
+        }).filter(g => g.pairs.length || g.orphan.length);
+        if (!groups.length) return null;
+        return (
+          <div className="apple-card" style={{ padding:0, overflow:'hidden', marginBottom:14 }}>
+            <p style={{ padding:'12px 16px 4px', fontSize:17, fontWeight:800 }}>מילוי מקום מול ההיעדרות</p>
+            <div className="table-scroll">
+              <table className="apple-table abs-table" style={{ fontSize:15.5 }}>
+                <thead><tr>
+                  <th>נעדר/ת</th><th>ההיעדרות</th><th style={{ textAlign:'center' }}>אישור</th>
+                  <th>מי מילא/ה את המקום</th><th style={{ textAlign:'center' }} title="שעות היעדרות פחות שעות מילוי מקום">פער שעות</th><th>מצב</th>
+                </tr></thead>
+                {groups.map(({ sc, pairs, orphan }) => (
+                  <tbody key={'pair-' + sc.id}>
+                    <tr className="grp"><th colSpan={6} scope="colgroup">{shortName(sc.name)} <span>· {pairs.length}</span></th></tr>
+                    {pairs.map(({ a, subs }) => {
+                      const mm = subs.reduce((x, t) => x + (Number(t.mmHours) || 0), 0), ah = Number(a.absenceHours) || 0;
+                      const st = stateOf([a, ...subs]);
+                      const reasons = [a, ...subs].flatMap(t => reportHoldReasons(t, teachers, onb)).filter((x, i, arr) => arr.indexOf(x) === i && x !== `חסר אישור היעדרות של ${a.name}`);
+                      const rej = [a, ...subs].map(t => rejectionOf(t, rejections)).find(Boolean);
+                      return (
+                        <tr key={'p-' + a.id}>
+                          <td style={{ fontWeight:600, wordBreak:'keep-all' }}>{a.name}</td>
+                          <td data-l="ההיעדרות">{[Number(a.absenceDays) > 0 ? `${a.absenceDays} ימים` : '', ah > 0 ? `${ah} שעות` : '', reasonLabel(a.absenceReason), onLeave(a) ? leaveText(a) : ''].filter(Boolean).join(' · ') || '—'}</td>
+                          <td data-l="אישור" style={{ textAlign:'center', fontWeight:700, color: a.sickFormPath ? 'var(--ok-text)' : 'var(--danger-text)' }}>{a.sickFormPath ? 'יש' : 'חסר'}</td>
+                          <td data-l="מי מילא/ה">{subs.length ? subs.map(t => `${t.name}${Number(t.mmHours) > 0 ? ` · ${t.mmHours} ש׳` : ''}`).join(' ; ') : <span style={{ color:'var(--text3)' }}>לא דווח מילוי מקום</span>}</td>
+                          <td data-l="פער שעות" className="num" style={{ textAlign:'center', fontWeight:700, color: !subs.length || onLeave(a) ? 'var(--text3)' : ah - mm === 0 ? 'var(--ok-text)' : ah - mm > 0 ? 'var(--text)' : 'var(--danger-text)' }}>{!subs.length || onLeave(a) ? '—' : ah - mm}</td>
+                          <td data-l="מצב"><span style={{ fontWeight:700, color: COLOR[st.k] }}>{st.t}</span>
+                            {(rej ? [rej.body] : reasons).map(x => <span key={x} style={{ display:'block', fontSize:14, color:'var(--text2)' }}>{x}</span>)}</td>
+                        </tr>
+                      );
+                    })}
+                    {orphan.map(t => (
+                      <tr key={'o-' + t.id}>
+                        <td style={{ fontWeight:600, color:'var(--text2)' }}>{t.mmFor || '—'}</td>
+                        <td data-l="ההיעדרות" style={{ color:'var(--danger-text)', fontWeight:600 }}>לא דווחה היעדרות</td>
+                        <td data-l="אישור" style={{ textAlign:'center', color:'var(--text3)' }}>—</td>
+                        <td data-l="מי מילא/ה">{t.name}{Number(t.mmHours) > 0 ? ` · ${t.mmHours} ש׳` : ''}</td>
+                        <td data-l="פער שעות" style={{ textAlign:'center', color:'var(--text3)' }}>—</td>
+                        <td data-l="מצב"><span style={{ fontWeight:700, color:'#8F4E00' }}>מילוי מקום בלי היעדרות מדווחת</span>
+                          {reportHoldReasons(t, teachers, onb).map(x => <span key={x} style={{ display:'block', fontSize:14, color:'var(--text2)' }}>{x}</span>)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                ))}
+              </table>
+            </div>
+          </div>
+        );
+      })()}
       {!bySchool.length ? (
         <div className="apple-card" style={{ textAlign:'center', padding:'56px 20px' }}>
           <p style={{ fontSize:17.2, fontWeight:700, color:'var(--text)' }}>אין דיווחי היעדרות או ממ"מ החודש</p>
@@ -12759,9 +13010,18 @@ export default function App() {
   const [schools, setSchools] = useState([]);
   const [months,  setMonths]  = useState({});
   const [fixes,   setFixes]   = useState([]);   // תיקונים שהוצעו מהשרת (22.9)
+  const [onbList, setOnbList] = useState([]);       // רשומות הקליטה — למסמכי ממלאת מקום שאינה משובצת (8.10)
+  const [rejections, setRejections] = useState([]); // דיווחים שנדחו בחודש הפעיל (8.10)
   // מועדי הדיווח לכל חודש — מסך הדיווח של המנהלת סופר לפיהם
   const [due,     setDue]     = useState({});
   const [activeMonth, setActiveMonth] = useState(nowMonthKey());
+  // הדחיות של החודש הפעיל — נטענות עם החלפת חודש (לצוות בלבד; למנהלת אין גישה לתור)
+  useEffect(() => {
+    if (!user || !['coordinator', 'clerk'].includes(user.role)) return;
+    let alive = true;
+    store.listReportRejections(activeMonth).then(r => { if (alive) setRejections(r); }).catch(() => { if (alive) setRejections([]); });
+    return () => { alive = false; };
+  }, [activeMonth, user?.role]);
   const [booting, setBooting] = useState(true);
   const [error,   setError]   = useState('');
   const [busy,    setBusy]    = useState(false);
@@ -12822,6 +13082,7 @@ export default function App() {
     for (const x of att.hours) { if (!dupAtt.has(`${x.schoolId}|${nrm(x.name)}`)) ATTENDANCE_HOURS.set(`${x.monthKey}|${x.schoolId}|${nrm(x.name)}`, x.hours); }
     const data = await store.loadAll();
     store.listFixes().then(setFixes).catch(() => setFixes([]));
+    store.listOnboarding().then(setOnbList).catch(() => setOnbList([]));
     setSchools(data.schools);
     for (const sc of (data.schools || [])) CHABAD_SUPP.set(sc.id, sc.chabadSupp !== false);
     setMonths(data.months);
@@ -13166,6 +13427,11 @@ export default function App() {
     }
     await store.decideFix(f.id, ok ? 'applied' : 'rejected');
   });
+  // דחיית דיווחים — הסימון נרשם, ההודעה למנהלת נכנסת לתור; הרשימה נטענת מחדש
+  const onRejectReports = async ({ rows, reason, principal, message }) => {
+    await store.rejectReports({ ids: rows.map(t => t.id), reason, monthKey: activeMonth, principal, message });
+    setRejections(await store.listReportRejections(activeMonth));
+  };
   const onApproveReport = (rows) => run(async () => {
     const done = await store.approveReport(rows.map(t => t.id));
     for (const t of done) {
@@ -13554,7 +13820,7 @@ export default function App() {
         ) : view === 'calibration' && (user.role === 'coordinator' || user.role === 'clerk') ? (
           <CalibrationView schools={schools} teachers={teachers} monthKey={activeMonth} />
         ) : view === 'mm' && (user.role === 'coordinator' || user.role === 'clerk') ? (
-          <AbsencesView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} canReopen={user.role === 'coordinator'} />
+          <AbsencesView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} canReopen={user.role === 'coordinator'} onb={onbList} rejections={rejections} />
         ) : view === 'slips' ? (
           <SlipsView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} onPickMonth={setActiveMonth}
             docs={(user.role === 'coordinator' || user.role === 'clerk')
@@ -13703,6 +13969,8 @@ export default function App() {
           onDecideFix={onDecideFix}
           onApproveAll={onApproveAll}
           onApproveReport={user.role === 'coordinator' ? onApproveReport : null}
+          onb={onbList} rejections={rejections}
+          onRejectReports={user.role === 'coordinator' ? onRejectReports : null}
           onClose={() => setShowApproval(false)}
         />
       )}
