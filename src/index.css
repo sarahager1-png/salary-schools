@@ -1427,3 +1427,11 @@ input.nospin { -moz-appearance: textfield; appearance: textfield; }
 .big-table.pvaf tbody td > span, .big-table.pvaf tfoot td > span { white-space: normal !important; line-height: 1.2; }
 .big-table.pvaf td span.num { font-size: 14.2px !important; white-space: nowrap; }
 .big-table.pvaf tbody th[scope="row"] { min-width: 0; }
+/* 12 עמודות: נוספה העברת הסניף לפני היתרה */
+.big-table.pvaf col { width: 7.7%; }
+.big-table.pvaf col.c-name { width: 10.3%; }
+.big-table.pvaf col:nth-child(9) { width: 9.8%; }
+.big-table.pvaf col:nth-child(11) { width: 7.7%; }
+.big-table.pvaf col:nth-child(12) { width: 10.6%; }
+.big-table.pvaf tbody td, .big-table.pvaf tfoot td { font-size: 14px !important; padding-inline: 1px; }
+.big-table.pvaf td span.num { font-size: 14px !important; }

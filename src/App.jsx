@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 180;
+const BUILD = 181;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -6388,14 +6388,15 @@ function BottomLineView({ activeMonth, viewer = false }) {
             התמונה המלאה (שרה, 8.10: "תבנה לי טבלה כזו, שמכניסה גם את ההוצאות הנוספות של הסניף ואת ההכנסות הנוספות…
             ותשתמש בנתונים מהטבלאות האחרות, המעודכנות"): אותן שורות של נתוני הבסיס — משרד החינוך (תקבול או צפי),
             עלות ההוראה של ספטמבר, כרית 15%, מענק הרשת — ולצדן ההכנסות וההוצאות הנוספות של הסניף ממבט-רשת.
-            היתרה להשלמת הסניף = סה"כ הוצאות − סה"כ הכנסות − מענק הרשת. לחיצה על שם הסניף פותחת את פירוט השורות.
+            "חסר שם כמה כסף השליחים מעבירים לרשת, לעלות השכר" (שרה, 8.10): עמודת העברת הסניף, לפני היתרה.
+            היתרה להשלמת הסניף = סה"כ הוצאות − סה"כ הכנסות − מענק הרשת − העברת הסניף. לחיצה על שם הסניף פותחת את פירוט השורות.
           */}
           {(() => {
             const full = lines.map(x => { const oi = (x.r.otherInc || 0) / 12, oe = (x.r.otherExp || 0) / 12;
               const inc = x.min + oi, exp = x.cost + x.cush + oe;
-              return { ...x, oi, oe, inc, exp, fgap: exp - inc, left: exp - inc - x.grant }; });
-            const F = full.reduce((a, x) => { for (const f of ['min', 'oi', 'inc', 'cost', 'cush', 'oe', 'exp', 'fgap', 'grant', 'left']) a[f] += x[f]; return a; },
-              { min: 0, oi: 0, inc: 0, cost: 0, cush: 0, oe: 0, exp: 0, fgap: 0, grant: 0, left: 0 });
+              return { ...x, oi, oe, inc, exp, fgap: exp - inc, left: exp - inc - x.grant - x.tr }; });
+            const F = full.reduce((a, x) => { for (const f of ['min', 'oi', 'inc', 'cost', 'cush', 'oe', 'exp', 'fgap', 'grant', 'tr', 'left']) a[f] += x[f]; return a; },
+              { min: 0, oi: 0, inc: 0, cost: 0, cush: 0, oe: 0, exp: 0, fgap: 0, grant: 0, tr: 0, left: 0 });
             const ln = (list, empty) => (list.length ? list.map(l => `${l.name} ${num(l.amount / 12 * k)}`).join(' · ') : empty);
             const detail = x => (<div style={{ fontSize:14.4, lineHeight:1.8, textAlign:'start', color:'var(--text2)' }}>
               <div><b style={{ color:'#166534' }}>הכנסות נוספות {per}:</b> {ln(x.r.incLines, 'לא נרשמו')}</div>
@@ -6406,19 +6407,19 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <p className="no-print" style={{ fontSize:14.4, color:'var(--text2)', margin:'0 0 8px' }}>כולל ההכנסות וההוצאות שמעבר לעלות ההוראה, מתקציב הסניף. לחיצה על שם הסניף פותחת את הפירוט.</p>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table pva pvaf" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{`התמונה המלאה לכל סניף, ${per}: הכנסות, הוצאות, הפער, מענק הרשת והיתרה להשלמת הסניף`}</caption>
-              <colgroup><col className="c-name" /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col /></colgroup>
+              <caption className="sr-only">{`התמונה המלאה לכל סניף, ${per}: הכנסות, הוצאות, הפער, מענק הרשת, העברת הסניף והיתרה להשלמת הסניף`}</caption>
+              <colgroup><col className="c-name" /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col /></colgroup>
               <thead>
                 <tr className="bl-groups">
                   <th />
                   <th scope="colgroup" colSpan={3} className="gh-inc">הכנסות</th>
                   <th scope="colgroup" colSpan={4} className="gh-cost">הוצאות</th>
-                  <th scope="colgroup" colSpan={3} className="gh-res">תוצאה</th>
+                  <th scope="colgroup" colSpan={4} className="gh-res">תוצאה</th>
                 </tr>
                 <tr>
                   <TH>סניף</TH><TH>משרד החינוך</TH><TH>הכנסות נוספות</TH><TH>סה"כ הכנסות</TH>
                   <TH>עלות ההוראה</TH><TH>כרית 15%</TH><TH>הוצאות נוספות</TH><TH>סה"כ הוצאות</TH>
-                  <TH>הפער</TH><TH>מענק הרשת</TH><TH>יתרה להשלמת הסניף</TH>
+                  <TH>הפער</TH><TH>מענק הרשת</TH><TH>העברת הסניף</TH><TH>יתרה להשלמת הסניף</TH>
                 </tr>
               </thead>
               <tbody>
@@ -6437,9 +6438,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <td style={{ ...tdP, fontWeight:800 }}>{num(x.exp * k)}</td>
                     <td style={tdP}><GapCell v={x.fgap * k} /></td>
                     <td style={tdP}>{num(x.grant * k)}</td>
+                    <td style={{ ...tdP, fontWeight:800, color:'var(--purple)' }}>{num(x.tr * k)}</td>
                     <td className={cellCls(gapSt(x.left * k))} style={tdP}><GapCell v={x.left * k} big /></td>
                   </tr>,
-                  fullOpen === x.r.id && (<tr key={'fulld-' + x.r.id}><td colSpan={11} style={{ padding:'8px 14px', background:'#FAF8FE' }}>{detail(x)}</td></tr>),
+                  fullOpen === x.r.id && (<tr key={'fulld-' + x.r.id}><td colSpan={12} style={{ padding:'8px 14px', background:'#FAF8FE' }}>{detail(x)}</td></tr>),
                 ])}
               </tbody>
               <tfoot>
@@ -6447,7 +6449,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={{ padding:'10px 8px' }}>סה"כ</td>
                   <td style={tdP}>{num(F.min * k)}</td><td style={tdP}>{num(F.oi * k)}</td><td style={tdP}>{num(F.inc * k)}</td>
                   <td style={tdP}>{num(F.cost * k)}</td><td style={tdP}>{num(F.cush * k)}</td><td style={tdP}>{num(F.oe * k)}</td><td style={tdP}>{num(F.exp * k)}</td>
-                  <td style={tdP}><GapCell v={F.fgap * k} /></td><td style={tdP}>{num(F.grant * k)}</td>
+                  <td style={tdP}><GapCell v={F.fgap * k} /></td><td style={tdP}>{num(F.grant * k)}</td><td style={tdP}>{num(F.tr * k)}</td>
                   <td className={cellCls(gapSt(F.left * k))} style={tdP}><GapCell v={F.left * k} big /></td>
                 </tr>
               </tfoot>
@@ -6467,6 +6469,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <CardRow label='סה"כ הוצאות'>{num(x.exp * k)}</CardRow>
                 <CardRow label="הפער"><GapV v={x.fgap * k} /></CardRow>
                 <CardRow label="מענק הרשת">{num(x.grant * k)}</CardRow>
+                <CardRow label="העברת הסניף" color="var(--purple)">{num(x.tr * k)}</CardRow>
                 <div style={{ marginTop:8 }}>{detail(x)}</div>
               </div>
             ))}
@@ -6475,6 +6478,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <CardRow label='סה"כ הכנסות'>{num(F.inc * k)}</CardRow>
               <CardRow label='סה"כ הוצאות'>{num(F.exp * k)}</CardRow>
               <CardRow label="מענק הרשת">{num(F.grant * k)}</CardRow>
+              <CardRow label="העברות הסניפים" color="var(--purple)">{num(F.tr * k)}</CardRow>
             </div>
           </div>
             </>); })()}
