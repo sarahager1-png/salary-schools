@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 150;
+const BUILD = 151;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5698,7 +5698,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
       : <span className="num" style={{ ...st, color: t.state === 'bad' ? 'var(--danger-text)' : '#8F4E00' }}>חרג {num(t.over)}</span>; };
   const SavedP = ({ v }) => Math.round(v) === 0 ? <span style={{ color:'var(--text2)', fontWeight:600 }}>כמו בתכנון</span>
     : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--ok-text)' : 'var(--danger-text)' }}>{v > 0 ? 'חסך ' : 'חרג '}{num(Math.abs(v))}</span>;
-  const yearCls = y => cellCls(y.sal >= 0 ? 'ok' : -y.sal <= y.plan * 0.05 ? 'mid' : 'bad');
+  const yearCls = y => cellCls(-y.sal <= y.plan * 0.005 ? 'ok' : -y.sal <= y.plan * 0.05 ? 'mid' : 'bad');
   // סימן החשבון ליד שם העמודה — כדי שהשורה תיקרא כתרגיל
   const Op = ({ c }) => <span aria-hidden="true" style={{ color:'var(--text3)', fontWeight:800, marginInlineEnd:4 }}>{c}</span>;
 
@@ -5817,18 +5817,18 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <button onClick={() => setMode('month')} aria-pressed={mode === 'month'}
                   className={['apple-seg-item', mode === 'month' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>החודש</button>
                 <button onClick={() => setMode('compare')} aria-pressed={mode === 'compare'}
-                  className={['apple-seg-item', mode === 'compare' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>השוואה בין חודשים</button>
+                  className={['apple-seg-item', mode === 'compare' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>כל השנה מול התכנון</button>
               </div>
             )}
           </div>
           <p className="section-sub">{mode === 'compare'
-            ? (cmpKind === 'salary' ? 'השכר של כל סניף בכל חודש מול התכנון מנתוני הבסיס. המשבצת צבועה: ירוק — לא יותר מהתכנון, כתום — חריגה עד 5%, אדום — יותר; ומתחת כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.' : 'הפער של כל סניף בכל חודש בביצוע: שכר + 20% − משרד החינוך שהתקבל − מענק הרשת − העברת הסניף. "חסר" כשהעלות גבוהה מהכיסוי, "עודף" כשנשאר. בסוף: הפער המצטבר.')
+            ? (cmpKind === 'salary' ? 'התכנון השנתי של עלות ההוראה לכל סניף, החלק החודשי שלו (השנתי ÷ 12), ועלות ההוראה בפועל בכל חודש מולו. ירוק — עומד בתכנון; כתום — כמעט (חריגה עד 5%); אדום — לא עומד. מתחת: כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.' : 'הפער של כל סניף בכל חודש בביצוע: שכר + 20% − משרד החינוך שהתקבל − מענק הרשת − העברת הסניף. "חסר" כשהעלות גבוהה מהכיסוי, "עודף" כשנשאר. בסוף: הפער המצטבר.')
             : <>לכל חלק תכנון, ביצוע ופער. התכנון מוזן מטבלת נתוני הבסיס שלמטה, חלקי 12. פער ירוק — לטובה; כתום — חריגה עד 5%; אדום — מעבר לזה. שכר + 20% − משרד החינוך שהתקבל − מענק והעברה = הפער לחודש.</>}</p>
           {mode === 'compare' ? (
           <>
           <div className="apple-seg no-print" role="group" aria-label="מה משווים" style={{ marginBottom:10 }}>
             <button onClick={() => setCmpKind('salary')} aria-pressed={cmpKind === 'salary'}
-              className={['apple-seg-item', cmpKind === 'salary' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>שכר מול התכנון</button>
+              className={['apple-seg-item', cmpKind === 'salary' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>עלות ההוראה מול התכנון</button>
             <button onClick={() => setCmpKind('cash')} aria-pressed={cmpKind === 'cash'}
               className={['apple-seg-item', cmpKind === 'cash' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>הפער לחודש</button>
           </div>
@@ -5836,14 +5836,16 @@ function BottomLineView({ activeMonth, viewer = false }) {
             <table className="sticky-first big-table bl-table pva" style={{ width:'100%', borderCollapse:'collapse' }}>
               <caption className="sr-only">{cmpKind === 'salary' ? 'מיפוי השנה לפי סניף: השכר בכל חודש מול התכנון, וסך החיסכון או החריגה' : 'מיפוי השנה לפי סניף: הפער בכל חודש בביצוע, והפער המצטבר'}</caption>
               <colgroup>
-                <col /><col className="g-cost" />{yearCols.map(c => <col key={c.key} className={c.key === sel ? 'g-res' : undefined} />)}
+                <col />{cmpKind === 'salary' && <col className="g-cost" />}<col className="g-cost" />{yearCols.map(c => <col key={c.key} className={c.key === sel ? 'g-res' : undefined} />)}
                 <col className="g-res g-sum" />
               </colgroup>
               <thead>
                 <tr>
                   <TH>סניף</TH>
-                  <TH>תכנון לחודש<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{cmpKind === 'salary' ? 'שכר' : 'הפער'}</span></TH>
-                  {yearCols.map(c => <TH key={c.key}>{shortMonth(c.key)}<span style={{ display:'block', fontSize:14, fontWeight:600, color: c.m ? undefined : 'var(--text3)' }}>{!c.m ? 'טרם' : c.m.frozenAt ? 'סגור' : 'פתוח'}</span></TH>)}
+                  {/* "הוא רוצה לראות תכנון שנתי של עלות ההוראה, וכל חודש ביחס לחודש — אם עומדים בו" (שרה, 8.10) */}
+                  {cmpKind === 'salary' && <TH>תכנון שנתי<span style={{ display:'block', fontSize:14, fontWeight:600 }}>עלות ההוראה</span></TH>}
+                  <TH>תכנון לחודש<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{cmpKind === 'salary' ? 'השנתי ÷ 12' : 'הפער'}</span></TH>
+                  {yearCols.map(c => <TH key={c.key}>{c.m ? shortMonth(c.key) : shortMonth(c.key).slice(0, 3) + "'"}{c.m && <span style={{ display:'block', fontSize:14, fontWeight:600 }}>{c.m.frozenAt ? 'סגור' : 'פתוח'}</span>}</TH>)}
                   {cmpKind === 'salary'
                     ? <TH>סה"כ השנה<span style={{ display:'block', fontSize:14, fontWeight:600 }}>חסך / חרג מול התכנון</span></TH>
                     : <TH>פער מצטבר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>ביצוע</span></TH>}
@@ -5852,13 +5854,14 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <tbody>
                 {cmpRows.map(r => { const bd = baseById.get(r.id); const y = yearOf(r.id); return (
                   <tr key={'cmp-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
+                    <th scope="row" style={{ padding:'10px 8px', fontWeight:700, textAlign:'start', fontSize:15.5 }} title={r.name}>{shortName(r.name).replace(/^שלהבות /, '').replace(/ קטמון$/, '')}</th>
+                    {cmpKind === 'salary' && <td style={{ ...td, fontWeight:800 }}>{bd ? num(bd.annual) : '—'}</td>}
                     <td style={{ ...td, color:'var(--text2)' }}>{!bd ? '—' : cmpKind === 'salary' ? num(bd.annual / 12) : <GapV v={(bd.annual + bd.add20 - bd.ministry - bd.supportYear) / 12 - (bd.month || 0)} />}</td>
                     {yearCols.map(({ key, m }) => { const p = m ? pvaIn(m, r.id) : null; if (!p) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; return cmpKind === 'salary' ? (
-                      <td key={key} className={cellCls(statusOf(p.actSal, p.planSal))} style={{ ...td, fontWeight: key === sel ? 800 : 500 }}
-                        title={({ ok:'עמד בתכנון', mid:'כמעט — חריגה עד 5%', bad:'חרג מהתכנון' })[statusOf(p.actSal, p.planSal)] || ''}>
-                        <span className="num">{num(p.actSal)}</span>
-                        <PlanNote cost={p.actSal} plan={p.planSal} />
+                      <td key={key} className={cellCls(actSt(p.actSal, p.planSal))} style={td}
+                        title={({ ok:'עומד בתכנון', mid:'כמעט — חריגה עד 5%', bad:'לא עומד בתכנון' })[actSt(p.actSal, p.planSal)]}>
+                        <span className="num" style={{ display:'block', fontWeight:800 }}>{num(p.actSal)}</span>
+                        <span style={{ display:'block', fontSize:14 }}>{Math.round(p.actSal - p.planSal) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>עומד</span> : <Diff v={p.actSal} plan={p.planSal} />}</span>
                       </td>
                     ) : (
                       <td key={key} className={cellCls(gapSt(p.actGap))} style={{ ...td, fontWeight: key === sel ? 800 : 500 }} title={p.noMin ? 'משרד החינוך טרם התקבל' : undefined}>
@@ -5873,11 +5876,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
+                  {cmpKind === 'salary' && <td style={td}>{num(baseTot.annual)}</td>}
                   <td style={td}>{cmpKind === 'salary' ? num(baseTot.annual / 12) : <GapV v={(baseTot.annual + baseTot.add20 - baseTot.ministry - baseTot.supportYear) / 12 - baseTot.month} />}</td>
                   {yearCols.map(({ key, m }) => { if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; const x = pvaNet(m); return cmpKind === 'salary' ? (
-                    <td key={key} className={cellCls(statusOf(x.actSal, x.planSal))} style={td}>
-                      <span className="num">{num(x.actSal)}</span>
-                      <PlanNote cost={x.actSal} plan={x.planSal} />
+                    <td key={key} className={cellCls(actSt(x.actSal, x.planSal))} style={td}>
+                      <span className="num" style={{ display:'block' }}>{num(x.actSal)}</span>
+                      <span style={{ display:'block', fontSize:14 }}><Diff v={x.actSal} plan={x.planSal} /></span>
                     </td>
                   ) : (
                     <td key={key} className={cellCls(gapSt(x.actGap))} style={td}><GapV v={x.actGap} /></td>
@@ -5891,6 +5895,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
             {cmpRows.map(r => { const y = yearOf(r.id); return (
               <div key={'cmpm-' + r.id} className="apple-card mcard">
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
+                {cmpKind === 'salary' && baseById.get(r.id) && <CardRow label="תכנון שנתי — עלות ההוראה" strong>{num(baseById.get(r.id).annual)}</CardRow>}
+                {cmpKind === 'salary' && baseById.get(r.id) && <CardRow label="תכנון לחודש (השנתי ÷ 12)">{num(baseById.get(r.id).annual / 12)}</CardRow>}
                 {yearCols.filter(c => c.m).map(({ key, m }) => { const p = pvaIn(m, r.id); if (!p) return null; return cmpKind === 'salary' ? (
                   <CardRow key={key} label={shortMonth(key)} strong={key === sel}>
                     <span style={{ marginInlineEnd:8 }}><Pill s={statusOf(p.actSal, p.planSal)} /></span>
