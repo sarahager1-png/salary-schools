@@ -1435,3 +1435,11 @@ input.nospin { -moz-appearance: textfield; appearance: textfield; }
 .big-table.pvaf col:nth-child(12) { width: 10.6%; }
 .big-table.pvaf tbody td, .big-table.pvaf tfoot td { font-size: 14px !important; padding-inline: 1px; }
 .big-table.pvaf td span.num { font-size: 14px !important; }
+/* 13 עמודות: תוצאה (הפער, מענק, יתרה) ואחריה ההעברה לרשת ומה שנשאר */
+.big-table.pvaf col { width: 6.9%; }
+.big-table.pvaf col.c-name { width: 9.6%; }
+.big-table.pvaf col:nth-child(9) { width: 8.8%; }
+.big-table.pvaf col:nth-child(11) { width: 9.6%; }
+.big-table.pvaf col:nth-child(12) { width: 6.9%; }
+.big-table.pvaf col:nth-child(13) { width: 9.9%; }
+.big-table.pvaf tr:not(.bl-groups) > :nth-child(12) { border-inline-start: 2px solid #E3DCF2; }
