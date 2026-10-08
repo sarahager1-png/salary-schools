@@ -1392,3 +1392,9 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* טבלת הבסיס בתצוגה החודשית: 9 עמודות */
 .big-table.pvab.mo col { width: 10.8%; }
 .big-table.pvab.mo col.c-name { width: 13.6%; }
+/* עמודת משרד החינוך בטבלת החודש רחבה יותר — שדה ההזנה וכפתור ה-✕ */
+.big-table.pvam col:nth-child(8) { width: 11.5%; }
+
+/* שדה מספר בלי חיצי הדפדפן — הם אוכלים רוחב בעמודה צרה */
+input.nospin::-webkit-outer-spin-button, input.nospin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input.nospin { -moz-appearance: textfield; appearance: textfield; }

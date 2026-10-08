@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 172;
+const BUILD = 173;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5389,11 +5389,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const carriedRecv = (id, key) => {
     for (const m of months.filter(m => m.key < key).reverse()) {
       const b = m.branches.find(x => x.id === id);
-      if (b && b.ministryReceived != null) return { v: b.ministryReceived, key: m.key };
+      if (b && b.ministryReceived > 0) return { v: b.ministryReceived, key: m.key };
     }
     return null;
   };
-  const minInfo = r => (r.ministryReceived != null ? { v: r.ministryReceived, key: null } : (carriedRecv(r.id, r._key || cur?.key || '') || { v: 0, key: 'none' }));
+  // "בעפולה זה לא נכון. פשוט לא קיבלו" (שרה, 8.10): תקבול של 0 אינו תקבול — הוא "טרם התקבל", בדיוק כמו שדה ריק
+  const minInfo = r => (r.ministryReceived > 0 ? { v: r.ministryReceived, key: null } : (carriedRecv(r.id, r._key || cur?.key || '') || { v: 0, key: 'none' }));
   const minOf  = r => minInfo(r).v;
   const minAdj = r => (r.ministry == null ? 0 : r.ministry - minOf(r));   // מתוכנן פחות מה שנספר
   const minSum = summed.reduce((x, r) => x + (minOf(r) || 0), 0);
@@ -5662,14 +5663,25 @@ function BottomLineView({ activeMonth, viewer = false }) {
     catch (e) { setErr(e.message); }
     finally { setBaseBusy(''); }
   };
+  /*
+    "תתן אפשרות שזה חוזר לטרם" (שרה, 8.10): מחיקת הסכום (או 0) מחזירה ל"טרם התקבל"; וליד סכום שהוזן יש
+    כפתור ✕ שעושה זאת בלחיצה.
+  */
   const minInput = (id, month, p, label) => (
-    <input type="number" min="0" step="any" dir="ltr" className="apple-input" inputMode="decimal" aria-label={label}
-      key={`min-${id}-${month}-${p.minOwn ?? ''}`} defaultValue={p.minOwn ?? ''} disabled={baseBusy === id}
-      placeholder={p.noMin ? 'טרם' : String(Math.round(p.actMin))}
-      title={p.minOwn != null ? 'התקבול שהוזן לחודש הזה' : p.noMin ? 'טרם הוזן תקבול' : `לפי ${fmtMonth(p.minFrom)} — אפשר להזין סכום לחודש הזה`}
-      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-      onBlur={e => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== null && (!Number.isFinite(v) || v < 0)) return; if (v !== (p.minOwn ?? null)) saveMin(id, month, v); }}
-      style={{ width:'100%', maxWidth:86, textAlign:'center', fontWeight:800, fontSize:14, padding:'4px 2px' }} />
+    <span style={{ display:'inline-flex', alignItems:'center', gap:2, width:'100%', justifyContent:'center' }}>
+      <input type="number" min="0" step="any" dir="ltr" className="apple-input nospin" inputMode="decimal" aria-label={label}
+        key={`min-${id}-${month}-${p.minOwn ?? ''}`} defaultValue={p.minOwn ?? ''} disabled={baseBusy === id}
+        placeholder={p.noMin ? 'טרם' : String(Math.round(p.actMin))}
+        title={p.minOwn != null ? 'התקבול שהוזן לחודש הזה; מחיקה מחזירה ל"טרם התקבל"' : p.noMin ? 'טרם הוזן תקבול' : `לפי ${fmtMonth(p.minFrom)} — אפשר להזין סכום לחודש הזה`}
+        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+        onBlur={e => { let v = e.target.value === '' ? null : Number(e.target.value); if (v !== null && (!Number.isFinite(v) || v < 0)) return; if (v === 0) v = null; if (v !== (p.minOwn ?? null)) saveMin(id, month, v); }}
+        style={{ flex:'1 1 auto', minWidth:0, maxWidth:96, textAlign:'center', fontWeight:800, fontSize:14, padding:'4px 1px' }} />
+      {p.minOwn != null && (
+        <button type="button" className="no-print" disabled={baseBusy === id} onClick={() => saveMin(id, month, null)}
+          title='חזרה ל"טרם התקבל"' aria-label={`חזרה לטרם התקבל, ${label}`}
+          style={{ flex:'0 0 auto', width:20, height:26, padding:0, border:'none', background:'none', cursor:'pointer', color:'var(--text3)', fontSize:14, fontWeight:800, lineHeight:1 }}>✕</button>
+      )}
+    </span>
   );
   const saveGrant = async (id, month, amount) => {
     setBaseBusy(id); setErr('');
@@ -5698,7 +5710,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
     const planSal = bd.annual / 12, plan20 = bd.add20 / 12, planMin = bd.ministry / 12;
     const act20 = Math.max(0, Math.round(actSal - planSal));   // נוצל מהכרית = החריגה של עלות ההוראה מהתכנון
     const grant = bd.supportYear / 12, transfer = bd.month || 0;
-    return { planSal, actSal, plan20, act20, planMin, actMin, grant, transfer, paid: r.chabadPaid ?? null, grantPaid: r.grantPaid ?? null, minOwn: r.ministryReceived ?? null, minFrom: minInfo(r).key, noMin: minInfo(r).key === 'none',
+    return { planSal, actSal, plan20, act20, planMin, actMin, grant, transfer, paid: r.chabadPaid ?? null, grantPaid: r.grantPaid ?? null, minOwn: r.ministryReceived > 0 ? r.ministryReceived : null, minFrom: minInfo(r).key, noMin: minInfo(r).key === 'none',
       planGap: planSal + plan20 - planMin - grant - transfer,
       // בביצוע: השכר בפועל ועוד מה שנשאר מהכרית (לא פחות מאפס)
       actGap: actSal + Math.max(0, plan20 - act20) - actMin - grant - transfer }; };
