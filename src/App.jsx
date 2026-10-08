@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 129;
+const BUILD = 130;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5269,6 +5269,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const baseCostOf = id => { const b = baseMonth?.branches.find(x => x.id === id); return b ? costAll(b) : 0; };
   const baseCostNet = (baseMonth?.branches || []).reduce((a, b) => a + costAll(b), 0);
   const statusOf = (cost, base) => targetOf(cost, base)?.state ?? null;
+  const CELL_BG = { ok:'#E6F6EC', mid:'var(--warn-bg)', bad:'var(--danger-bg)' };
+  const cellBg = st => (st ? { background: CELL_BG[st] } : {});
   const Pill = ({ s }) => s == null ? null : (
     <span style={{ display:'inline-block', fontSize:14, fontWeight:700, borderRadius:999, padding:'1px 9px', marginBottom:3, lineHeight:1.5,
       ...(s === 'ok' ? { background:'#E6F6EC', color:'#166534' } : s === 'mid' ? { background:'var(--warn-bg)', color:'#8F4E00' } : { background:'var(--danger-bg)', color:'var(--danger-text)' }) }}>
@@ -5484,7 +5486,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             )}
           </div>
           <p className="section-sub">{mode === 'compare'
-            ? (cmpKind === 'salary' ? `השכר של כל סניף בכל חודש מול ${fmtMonth(baseMonth.key)} (הבסיס): ירוק לא יותר, כתום חריגה עד 5%, אדום יותר; ומתחת — כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.` : `מה נשאר בכל חודש אחרי השכר (משרד החינוך לפי תקבול בפועל בלבד), ומתחתיו ההפרש מול ${fmtMonth(baseMonth.key)}: זכות כשנשאר יותר, חובה כשנשאר פחות. היתרה המצטברת = סכום ההפרשים; בשורה האחרונה — כמה הרשת משלימה בכל חודש.`)
+            ? (cmpKind === 'salary' ? `השכר של כל סניף בכל חודש מול ${fmtMonth(baseMonth.key)} (הבסיס); המשבצת צבועה לפי עמידה ביעד: ירוק לא יותר, כתום חריגה עד 5%, אדום יותר; ומתחת — כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.` : `מה נשאר בכל חודש אחרי השכר (משרד החינוך לפי תקבול בפועל בלבד), ומתחתיו ההפרש מול ${fmtMonth(baseMonth.key)}: זכות כשנשאר יותר, חובה כשנשאר פחות. היתרה המצטברת = סכום ההפרשים; בשורה האחרונה — כמה הרשת משלימה בכל חודש.`)
             : <>בפועל − משרד החינוך − מענק הרשת − העברת סניף קבועה = נשאר. "עמד ביעד?" = השכר של הסניף מול ספטמבר: ירוק לא יותר, כתום חריגה עד 5%, אדום יותר. "נשאר" הוא מזומן — משרד החינוך רק לפי תקבול בפועל.{multi ? ` יתרה מצטברת = מה שנשאר החודש פחות מה שנשאר ב${fmtMonth(baseMonth.key)}, מצטבר מחודש לחודש: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות.` : ''}</>}</p>
           {mode === 'compare' ? (
           <>
@@ -5515,8 +5517,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <tr key={'cmp-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
                     {yearCols.map(({ key, m }) => { const isB = key === baseMonth.key; if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; return cmpKind === 'salary' ? (
-                      <td key={key} style={{ ...td, fontWeight: key === sel ? 800 : 500 }}>
-                        {!isB && <span style={{ display:'block' }}><Pill s={statusOf(costIn(m, r.id), baseCostOf(r.id))} /></span>}
+                      <td key={key} style={{ ...td, fontWeight: key === sel ? 800 : 500, ...(isB ? {} : cellBg(statusOf(costIn(m, r.id), baseCostOf(r.id)))) }}
+                        title={isB ? 'חודש הבסיס' : ({ ok:'עמד ביעד', mid:'כמעט — חריגה עד 5%', bad:'לא עמד' })[statusOf(costIn(m, r.id), baseCostOf(r.id))] || ''}>
                         <span className="num">{costIn(m, r.id) == null ? '—' : num(costIn(m, r.id))}</span>
                         <TargetNote cost={costIn(m, r.id)} base={baseCostOf(r.id)} isBaseMonth={isB} />
                       </td>
@@ -5534,8 +5536,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
                   {yearCols.map(({ key, m }) => { const isB = key === baseMonth.key; if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; return cmpKind === 'salary' ? (
-                    <td key={key} style={td}>
-                      {!isB && <span style={{ display:'block' }}><Pill s={statusOf(netCost(m), baseCostNet)} /></span>}
+                    <td key={key} style={{ ...td, ...(isB ? {} : cellBg(statusOf(netCost(m), baseCostNet))) }}>
                       <span className="num">{num(netCost(m))}</span>
                       <TargetNote cost={netCost(m)} base={baseCostNet} isBaseMonth={isB} />
                     </td>
