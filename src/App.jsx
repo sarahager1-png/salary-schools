@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 126;
+const BUILD = 127;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5171,19 +5171,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
     לא מוסיפים עליו את השעתיות לפי הנוכחות — הן רק כשלא סוכם סכום.
   */
   const sendOf = r => (r.agreed != null ? r.agreed : (r.hourly || 0));
-  /*
-    כמו בעמודת משרד החינוך (שרה, 6.10: "זה מה שהועבר בפועל?"): סניף שנרשמה לו
-    העברה בפועל במסך התקבולים — היא שמוצגת ונספרת בחשבון החודש, במקום הסכום
-    שסוכם; סניף שטרם — הסכום שסוכם, מסומן. כך יש חשבון אחד, לא שניים.
-  */
-  const sendReal = r => (r.chabadPaid != null ? r.chabadPaid : sendOf(r));
-  const payN = summed.filter(r => r.chabadPaid != null).length;
-  const openOf = r => (r.gap == null ? null : r.gap + minAdj(r) + (r.hourly || 0) - sendReal(r));
-  const dealSum = summed.reduce((x, r) => x + sendReal(r), 0);
+  // "תשנה: העברת סניף קבועה" (שרה, 8.10): ההעברה של הסניף קבועה — הסכום שסוכם; מה שהועבר בפועל נרשם במסך התקבולים למעקב בלבד
+  const openOf = r => (r.gap == null ? null : r.gap + minAdj(r) + (r.hourly || 0) - sendOf(r));
+  const dealSum = summed.reduce((x, r) => x + sendOf(r), 0);
   const noDeal = summed.filter(r => r.agreed == null && r.gap > 0).length;
   const openSum = tot.gap + adjSum + tzSum - dealSum;
   // לפני הכרית: בפועל − משרד החינוך − מענק − מה שהסניף מעביר. אחרי הכרית = זה ועוד 20%.
-  const beforeOf = r => (r.gap == null ? null : r.gap + minAdj(r) + (r.hourly || 0) - r.add20 - sendReal(r));
+  const beforeOf = r => (r.gap == null ? null : r.gap + minAdj(r) + (r.hourly || 0) - r.add20 - sendOf(r));
   const beforeSum = openSum - sum('add20');
   const hasPay = upTo.some(m => m.branches.some(br => br.chabadPaid != null));
   const Remain = ({ v }) => v == null ? <span>—</span>
@@ -5436,7 +5430,6 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <span className="bl-fact" title="עובדות שעלותן נלקחה מקובץ השכר; לשאר — אומדן של המערכת">
                   עלות מקובץ השכר: <b className="num">{tot.withActual}</b> מתוך {tot.staff}
                 </span>
-                {payN > 0 && <span className="bl-fact" title="בסניפים האלה נרשמה במסך התקבולים ההעברה בפועל, והיא שנספרת במקום הסכום שסוכם">הועבר בפועל ב-<b className="num">{payN}</b> מתוך {summed.length} סניפים</span>}
               </div>
             </div>
           </section>
@@ -5454,7 +5447,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <p className="s">{recvN === summed.length ? 'משרד החינוך: התקבל בפועל בכל הסניפים'
                 : recvN ? `משרד החינוך: התקבל בפועל ב-${recvN} מתוך ${summed.length} סניפים; בשאר — 0 עד שיתקבל`
                 : 'משרד החינוך: טרם הוזנו תקבולים — נספר 0'}</p></div>
-            <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>הסניפים מעבירים</p><p className="v num">{num(dealSum)}</p>
+            <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>העברות סניפים קבועות</p><p className="v num">{num(dealSum)}</p>
               <p className="s">{noDeal ? `עם ${noDeal === 1 ? 'סניף אחד' : noDeal + ' סניפים'} טרם סוכם` : 'לפי מה שסוכם איתם'}</p></div>
             <div className="bl-tile t-res"><p className="l"><span className="op" aria-hidden="true">=</span>נשאר</p>
               <p className="v"><Left v={-beforeSum} /></p>
@@ -5481,7 +5474,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </div>
           <p className="section-sub">{mode === 'compare'
             ? (cmpKind === 'salary' ? `השכר של כל סניף בכל חודש מול ${fmtMonth(baseMonth.key)} (הבסיס): ירוק לא יותר, כתום חריגה עד 5%, אדום יותר; ומתחת — כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.` : `מה נשאר בכל חודש אחרי השכר (משרד החינוך לפי תקבול בפועל בלבד), ומתחתיו ההפרש מול ${fmtMonth(baseMonth.key)}: זכות כשנשאר יותר, חובה כשנשאר פחות. היתרה המצטברת = סכום ההפרשים; בשורה האחרונה — כמה הרשת משלימה בכל חודש.`)
-            : <>בפועל − משרד החינוך − מענק הרשת − מה שהסניף מעביר = נשאר. "עמד ביעד?" = השכר של הסניף מול ספטמבר: ירוק לא יותר, כתום חריגה עד 5%, אדום יותר. "נשאר" הוא מזומן — משרד החינוך רק לפי תקבול בפועל.{multi ? ` יתרה מצטברת = מה שנשאר החודש פחות מה שנשאר ב${fmtMonth(baseMonth.key)}, מצטבר מחודש לחודש: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות.` : ''}</>}</p>
+            : <>בפועל − משרד החינוך − מענק הרשת − העברת סניף קבועה = נשאר. "עמד ביעד?" = השכר של הסניף מול ספטמבר: ירוק לא יותר, כתום חריגה עד 5%, אדום יותר. "נשאר" הוא מזומן — משרד החינוך רק לפי תקבול בפועל.{multi ? ` יתרה מצטברת = מה שנשאר החודש פחות מה שנשאר ב${fmtMonth(baseMonth.key)}, מצטבר מחודש לחודש: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות.` : ''}</>}</p>
           {mode === 'compare' ? (
           <>
           {/*
@@ -5582,7 +5575,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: תכנון משוער, בפועל, משרד החינוך, מענק רשת, הסניף מעביר, נשאר, כרית 20%${multi ? ', מהחודש הקודם ויתרה מצטברת' : ''}`}</caption>
+              <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: תכנון משוער, בפועל, משרד החינוך, מענק רשת, העברת סניף קבועה, נשאר, עמד ביעד${multi ? ', מהחודש הקודם ויתרה מצטברת' : ''}`}</caption>
               <colgroup>
                 <col />{!isBase && <col className="g-cost" />}<col className="g-cost" />
                 <col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
@@ -5598,7 +5591,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 </tr>
                 <tr>
                   <TH>סניף</TH>{!isBase && <TH>{fmtMonth(baseMonth.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>הבסיס</span></TH>}<TH>בפועל</TH>
-                  <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל בלבד</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />הסניף מעביר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל, או שסוכם</span></TH>
+                  <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל בלבד</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />העברת סניף קבועה</TH>
                   <TH><Op c="=" />נשאר</TH><TH>עמד ביעד?<span style={{ display:'block', fontSize:14, fontWeight:600 }}>שכר מול {fmtMonth(baseMonth.key)}</span></TH>
                   {multi && !isBase && <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>נשאר מול {fmtMonth(baseMonth.key)}</span></TH>}
                 </tr>
@@ -5622,9 +5615,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <td style={td} title={isBase ? undefined : `הרשת צריכה להעביר החודש: המענק ${num(r.support)} פחות היתרה ${num(runningOf(r.id))}, ולא פחות מאפס`}>{num(r.support)}
                       {/* "כמה הרשת צריכה להעביר כל חודש: המענק מינוס יתרה" (שרה, 8.10) */}
                       {!isBase && runningOf(r.id) != null && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--purple)', marginTop:2 }}>להעביר {num(completeOf(r.support, runningOf(r.id)))}</span>}</td>
-                    <td style={td} title={r.chabadPaid != null ? `הועבר בפועל. סוכם: ${r.agreed == null ? 'טרם' : num(sendOf(r))}` : r.agreed != null ? 'הסכום שסוכם עם הסניף — כולל משרות שעתיות (מזכירה, צהרון)' : undefined}>
-                      {r.chabadPaid != null ? <span style={{ fontWeight:800 }}>{num(r.chabadPaid)}<span className="bl-tag ok">בפועל</span></span>
-                        : r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
+                    <td style={td} title={r.agreed != null ? 'הסכום הקבוע שסוכם עם הסניף — סכום אחד, כולל משרות שעתיות (מזכירה, צהרון)' : undefined}>
+                      {r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
                     <td style={td}><Left v={leftOf(r)} /></td>
                     <td style={td}><TargetBar cost={costAll(r)} base={baseCostOf(r.id)} isBaseMonth={isBase} />
                       <TargetNote cost={costAll(r)} base={baseCostOf(r.id)} isBaseMonth={isBase} /></td>
@@ -5667,7 +5659,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <CardRow label={r.ministryReceived != null ? 'משרד החינוך — בפועל' : minInfo(r).key === 'none' ? 'משרד החינוך — טרם התקבל' : `משרד החינוך — לפי ${fmtMonth(minInfo(r).key)}`}>{num(minOf(r))}</CardRow>
                     <CardRow label="מענק רשת">{num(r.support)}</CardRow>
                     {!isBase && runningOf(r.id) != null && <CardRow label="הרשת מעבירה החודש (מענק − יתרה)" strong color="var(--purple)">{num(completeOf(r.support, runningOf(r.id)))}</CardRow>}
-                    <CardRow label={r.chabadPaid != null ? 'הסניף העביר — בפועל' : 'הסניף מעביר — סוכם'}>{r.chabadPaid != null ? num(r.chabadPaid) : r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
+                    <CardRow label="העברת סניף קבועה">{r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
                   </>
                 )}
                 <button onClick={() => setOpenB(open ? null : r.id)} aria-expanded={open}
@@ -5682,7 +5674,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
 
           {!hasPay && (
             <p style={{ fontSize:14.6, color:'var(--text2)', marginTop:10, lineHeight:1.6 }}>
-              העברות הסניפים בפועל טרם הוזנו. כשיוזנו במסך "תקבולים ותשלומים", עמודת "הסניף מעביר" תציג את מה שהועבר בפועל (מסומן "בפועל"), והוא שייספר ב"נשאר" וביתרה המצטברת.
+              העברת הסניף קבועה — הסכום שסוכם. מה שהסניף העביר בפועל נרשם במסך "תקבולים" למעקב, ואינו משנה את החשבון כאן.
             </p>
           )}
 
@@ -5802,7 +5794,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
               <b>הבסיס</b> — עלות השכר בפועל בחודש הראשון במערכת (ספטמבר 2026); היא ה-100% שמולו נמדדים החודשים הבאים, והכרית היא 20% ממנה. <b>בפועל</b> — עלות המעביד של כל עובדי בית הספר בחודש, כולל מנהלת, הנהלה וצהרון; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
               {' '}<b>עמד ביעד?</b> — השכר של הסניף החודש מול השכר שלו בספטמבר (הבסיס): ירוק = לא יותר, כתום = חריגה עד 5%, אדום = יותר; מתחת לפס — כמה חסך או חרג. זה המדד של הסניף; תקבולי משרד החינוך אינם חלק ממנו. <b>משרד החינוך</b> — רק מה שהתקבל בפועל (הוזן במסך "תקבולים"); תקבול שהוזן נשאר בתוקף לחודשים הבאים עד שמוזן חדש, וסניף שטרם התקבל לו דבר נספר 0 — לא "מתוכנן". <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
-              {' '}<b>הסניף מעביר</b> — הסכום החודשי שסוכם איתו, סכום אחד כולל משרות שעתיות; "טרם סוכם" נספר כאפס. <b>להעביר</b> (מתחת למענק) ו<b>הרשת משלימה החודש</b> (ברצועה למעלה ובשורת הסיכום של ההשוואה) — כמה הרשת צריכה להעביר החודש: המענק פחות היתרה המצטברת (חובה מגדילה, זכות מקטינה — אך לא מתחת לאפס; סניף בלי מענק שומר את הזכות לחודשים הבאים). ההעברה שסוכמה עם הסניף אינה משתנה. בחודש הבסיס — המענק. כשנרשמה במסך התקבולים העברה בפועל — היא שמוצגת ונספרת ("בפועל"). <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
+              {' '}<b>העברת סניף קבועה</b> — הסכום החודשי שסוכם עם הסניף, סכום אחד כולל משרות שעתיות; קבוע, אינו משתנה לפי תקבולים; "טרם סוכם" נספר כאפס. מה שהסניף העביר בפועל נרשם במסך "תקבולים" למעקב. <b>להעביר</b> (מתחת למענק) ו<b>הרשת משלימה החודש</b> (ברצועה למעלה ובשורת הסיכום של ההשוואה) — כמה הרשת צריכה להעביר החודש: המענק פחות היתרה המצטברת (חובה מגדילה, זכות מקטינה — אך לא מתחת לאפס; סניף בלי מענק שומר את הזכות לחודשים הבאים). ההעברה שסוכמה עם הסניף אינה משתנה. בחודש הבסיס — המענק. כשנרשמה במסך התקבולים העברה בפועל — היא שמוצגת ונספרת ("בפועל"). <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
               {anyTz && <>{' '}<b>הנהלה וצהרון</b> — המשרות השעתיות מגולמות בשכר (לפי המחשבון ובפועל); אין מולן הכנסה ממשרד החינוך, והן כולן על הסניף: הסכום ש"הסניף מעביר" כולל אותן, וכרית ה-20% מחושבת גם עליהן.</>}
               {' '}<b>יתרה מצטברת</b> — מה שנשאר החודש פחות מה שנשאר בספטמבר (הבסיס), מצטבר: "זכות" כשנשאר יותר (שכר נמוך יותר, או תקבול ממשרד החינוך שהגיע), "חובה" כשנשאר פחות; היתרה עוברת מחודש לחודש.
               {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
