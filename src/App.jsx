@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 155;
+const BUILD = 156;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5792,10 +5792,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     {salSt === 'bad' ? 'השכר חורג מהתכנון' : salSt === 'mid' ? 'השכר מעט מעל התכנון' : salOn ? 'השכר עומד בתכנון' : 'השכר מתחת לתכנון'}
                   </h2>
                   <p className="bl-line">
-                    עלות השכר בביצוע <b className="num">{num(pvaTot.actSal)}</b>, מול <b className="num">{num(pvaTot.planSal)}</b> בתכנון
+                    ביצוע <b className="num">{num(pvaTot.actSal)}</b> מול תכנון <b className="num">{num(pvaTot.planSal)}</b>
                     {pvaTot.actSal > pvaTot.planSal ? <> — גבוה ב-<b className="num" style={{ color: ST_COLOR[salSt] }}>{num(pvaTot.actSal - pvaTot.planSal)}</b>{salSt === 'mid' ? ' (חריגה קטנה, עד 5%)' : ''}.</>
                       : <> — נמוך ב-<b className="num" style={{ color:'var(--ok-text)' }}>{num(pvaTot.planSal - pvaTot.actSal)}</b>.</>}
-                    {' '}הפער לחודש: <GapV v={pvaTot.actGap} /> (בתכנון: <GapV v={pvaTot.planGap} />).
                   </p>
                 </>
               ) : (
@@ -5811,7 +5810,6 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 {upTo.length > 1 && cumSalPct != null && (
                   <span className="bl-fact" title="עלות השכר בביצוע מול התכנון, בכל החודשים עד החודש הזה">מתחילת השנה <b className="num" style={{ color: cumSalPct > 101 ? 'var(--danger-text)' : undefined }}>{cumSalPct}%</b> מהתכנון</span>
                 )}
-                <span className="bl-fact" title="התכנון הוא נתוני הבסיס שבטבלה למטה, חלקי 12">התכנון: נתוני הבסיס ÷ 12</span>
                 {simN > 0 && (
                   <span className="bl-fact" style={{ background:'var(--warn-bg)', borderColor:'var(--warn-line)', color:'#8F4E00', fontWeight:700 }}
                     title="בסניפים האלה יש תיקוני ברוטו לפי התלושים שעוד לא אושרו במסך אישורים. עד האישור הם מוצגים לפי הסימולציה.">
@@ -5825,24 +5823,33 @@ function BottomLineView({ activeMonth, viewer = false }) {
             </div>
           </section>
 
-          {/* שש כרטיסיות, אותו חשבון של הטבלה: שכר + 20% − משרד החינוך − מענק והעברות = הפער; בכל אחת ביצוע ומתחתיו התכנון */}
+          {/*
+            "תמקד" (שרה, 8.10): שש כרטיסיות באותו מבנה בדיוק — כותרת קצרה, המספר, ומתחתיו שתי שורות קבועות:
+            התכנון, והפער ממנו בצבע. בלי משפטים.
+          */}
           <div className="bl-eq" role="group" aria-label="החשבון החודשי של הרשת — ביצוע מול תכנון">
-            <div className="bl-tile t-cost"><p className="l">עלות השכר — ביצוע</p><p className="v num" style={{ color: ST_COLOR[actSt(pvaTot.actSal, pvaTot.planSal)] }}>{num(pvaTot.actSal)}</p>
-              <p className="s">תכנון {num(pvaTot.planSal)}<PlanNote cost={pvaTot.actSal} plan={pvaTot.planSal} block={false} /></p></div>
-            <div className="bl-tile t-cost"><p className="l"><span className="op" aria-hidden="true">+</span>ה-20% — ביצוע</p><p className="v num" style={{ color: ST_COLOR[actSt(pvaTot.act20, pvaTot.plan20)] }}>{num(pvaTot.act20)}</p>
-              <p className="s">תכנון {num(pvaTot.plan20)}<PlanNote cost={pvaTot.act20} plan={pvaTot.plan20} block={false} /></p></div>
-            <div className="bl-tile t-inc" title={noMinN ? `טרם התקבל: ${pvaRows.filter(x => x.p?.noMin).map(x => shortName(x.r.name)).join(', ')}` : undefined}>
-              <p className="l"><span className="op" aria-hidden="true">−</span>משרד החינוך — התקבל</p><p className="v num" style={{ color: ST_COLOR[actSt(pvaTot.actMin, pvaTot.planMin, true)] }}>{num(pvaTot.actMin)}</p>
-              <p className="s">תכנון {num(pvaTot.planMin)}{noMinN ? ` · ${noMinN} סניפים טרם` : ''}</p></div>
-            <div className="bl-tile t-inc" title="הסכומים שבטבלת נתוני הבסיס: מענק הרשת (החלק ה-12) והעברות הסניפים">
-              <p className="l"><span className="op" aria-hidden="true">−</span>מענק הרשת + העברות הסניפים</p><p className="v num">{num(pvaTot.grant + pvaTot.transfer)}</p>
-              <p className="s">מענק {num(pvaTot.grant)} · סניפים {num(pvaTot.transfer)}</p></div>
-            <div className="bl-tile t-res"><p className="l"><span className="op" aria-hidden="true">=</span>הפער לחודש — ביצוע</p>
-              <p className="v"><GapV v={pvaTot.actGap} /></p>
-              <p className="s">תכנון: <GapV v={pvaTot.planGap} /></p></div>
-            <div className="bl-tile t-res t-final"><p className="l">הפער מתחילת השנה</p>
-              <p className="v"><GapV v={pvaCum.actGap} /></p>
-              <p className="s">תכנון: <GapV v={pvaCum.planGap} />{upTo.length > 1 ? ` · ${upTo.length} חודשים` : ''}</p></div>
+            {[
+              { cls:'t-cost', op:null, l:'עלות השכר', v:<span style={{ color: ST_COLOR[actSt(pvaTot.actSal, pvaTot.planSal)] }}>{num(pvaTot.actSal)}</span>,
+                s1:<>תכנון {num(pvaTot.planSal)}</>, s2:<Diff v={pvaTot.actSal} plan={pvaTot.planSal} /> },
+              { cls:'t-cost', op:'+', l:'ה-20%', v:<span style={{ color: ST_COLOR[actSt(pvaTot.act20, pvaTot.plan20)] }}>{num(pvaTot.act20)}</span>,
+                s1:<>תכנון {num(pvaTot.plan20)}</>, s2:<Diff v={pvaTot.act20} plan={pvaTot.plan20} /> },
+              { cls:'t-inc', op:'−', l:'משרד החינוך', v:<span style={{ color: ST_COLOR[actSt(pvaTot.actMin, pvaTot.planMin, true)] }}>{num(pvaTot.actMin)}</span>,
+                s1:<>תכנון {num(pvaTot.planMin)}</>, s2: noMinN ? <span style={{ color:'#8F4E00', fontWeight:700 }}>{noMinN} סניפים טרם קיבלו</span> : <Diff v={pvaTot.actMin} plan={pvaTot.planMin} income />,
+                title: noMinN ? `טרם התקבל: ${pvaRows.filter(x => x.p?.noMin).map(x => shortName(x.r.name)).join(', ')}` : undefined },
+              { cls:'t-inc', op:'−', l:'מענק + העברות', v:num(pvaTot.grant + pvaTot.transfer),
+                s1:<>מענק {num(pvaTot.grant)}</>, s2:<>סניפים {num(pvaTot.transfer)}</> },
+              { cls:'t-res', op:'=', l:'הפער לחודש', v:<GapV v={pvaTot.actGap} />,
+                s1:<>תכנון: <GapV v={pvaTot.planGap} /></>, s2:null },
+              { cls:'t-res t-final', op:null, l:'מתחילת השנה', v:<GapV v={pvaCum.actGap} />,
+                s1:<>תכנון: <GapV v={pvaCum.planGap} /></>, s2: upTo.length > 1 ? `${upTo.length} חודשים` : 'חודש אחד' },
+            ].map(x => (
+              <div key={x.l} className={'bl-tile ' + x.cls} title={x.title}>
+                <p className="l">{x.op && <span className="op" aria-hidden="true">{x.op}</span>}{x.l}</p>
+                <p className="v num">{x.v}</p>
+                <p className="s" style={{ whiteSpace:'nowrap' }}>{x.s1}</p>
+                <p className="s" style={{ whiteSpace:'nowrap', minHeight:21 }}>{x.s2}</p>
+              </div>
+            ))}
           </div>
 
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:6 }}>
@@ -5858,7 +5865,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </div>
           <p className="section-sub">{mode === 'compare'
             ? (cmpKind === 'salary' ? 'התכנון השנתי של עלות ההוראה לכל סניף, החלק החודשי שלו (השנתי ÷ 12), ועלות ההוראה בפועל בכל חודש מולו. ירוק — עומד בתכנון; כתום — כמעט (חריגה עד 5%); אדום — לא עומד. מתחת: כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.' : 'הפער של כל סניף בכל חודש בביצוע: שכר + 20% − משרד החינוך שהתקבל − מענק הרשת − העברת הסניף. "חסר" כשהעלות גבוהה מהכיסוי, "עודף" כשנשאר. בסוף: הפער המצטבר.')
-            : <>לכל חלק תכנון, ביצוע ופער. התכנון מוזן מטבלת נתוני הבסיס שלמטה, חלקי 12. פער ירוק — לטובה; כתום — חריגה עד 5%; אדום — מעבר לזה. שכר + 20% − משרד החינוך שהתקבל − מענק הרשת − העברת הסניף = הפער לחודש; המענק וההעברה נכנסים לחשבון לפי התכנון, והביצוע שלהם מוצג למעקב: את המענק ששולם רושם מנהל הרשת כאן, ואת העברת הסניף — במסך "תקבולים ותשלומים".</>}</p>
+            : <>תכנון = נתוני הבסיס שלמטה ÷ 12. פער ירוק — לטובה · כתום — חריגה עד 5% · אדום — מעבר לזה.</>}</p>
           {mode === 'compare' ? (
           <>
           <div className="apple-seg no-print" role="group" aria-label="מה משווים" style={{ marginBottom:10 }}>
