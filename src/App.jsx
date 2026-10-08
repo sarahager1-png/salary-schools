@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 176;
+const BUILD = 177;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5161,6 +5161,15 @@ function workMonthKey(now = new Date()) {
 // התוספת על עלות השכר בדף המנכ"ל (שרה, 8.10.26: "15 אחוז"); שם המשתנה add20 נשאר מההיסטוריה
 const CEO_ADD_PCT = 0.15;
 
+/*
+  צפי הכנסות משרד החינוך לסניף שטרם קיבל (שרה, 8.10: "רק בתכנון למטה לא בטבלה למעלה"; "תלך לפי הערכה שלי
+  הראשונית"). הסכומים הם ההערכה השנתית שלה מהדוח מ-23.9 (ולקרית ביאליק מהתקציב שסוכם ב-24.9), חלקי 12.
+  מוצג ונספר רק בטבלת נתוני הבסיס; טבלת החודש ממשיכה לספור תקבול בפועל בלבד. ברגע שמוזן תקבול לסניף —
+  הצפי יורד. ההתאמה לפי שם העיר.
+*/
+const CEO_MINISTRY_EST = [['עפולה', 505440 / 12], ['רעננה', 528110 / 12], ['אשקלון', 574990 / 12], ['רמת ישי', 284720 / 12], ['קרית ביאליק', 414370 / 12]];
+const ceoMinistryEst = name => CEO_MINISTRY_EST.find(([city]) => String(name || '').includes(city))?.[1] || 0;
+
 const CEO_TRANSFERS_REPORT = {
   title: 'העברות לסניפים — עלות הוראה שנתית',
   sub: 'רשת חינוך חב״ד · נכון ל־23 בספטמבר 2026 · עלות ההוראה לפי חודש 2026-09 · הדוח שסוכם: השיקים המועברים והשכר שתוכנן קבועים ואינם משתנים',
@@ -6272,7 +6281,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             </div>
           </div>
           {help === 'base' && (
-            <p style={helpBox}>בכל תצוגה כל העמודות באותה יחידה: ב"חודשי" הסכום לחודש, וב"שנתי" אותו סכום כפול 12. <b>עלות ההוראה</b> — ספטמבר בפועל (חודש המוצא). <b>הכרית</b> — 15% ממנה. <b>משרד החינוך</b> — התקבול האחרון שהוזן לסניף. <b>מענק הרשת והעברת הסניף</b> — הסכומים שבתוקף עכשיו; {canEditBase ? 'אפשר לשנות אותם כאן בשתי התצוגות, והשינוי נכנס מיד לטבלת החודש.' : 'רק מנהל הרשת משנה אותם.'} <b>הפער</b> — עלות + כרית − משרד החינוך − מענק − העברה.</p>
+            <p style={helpBox}>בכל תצוגה כל העמודות באותה יחידה: ב"חודשי" הסכום לחודש, וב"שנתי" אותו סכום כפול 12. <b>עלות ההוראה</b> — ספטמבר בפועל (חודש המוצא). <b>הכרית</b> — 15% ממנה. <b>משרד החינוך</b> — התקבול האחרון שהוזן לסניף; לסניף שטרם קיבל — ההערכה מהדוח מ-23.9 (מסומנת "צפי"), שנספר רק בטבלה הזו. <b>מענק הרשת והעברת הסניף</b> — הסכומים שבתוקף עכשיו; {canEditBase ? 'אפשר לשנות אותם כאן בשתי התצוגות, והשינוי נכנס מיד לטבלת החודש.' : 'רק מנהל הרשת משנה אותם.'} <b>הפער</b> — עלות + כרית − משרד החינוך − מענק − העברה.</p>
           )}
           {/*
             נתוני הבסיס (שרה, 8.10, לילה: "לא כל הנתונים פה שנתיים. וכשמעבירים לחודשי, אז זה אמור להיות מחולק ל-12.
@@ -6283,9 +6292,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
           {(() => {
             const mo = basePer === 'month', k = mo ? 1 : 12, per = mo ? 'לחודש' : 'לשנה';
             const lines = baseRows.map(r => { const pm = pvaIn(cur, r.id);
-              const cost = r.annual / 12, cush = r.add20 / 12, min = pm ? pm.actMin : 0, wait = pm ? pm.noMin : true;
+              const wait = pm ? pm.noMin : true, est = wait ? ceoMinistryEst(r.name) : 0;
+              const cost = r.annual / 12, cush = r.add20 / 12, min = est || (pm ? pm.actMin : 0);
               const grant = r.supportYear / 12, tr = r.month || 0;
-              return { r, cost, cush, min, wait, grant, tr, gap: cost + cush - min - grant - tr }; });
+              return { r, cost, cush, min, wait, est, grant, tr, gap: cost + cush - min - grant - tr }; });
             const T = lines.reduce((a, x) => ({ cost: a.cost + x.cost, cush: a.cush + x.cush, min: a.min + x.min, grant: a.grant + x.grant, tr: a.tr + x.tr, gap: a.gap + x.gap }), { cost: 0, cush: 0, min: 0, grant: 0, tr: 0, gap: 0 });
             /*
               "תפתח למנכ"ל את האפשרות לשינוי בשנתי" (שרה, 8.10): מנהל הרשת משנה את המענק ואת העברת הסניף בשתי
@@ -6305,7 +6315,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
             );
             const grantCell = x => (canEditBase ? scaled(x.r.id, 'supportYear', x.r.supportYear, mo ? 1 / 12 : 1, `מענק הרשת ${per}, ${x.r.name}`) : num(x.grant * k));
             const trCell = x => (canEditBase ? scaled(x.r.id, 'transfer', x.r.month, mo ? 1 : 12, `העברת הסניף ${per}, ${x.r.name}`) : num(x.tr * k));
-            const minCell = x => (x.wait ? <span style={{ color:'#8F4E00', fontWeight:700 }}>טרם התקבל</span> : <span className="num" style={{ fontWeight:700 }}>{num(x.min * k)}</span>);
+            const minCell = x => (x.est ? <span className="num" style={{ fontWeight:700, color:'#8F4E00' }} title="טרם התקבל — ההערכה מהדוח מ-23.9">{num(x.est * k)} <span style={{ fontSize:14, fontWeight:600 }}>צפי</span></span>
+              : x.wait ? <span style={{ color:'#8F4E00', fontWeight:700 }}>טרם התקבל</span> : <span className="num" style={{ fontWeight:700 }}>{num(x.min * k)}</span>);
             return (<>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table pva pvab" style={{ width:'100%', borderCollapse:'collapse' }}>
