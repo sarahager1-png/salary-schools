@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 139;
+const BUILD = 140;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -7889,6 +7889,15 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
   const [mode, setMode] = useState(initialMode || (onSaveTeacher ? 'archive' : 'prep'));
   const [openSc, setOpenSc] = useState(null);
   /*
+    "עדיין לא רואה תלושים" (שרה, 8.10): במסך שלה כל בתי הספר פתוחים מראש, בלי
+    הלשונית "תלושים שהתקבלו" ובלי ההודעה על תלושי הגזברות — רואים מיד את התלושים
+    שהמערכת מכינה, ובכל שורה כפתור גלוי שפותח את התלוש המלא.
+  */
+  const simOnly = initialMode === 'prep';
+  const [shut, setShut] = useState(() => new Set());
+  const isOpenSc = id => simOnly ? !shut.has(id) : openSc === id;
+  const toggleSc = id => simOnly ? setShut(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; }) : setOpenSc(openSc === id ? null : id);
+  /*
     "לא רואה את כל התלושים… פה" (שרה, 6.10): גם בהכנת התלושים רואים, לכל
     עובדת, את התלוש שהתקבל מהגזברות לאותו חודש — ופותחים אותו מהשורה.
   */
@@ -7991,7 +8000,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
   return (
     <div className="page-wrap" style={{ maxWidth:1180 }}>
       <PageHead
-        title={`תלושים · ${fmtMonthFn ? fmtMonthFn(monthKey) : monthKey}`}
+        title={`${simOnly ? 'תלושי סימולציה' : 'תלושים'} · ${fmtMonthFn ? fmtMonthFn(monthKey) : monthKey}`}
         subtitle={mode === 'archive' ? 'התלושים שהתקבלו מהגזברות, לכל עובדת ולכל חודש, עם עלות השכר לסניף.' : 'הבסיס בעולם ישן לפי השעות (מחנכת +3 · אם מעל 79% +10), תוספת בית חב"ד שורה קבועה, והסה"כ הוא השכר המאומת. הכול מתעדכן חי מהנתונים.'}
         actions={mode === 'prep' ? (
           <button className="apple-btn apple-btn-ghost no-print" onClick={() => window.print()} style={{ fontSize:14.9 }} title="מדפיס את כל בתי הספר">
@@ -7999,7 +8008,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
           </button>
         ) : null}
       />
-      <div className="apple-seg even-grid no-print" role="group" aria-label="תצוגת תלושים" style={{ marginBottom:16, maxWidth:520, gap:2 }}>
+      <div className="apple-seg even-grid no-print" role="group" aria-label="תצוגת תלושים" style={{ marginBottom:16, maxWidth:520, gap:2, display: simOnly ? 'none' : undefined }}>
         {[['archive', 'תלושים שהתקבלו'], ['prep', 'הכנת תלושים']].map(([k, l]) => (
           <button key={k} onClick={() => setMode(k)} aria-pressed={mode === k}
             className={['apple-seg-item', mode === k ? 'active' : ''].join(' ')} style={{ padding:'6px 13px', fontSize:15.5, minHeight:42 }}>{l}</button>
@@ -8011,7 +8020,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
         <div role="alert" style={{ background:'var(--danger-bg)', color:'var(--danger-text)', border:'1px solid var(--danger-line)', borderRadius:12,
           padding:'10px 14px', fontSize:15, fontWeight:600, marginBottom:10 }}>{slipErr}</div>
       )}
-      {mode === 'prep' && !monthFiles.length && lastFilesMonth && lastFilesMonth !== monthKey && (
+      {mode === 'prep' && !simOnly && !monthFiles.length && lastFilesMonth && lastFilesMonth !== monthKey && (
         <div className="apple-card no-print" style={{ padding:'12px 16px', marginBottom:12, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap',
           background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>
           <p style={{ flex:'1 1 260px', fontSize:15.5, fontWeight:600, color:'#8F4E00', lineHeight:1.5 }}>
@@ -8052,9 +8061,9 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
         const tot = live.reduce((a, x) => ({ base: a.base + x.r.base, supp: a.supp + x.r.supp, gross: a.gross + x.r.gross }),
           { base: 0, supp: 0, gross: 0 });
         return (
-          <div key={sc.id} className={'apple-card slip-school' + (openSc === sc.id ? '' : ' closed')} style={{ padding:0, marginBottom:10, overflow:'hidden' }}>
-            <button type="button" className="slip-head no-print" aria-expanded={openSc === sc.id} onClick={() => setOpenSc(openSc === sc.id ? null : sc.id)}>
-              <ChevronLeft size={18} strokeWidth={2.4} style={{ transform: openSc === sc.id ? 'rotate(-90deg)' : 'none', transition:'transform .15s', flexShrink:0 }} />
+          <div key={sc.id} className={'apple-card slip-school' + (isOpenSc(sc.id) ? '' : ' closed')} style={{ padding:0, marginBottom:10, overflow:'hidden' }}>
+            <button type="button" className="slip-head no-print" aria-expanded={isOpenSc(sc.id)} onClick={() => toggleSc(sc.id)}>
+              <ChevronLeft size={18} strokeWidth={2.4} style={{ transform: isOpenSc(sc.id) ? 'rotate(-90deg)' : 'none', transition:'transform .15s', flexShrink:0 }} />
               <span className="nm">{shortName(sc.name)}</span>
               {!paysSupp && <span className="bl-tag">תשלום ישיר</span>}
               <span className="st"><b className="num">{live.length}</b> תלושים</span>
@@ -8095,7 +8104,12 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                       <td style={{ fontWeight:600 }}>
                         {r.principal && <Briefcase size={12} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}
                         {t.name}
-                        {((lines[t.id] && !r.hourly) || r.principal) && <FileText size={12} strokeWidth={2.2} style={{ display:'inline', verticalAlign:'-1px', marginInlineStart:5, color:'var(--purple)' }} />}
+                        {((lines[t.id] && !r.hourly) || r.principal) && (
+                          <span className="no-print" style={{ display:'inline-flex', alignItems:'center', gap:4, marginInlineStart:8, padding:'2px 9px', borderRadius:999,
+                            background:'var(--purple-100)', color:'var(--purple)', fontSize:14, fontWeight:700, whiteSpace:'nowrap' }}>
+                            <FileText size={13} strokeWidth={2.2} />לתלוש
+                          </span>
+                        )}
                         <p style={{ fontSize:14, fontWeight:500, color:'var(--text3)' }}>
                           {r.hourly
                             ? [jobLabel(t.job), `${r.rate} ₪ לשעה`, r.fromAttendance ? `לפי דוח נוכחות: ${r.hours} שעות` : r.awaiting ? 'ממתין לדוח נוכחות (אומדן)' : `כ-${r.hours} שעות בחודש (אומדן)`].join(' · ')
