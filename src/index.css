@@ -1318,21 +1318,22 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .big-table.pva tbody th[scope="row"] { min-width: 104px; padding-inline-start: 10px !important; }
 .big-table.pva thead th:first-child, .big-table.pva tfoot td:first-child { padding-inline-start: 10px !important; }
 
-/* טבלת החודש — "תסדר" (שרה, 8.10): עמודות ברוחב שווה, שורות בגובה אחיד, בלי גווני רקע לעמודות
-   (רק צבע המצב של הביצוע), וקו מפריד בין הקבוצות */
+/* טבלת החודש (שרה, 8.10: "תסדר", "צריך עמודה שמספרת את הפער", "זה עמוס"): תא = שורה אחת, שלוש עמודות
+   לכל חלק, הצבע רק בעמודת הפער, בלי משבצות צבועות; קו מפריד בין הקבוצות */
 .big-table.pvam { table-layout: fixed; }
-.big-table.pvam col { background: transparent !important; width: 8.1%; }
-.big-table.pvam col:first-child { width: 13%; }
-.big-table.pvam col:nth-child(10), .big-table.pvam col:nth-child(11) { width: 11.1%; }
-.big-table.pvam col:nth-child(11) { background: #F7F4FC !important; }
+.big-table.pvam col { background: transparent !important; width: 6.95%; }
+.big-table.pvam col.c-name { width: 11.6%; }
+.big-table.pvam col.c-final { width: 11.5%; }
+.big-table.pvam col.c-gap { background: #FAF8FE !important; width: 9.4%; }
+.big-table.pvam tbody td, .big-table.pvam tfoot td { padding-inline: 2px; font-size: 14.4px !important; }
+.big-table.pvam tbody td { height: 48px; padding-top: 6px; padding-bottom: 6px; vertical-align: middle; }
+.big-table.pvam tbody tr { border-bottom: 1px solid var(--line); }
+.big-table.pvam tbody tr:nth-child(even) td, .big-table.pvam tbody tr:nth-child(even) th[scope="row"] { background: transparent !important; }
+.big-table.pvam tr > :nth-child(2), .big-table.pvam tr > :nth-child(5), .big-table.pvam tr > :nth-child(8),
+.big-table.pvam tr > :nth-child(11), .big-table.pvam tr > :nth-child(12) { border-inline-start: 2px solid #E3DCF2; }
+.big-table.pvam tr.bl-groups > :nth-child(n) { border-inline-start: 0; }
+.big-table.pvam tr.bl-groups > :nth-child(n+2) { border-inline-start: 2px solid #E3DCF2; }
 .gap-chip { padding: 5px 6px; border-radius: 10px; border: 1px solid transparent; }
 .gap-chip.ok  { background: #E6F6EC; border-color: #BBE5C8; }
 .gap-chip.bad { background: var(--danger-bg); border-color: var(--danger-line, #F3C7C7); }
-.big-table.pvam tbody td { height: 62px; padding-top: 6px; padding-bottom: 6px; vertical-align: middle; line-height: 1.35; }
-.big-table.pvam tbody tr:nth-child(even) td:not([class*="tgt-"]), .big-table.pvam tbody tr:nth-child(even) th[scope="row"] { background: #FAF9FD !important; }
-.big-table.pvam thead tr:not(.bl-groups) th { font-weight: 700; }
-.big-table.pvam tr > :nth-child(2), .big-table.pvam tr > :nth-child(4), .big-table.pvam tr > :nth-child(6),
-.big-table.pvam tr > :nth-child(8), .big-table.pvam tr > :nth-child(10) { border-inline-start: 2px solid #E3DCF2; }
-.big-table.pvam tr.bl-groups > :nth-child(n) { border-inline-start: 0; }
-.big-table.pvam tr.bl-groups > :nth-child(n+2) { border-inline-start: 2px solid #E3DCF2; }
-.big-table.pvam td.tgt-ok, .big-table.pvam td.tgt-mid, .big-table.pvam td.tgt-bad { box-shadow: inset 0 0 0 3px #fff; border-radius: 10px; }
+.big-table.pvam tfoot td { font-size: 14px !important; letter-spacing: -0.02em; padding-inline: 1px; }
