@@ -68,6 +68,20 @@ export default async function handler(req, res) {
         if (!up?.length) return res.status(404).json({ error: 'לסניף אין שורת כספים' });
         return res.status(200).json({ ok: true });
       }
+      // מענק הרשת ששולם בפועל לסניף בחודש — מנהל הרשת בלבד (שרה, 8.10.26: "זה גם משתנה מהמנכ"ל")
+      if (b0.action === 'setGrantPaid') {
+        if (!canEditBase) return res.status(403).json({ error: 'רק מנהל הרשת רושם את המענק ששולם' });
+        if (typeof b0.schoolId !== 'string' || !/^[0-9a-f-]{36}$/i.test(b0.schoolId)) return res.status(400).json({ error: 'חסר סניף' });
+        if (typeof b0.month !== 'string' || !/^\d{4}-\d{2}$/.test(b0.month)) return res.status(400).json({ error: 'חודש לא תקין' });
+        if (b0.amount !== null && typeof b0.amount !== 'number') return res.status(400).json({ error: 'סכום לא תקין' });
+        const v = b0.amount;
+        if (v != null && (!Number.isFinite(v) || v < 0 || v > 50000000)) return res.status(400).json({ error: 'סכום לא תקין' });
+        const { error } = await sb.from('school_payment_ledger')
+          .upsert({ school_id: b0.schoolId, month_key: b0.month, grant_paid: v == null ? null : Math.round(v), updated_at: new Date().toISOString() },
+            { onConflict: 'school_id,month_key' });
+        if (error) throw new Error(`school_payment_ledger: ${error.message}`);
+        return res.status(200).json({ ok: true });
+      }
     }
     // סגירה ופתיחה מחדש של חודש — רכזת בלבד; מנהל בצפייה אינו כותב דבר
     if (isPost && prof.role !== 'coordinator') return res.status(403).json({ error: 'רק הרכזת סוגרת חודש' });
@@ -128,7 +142,7 @@ export async function readAll(sb) {
     all('schools', '*', 'id'),
     all('teacher_months', '*', 'id'),
     all('school_finance', 'school_id, ministry_budget, network_support, monthly_transfer, teaching_sim', 'school_id'),
-    all('school_payment_ledger', 'school_id, month_key, ministry_received, chabad_paid', 'month_key'),
+    all('school_payment_ledger', 'school_id, month_key, ministry_received, chabad_paid, grant_paid', 'month_key'),
     all('months', 'key, opened_at, locked, closed_at', 'key'),
     all('month_sim_snapshot', 'school_id, month_key, sim_cost, source', 'month_key'),
     // התלושים הם השלמה בלבד — כשל בקריאתם לא מפיל את הדף
@@ -232,7 +246,7 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
         ministry: ministry == null ? null : Math.round(ministry), support: Math.round(support),
         gap: gap == null ? null : Math.round(gap),
         agreed, due: agreed ?? (gap == null ? null : Math.round(gap)),
-        ministryReceived: n(l.ministry_received), chabadPaid: n(l.chabad_paid),
+        ministryReceived: n(l.ministry_received), chabadPaid: n(l.chabad_paid), grantPaid: n(l.grant_paid),
         // התחשיב הראשוני מהתקציב לחודש (לא מוצג בדף; נשמר להשוואה)
         budgetPlan: n(f.teaching_sim) == null ? null : Math.round(n(f.teaching_sim) / 12),
         plan: null,   // מתמלא למטה: העלות לפי מחשבון המשרד
@@ -325,7 +339,8 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
       const l = ledBy.get(`${mo.key}|${f.school_id}`) || {};
       return { ...f.data, id: f.school_id, name: scBy.get(f.school_id)?.name || f.data.name,
         ministryReceived: n(l.ministry_received) ?? f.data.ministryReceived ?? null,
-        chabadPaid: n(l.chabad_paid) ?? f.data.chabadPaid ?? null };
+        chabadPaid: n(l.chabad_paid) ?? f.data.chabadPaid ?? null,
+        grantPaid: n(l.grant_paid) ?? f.data.grantPaid ?? null };
     });
   }
   return { months };

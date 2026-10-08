@@ -1215,6 +1215,18 @@ export async function setBaseData(schoolId, patch) {
   return j;
 }
 
+// מענק הרשת ששולם בפועל לסניף בחודש — השרת מתיר למנהל הרשת בלבד
+export async function setGrantPaid(schoolId, month, amount) {
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error('פג תוקף ההתחברות — יש להתחבר מחדש');
+  const r = await fetch('/api/monthly-summary', { method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ action: 'setGrantPaid', schoolId, month, amount }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `רישום המענק: שגיאה ${r.status}`);
+  return j;
+}
+
 /* ── התלושים בפועל מהגזברות (שרה, 6.10.26) ─────────────────────
    קובץ לכל עובדת ולכל חודש, בדלי פרטי. הרישום והקובץ נקראים רק על ידי
    הרכזת והחשבת (RLS); ההעלאה נעשית מהשרת (scripts/upload-payslips.mjs). */
