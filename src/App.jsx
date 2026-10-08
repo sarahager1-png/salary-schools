@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 127;
+const BUILD = 128;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5578,7 +5578,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: תכנון משוער, בפועל, משרד החינוך, מענק רשת, העברת סניף קבועה, נשאר, עמד ביעד${multi ? ', מהחודש הקודם ויתרה מצטברת' : ''}`}</caption>
               <colgroup>
                 <col />{!isBase && <col className="g-cost" />}<col className="g-cost" />
-                <col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
+                <col className="g-inc" /><col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
                 <col className="g-res" /><col className="g-res g-sum" />
                 {multi && !isBase && <col className="g-res g-sum" />}
               </colgroup>
@@ -5586,12 +5586,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <tr className="bl-groups">
                   <th />
                   <th colSpan={isBase ? 1 : 2} scope="colgroup" className="gh-cost">השכר</th>
-                  <th colSpan={3} scope="colgroup" className="gh-inc">הכיסוי</th>
+                  <th colSpan={4} scope="colgroup" className="gh-inc">הכיסוי</th>
                   <th colSpan={multi && !isBase ? 3 : 2} scope="colgroup" className="gh-res">מה נשאר</th>
                 </tr>
                 <tr>
                   <TH>סניף</TH>{!isBase && <TH>{fmtMonth(baseMonth.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>הבסיס</span></TH>}<TH>בפועל</TH>
-                  <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל בלבד</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />העברת סניף קבועה</TH>
+                  <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל בלבד</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />העברת סניף קבועה</TH><TH>הסניף העביר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל</span></TH>
                   <TH><Op c="=" />נשאר</TH><TH>עמד ביעד?<span style={{ display:'block', fontSize:14, fontWeight:600 }}>שכר מול {fmtMonth(baseMonth.key)}</span></TH>
                   {multi && !isBase && <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>נשאר מול {fmtMonth(baseMonth.key)}</span></TH>}
                 </tr>
@@ -5617,6 +5617,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                       {!isBase && runningOf(r.id) != null && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--purple)', marginTop:2 }}>להעביר {num(completeOf(r.support, runningOf(r.id)))}</span>}</td>
                     <td style={td} title={r.agreed != null ? 'הסכום הקבוע שסוכם עם הסניף — סכום אחד, כולל משרות שעתיות (מזכירה, צהרון)' : undefined}>
                       {r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
+                    <td style={td} title={r.chabadPaid == null ? 'טרם הוזנה העברה בפועל במסך התקבולים' : `הועבר בפועל; הסכום הקבוע ${num(sendOf(r))}`}>{r.chabadPaid == null ? <span style={{ color:'var(--text2)', fontSize:14.4 }}>טרם הוזן</span> : <span className="num" style={{ fontWeight:800, color: r.chabadPaid >= sendOf(r) ? 'var(--ok-text)' : 'var(--danger-text)' }}>{num(r.chabadPaid)}</span>}</td>
                     <td style={td}><Left v={leftOf(r)} /></td>
                     <td style={td}><TargetBar cost={costAll(r)} base={baseCostOf(r.id)} isBaseMonth={isBase} />
                       <TargetNote cost={costAll(r)} base={baseCostOf(r.id)} isBaseMonth={isBase} /></td>
@@ -5633,6 +5634,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={td}>{num(tot.support)}
                     {!isBase && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--purple)', marginTop:2 }}>להעביר {num(completeRows)}</span>}</td>
                   <td style={td}>{num(dealSum)}</td>
+                  <td style={td}>{summed.some(r => r.chabadPaid != null) ? num(summed.reduce((a, r) => a + (r.chabadPaid || 0), 0)) : '—'}</td>
                   <td style={td}><Left v={-beforeSum} /></td>
                   <td style={td}><TargetBar cost={sum('cost') + tzSum} base={baseCostNet} isBaseMonth={isBase} />
                     <TargetNote cost={sum('cost') + tzSum} base={baseCostNet} isBaseMonth={isBase} /></td>
@@ -5660,6 +5662,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <CardRow label="מענק רשת">{num(r.support)}</CardRow>
                     {!isBase && runningOf(r.id) != null && <CardRow label="הרשת מעבירה החודש (מענק − יתרה)" strong color="var(--purple)">{num(completeOf(r.support, runningOf(r.id)))}</CardRow>}
                     <CardRow label="העברת סניף קבועה">{r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
+                    <CardRow label="הסניף העביר בפועל">{r.chabadPaid == null ? 'טרם הוזן' : num(r.chabadPaid)}</CardRow>
                   </>
                 )}
                 <button onClick={() => setOpenB(open ? null : r.id)} aria-expanded={open}
