@@ -1321,8 +1321,13 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* טבלת החודש — "תסדר" (שרה, 8.10): עמודות ברוחב שווה, שורות בגובה אחיד, בלי גווני רקע לעמודות
    (רק צבע המצב של הביצוע), וקו מפריד בין הקבוצות */
 .big-table.pvam { table-layout: fixed; }
-.big-table.pvam col { background: transparent !important; width: 8.6%; }
-.big-table.pvam col:first-child { width: 14%; }
+.big-table.pvam col { background: transparent !important; width: 8.1%; }
+.big-table.pvam col:first-child { width: 13%; }
+.big-table.pvam col:nth-child(10), .big-table.pvam col:nth-child(11) { width: 11.1%; }
+.big-table.pvam col:nth-child(11) { background: #F7F4FC !important; }
+.gap-chip { padding: 5px 6px; border-radius: 10px; border: 1px solid transparent; }
+.gap-chip.ok  { background: #E6F6EC; border-color: #BBE5C8; }
+.gap-chip.bad { background: var(--danger-bg); border-color: var(--danger-line, #F3C7C7); }
 .big-table.pvam tbody td { height: 62px; padding-top: 6px; padding-bottom: 6px; vertical-align: middle; line-height: 1.35; }
 .big-table.pvam tbody tr:nth-child(even) td:not([class*="tgt-"]), .big-table.pvam tbody tr:nth-child(even) th[scope="row"] { background: #FAF9FD !important; }
 .big-table.pvam thead tr:not(.bl-groups) th { font-weight: 700; }

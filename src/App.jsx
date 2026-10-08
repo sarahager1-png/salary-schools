@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 147;
+const BUILD = 148;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5645,12 +5645,19 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const Act = ({ v, plan, income = false }) => { const d = v - plan, c = ST_COLOR[actSt(v, plan, income)];
     return (<span title={`${d >= 0 ? '+' : '−'}${num(Math.abs(d))} מול התכנון`} style={{ display:'block' }}>
       <span className="num" style={{ fontWeight:800, color: c }}>{num(v)}</span>
-      {Math.round(d) !== 0 && <bdi dir="ltr" className="num" style={{ display:'block', fontSize:14, fontWeight:700, color: c }}>{d > 0 ? '+' : '−'}{num(Math.abs(d))}</bdi>}
+      {/* "הפער לא נראה טוב… בכל חלק" (שרה, 8.10): הפער במילים, לא בסימן — חרג/חסך בהוצאה, יותר/פחות בהכנסה */}
+      {Math.round(d) !== 0 && <span style={{ display:'block', fontSize:14, fontWeight:700, color: c, whiteSpace:'nowrap' }}>{income ? (d > 0 ? 'יותר' : 'פחות') : (d > 0 ? 'חרג' : 'חסך')} <span className="num">{num(Math.abs(d))}</span></span>}
     </span>); };
   // פער: חיובי = חסר (העלות גבוהה מהכיסוי), שלילי = עודף
-  // בטבלה: מספר ומתחתיו "חסר"/"עודף" — אותה צורה של שאר התאים
-  const GapCell = ({ v }) => Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>מאוזן</span>
-    : <span style={{ display:'block', color: v > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}><span className="num" style={{ fontWeight:800 }}>{num(Math.abs(v))}</span><span style={{ display:'block', fontSize:14, fontWeight:700 }}>{v > 0 ? 'חסר' : 'עודף'}</span></span>;
+  /*
+    "הפער לא נראה טוב" (שרה, 8.10): הפער הוא השורה התחתונה, ולכן בשורה אחת וברורה — "חסר 31,277" /
+    "עודף 9,874". התכנון: טקסט צבעוני בלבד. הביצוע: תווית מלאה ובולטת, המספר גדול יותר.
+  */
+  const GapCell = ({ v, strong = false }) => { const z = Math.round(v) === 0, bad = v > 0 && !z;
+    const c = bad ? 'var(--danger-text)' : 'var(--ok-text)';
+    return (<span className={strong ? 'gap-chip ' + (bad ? 'bad' : 'ok') : undefined} style={{ display:'inline-block', whiteSpace:'nowrap', color: c, fontWeight: strong ? 800 : 700 }}>
+      {z ? 'מאוזן' : <>{bad ? 'חסר' : 'עודף'} <span className="num" style={{ fontSize: strong ? 15.5 : undefined }}>{num(Math.abs(v))}</span></>}
+    </span>); };
   const GapV = ({ v }) => Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>מאוזן</span>
     : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>{v > 0 ? 'חסר ' : 'עודף '}{num(Math.abs(v))}</span>;
   /*
@@ -5928,8 +5935,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                         : <Act v={p.actMin} plan={p.planMin} income />}</td>
                       <td style={tdP}>{num(p.grant)}</td>
                       <td style={{ ...tdP, fontWeight:700, color:'var(--purple)' }}>{num(p.transfer)}</td>
-                      <td className={cellCls(gapSt(p.planGap))} style={tdP}><GapCell v={p.planGap} /></td>
-                      <td className={cellCls(gapSt(p.actGap))} style={tdP}><GapCell v={p.actGap} /></td>
+                      <td style={tdP}><GapCell v={p.planGap} /></td>
+                      <td style={tdP}><GapCell v={p.actGap} strong /></td>
                     </>)}
                   </tr>
                 ))}
@@ -5945,8 +5952,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td className={cellCls(actSt(pvaTot.actMin, pvaTot.planMin, true))} style={tdP}><Act v={pvaTot.actMin} plan={pvaTot.planMin} income /></td>
                   <td style={tdP}>{num(pvaTot.grant)}</td>
                   <td style={tdP}>{num(pvaTot.transfer)}</td>
-                  <td className={cellCls(gapSt(pvaTot.planGap))} style={tdP}><GapCell v={pvaTot.planGap} /></td>
-                  <td className={cellCls(gapSt(pvaTot.actGap))} style={tdP}><GapCell v={pvaTot.actGap} /></td>
+                  <td style={tdP}><GapCell v={pvaTot.planGap} /></td>
+                  <td style={tdP}><GapCell v={pvaTot.actGap} strong /></td>
                 </tr>
               </tfoot>
             </table>
