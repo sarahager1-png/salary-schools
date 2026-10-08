@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 141;
+const BUILD = 142;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -7941,6 +7941,16 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
   */
   const [lines, setLines] = useState({});
   const [openSlip, setOpenSlip] = useState(null);
+  // "מה עם תלוש לצהרון ולמזכירה" (שרה, 8.10): גם משרה שעתית נפתחת כתלוש — שעות × תעריף
+  const canOpen = (t, r) => Boolean(lines[t.id]) || r.principal || r.hourly;
+  // הפרשי ספטמבר מתיקון הוותק — שורה בתלוש אוקטובר: לתשלום או לקיזוז
+  const [retro, setRetro] = useState({});
+  useEffect(() => {
+    let alive = true;
+    store.listRetroDiffs(teachers.map(t => t.id)).then(m => { if (alive) setRetro(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, [teachers]);
+  const signed = v => (v < 0 ? '−' : '+') + Math.abs(Math.round(v)).toLocaleString('he-IL') + ' ₪';
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -8112,11 +8122,11 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                       <td colSpan={simOnly ? 5 : 9} style={{ fontSize:14 }}>{r.skip}</td>
                     </tr>
                   ) : (
-                    <tr key={t.id} onClick={() => ((lines[t.id] && !r.hourly) || r.principal) && setOpenSlip({ t, r })}
-                      style={{ cursor: ((lines[t.id] && !r.hourly) || r.principal) ? 'pointer' : 'default' }}
-                      title={((lines[t.id] && !r.hourly) || r.principal) ? 'לחיצה פותחת את התלוש המלא' : 'התלוש המפורט בהכנה — יופיע בסיום החישוב'}>
+                    <tr key={t.id} onClick={() => canOpen(t, r) && setOpenSlip({ t, r })}
+                      style={{ cursor: canOpen(t, r) ? 'pointer' : 'default' }}
+                      title={canOpen(t, r) ? 'לחיצה פותחת את התלוש המלא' : 'התלוש המפורט בהכנה — יופיע בסיום החישוב'}>
                       <td style={{ fontWeight:600 }}>
-                        {((lines[t.id] && !r.hourly) || r.principal) && (
+                        {canOpen(t, r) && (
                           <span className="no-print" style={{ float:'inline-end', display:'inline-flex', alignItems:'center', gap:4, marginInlineStart:10, padding:'4px 11px', borderRadius:999,
                             background:'var(--purple-100)', color:'var(--purple)', fontSize:14, fontWeight:700, whiteSpace:'nowrap' }}>
                             <FileText size={13} strokeWidth={2.2} />לתלוש
@@ -8152,6 +8162,11 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                       <td style={{ textAlign:'center' }}>{money(r.base)}</td>
                       <td style={{ textAlign:'center' }}>{r.paysSupp ? money(r.supp) : '—'}</td>
                       <td style={{ textAlign:'center', fontWeight:800 }}>{money(r.gross)}
+                        {retro[t.id] ? (
+                          <span style={{ display:'block', fontSize:14, fontWeight:700, color: retro[t.id] < 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>
+                            הפרש ספטמבר {signed(retro[t.id])}
+                          </span>
+                        ) : null}
                         {r.extra?.map(({ h, gross }) => (
                           <span key={h.id} style={{ display:'block', fontSize:14, fontWeight:600, color:'var(--text3)' }}>
                             כולל {jobLabel(h.job)} {money(gross)}
@@ -8248,6 +8263,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                   <CardRow label="בסיס עולם ישן">{money(r.base)}</CardRow>
                   {paysSupp && <CardRow label='תוספת בית חב"ד'>{r.paysSupp ? money(r.supp) : '—'}</CardRow>}
                   <CardRow label="ברוטו לתשלום" strong>{money(r.gross)}</CardRow>
+                  {retro[t.id] ? <CardRow label={retro[t.id] < 0 ? 'הפרש ספטמבר — לקיזוז' : 'הפרש ספטמבר — לתשלום'}>{signed(retro[t.id])}</CardRow> : null}
                   <div className="mcard-row">
                     <span className="mcard-label" title="הברוטו שיצא בתלוש בפועל — נרשם לצד המספר של המערכת, לא במקומו">יצא בתלוש (₪)</span>
                     {onSaveSlipGross ? (
@@ -8291,7 +8307,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                   ) : monthFiles.some(x => x.schoolId === sc.id) ? (
                     <p style={{ marginTop:6 }}><span className="apple-badge badge-red">תלוש לא התקבל</span></p>
                   ) : null}
-                  {((lines[t.id] && !r.hourly) || r.principal) && (
+                  {canOpen(t, r) && (
                     <button className="apple-btn apple-btn-ghost" onClick={() => setOpenSlip({ t, r })}
                       style={{ width:'100%', marginTop:6, fontSize:14.4 }}>
                       <FileText size={14} strokeWidth={2.2} />
@@ -8337,6 +8353,10 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                   <p style={{ fontSize:14, color:'var(--text2)', fontWeight:600 }}>
                     מנהל/ת בית ספר · 40 שעות שבועיות · משרה מלאה{r.principalCalc ? ' · עולם ישן + גמול ניהול' : ''}
                   </p>
+                ) : r.hourly ? (
+                  <p style={{ fontSize:14, color:'var(--text2)', fontWeight:600 }}>
+                    {jobLabel(t.job)} · משרה שעתית · {r.rate} ₪ לשעה · {r.fromAttendance ? `${r.hours} שעות לפי דוח הנוכחות` : `כ-${r.hours} שעות בחודש (אומדן עד דוח הנוכחות)`}
+                  </p>
                 ) : (<>
                 <p style={{ fontSize:14, color:'var(--text2)', fontWeight:600 }}>
                   {t.frontalHours} שעות פרונטליות{r.kita ? ' + 3 שעות חינוך (מחנכת)' : ''} = {r.hours} שעות
@@ -8363,14 +8383,21 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                       <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(r.base).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   )}
-                  {(sl?.lines || []).map((ln, i) => (
+                  {r.hourly && (
+                    <tr style={{ borderBottom:'1px solid var(--line)' }}>
+                      <td style={{ padding:'4px', color:'var(--text3)', fontSize:14 }}></td>
+                      <td style={{ padding:'4px' }}>שכר שעתי — {r.rate ? Math.round(r.gross / r.rate * 10) / 10 : r.hours} שעות × {r.rate} ₪</td>
+                      <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(r.gross).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  )}
+                  {!r.hourly && (sl?.lines || []).map((ln, i) => (
                     <tr key={i} style={{ borderBottom:'1px solid var(--line)' }}>
                       <td style={{ padding:'4px', color:'var(--text3)', fontSize:14 }}>{ln.code}</td>
                       <td style={{ padding:'4px' }}>{ln.label}</td>
                       <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(ln.amount).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
-                  {(!r.principal || r.principalCalc) && (
+                  {!r.hourly && (!r.principal || r.principalCalc) && (
                   <tr style={{ borderBottom:'1px solid var(--line)', fontWeight:700 }}>
                     <td style={{ padding:'4px' }}></td>
                     <td style={{ padding:'4px' }}>סה"כ עולם ישן</td>
@@ -8381,18 +8408,37 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                     <tr style={{ borderBottom:'1px solid var(--line)' }}>
                       <td style={{ padding:'4px' }}></td>
                       <td style={{ padding:'4px' }}>תוספת בית חב"ד <span style={{ fontSize:14, color:'var(--text3)' }}>(שורה קבועה — ללא נלוות)</span></td>
-                      <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{(r.principal ? r.supp : Math.max(0, r.gross - (sl?.gross || 0))).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{(r.principal ? r.supp : Math.max(0, r.gross - (r.extra || []).reduce((a, x) => a + x.gross, 0) - (sl?.gross || 0))).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   )}
+                  {(r.extra || []).map(({ h, gross }) => (
+                    <tr key={h.id} style={{ borderBottom:'1px solid var(--line)' }}>
+                      <td style={{ padding:'4px' }}></td>
+                      <td style={{ padding:'4px' }}>{jobLabel(h.job)} <span style={{ fontSize:14, color:'var(--text3)' }}>(משרה שעתית)</span></td>
+                      <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{Number(gross).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}
                   <tr style={{ fontWeight:800, fontSize:15.5, background:'var(--apple-fill)' }}>
                     <td style={{ padding:'6px 4px' }}></td>
                     <td style={{ padding:'6px 4px' }}>ברוטו לתשלום</td>
-                    <td style={{ padding:'6px 4px', textAlign:'left', direction:'ltr' }}>{Number(r.paysSupp ? r.gross : (sl?.gross || r.gross)).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
+                    <td style={{ padding:'6px 4px', textAlign:'left', direction:'ltr' }}>{Number(r.paysSupp || r.hourly ? r.gross : (sl?.gross || r.gross)).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
                   </tr>
+                  {retro[t.id] ? (<>
+                    <tr style={{ borderBottom:'1px solid var(--line)', color: retro[t.id] < 0 ? 'var(--danger-text)' : 'var(--ok-text)', fontWeight:700 }}>
+                      <td style={{ padding:'4px' }}></td>
+                      <td style={{ padding:'4px' }}>הפרש ספטמבר (תיקון ותק) — {retro[t.id] < 0 ? 'לקיזוז' : 'לתשלום'}</td>
+                      <td style={{ padding:'4px', textAlign:'left', direction:'ltr' }}>{retro[t.id].toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                    <tr style={{ fontWeight:800, fontSize:15.5, background:'var(--apple-fill)' }}>
+                      <td style={{ padding:'6px 4px' }}></td>
+                      <td style={{ padding:'6px 4px' }}>סה"כ לתשלום החודש</td>
+                      <td style={{ padding:'6px 4px', textAlign:'left', direction:'ltr' }}>{(Number(r.paysSupp || r.hourly ? r.gross : (sl?.gross || r.gross)) + retro[t.id]).toLocaleString('he-IL', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  </>) : null}
                 </tbody>
               </table>
               <p style={{ fontSize:14, color:'var(--text3)', marginTop:10 }}>
-                הרכיבים כפי שמפיק מחשבון משרד החינוך לנתוני התלוש · הופק ממערכת השכר, רשת גני חב"ד
+                {r.hourly ? 'שכר לפי שעות × תעריף' : 'הרכיבים כפי שמפיק מחשבון משרד החינוך לנתוני התלוש'} · הופק ממערכת השכר, רשת גני חב"ד
               </p>
             </div>
           </div>

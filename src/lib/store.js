@@ -1113,6 +1113,21 @@ export async function deleteSimRequest(id) {
   raise(error, 'מחיקת בקשת החישוב נכשלה');
 }
 
+/* הפרשי ספטמבר מתיקון הוותק (שרה, 8.10.26: "יש לעשות להם הפרשים מספטמבר") — הסכום רשום
+   בהצעת התיקון שאושרה. חיובי = לתשלום, שלילי = לקיזוז. המפתח: מזהה שורת העובד/ת בחודש. */
+export async function listRetroDiffs(ids) {
+  if (!ids.length) return {};
+  const { data, error } = await supabase.from('proposed_fixes')
+    .select('teacher_month_id, source').eq('status', 'applied').like('source', '%הפרש ספטמבר%').in('teacher_month_id', ids);
+  raise(error, 'טעינת הפרשי ספטמבר נכשלה');
+  const out = {};
+  for (const f of data || []) {
+    const m = String(f.source || '').match(/הפרש ספטמבר: ל(תשלום|קיזוז) ([\d,]+) ₪/);
+    if (m) out[f.teacher_month_id] = (m[1] === 'קיזוז' ? -1 : 1) * Number(m[2].replace(/,/g, ''));
+  }
+  return out;
+}
+
 /* שורות התלוש המלאות — רכיבי המחשבון שנלכדו לכל מורה. */
 export async function listSlipLines(teacherIds) {
   if (!teacherIds.length) return {};
