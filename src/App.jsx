@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 128;
+const BUILD = 129;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5240,6 +5240,17 @@ function BottomLineView({ activeMonth, viewer = false }) {
     האחרון שמוצג — לא עד החודש שנבחר.
   */
   const lastKey = months[months.length - 1]?.key;
+  /*
+    "תבנה מיפוי של כל החודשים כהשוואה" (שרה, 8.10): ההשוואה פרושה על כל חודשי
+    שנת הלימודים מחודש הבסיס (ספטמבר) ועד אוגוסט. חודש שיש לו נתונים מתמלא;
+    חודש שטרם הגיע — ריק. כך רואים את השנה כולה במבט אחד.
+  */
+  const yearCols = (() => {
+    if (!baseMonth) return [];
+    const [y0, m0] = baseMonth.key.split('-').map(Number);
+    return Array.from({ length: 12 }, (_, k) => { const d = new Date(y0, m0 - 1 + k, 1); const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; return { key, m: months.find(x => x.key === key) || null }; });
+  })();
+  const shortMonth = key => fmtMonth(key).replace(/\s*\d{4}$/, '');
   const totalOf = id => sumKnown(months.map(m => resultIn(m, id)));
   const totalNet = months.reduce((a, m) => a + netResult(m), 0);
   /*
@@ -5463,7 +5474,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
 
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:6 }}>
             <h2 className="section-head" style={{ margin:0 }}>לפי סניף</h2>
-            {multi && (
+            {months.length > 0 && (
               <div className="apple-seg no-print" role="group" aria-label="תצוגת הסניפים">
                 <button onClick={() => setMode('month')} aria-pressed={mode === 'month'}
                   className={['apple-seg-item', mode === 'month' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>החודש</button>
@@ -5477,11 +5488,6 @@ function BottomLineView({ activeMonth, viewer = false }) {
             : <>בפועל − משרד החינוך − מענק הרשת − העברת סניף קבועה = נשאר. "עמד ביעד?" = השכר של הסניף מול ספטמבר: ירוק לא יותר, כתום חריגה עד 5%, אדום יותר. "נשאר" הוא מזומן — משרד החינוך רק לפי תקבול בפועל.{multi ? ` יתרה מצטברת = מה שנשאר החודש פחות מה שנשאר ב${fmtMonth(baseMonth.key)}, מצטבר מחודש לחודש: זכות כשנשאר יותר מבבסיס, חובה כשנשאר פחות.` : ''}</>}</p>
           {mode === 'compare' ? (
           <>
-          {/*
-            "עכשיו תחשוב על השוואת החודשים" (שרה, 8.10): שני מבטים נפרדים, כמו בטבלת
-            החודש — "עמידה ביעד" (השכר של כל סניף בכל חודש מול ספטמבר) ו"מזומן" (מה
-            נשאר, היתרה מול ספטמבר, והשלמת הרשת). לא מערבבים אותם בתא אחד.
-          */}
           <div className="apple-seg no-print" role="group" aria-label="מה משווים" style={{ marginBottom:10 }}>
             <button onClick={() => setCmpKind('salary')} aria-pressed={cmpKind === 'salary'}
               className={['apple-seg-item', cmpKind === 'salary' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>עמידה ביעד · שכר</button>
@@ -5490,32 +5496,32 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </div>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{cmpKind === 'salary' ? 'השוואה בין החודשים לפי סניף: השכר בכל חודש מול ספטמבר, וסך החיסכון או החריגה' : 'השוואה בין החודשים לפי סניף: מה נשאר בכל חודש, ההפרש מול ספטמבר, היתרה המצטברת והשלמת הרשת'}</caption>
+              <caption className="sr-only">{cmpKind === 'salary' ? 'מיפוי השנה לפי סניף: השכר בכל חודש מול ספטמבר, וסך החיסכון או החריגה' : 'מיפוי השנה לפי סניף: מה נשאר בכל חודש, ההפרש מול ספטמבר, היתרה המצטברת והשלמת הרשת'}</caption>
               <colgroup>
-                <col />{months.map(m => <col key={m.key} className={m.key === sel ? 'g-res' : undefined} />)}
+                <col />{yearCols.map(c => <col key={c.key} className={c.key === sel ? 'g-res' : undefined} />)}
                 <col className="g-res g-sum" />
               </colgroup>
               <thead>
                 <tr>
                   <TH>סניף</TH>
-                  {months.map(m => <TH key={m.key}>{fmtMonth(m.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{m.key === baseMonth.key ? 'הבסיס' : m.frozenAt ? 'סגור' : 'פתוח'}</span></TH>)}
+                  {yearCols.map(c => <TH key={c.key}>{shortMonth(c.key)}<span style={{ display:'block', fontSize:14, fontWeight:600, color: c.m ? undefined : 'var(--text3)' }}>{c.key === baseMonth.key ? 'הבסיס' : !c.m ? 'טרם' : c.m.frozenAt ? 'סגור' : 'פתוח'}</span></TH>)}
                   {cmpKind === 'salary'
-                    ? <TH>סה"כ מול {fmtMonth(baseMonth.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>חסך / חרג, עד {fmtMonth(lastKey)}</span></TH>
-                    : <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>מול {fmtMonth(baseMonth.key)}, עד {fmtMonth(lastKey)}</span></TH>}
+                    ? <TH>סה"כ השנה<span style={{ display:'block', fontSize:14, fontWeight:600 }}>חסך / חרג מול {shortMonth(baseMonth.key)}</span></TH>
+                    : <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>מול {shortMonth(baseMonth.key)}</span></TH>}
                 </tr>
               </thead>
               <tbody>
                 {cmpRows.map(r => (
                   <tr key={'cmp-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
-                    {months.map(m => { const isB = m.key === baseMonth.key; return cmpKind === 'salary' ? (
-                      <td key={m.key} style={{ ...td, fontWeight: m.key === sel ? 800 : 500 }}>
+                    {yearCols.map(({ key, m }) => { const isB = key === baseMonth.key; if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; return cmpKind === 'salary' ? (
+                      <td key={key} style={{ ...td, fontWeight: key === sel ? 800 : 500 }}>
                         {!isB && <span style={{ display:'block' }}><Pill s={statusOf(costIn(m, r.id), baseCostOf(r.id))} /></span>}
                         <span className="num">{costIn(m, r.id) == null ? '—' : num(costIn(m, r.id))}</span>
                         <TargetNote cost={costIn(m, r.id)} base={baseCostOf(r.id)} isBaseMonth={isB} />
                       </td>
                     ) : (
-                      <td key={m.key} style={{ ...td, fontWeight: m.key === sel ? 800 : 500 }}>
+                      <td key={key} style={{ ...td, fontWeight: key === sel ? 800 : 500 }}>
                         <Left v={leftIn(m, r.id)} />
                         <span style={{ display:'block', fontSize:14, marginTop:2 }}>{isB ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={resultIn(m, r.id)} />}</span>
                       </td>
@@ -5527,21 +5533,21 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  {months.map(m => { const isB = m.key === baseMonth.key; return cmpKind === 'salary' ? (
-                    <td key={m.key} style={td}>
+                  {yearCols.map(({ key, m }) => { const isB = key === baseMonth.key; if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; return cmpKind === 'salary' ? (
+                    <td key={key} style={td}>
                       {!isB && <span style={{ display:'block' }}><Pill s={statusOf(netCost(m), baseCostNet)} /></span>}
                       <span className="num">{num(netCost(m))}</span>
                       <TargetNote cost={netCost(m)} base={baseCostNet} isBaseMonth={isB} />
                     </td>
                   ) : (
-                    <td key={m.key} style={td}><Left v={netLeft(m)} /><span style={{ display:'block', fontSize:14, marginTop:2 }}>{isB ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={netResult(m)} />}</span></td>
+                    <td key={key} style={td}><Left v={netLeft(m)} /><span style={{ display:'block', fontSize:14, marginTop:2 }}>{isB ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={netResult(m)} />}</span></td>
                   ); })}
                   <td style={td}>{cmpKind === 'salary' ? <Saved v={saveTotalNet()} /> : <Credit v={totalNet} />}</td>
                 </tr>
                 {cmpKind === 'cash' && (
                 <tr>
                   <td style={{ padding:'10px 12px', color:'var(--purple)' }}>הרשת משלימה<span style={{ display:'block', fontSize:14, fontWeight:600 }}>מענק − יתרה</span></td>
-                  {months.map(m => { const sup = m.branches.reduce((a, b) => a + (b.support || 0), 0); return <td key={m.key} style={{ ...td, fontWeight:800, color:'var(--purple)' }} title={`מענק ${num(sup)}; חוסר מתווסף, עודף מקטין, לא מתחת לאפס לסניף`}>{num(completeIn(m))}</td>; })}
+                  {yearCols.map(({ key, m }) => { if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; const sup = m.branches.reduce((a, b) => a + (b.support || 0), 0); return <td key={key} style={{ ...td, fontWeight:800, color:'var(--purple)' }} title={`מענק ${num(sup)}; חוסר מתווסף, עודף מקטין, לא מתחת לאפס לסניף`}>{num(completeIn(m))}</td>; })}
                   <td style={{ ...td, fontWeight:800, color:'var(--purple)' }} title="סך ההשלמות של הרשת בכל החודשים">{num(months.reduce((a, m) => a + completeIn(m), 0))}</td>
                 </tr>
                 )}
@@ -5552,21 +5558,21 @@ function BottomLineView({ activeMonth, viewer = false }) {
             {cmpRows.map(r => (
               <div key={'cmpm-' + r.id} className="apple-card mcard">
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
-                {months.map(m => { const isB = m.key === baseMonth.key; return cmpKind === 'salary' ? (
-                  <CardRow key={m.key} label={fmtMonth(m.key)} strong={m.key === sel}>
+                {yearCols.filter(c => c.m).map(({ key, m }) => { const isB = key === baseMonth.key; return cmpKind === 'salary' ? (
+                  <CardRow key={key} label={shortMonth(key)} strong={key === sel}>
                     {!isB && <span style={{ marginInlineEnd:8 }}><Pill s={statusOf(costIn(m, r.id), baseCostOf(r.id))} /></span>}
                     {costIn(m, r.id) == null ? '—' : num(costIn(m, r.id))}
                     <TargetNote cost={costIn(m, r.id)} base={baseCostOf(r.id)} isBaseMonth={isB} block={false} />
                   </CardRow>
                 ) : (
-                  <CardRow key={m.key} label={fmtMonth(m.key)} strong={m.key === sel}>
+                  <CardRow key={key} label={shortMonth(key)} strong={key === sel}>
                     <Left v={leftIn(m, r.id)} />
                     <span style={{ fontSize:14, marginInlineStart:8 }}>{isB ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={resultIn(m, r.id)} />}</span>
                   </CardRow>
                 ); })}
                 {cmpKind === 'salary'
-                  ? <CardRow label={`סה"כ מול ${fmtMonth(baseMonth.key)}`} strong><Saved v={saveTotalOf(r.id)} /></CardRow>
-                  : <CardRow label={`יתרה מצטברת עד ${fmtMonth(lastKey)}`} strong><Credit v={totalOf(r.id)} /></CardRow>}
+                  ? <CardRow label="סה&quot;כ השנה מול הבסיס" strong><Saved v={saveTotalOf(r.id)} /></CardRow>
+                  : <CardRow label="יתרה מצטברת" strong><Credit v={totalOf(r.id)} /></CardRow>}
               </div>
             ))}
           </div>
@@ -5578,7 +5584,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <caption className="sr-only">{`תמונת מצב חודשית לפי סניף, ${fmtMonth(sel)}: תכנון משוער, בפועל, משרד החינוך, מענק רשת, העברת סניף קבועה, נשאר, עמד ביעד${multi ? ', מהחודש הקודם ויתרה מצטברת' : ''}`}</caption>
               <colgroup>
                 <col />{!isBase && <col className="g-cost" />}<col className="g-cost" />
-                <col className="g-inc" /><col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
+                <col className="g-inc" /><col className="g-inc" /><col className="g-inc" />
                 <col className="g-res" /><col className="g-res g-sum" />
                 {multi && !isBase && <col className="g-res g-sum" />}
               </colgroup>
@@ -5586,12 +5592,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <tr className="bl-groups">
                   <th />
                   <th colSpan={isBase ? 1 : 2} scope="colgroup" className="gh-cost">השכר</th>
-                  <th colSpan={4} scope="colgroup" className="gh-inc">הכיסוי</th>
+                  <th colSpan={3} scope="colgroup" className="gh-inc">הכיסוי</th>
                   <th colSpan={multi && !isBase ? 3 : 2} scope="colgroup" className="gh-res">מה נשאר</th>
                 </tr>
                 <tr>
                   <TH>סניף</TH>{!isBase && <TH>{fmtMonth(baseMonth.key)}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>הבסיס</span></TH>}<TH>בפועל</TH>
-                  <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל בלבד</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />העברת סניף קבועה</TH><TH>הסניף העביר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל</span></TH>
+                  <TH><Op c="−" />משרד החינוך<span style={{ display:'block', fontSize:14, fontWeight:600 }}>בפועל בלבד</span></TH><TH><Op c="−" />מענק רשת</TH><TH><Op c="−" />העברת סניף קבועה</TH>
                   <TH><Op c="=" />נשאר</TH><TH>עמד ביעד?<span style={{ display:'block', fontSize:14, fontWeight:600 }}>שכר מול {fmtMonth(baseMonth.key)}</span></TH>
                   {multi && !isBase && <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>נשאר מול {fmtMonth(baseMonth.key)}</span></TH>}
                 </tr>
@@ -5617,7 +5623,6 @@ function BottomLineView({ activeMonth, viewer = false }) {
                       {!isBase && runningOf(r.id) != null && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--purple)', marginTop:2 }}>להעביר {num(completeOf(r.support, runningOf(r.id)))}</span>}</td>
                     <td style={td} title={r.agreed != null ? 'הסכום הקבוע שסוכם עם הסניף — סכום אחד, כולל משרות שעתיות (מזכירה, צהרון)' : undefined}>
                       {r.agreed == null ? <span style={{ color:'#8F4E00', fontSize:14.4, fontWeight:600 }}>טרם סוכם</span> : num(sendOf(r))}</td>
-                    <td style={td} title={r.chabadPaid == null ? 'טרם הוזנה העברה בפועל במסך התקבולים' : `הועבר בפועל; הסכום הקבוע ${num(sendOf(r))}`}>{r.chabadPaid == null ? <span style={{ color:'var(--text2)', fontSize:14.4 }}>טרם הוזן</span> : <span className="num" style={{ fontWeight:800, color: r.chabadPaid >= sendOf(r) ? 'var(--ok-text)' : 'var(--danger-text)' }}>{num(r.chabadPaid)}</span>}</td>
                     <td style={td}><Left v={leftOf(r)} /></td>
                     <td style={td}><TargetBar cost={costAll(r)} base={baseCostOf(r.id)} isBaseMonth={isBase} />
                       <TargetNote cost={costAll(r)} base={baseCostOf(r.id)} isBaseMonth={isBase} /></td>
@@ -5634,7 +5639,6 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={td}>{num(tot.support)}
                     {!isBase && <span className="num" style={{ display:'block', fontSize:14, fontWeight:700, color:'var(--purple)', marginTop:2 }}>להעביר {num(completeRows)}</span>}</td>
                   <td style={td}>{num(dealSum)}</td>
-                  <td style={td}>{summed.some(r => r.chabadPaid != null) ? num(summed.reduce((a, r) => a + (r.chabadPaid || 0), 0)) : '—'}</td>
                   <td style={td}><Left v={-beforeSum} /></td>
                   <td style={td}><TargetBar cost={sum('cost') + tzSum} base={baseCostNet} isBaseMonth={isBase} />
                     <TargetNote cost={sum('cost') + tzSum} base={baseCostNet} isBaseMonth={isBase} /></td>
@@ -5662,7 +5666,6 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <CardRow label="מענק רשת">{num(r.support)}</CardRow>
                     {!isBase && runningOf(r.id) != null && <CardRow label="הרשת מעבירה החודש (מענק − יתרה)" strong color="var(--purple)">{num(completeOf(r.support, runningOf(r.id)))}</CardRow>}
                     <CardRow label="העברת סניף קבועה">{r.agreed == null ? 'טרם סוכם' : num(sendOf(r))}</CardRow>
-                    <CardRow label="הסניף העביר בפועל">{r.chabadPaid == null ? 'טרם הוזן' : num(r.chabadPaid)}</CardRow>
                   </>
                 )}
                 <button onClick={() => setOpenB(open ? null : r.id)} aria-expanded={open}
