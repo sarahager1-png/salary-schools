@@ -111,8 +111,20 @@ export default async function handler(req, res) {
 
     res.setHeader('cache-control', 'no-store');
     // נתוני הבסיס החיים לכל סניף — תמיד מהמסד, גם כשהחודש המוצג סגור
-    const base = (args[2] || []).map(f => ({ id: f.school_id,
-      supportYear: n(f.network_support) || 0, transfer: n(f.monthly_transfer), ministryYear: n(f.ministry_budget) }));
+    /*
+      "הוצאות והכנסות נוספים, מעבר לעלות ההוראה, גם יהיו בטבלה" (שרה, 8.10): שורות התקציב של הסניף ממבט-רשת
+      (school_finance.detail) — הכנסות שאינן משרד החינוך (הורים, הפרשי צהרון, תרומות) והוצאות שאינן הוראה
+      (שכר דירה, ניקיון, מזכירה). סכומים לשנה, ברמת הסניף; אותו מקור ואותו חישוב כמו במסך "כספי הסניפים".
+    */
+    const mergeLines = lines => { const m = new Map();
+      for (const x of Array.isArray(lines) ? lines : []) m.set(String(x.name || 'אחר'), (m.get(String(x.name || 'אחר')) || 0) + (Number(x.amount) || 0));
+      return [...m.entries()].map(([name, amount]) => ({ name, amount: Math.round(amount) })); };
+    const base = (args[2] || []).map(f => { const incLines = mergeLines(f.detail?.income), expLines = mergeLines(f.detail?.expenses);
+      return { id: f.school_id,
+        supportYear: n(f.network_support) || 0, transfer: n(f.monthly_transfer), ministryYear: n(f.ministry_budget),
+        otherIncYear: incLines.reduce((a, x) => a + x.amount, 0) || n(f.income_total) || 0,
+        otherExpYear: expLines.reduce((a, x) => a + x.amount, 0) || n(f.expenses_other) || 0,
+        incLines, expLines }; });
     return res.status(200).json({ ...summarize(...args, frozen), base, canEditBase, canClose, fetchedAt: new Date().toISOString() });
   } catch (e) {
     // הפרטים ליומן השרת בלבד — מי שנכנס לצפייה מקבל הודעה כללית
@@ -141,7 +153,7 @@ export async function readAll(sb) {
   const [sc, tm, fin, led, mo, snaps, slips, frozen, fixes, attP, attR] = await Promise.all([
     all('schools', '*', 'id'),
     all('teacher_months', '*', 'id'),
-    all('school_finance', 'school_id, ministry_budget, network_support, monthly_transfer, teaching_sim', 'school_id'),
+    all('school_finance', 'school_id, ministry_budget, network_support, monthly_transfer, teaching_sim, income_total, expenses_other, detail', 'school_id'),
     all('school_payment_ledger', 'school_id, month_key, ministry_received, chabad_paid, grant_paid', 'month_key'),
     all('months', 'key, opened_at, locked, closed_at', 'key'),
     all('month_sim_snapshot', 'school_id, month_key, sim_cost, source', 'month_key'),

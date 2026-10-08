@@ -1406,3 +1406,16 @@ input.nospin { -moz-appearance: textfield; appearance: textfield; }
 .big-table.pvab tr > :nth-child(n+2) { border-inline-start: 2px solid #E3DCF2; }
 .big-table.pvab tbody td, .big-table.pvab tfoot td { font-size: 15.5px !important; }
 .big-table.pvab .apple-input { max-width: 120px; font-size: 15px !important; }
+
+/* התמונה המלאה של הסניף — 11 עמודות: שם, 3 הכנסות, 4 הוצאות, 3 תוצאה */
+.big-table.pvaf { table-layout: fixed; }
+.big-table.pvaf col { width: 8.65%; background: transparent !important; }
+.big-table.pvaf col.c-name { width: 13.5%; }
+.big-table.pvaf tbody td, .big-table.pvaf tfoot td { padding-inline: 2px; font-size: 14.2px !important; }
+.big-table.pvaf tbody td { height: 46px; vertical-align: middle; }
+.big-table.pvaf thead tr:not(.bl-groups) th { white-space: normal; line-height: 1.25; font-size: 14px !important; }
+.big-table.pvaf tr > :nth-child(2), .big-table.pvaf tr:not(.bl-groups) > :nth-child(5), .big-table.pvaf tr:not(.bl-groups) > :nth-child(9) { border-inline-start: 2px solid #E3DCF2; }
+.big-table.pvaf tr.bl-groups > :nth-child(n+2) { border-inline-start: 2px solid #E3DCF2; }
+.big-table.pvaf td.tgt-ok  { background: #DDF3E4 !important; }
+.big-table.pvaf td.tgt-mid { background: #FCEBC8 !important; }
+.big-table.pvaf td.tgt-bad { background: #FBDCDC !important; }

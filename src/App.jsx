@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 178;
+const BUILD = 179;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5164,12 +5164,13 @@ const CEO_ADD_PCT = 0.15;
 /*
   צפי הכנסות משרד החינוך לסניף שטרם קיבל (שרה, 8.10: "רק בתכנון למטה לא בטבלה למעלה"; "תלך לפי הערכה שלי
   הראשונית"; "תשנה במקום 350 שח לשנה 850 לשנה"). ההערכה שלה מהדוח מ-23.9 (ולקרית ביאליק מהתקציב שסוכם ב-24.9):
-  שעות התקן × 400 ₪ × 12, ועוד לכל תלמיד — עכשיו 850 ₪ לשנה (בדוח היה 370). [עיר, שעות תקן, תלמידים].
+  שעות התקן × 400 ₪ × 12, ועוד לכל תלמיד — עכשיו 850 ₪ לשנה במקום 370 (בעפולה 360). קרית ביאליק לפי
+  הסכום המעודכן שבמסך "כספי הסניפים" (524,040). [עיר, ההערכה לשנה, תלמידים, הסכום הקודם לתלמיד].
   מוצג ונספר רק בטבלת נתוני הבסיס; טבלת החודש ממשיכה לספור תקבול בפועל בלבד. ברגע שמוזן תקבול לסניף —
   הצפי יורד. ההתאמה לפי שם העיר.
 */
-const CEO_MINISTRY_EST = [['עפולה', 99, 84], ['רעננה', 99, 143], ['אשקלון', 110, 127], ['רמת ישי', 55, 56], ['קרית ביאליק', 77, 121]]
-  .map(([city, hours, students]) => [city, (hours * 400 * 12 + students * 850) / 12]);
+const CEO_MINISTRY_EST = [['עפולה', 505440, 84, 360], ['רעננה', 528110, 143, 370], ['אשקלון', 574990, 127, 370], ['רמת ישי', 284720, 56, 370], ['קרית ביאליק', 524040, 121, 370]]
+  .map(([city, year, students, was]) => [city, (year + students * (850 - was)) / 12]);
 const ceoMinistryEst = name => CEO_MINISTRY_EST.find(([city]) => String(name || '').includes(city))?.[1] || 0;
 
 const CEO_TRANSFERS_REPORT = {
@@ -5348,6 +5349,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const [cmpKind, setCmpKind] = useState('salary');
   const [baseBusy, setBaseBusy] = useState('');
   const [showImport, setShowImport] = useState(false);
+  const [fullOpen, setFullOpen] = useState('');   // הטבלה המלאה: הסניף שפירוט ההכנסות וההוצאות שלו פתוח
   const [basePer, setBasePer] = useState('year');   // טבלת הבסיס: 'year' שנתי | 'month' חודשי (שרה, 8.10: "אם אני לוחצת — שנתי; אם אני לוחצת — חודשי")
   const [help, setHelp] = useState('');   // "ההסברים בלחיצה" (שרה, 8.10): 'month' | 'base' | '' — ההסבר שפתוח עכשיו
   const [copied, setCopied] = useState(false);   // "סיכום להעברה" הועתק   // בהשוואה: 'salary' — עמידה ביעד (שכר) | 'cash' — מזומן
@@ -5778,7 +5780,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
     const month = lb.transfer !== undefined ? lb.transfer : (b.agreed ?? null);
     const total = annual + add20;
     return { id: b.id, name: rp ? rp.name : shortName(b.name), ord: rp ? (CEO_TRANSFERS_REPORT.rows.indexOf(rp) + 1 || 50) : 99, fromSeptember: false, src: null, hourlyYear,
-      annual, add20, total, ministry, supportYear, gap: total - ministry - supportYear, month, year: month == null ? null : month * 12 };
+      annual, add20, total, ministry, supportYear, gap: total - ministry - supportYear, month, year: month == null ? null : month * 12,
+      otherInc: lb.otherIncYear || 0, otherExp: lb.otherExpYear || 0, incLines: lb.incLines || [], expLines: lb.expLines || [] };
   }).filter(Boolean).sort((a, b) => a.ord - b.ord);
   const baseById = new Map(baseRows.map(x => [x.id, x]));
   const baseTot = baseRows.reduce((a, x) => { for (const k of ['annual', 'add20', 'total', 'ministry', 'supportYear', 'gap', 'month', 'year']) a[k] += x[k] || 0; return a; },
@@ -6381,6 +6384,100 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <CardRow label="העברות הסניפים" color="var(--purple)">{num(T.tr * k)}</CardRow>
             </div>
           </div>
+          {/*
+            התמונה המלאה (שרה, 8.10: "תבנה לי טבלה כזו, שמכניסה גם את ההוצאות הנוספות של הסניף ואת ההכנסות הנוספות…
+            ותשתמש בנתונים מהטבלאות האחרות, המעודכנות"): אותן שורות של נתוני הבסיס — משרד החינוך (תקבול או צפי),
+            עלות ההוראה של ספטמבר, כרית 15%, מענק הרשת — ולצדן ההכנסות וההוצאות הנוספות של הסניף ממבט-רשת.
+            היתרה להשלמת הסניף = סה"כ הוצאות − סה"כ הכנסות − מענק הרשת. לחיצה על שם הסניף פותחת את פירוט השורות.
+          */}
+          {(() => {
+            const full = lines.map(x => { const oi = (x.r.otherInc || 0) / 12, oe = (x.r.otherExp || 0) / 12;
+              const inc = x.min + oi, exp = x.cost + x.cush + oe;
+              return { ...x, oi, oe, inc, exp, fgap: exp - inc, left: exp - inc - x.grant }; });
+            const F = full.reduce((a, x) => { for (const f of ['min', 'oi', 'inc', 'cost', 'cush', 'oe', 'exp', 'fgap', 'grant', 'left']) a[f] += x[f]; return a; },
+              { min: 0, oi: 0, inc: 0, cost: 0, cush: 0, oe: 0, exp: 0, fgap: 0, grant: 0, left: 0 });
+            const ln = (list, empty) => (list.length ? list.map(l => `${l.name} ${num(l.amount / 12 * k)}`).join(' · ') : empty);
+            const detail = x => (<div style={{ fontSize:14.4, lineHeight:1.8, textAlign:'start', color:'var(--text2)' }}>
+              <div><b style={{ color:'#166534' }}>הכנסות נוספות {per}:</b> {ln(x.r.incLines, 'לא נרשמו')}</div>
+              <div><b style={{ color:'#B42318' }}>הוצאות נוספות {per}:</b> {ln(x.r.expLines, 'לא נרשמו')}</div>
+            </div>);
+            return (<>
+          <h2 className="section-head" style={{ margin:'22px 0 8px' }}>התמונה המלאה של הסניף — {mo ? 'חודשי' : 'שנתי'}</h2>
+          <p className="no-print" style={{ fontSize:14.4, color:'var(--text2)', margin:'0 0 8px' }}>כולל ההכנסות וההוצאות שמעבר לעלות ההוראה, מתקציב הסניף. לחיצה על שם הסניף פותחת את הפירוט.</p>
+          <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
+            <table className="sticky-first big-table bl-table pva pvaf" style={{ width:'100%', borderCollapse:'collapse' }}>
+              <caption className="sr-only">{`התמונה המלאה לכל סניף, ${per}: הכנסות, הוצאות, הפער, מענק הרשת והיתרה להשלמת הסניף`}</caption>
+              <colgroup><col className="c-name" /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col /></colgroup>
+              <thead>
+                <tr className="bl-groups">
+                  <th />
+                  <th scope="colgroup" colSpan={3} className="gh-inc">הכנסות</th>
+                  <th scope="colgroup" colSpan={4} className="gh-cost">הוצאות</th>
+                  <th scope="colgroup" colSpan={3} className="gh-res">תוצאה</th>
+                </tr>
+                <tr>
+                  <TH>סניף</TH><TH>משרד החינוך</TH><TH>הכנסות נוספות</TH><TH>סה"כ הכנסות</TH>
+                  <TH>עלות ההוראה</TH><TH>כרית 15%</TH><TH>הוצאות נוספות</TH><TH>סה"כ הוצאות</TH>
+                  <TH>הפער</TH><TH>מענק הרשת</TH><TH>יתרה להשלמת הסניף</TH>
+                </tr>
+              </thead>
+              <tbody>
+                {full.map(x => [
+                  <tr key={'full-' + x.r.id}>
+                    <th scope="row" style={{ padding:'8px 6px', fontWeight:700, textAlign:'start', fontSize:15 }} title={x.r.name}>
+                      <button type="button" aria-expanded={fullOpen === x.r.id} onClick={() => setFullOpen(o => (o === x.r.id ? '' : x.r.id))}
+                        style={{ all:'unset', cursor:'pointer', fontWeight:700, display:'block', width:'100%' }}>{x.r.name.replace(/^(שלהבות|בית חינוך) /, '')} <span aria-hidden="true" style={{ color:'var(--text3)' }}>{fullOpen === x.r.id ? '▴' : '▾'}</span></button>
+                    </th>
+                    <td className={x.wait ? cellCls('mid') : undefined} style={tdP}>{minCell(x)}</td>
+                    <td style={tdP}>{num(x.oi * k)}</td>
+                    <td style={{ ...tdP, fontWeight:800 }}>{num(x.inc * k)}</td>
+                    <td style={tdP}>{num(x.cost * k)}</td>
+                    <td style={{ ...tdP, color:'var(--text2)' }}>{num(x.cush * k)}</td>
+                    <td style={tdP}>{num(x.oe * k)}</td>
+                    <td style={{ ...tdP, fontWeight:800 }}>{num(x.exp * k)}</td>
+                    <td style={tdP}><GapCell v={x.fgap * k} /></td>
+                    <td style={tdP}>{num(x.grant * k)}</td>
+                    <td className={cellCls(gapSt(x.left * k))} style={tdP}><GapCell v={x.left * k} big /></td>
+                  </tr>,
+                  fullOpen === x.r.id && (<tr key={'fulld-' + x.r.id}><td colSpan={11} style={{ padding:'8px 14px', background:'#FAF8FE' }}>{detail(x)}</td></tr>),
+                ])}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td style={{ padding:'10px 8px' }}>סה"כ</td>
+                  <td style={tdP}>{num(F.min * k)}</td><td style={tdP}>{num(F.oi * k)}</td><td style={tdP}>{num(F.inc * k)}</td>
+                  <td style={tdP}>{num(F.cost * k)}</td><td style={tdP}>{num(F.cush * k)}</td><td style={tdP}>{num(F.oe * k)}</td><td style={tdP}>{num(F.exp * k)}</td>
+                  <td style={tdP}><GapCell v={F.fgap * k} /></td><td style={tdP}>{num(F.grant * k)}</td>
+                  <td className={cellCls(gapSt(F.left * k))} style={tdP}><GapCell v={F.left * k} big /></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="only-mobile big-cards">
+            {full.map(x => (
+              <div key={'fullm-' + x.r.id} className="apple-card mcard">
+                <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{x.r.name}</p>
+                <CardRow label={`יתרה להשלמת הסניף ${per}`} strong><GapV v={x.left * k} /></CardRow>
+                <CardRow label="משרד החינוך">{minCell(x)}</CardRow>
+                <CardRow label="הכנסות נוספות">{num(x.oi * k)}</CardRow>
+                <CardRow label='סה"כ הכנסות'>{num(x.inc * k)}</CardRow>
+                <CardRow label="עלות ההוראה">{num(x.cost * k)}</CardRow>
+                <CardRow label="כרית 15%">{num(x.cush * k)}</CardRow>
+                <CardRow label="הוצאות נוספות">{num(x.oe * k)}</CardRow>
+                <CardRow label='סה"כ הוצאות'>{num(x.exp * k)}</CardRow>
+                <CardRow label="הפער"><GapV v={x.fgap * k} /></CardRow>
+                <CardRow label="מענק הרשת">{num(x.grant * k)}</CardRow>
+                <div style={{ marginTop:8 }}>{detail(x)}</div>
+              </div>
+            ))}
+            <div className="apple-card mcard"><p className="mcard-name" style={{ marginBottom:4 }}>סה"כ {per}</p>
+              <CardRow label="יתרה להשלמת הסניפים" strong><GapV v={F.left * k} /></CardRow>
+              <CardRow label='סה"כ הכנסות'>{num(F.inc * k)}</CardRow>
+              <CardRow label='סה"כ הוצאות'>{num(F.exp * k)}</CardRow>
+              <CardRow label="מענק הרשת">{num(F.grant * k)}</CardRow>
+            </div>
+          </div>
+            </>); })()}
             </>); })()}
 
           {showImport && cur && (
