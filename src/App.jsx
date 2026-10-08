@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 153;
+const BUILD = 154;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5644,7 +5644,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
     const actSal = costAll(r), act20 = Math.round(actSal * 0.2), actMin = minOf(r) || 0;
     const planSal = bd.annual / 12, plan20 = bd.add20 / 12, planMin = bd.ministry / 12;
     const grant = bd.supportYear / 12, transfer = bd.month || 0;
-    return { planSal, actSal, plan20, act20, planMin, actMin, grant, transfer, noMin: minInfo(r).key === 'none',
+    return { planSal, actSal, plan20, act20, planMin, actMin, grant, transfer, paid: r.chabadPaid ?? null, noMin: minInfo(r).key === 'none',
       planGap: planSal + plan20 - planMin - grant - transfer, actGap: actSal + act20 - actMin - grant - transfer }; };
   const pvaRows = rows.map(r => ({ r, p: pvaOf(r) })).sort((a, b) => (baseById.get(a.r.id)?.ord ?? 99) - (baseById.get(b.r.id)?.ord ?? 99));
   const pvaTot = pvaRows.reduce((a, { p }) => { if (p) for (const k of Object.keys(a)) a[k] += p[k] || 0; return a; },
@@ -5844,7 +5844,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </div>
           <p className="section-sub">{mode === 'compare'
             ? (cmpKind === 'salary' ? 'התכנון השנתי של עלות ההוראה לכל סניף, החלק החודשי שלו (השנתי ÷ 12), ועלות ההוראה בפועל בכל חודש מולו. ירוק — עומד בתכנון; כתום — כמעט (חריגה עד 5%); אדום — לא עומד. מתחת: כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.' : 'הפער של כל סניף בכל חודש בביצוע: שכר + 20% − משרד החינוך שהתקבל − מענק הרשת − העברת הסניף. "חסר" כשהעלות גבוהה מהכיסוי, "עודף" כשנשאר. בסוף: הפער המצטבר.')
-            : <>לכל חלק תכנון, ביצוע ופער. התכנון מוזן מטבלת נתוני הבסיס שלמטה, חלקי 12. פער ירוק — לטובה; כתום — חריגה עד 5%; אדום — מעבר לזה. שכר + 20% − משרד החינוך שהתקבל − מענק והעברה = הפער לחודש.</>}</p>
+            : <>לכל חלק תכנון, ביצוע ופער. התכנון מוזן מטבלת נתוני הבסיס שלמטה, חלקי 12. פער ירוק — לטובה; כתום — חריגה עד 5%; אדום — מעבר לזה. שכר + 20% − משרד החינוך שהתקבל − מענק הרשת − העברת הסניף = הפער לחודש; המענק וההעברה נכנסים לחשבון לפי התכנון, והביצוע שלהם מוצג למעקב.</>}</p>
           {mode === 'compare' ? (
           <>
           <div className="apple-seg no-print" role="group" aria-label="מה משווים" style={{ marginBottom:10 }}>
@@ -5947,7 +5947,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <colgroup>
                 <col className="c-name" />
                 <col /><col /><col className="c-gap" /><col /><col /><col className="c-gap" /><col /><col /><col className="c-gap" />
-                <col /><col className="c-final" />
+                <col /><col /><col /><col /><col className="c-final" />
               </colgroup>
               <thead>
                 <tr className="bl-groups">
@@ -5955,19 +5955,21 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <th colSpan={3} scope="colgroup" className="gh-cost">עלות השכר</th>
                   <th colSpan={3} scope="colgroup" className="gh-cost"><Op c="+" />ה-20%</th>
                   <th colSpan={3} scope="colgroup" className="gh-inc"><Op c="−" />משרד החינוך</th>
-                  <th scope="col" className="gh-inc" title="מענק הרשת (החלק ה-12) ועוד העברת הסניף — מטבלת נתוני הבסיס"><Op c="−" />קבועים</th>
+                  {/* "לחלק ל-2, תכנון מול ביצוע לכל חלק" (שרה, 8.10): מענק הרשת והעברת הסניף — כל אחד תכנון וביצוע */}
+                  <th colSpan={2} scope="colgroup" className="gh-inc"><Op c="−" />מענק הרשת</th>
+                  <th colSpan={2} scope="colgroup" className="gh-inc"><Op c="−" />העברת הסניף</th>
                   <th scope="col" className="gh-res"><Op c="=" />הפער לחודש</th>
                 </tr>
                 <tr>
                   <TH>סניף</TH><TH>תכנון</TH><TH>ביצוע</TH><TH>פער</TH><TH>תכנון</TH><TH>ביצוע</TH><TH>פער</TH>
-                  <TH>תכנון</TH><TH>ביצוע</TH><TH>פער</TH><TH>מענק + העברה</TH><TH>ביצוע</TH>
+                  <TH>תכנון</TH><TH>ביצוע</TH><TH>פער</TH><TH>תכנון</TH><TH>ביצוע</TH><TH>תכנון</TH><TH>ביצוע</TH><TH>ביצוע</TH>
                 </tr>
               </thead>
               <tbody>
                 {pvaRows.map(({ r, p }) => (
                   <tr key={'pva-' + r.id}>
                     <th scope="row" style={{ padding:'10px 8px', fontWeight:700, textAlign:'start', fontSize:15.5 }} title={r.name}>{shortName(r.name).replace(/^שלהבות /, '').replace(/ קטמון$/, '')}</th>
-                    {!p ? <td colSpan={11} style={{ ...tdP, color:'var(--text2)' }}>אין לסניף נתוני בסיס</td> : (<>
+                    {!p ? <td colSpan={14} style={{ ...tdP, color:'var(--text2)' }}>אין לסניף נתוני בסיס</td> : (<>
                       <td style={tdP}>{num(p.planSal)}</td>
                       <td style={{ ...tdP, fontWeight:700 }}>{num(p.actSal)}</td>
                       <td className={cellCls(Math.round(p.actSal - p.planSal) === 0 ? null : actSt(p.actSal, p.planSal))} style={tdP}><Diff v={p.actSal} plan={p.planSal} /></td>
@@ -5977,7 +5979,11 @@ function BottomLineView({ activeMonth, viewer = false }) {
                       <td style={tdP}>{num(p.planMin)}</td>
                       <td style={{ ...tdP, fontWeight:700 }}>{num(p.actMin)}</td>
                       <td className={cellCls(p.noMin ? 'mid' : Math.round(p.actMin - p.planMin) === 0 ? null : actSt(p.actMin, p.planMin, true))} style={tdP}>{p.noMin ? <span style={{ color:'#8F4E00', fontWeight:700 }}>טרם התקבל</span> : <Diff v={p.actMin} plan={p.planMin} income />}</td>
-                      <td style={tdP} title={`מענק הרשת ${num(p.grant)} + העברת הסניף ${num(p.transfer)}`}>{num(p.grant + p.transfer)}</td>
+                      <td style={tdP}>{num(p.grant)}</td>
+                      <td style={{ ...tdP, color:'var(--text3)' }} title="במערכת אין רישום של המענק ששולם בפועל">—</td>
+                      <td style={{ ...tdP, color:'var(--purple)', fontWeight:700 }}>{num(p.transfer)}</td>
+                      <td className={p.paid == null ? undefined : cellCls(actSt(p.paid, p.transfer, true))} style={tdP} title={p.paid == null ? 'טרם נרשם במסך "תקבולים ותשלומים" מה שהסניף העביר' : undefined}>
+                        {p.paid == null ? <span style={{ color:'var(--text3)' }}>—</span> : <span className="num" style={{ fontWeight:800, color: ST_COLOR[actSt(p.paid, p.transfer, true)] }}>{num(p.paid)}</span>}</td>
                       <td className={cellCls(gapSt(p.actGap))} style={tdP} title={`בתכנון: ${Math.round(p.planGap) === 0 ? 'מאוזן' : (p.planGap > 0 ? 'חסר ' : 'עודף ') + num(Math.abs(p.planGap))}`}><GapCell v={p.actGap} big /></td>
                     </>)}
                   </tr>
@@ -5989,7 +5995,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={tdP}>{num(pvaTot.planSal)}</td><td style={tdP}>{num(pvaTot.actSal)}</td><td className={cellCls(Math.round(pvaTot.actSal - pvaTot.planSal) === 0 ? null : actSt(pvaTot.actSal, pvaTot.planSal))} style={tdP}><Diff v={pvaTot.actSal} plan={pvaTot.planSal} /></td>
                   <td style={tdP}>{num(pvaTot.plan20)}</td><td style={tdP}>{num(pvaTot.act20)}</td><td className={cellCls(Math.round(pvaTot.act20 - pvaTot.plan20) === 0 ? null : actSt(pvaTot.act20, pvaTot.plan20))} style={tdP}><Diff v={pvaTot.act20} plan={pvaTot.plan20} /></td>
                   <td style={tdP}>{num(pvaTot.planMin)}</td><td style={tdP}>{num(pvaTot.actMin)}</td><td className={cellCls(Math.round(pvaTot.actMin - pvaTot.planMin) === 0 ? null : actSt(pvaTot.actMin, pvaTot.planMin, true))} style={tdP}><Diff v={pvaTot.actMin} plan={pvaTot.planMin} income /></td>
-                  <td style={tdP} title={`מענק הרשת ${num(pvaTot.grant)} + העברות הסניפים ${num(pvaTot.transfer)}`}>{num(pvaTot.grant + pvaTot.transfer)}</td>
+                  <td style={tdP}>{num(pvaTot.grant)}</td>
+                  <td style={{ ...tdP, color:'var(--text3)' }}>—</td>
+                  <td style={tdP}>{num(pvaTot.transfer)}</td>
+                  <td style={tdP}>{pvaRows.some(x => x.p?.paid != null) ? num(pvaRows.reduce((a, x) => a + (x.p?.paid || 0), 0)) : <span style={{ color:'var(--text3)' }}>—</span>}</td>
                   <td className={cellCls(gapSt(pvaTot.actGap))} style={tdP} title={`בתכנון: ${(pvaTot.planGap > 0 ? 'חסר ' : 'עודף ') + num(Math.abs(pvaTot.planGap))}`}><GapCell v={pvaTot.actGap} big /></td>
                 </tr>
               </tfoot>
@@ -6010,8 +6019,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <CardRow label="ה-20% — ביצוע"><Act v={p.act20} plan={p.plan20} /></CardRow>
                   <CardRow label="משרד החינוך — תכנון">{num(p.planMin)}</CardRow>
                   <CardRow label="משרד החינוך — ביצוע">{p.noMin ? <span style={{ color:'#8F4E00', fontWeight:700 }}>0 · טרם התקבל</span> : <Act v={p.actMin} plan={p.planMin} income />}</CardRow>
-                  <CardRow label="מענק הרשת">{num(p.grant)}</CardRow>
-                  <CardRow label="העברת הסניף" color="var(--purple)">{num(p.transfer)}</CardRow>
+                  <CardRow label="מענק הרשת — תכנון">{num(p.grant)}</CardRow>
+                  <CardRow label="מענק הרשת — ביצוע"><span style={{ color:'var(--text3)' }}>אין רישום</span></CardRow>
+                  <CardRow label="העברת הסניף — תכנון" color="var(--purple)">{num(p.transfer)}</CardRow>
+                  <CardRow label="העברת הסניף — ביצוע">{p.paid == null ? <span style={{ color:'var(--text3)' }}>טרם נרשם</span> : <span className="num" style={{ fontWeight:800, color: ST_COLOR[actSt(p.paid, p.transfer, true)] }}>{num(p.paid)}</span>}</CardRow>
                 </>)}
               </div>
             ))}

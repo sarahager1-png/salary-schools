@@ -1321,10 +1321,12 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* טבלת החודש (שרה, 8.10: "תסדר", "צריך עמודה שמספרת את הפער", "זה עמוס"): תא = שורה אחת, שלוש עמודות
    לכל חלק, הצבע רק בעמודת הפער, בלי משבצות צבועות; קו מפריד בין הקבוצות */
 .big-table.pvam { table-layout: fixed; }
-.big-table.pvam col { background: transparent !important; width: 6.95%; }
-.big-table.pvam col.c-name { width: 11.6%; }
-.big-table.pvam col.c-final { width: 11.5%; }
-.big-table.pvam col.c-gap { background: #FAF8FE !important; width: 9.4%; }
+/* 15 עמודות (מענק והעברה — כל אחד תכנון וביצוע): רוחב מינימלי 1,140; במסך צר יותר גלילה לצדדים, והסניף נשאר קבוע */
+.big-table.pvam { min-width: 1136px; }
+.big-table.pvam col { background: transparent !important; width: 5.75%; }
+.big-table.pvam col.c-name { width: 9.6%; }
+.big-table.pvam col.c-final { width: 9.6%; }
+.big-table.pvam col.c-gap { background: #FAF8FE !important; width: 7.8%; }
 .big-table.pvam tbody td, .big-table.pvam tfoot td { padding-inline: 2px; font-size: 14.4px !important; }
 .big-table.pvam tbody td { height: 48px; padding-top: 6px; padding-bottom: 6px; vertical-align: middle; }
 .big-table.pvam tbody tr { border-bottom: 1px solid var(--line); }
@@ -1335,7 +1337,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .big-table.pvam td.tgt-bad { background: #FBDCDC !important; }
 .big-table.pvam tbody td[class*="tgt-"], .big-table.pvam tfoot td[class*="tgt-"] { box-shadow: inset 0 0 0 2px #fff; }
 .big-table.pvam tr > :nth-child(2), .big-table.pvam tr > :nth-child(5), .big-table.pvam tr > :nth-child(8),
-.big-table.pvam tr > :nth-child(11), .big-table.pvam tr > :nth-child(12) { border-inline-start: 2px solid #E3DCF2; }
+.big-table.pvam tr > :nth-child(11), .big-table.pvam tr > :nth-child(13), .big-table.pvam tr > :nth-child(15) { border-inline-start: 2px solid #E3DCF2; }
 .big-table.pvam tr.bl-groups > :nth-child(n) { border-inline-start: 0; }
 .big-table.pvam tr.bl-groups > :nth-child(n+2) { border-inline-start: 2px solid #E3DCF2; }
 .gap-chip { padding: 5px 6px; border-radius: 10px; border: 1px solid transparent; }
@@ -1362,3 +1364,6 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .big-table.pvab tr.bl-groups > :nth-child(n+2) { border-inline-start: 2px solid #E3DCF2; }
 .big-table.pvab .apple-input { width: 100% !important; max-width: 84px; padding: 4px 2px !important; font-size: 14.4px !important; }
 .big-table.pvab tfoot td { font-size: 14px !important; letter-spacing: -0.02em; }
+/* כשהטבלה רחבה מהמסך — עמודת הסניף נשארת במקום בגלילה לצדדים */
+.big-table.pvam tbody tr th[scope="row"], .big-table.pvam tbody tr:nth-child(even) th[scope="row"] { position: sticky; inset-inline-start: 0; z-index: 2; background: #fff !important; box-shadow: -1px 0 0 #E3DCF2; }
+.big-table.pvam thead tr:not(.bl-groups) th:first-child, .big-table.pvam tfoot td:first-child { position: sticky; inset-inline-start: 0; z-index: 2; }
