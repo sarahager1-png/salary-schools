@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 173;
+const BUILD = 174;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5198,6 +5198,133 @@ const CEO_TRANSFERS_REPORT = {
    מגיעות לדפדפן של מי שנכנס לצפייה. ההעברות בפועל מוזנות במסך
    "תקבולים ותשלומים", והיתרה כאן מצטברת מהחודש הראשון עד החודש שנבחר.
 */
+/*
+  ייבוא לדף המנכ"ל (שרה, 8.10.26: "תן מקום לייבא הכנסות של משרד החינוך... וכל דבר שניתן יהיה לייבא מבחוץ").
+  קובץ אקסל / CSV או הדבקה מאקסל. כל שורה שיש בה שם סניף וסכום נקלטת; כמה שורות לאותו סניף (למשל קודי
+  נושא) מסתכמות. לפני השמירה מוצג מה זוהה ומה לא — שום דבר לא נשמר בלי לחיצה על "שמירה".
+  סוגי הייבוא ב-CEO_IMPORT_KINDS; סוג חדש = שורה אחת שם ופונקציית שמירה.
+*/
+const CEO_IMPORT_KINDS = [
+  { id: 'ministry', label: 'הכנסות משרד החינוך', hint: 'מה שהתקבל ממשרד החינוך לכל סניף בחודש שנבחר' },
+];
+const ceoBranchKey = name => String(name || '').replace(/["'״׳]/g, '').replace(/קריית/g, 'קרית').replace(/תקווה/g, 'תקוה')
+  .replace(/בית ספר|בית חינוך|שלהבות|בנים|בנות|קטמון|,/g, ' ').replace(/\s+/g, ' ').trim();
+const ceoParseNum = v => { if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const t = String(v ?? '').replace(/[₪\s,]/g, '').replace(/^\((.*)\)$/, '-$1'); if (!/^-?\d+(\.\d+)?$/.test(t)) return null; return Number(t); };
+function CeoImportDialog({ branches, month, monthLabel, onClose, onSave }) {
+  const [kind, setKind] = useState(CEO_IMPORT_KINDS[0].id);
+  const [text, setText] = useState('');
+  const [rows, setRows] = useState(null);     // שורות גולמיות: מערך של מערכי תאים
+  const [fileName, setFileName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const keys = branches.map(b => ({ ...b, key: ceoBranchKey(b.name) })).sort((a, b) => b.key.length - a.key.length);
+  const readFile = async f => {
+    if (!f) return; setMsg(''); setFileName(f.name);
+    try {
+      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+      const all = wb.SheetNames.flatMap(n => XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }));
+      setRows(all); setText('');
+    } catch (e) { setRows(null); setMsg('לא הצלחתי לקרוא את הקובץ. אפשר להדביק את הטבלה מאקסל במקום.'); }
+  };
+  const fromText = t => t.split(/\r?\n/).map(l => l.split(/\t|;|\s{2,}|(?<=\D),(?=\s*\d)/).map(c => c.trim())).filter(r => r.some(Boolean));
+  const src = rows || (text.trim() ? fromText(text) : []);
+  // זיהוי: שם סניף באחד התאים, והסכום — המספר האחרון בשורה
+  const found = new Map(), unknown = [];
+  for (const r of src) {
+    const line = r.map(c => String(c ?? '')).join(' ');
+    const k = ceoBranchKey(line);
+    const b = keys.find(x => x.key && k.includes(x.key));
+    const nums = r.map(ceoParseNum).filter(v => v != null);
+    const amt = nums.length ? nums[nums.length - 1] : null;
+    if (!b || amt == null) { if (line.trim() && (b || amt != null)) unknown.push({ line: line.trim().slice(0, 70), why: b ? 'אין סכום' : 'סניף לא זוהה' }); continue; }
+    const cur = found.get(b.id) || { id: b.id, name: b.name, amount: 0, n: 0 };
+    cur.amount += amt; cur.n += 1; found.set(b.id, cur);
+  }
+  const list = [...found.values()].map(x => ({ ...x, amount: Math.round(x.amount * 100) / 100 }));
+  const good = list.filter(x => x.amount > 0);
+  const total = good.reduce((a, x) => a + x.amount, 0);
+  const fmt = v => Number(v).toLocaleString('he-IL', { maximumFractionDigits: 2 });
+  const save = async () => {
+    setBusy(true); setMsg('');
+    try { await onSave(kind, good); onClose(); }
+    catch (e) { setMsg(e.message || 'השמירה נכשלה'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div onClick={onClose} className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(26,11,53,0.5)', zIndex:70, overflowY:'auto' }} dir="rtl">
+      <div onClick={e => e.stopPropagation()} className="modal-card" role="dialog" aria-modal="true" aria-label="ייבוא נתונים"
+        style={{ maxWidth:640, margin:'26px auto', background:'#fff', borderRadius:16, padding:'20px 22px' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginBottom:10 }}>
+          <h2 style={{ fontSize:19, fontWeight:800, color:'var(--text)', margin:0 }}>ייבוא · {monthLabel}</h2>
+          <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ minHeight:40 }}>סגירה</button>
+        </div>
+        <p style={{ fontSize:14.6, fontWeight:700, color:'var(--text2)', marginBottom:6 }}>מה מייבאים?</p>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(min(100%,180px),1fr))', gridAutoRows:'1fr', gap:8, marginBottom:12 }}>
+          {CEO_IMPORT_KINDS.map(k => (
+            <button key={k.id} type="button" onClick={() => setKind(k.id)} aria-pressed={kind === k.id} title={k.hint}
+              style={{ minHeight:46, borderRadius:12, border: kind === k.id ? '2px solid var(--purple)' : '1px solid var(--line)', background: kind === k.id ? 'var(--purple-100)' : '#fff',
+                color:'var(--purple)', fontSize:15, fontWeight:700, cursor:'pointer', padding:'6px 10px' }}>{k.label}</button>
+          ))}
+        </div>
+        <p style={{ fontSize:14, color:'var(--text2)', lineHeight:1.6, marginBottom:10 }}>{CEO_IMPORT_KINDS.find(k => k.id === kind)?.hint}. בוחרים קובץ אקסל או CSV, או מדביקים טבלה מאקסל. בכל שורה: שם הסניף והסכום. כמה שורות לאותו סניף מסתכמות.</p>
+        <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginBottom:10 }}>
+          <label className="apple-btn apple-btn-blue" style={{ minHeight:44, cursor:'pointer', fontSize:15 }}>
+            <Upload size={16} strokeWidth={2.2} />בחירת קובץ
+            <input type="file" accept=".xlsx,.xls,.csv,text/csv" hidden onChange={e => { readFile(e.target.files?.[0]); e.target.value = ''; }} />
+          </label>
+          {fileName && rows && <span style={{ fontSize:14, color:'var(--text2)' }}>{fileName} <button type="button" onClick={() => { setRows(null); setFileName(''); }} style={{ border:'none', background:'none', color:'var(--purple)', fontWeight:700, fontSize:14, cursor:'pointer' }}>הסרה</button></span>}
+        </div>
+        {!rows && (
+          <textarea value={text} onChange={e => setText(e.target.value)} dir="rtl" aria-label="הדבקת טבלה"
+            placeholder={'או הדבקה מאקסל, למשל:\nעפולה\t42,120\nרעננה\t44,009'}
+            style={{ width:'100%', minHeight:110, borderRadius:12, border:'1px solid var(--line)', padding:'10px 12px', fontSize:15, fontFamily:'inherit', lineHeight:1.6, resize:'vertical' }} />
+        )}
+        {src.length > 0 && (
+          <div style={{ marginTop:12 }}>
+            <p style={{ fontSize:15, fontWeight:800, color:'var(--text)', marginBottom:6 }}>זוהו {good.length} סניפים · סה"כ {fmt(total)} ₪</p>
+            <div className="table-scroll" style={{ border:'1px solid var(--line)', borderRadius:12 }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:15 }}>
+                <thead><tr style={{ background:'var(--apple-fill)' }}>
+                  <th style={{ textAlign:'right', padding:'7px 10px', fontSize:14 }}>סניף</th>
+                  <th style={{ textAlign:'center', padding:'7px 10px', fontSize:14 }}>שורות</th>
+                  <th style={{ textAlign:'left', padding:'7px 10px', fontSize:14 }}>סכום</th>
+                </tr></thead>
+                <tbody>
+                  {list.map(x => (
+                    <tr key={x.id} style={{ borderTop:'1px solid var(--line)', color: x.amount > 0 ? undefined : 'var(--text3)' }}>
+                      <td style={{ padding:'7px 10px', fontWeight:700 }}>{shortName(x.name)}</td>
+                      <td style={{ padding:'7px 10px', textAlign:'center' }}>{x.n}</td>
+                      <td style={{ padding:'7px 10px', textAlign:'left', direction:'ltr', fontWeight:800 }}>{x.amount > 0 ? fmt(x.amount) : 'לא יישמר (0)'}</td>
+                    </tr>
+                  ))}
+                  {branches.filter(b => !found.has(b.id)).map(b => (
+                    <tr key={'no-' + b.id} style={{ borderTop:'1px solid var(--line)', color:'var(--text3)' }}>
+                      <td style={{ padding:'7px 10px' }}>{shortName(b.name)}</td><td /><td style={{ padding:'7px 10px', textAlign:'left' }}>אינו בקובץ — לא משתנה</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {unknown.length > 0 && (
+              <p style={{ fontSize:14, color:'#8F4E00', marginTop:8, lineHeight:1.6 }}>
+                {unknown.length} שורות לא נקלטו: {unknown.slice(0, 4).map(u => `"${u.line}" (${u.why})`).join(' · ')}{unknown.length > 4 ? ' …' : ''}
+              </p>
+            )}
+          </div>
+        )}
+        {msg && <p role="alert" style={{ fontSize:15, fontWeight:600, color:'var(--danger-text)', marginTop:10 }}>{msg}</p>}
+        <div style={{ display:'flex', gap:10, justifyContent:'flex-start', marginTop:16, flexWrap:'wrap' }}>
+          <button className="apple-btn apple-btn-blue" disabled={!good.length || busy} onClick={save} style={{ minHeight:46, fontSize:15.5 }}>
+            {busy ? 'שומר…' : good.length ? `שמירה — ${good.length} סניפים, ${monthLabel}` : 'שמירה'}
+          </button>
+          <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ minHeight:46, fontSize:15.5 }}>ביטול</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BottomLineView({ activeMonth, viewer = false }) {
   const [data, setData] = useState(null);
   const [err, setErr]   = useState('');
@@ -5209,6 +5336,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const [mode, setMode] = useState('month');   // 'month' — החודש שנבחר | 'compare' — השוואה בין החודשים
   const [cmpKind, setCmpKind] = useState('salary');
   const [baseBusy, setBaseBusy] = useState('');
+  const [showImport, setShowImport] = useState(false);
   const [basePer, setBasePer] = useState('year');   // טבלת הבסיס: 'year' שנתי | 'month' חודשי (שרה, 8.10: "אם אני לוחצת — שנתי; אם אני לוחצת — חודשי")
   const [help, setHelp] = useState('');   // "ההסברים בלחיצה" (שרה, 8.10): 'month' | 'base' | '' — ההסבר שפתוח עכשיו
   const [copied, setCopied] = useState(false);   // "סיכום להעברה" הועתק   // בהשוואה: 'salary' — עמידה ביעד (שכר) | 'cash' — מזומן
@@ -5667,6 +5795,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
     "תתן אפשרות שזה חוזר לטרם" (שרה, 8.10): מחיקת הסכום (או 0) מחזירה ל"טרם התקבל"; וליד סכום שהוזן יש
     כפתור ✕ שעושה זאת בלחיצה.
   */
+  const importSave = async (kind, list) => {
+    if (kind === 'ministry') for (const x of list) await store.setMinistryReceived(x.id, cur.key, x.amount);
+    setData(await store.fetchMonthlySummary());
+  };
   const minInput = (id, month, p, label) => (
     <span style={{ display:'inline-flex', alignItems:'center', gap:2, width:'100%', justifyContent:'center' }}>
       <input type="number" min="0" step="any" dir="ltr" className="apple-input nospin" inputMode="decimal" aria-label={label}
@@ -5921,6 +6053,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
             <h2 className="section-head" style={{ margin:0 }}>לפי סניף</h2>
             {months.length > 0 && (
               <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}><HelpBtn id="month" />
+              {canEditMin && cur && (
+                <button type="button" className="no-print" onClick={() => setShowImport(true)}
+                  style={{ display:'inline-flex', alignItems:'center', gap:5, background:'none', border:'1px solid #D8CEEF', borderRadius:999, padding:'4px 12px', minHeight:36, cursor:'pointer', fontSize:14, fontWeight:700, color:'var(--purple)' }}>
+                  <Upload size={14} strokeWidth={2.4} />ייבוא
+                </button>
+              )}
               <div className="apple-seg no-print" role="group" aria-label="תצוגת הסניפים">
                 <button onClick={() => setMode('month')} aria-pressed={mode === 'month'}
                   className={['apple-seg-item', mode === 'month' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>החודש</button>
@@ -6227,6 +6365,11 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <CardRow label={basePer === 'month' ? 'העברות הסניפים לחודש' : 'העברות הסניפים לשנה'} color="var(--purple)">{num(basePer === 'month' ? baseTot.month : baseTot.year)}</CardRow>
             </div>
           </div>
+
+          {showImport && cur && (
+            <CeoImportDialog branches={rows.map(r => ({ id: r.id, name: r.name }))} month={cur.key} monthLabel={fmtMonth(cur.key)}
+              onClose={() => setShowImport(false)} onSave={importSave} />
+          )}
 
           {/* סגירת החודש — לשרה בלבד. האישור בתוך הדף, עם מה שייקרה */}
           {!viewer && cur && data?.canClose && (
