@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 137;
+const BUILD = 138;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -1027,7 +1027,7 @@ function ReportRejectDialog({ rows, label, monthLabel, schoolName, onCancel, onC
   );
 }
 
-function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose, fixes = [], onDecideFix, monthLabel = '', otherFixes = 0, onb = [], rejections = [], onRejectReports = null }) {
+function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose, fixes = [], onDecideFix, onDecideAllFixes = null, monthLabel = '', otherFixes = 0, onb = [], rejections = [], onRejectReports = null }) {
   // דיווחי מנהלות — השלב הראשון: בלי אישורה אין סימולציה ואין שכר (21.9.26)
   // מה-8.10.26: דיווח שחסר בו מסמך מוחזק ואינו בתור האישור; דיווח שנדחה ממתין לתיקון המנהלת
   const pendingAll = onApproveReport ? teachers.filter(reportPending) : [];
@@ -1080,46 +1080,64 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
           </p>
         )}
         {/* תיקונים שהוצעו מהשרת — "תמלא, אני מאשרת" (שרה, 22.9) */}
-        {fixes.length > 0 && (
+        {/*
+          "למה אני צריכה לפתוח אחד אחד ולחפש — תראה לי את כל האישורים ואאשר" (שרה, 8.10):
+          כל התיקונים ברשימה אחת — שורה לתיקון: מי, איפה, מה משתנה — וכפתור אחד שמאשר את כולם.
+          המקור המלא של כל תיקון נשאר בריחוף על השורה.
+        */}
+        {fixes.length > 0 && (() => {
+          const live = fixes.map(f => ({ f, t: teachers.find(x => x.id === f.teacherId) })).filter(x => x.t)
+            .sort((x, y) => schoolName(x.t.schoolId).localeCompare(schoolName(y.t.schoolId), 'he') || x.t.name.localeCompare(y.t.name, 'he'));
+          const show = (k, v) => k === 'gender' ? (v === 'f' ? 'נקבה' : v === 'm' ? 'זכר' : '') : readableVal(k, v);
+          const lbl = k => k === 'gender' ? 'מגדר' : (FIELD_LBL[k] || (k === 'tzId' ? 'ת.ז.' : k));
+          return (
           <div className="apple-card" style={{ padding:16, marginBottom:16, borderRight:'3px solid var(--apple-blue)' }}>
-            <p style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-text)', marginBottom:4 }}>
-              {fixes.length} תיקונים ממתינים לאישורך
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:4 }}>
+              <p style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-text)' }}>
+                {live.length === 1 ? 'תיקון אחד ממתין' : `${live.length} תיקונים ממתינים`} לאישורך
+              </p>
+              {live.length > 1 && onDecideAllFixes && (
+                <button className="apple-btn apple-btn-green" style={{ fontSize:14.9, padding:'7px 16px' }}
+                  onClick={() => onDecideAllFixes(live.map(x => x.f))}>
+                  אשרי את כל התיקונים ({live.length})
+                </button>
+              )}
+            </div>
+            <p style={{ fontSize:14, color:'var(--apple-text2)', marginBottom:10 }}>
+              "אשרי" שומר את התיקון בשורת העובד/ת. המקור של כל תיקון מוצג בריחוף על השורה.
             </p>
-            <p style={{ fontSize:13.8, color:'var(--apple-text2)', marginBottom:12 }}>
-              הוכנו לפי תשובות המנהלות. "אשרי" שומר את התיקון בשורת העובדת.
-            </p>
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {fixes.map(f => {
-                const t = teachers.find(x => x.id === f.teacherId);
-                if (!t) return null;
-                return (
-                  <div key={f.id} style={{ border:'1px solid var(--line, #e5e5ea)', borderRadius:12, padding:12, background:'var(--surface, #fff)' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, flexWrap:'wrap' }}>
-                      <div style={{ minWidth:0 }}>
-                        <p style={{ fontWeight:600, fontSize:16.1, color:'var(--apple-text)' }}>{t.name}</p>
-                        <p style={{ fontSize:13.8, color:'var(--apple-text2)' }}>{schoolName(t.schoolId)}{f.source ? ` · ${f.source}` : ''}</p>
+            <div className="table-scroll">
+              <table className="apple-table" style={{ fontSize:15, width:'100%' }}>
+                <thead><tr><th>שם</th><th>בית ספר</th><th>השינוי</th><th style={{ textAlign:'center' }}>החלטה</th></tr></thead>
+                <tbody>
+                  {live.map(({ f, t }) => (
+                    <tr key={f.id} title={f.source || undefined}>
+                      <td style={{ fontWeight:600, wordBreak:'keep-all' }}>{t.name}</td>
+                      <td style={{ color:'var(--apple-text2)' }}>{shortName(schoolName(t.schoolId))}</td>
+                      <td>
                         {Object.entries(f.patch).map(([k, v]) => (
-                          <div key={k} style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', fontSize:13.8, marginTop:4 }}>
-                            <span style={{ color:'var(--apple-text2)' }}>{FIELD_LBL[k] || (k === 'tzId' ? 'ת.ז.' : k)}:</span>
-                            <span style={{ textDecoration:'line-through', color:'var(--apple-red)' }}>{readableVal(k, t[k]) || '—'}</span>
+                          <span key={k} style={{ display:'inline-flex', alignItems:'center', gap:6, marginInlineEnd:12, whiteSpace:'nowrap' }}>
+                            <span style={{ color:'var(--apple-text2)' }}>{lbl(k)}:</span>
+                            <span style={{ textDecoration:'line-through', color:'var(--apple-red)' }}>{show(k, t[k]) || '—'}</span>
                             <span style={{ color:'var(--apple-text3)' }}>→</span>
-                            <span style={{ fontWeight:600, color:'var(--apple-green)' }}>{readableVal(k, v)}</span>
-                          </div>
+                            <span style={{ fontWeight:700, color:'var(--apple-green)' }}>{show(k, v)}</span>
+                          </span>
                         ))}
-                      </div>
-                      <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                      </td>
+                      <td style={{ textAlign:'center', whiteSpace:'nowrap' }}>
                         <button className="apple-btn apple-btn-ghost" onClick={() => onDecideFix(f, false)}
-                          style={{ fontSize:14.9, padding:'7px 14px', color:'var(--danger)' }}>לא לאשר</button>
+                          style={{ fontSize:14, padding:'5px 10px', color:'var(--danger)', minHeight:36 }}>לא</button>
                         <button className="apple-btn apple-btn-green" onClick={() => onDecideFix(f, true)}
-                          style={{ fontSize:14.9, padding:'7px 16px' }}>אשרי</button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                          style={{ fontSize:14, padding:'5px 12px', marginInlineStart:6, minHeight:36 }}>אשרי</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* דיווחי מנהלות שממתינים לאישור — לפני סימולציה */}
         {reports.length > 0 && (
@@ -13427,6 +13445,17 @@ export default function App() {
     }
     await store.decideFix(f.id, ok ? 'applied' : 'rejected');
   });
+  // אישור כל התיקונים בבת אחת: כמה תיקונים לאותה שורה מתמזגים לשמירה אחת, ואז כולם מסומנים כמיושמים
+  const onDecideAllFixes = (list) => run(async () => {
+    const byT = new Map();
+    for (const f of list) { const g = byT.get(f.teacherId) || { patch: {}, fixes: [] }; Object.assign(g.patch, f.patch); g.fixes.push(f); byT.set(f.teacherId, g); }
+    for (const [tid, g] of byT) {
+      const t = teachers.find(x => x.id === tid);
+      if (!t) continue;
+      await onSaveTeacher({ ...t, ...g.patch });
+      for (const f of g.fixes) await store.decideFix(f.id, 'applied');
+    }
+  });
   // דחיית דיווחים — הסימון נרשם, ההודעה למנהלת נכנסת לתור; הרשימה נטענת מחדש
   const onRejectReports = async ({ rows, reason, principal, message }) => {
     await store.rejectReports({ ids: rows.map(t => t.id), reason, monthKey: activeMonth, principal, message });
@@ -13967,6 +13996,7 @@ export default function App() {
           monthLabel={fmtMonth(activeMonth)}
           otherFixes={user.role === 'coordinator' ? fixes.length - liveFixes.length : 0}
           onDecideFix={onDecideFix}
+          onDecideAllFixes={user.role === 'coordinator' ? onDecideAllFixes : null}
           onApproveAll={onApproveAll}
           onApproveReport={user.role === 'coordinator' ? onApproveReport : null}
           onb={onbList} rejections={rejections}
