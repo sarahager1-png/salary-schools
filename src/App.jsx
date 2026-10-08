@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 133;
+const BUILD = 134;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -4975,7 +4975,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const [askClose, setAskClose] = useState(null);   // 'close' | 'reopen' — אישור בתוך הדף
   const [closing, setClosing] = useState(false);
   const [mode, setMode] = useState('month');   // 'month' — החודש שנבחר | 'compare' — השוואה בין החודשים
-  const [cmpKind, setCmpKind] = useState('salary');   // בהשוואה: 'salary' — עמידה ביעד (שכר) | 'cash' — מזומן
+  const [cmpKind, setCmpKind] = useState('salary');
+  const [copied, setCopied] = useState(false);   // "סיכום להעברה" הועתק   // בהשוואה: 'salary' — עמידה ביעד (שכר) | 'cash' — מזומן
   const doClose = async action => {
     setClosing(true); setErr('');
     try { await store.closeMonthSummary(sel, action); setData(await store.fetchMonthlySummary()); setAskClose(null); }
@@ -5478,6 +5479,35 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <p className="v">{isBase ? <span style={{ fontSize:20, color:'var(--text2)' }}>חודש הבסיס</span> : <Credit v={runningRows} />}</p>
               <p className="s">{isBase ? `${fmtMonth(baseMonth.key)} = 100%` : <>שכר: <Saved v={saveTotalNet()} /></>}</p></div>
           </div>
+
+          {/*
+            "איפה הסיכום להעברה" (שרה, 8.10): הרשימה לגזברות — כמה הרשת מעבירה לכל
+            סניף החודש (המענק פחות היתרה, לא מתחת לאפס; בחודש הבסיס — המענק), עם
+            סה"כ וכפתור העתקה לשליחה.
+          */}
+          {(() => {
+            const list = sorted.map(r => ({ name: shortName(r.name), amount: completeOf(r.support, isBase ? 0 : (runningOf(r.id) || 0)) }));
+            const total = list.reduce((a, x) => a + x.amount, 0);
+            const text = `העברות הרשת לסניפים — ${fmtMonth(sel)}\n` + list.map(x => `${x.name}: ${num(x.amount)} ₪`).join('\n') + `\nסה"כ: ${num(total)} ₪`;
+            const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* אין גישה ללוח */ } };
+            return (
+              <section className="apple-card" style={{ marginTop:14, padding:'14px 16px' }} aria-label="סיכום להעברה החודש">
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:8 }}>
+                  <h2 className="section-head" style={{ margin:0, fontSize:17.5 }}>סיכום להעברה — {fmtMonth(sel)}</h2>
+                  <button className="apple-btn apple-btn-ghost no-print" onClick={copy} style={{ minHeight:36, fontSize:14.6 }}>{copied ? 'הועתק ✓' : 'העתקת הרשימה'}</button>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 210px), 1fr))', gap:'6px 18px' }}>
+                  {list.map(x => (
+                    <div key={x.name} style={{ display:'flex', justifyContent:'space-between', gap:8, borderBottom:'1px dashed var(--line)', padding:'4px 0', fontSize:15 }}>
+                      <span style={{ fontWeight:600 }}>{x.name}</span><span className="num" style={{ fontWeight:800, color:'var(--purple)' }}>{num(x.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ marginTop:10, fontSize:15.5, fontWeight:800, display:'flex', justifyContent:'space-between' }}><span>סה"כ הרשת מעבירה החודש</span><span className="num" style={{ color:'var(--purple)' }}>{num(total)} ₪</span></p>
+                <p style={{ fontSize:14, color:'var(--text2)', marginTop:4 }}>{isBase ? 'חודש הבסיס — המענק של כל סניף.' : 'המענק פחות היתרה המצטברת מול ספטמבר (חובה מגדילה, זכות מקטינה, לא מתחת לאפס).'}</p>
+              </section>
+            );
+          })()}
 
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:6 }}>
             <h2 className="section-head" style={{ margin:0 }}>לפי סניף</h2>
