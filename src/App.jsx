@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 138;
+const BUILD = 139;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -1089,7 +1089,10 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
           const live = fixes.map(f => ({ f, t: teachers.find(x => x.id === f.teacherId) })).filter(x => x.t)
             .sort((x, y) => schoolName(x.t.schoolId).localeCompare(schoolName(y.t.schoolId), 'he') || x.t.name.localeCompare(y.t.name, 'he'));
           const show = (k, v) => k === 'gender' ? (v === 'f' ? 'נקבה' : v === 'm' ? 'זכר' : '') : readableVal(k, v);
-          const lbl = k => k === 'gender' ? 'מגדר' : (FIELD_LBL[k] || (k === 'tzId' ? 'ת.ז.' : k));
+          const LBL = { gender:'מגדר', _officialGross:'ברוטו', _chabadSupp:'תוספת בית חב"ד', _slipGross:'ברוטו בתלוש', _agreedGross:'ברוטו מוסכם', tzId:'ת.ז.' };
+          const lbl = k => LBL[k] || FIELD_LBL[k] || k;
+          // הפרש ספטמבר (קיזוז או תשלום) — מוצג גלוי בשורה, לא רק בריחוף
+          const retro = f => (String(f.source || '').match(/הפרש ספטמבר: (ל(?:תשלום|קיזוז) [\d,]+ ₪)/) || [])[1] || '';
           return (
           <div className="apple-card" style={{ padding:16, marginBottom:16, borderRight:'3px solid var(--apple-blue)' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:4 }}>
@@ -1108,7 +1111,7 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
             </p>
             <div className="table-scroll">
               <table className="apple-table" style={{ fontSize:15, width:'100%' }}>
-                <thead><tr><th>שם</th><th>בית ספר</th><th>השינוי</th><th style={{ textAlign:'center' }}>החלטה</th></tr></thead>
+                <thead><tr style={{ fontSize:14 }}><th style={{ fontSize:14 }}>שם</th><th style={{ fontSize:14 }}>בית ספר</th><th style={{ fontSize:14 }}>השינוי</th><th style={{ fontSize:14, textAlign:'center' }}>החלטה</th></tr></thead>
                 <tbody>
                   {live.map(({ f, t }) => (
                     <tr key={f.id} title={f.source || undefined}>
@@ -1123,6 +1126,7 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
                             <span style={{ fontWeight:700, color:'var(--apple-green)' }}>{show(k, v)}</span>
                           </span>
                         ))}
+                        {retro(f) && <span style={{ display:'block', fontSize:14, fontWeight:600, color: retro(f).startsWith('לקיזוז') ? 'var(--danger-text)' : 'var(--ok-text)' }}>ספטמבר: {retro(f)}</span>}
                       </td>
                       <td style={{ textAlign:'center', whiteSpace:'nowrap' }}>
                         <button className="apple-btn apple-btn-ghost" onClick={() => onDecideFix(f, false)}
@@ -1342,7 +1346,7 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
             ))}
           </div>
         )}
-        <p style={{ fontSize:13.8, color:'var(--apple-text3)', textAlign:'center', marginTop:32 }}>
+        <p style={{ fontSize:14, color:'var(--apple-text3)', textAlign:'center', marginTop:32 }}>
           לאחר אישור, הנתונים מוכנים לחישוב משכורות חודשי
         </p>
       </div>
@@ -7880,9 +7884,9 @@ function GenderPick({ value, onChange }) {
   );
 }
 
-function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onMarkSlip, onSaveSlipGross, docs = null, onPickMonth = null }) {
+function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onMarkSlip, onSaveSlipGross, docs = null, onPickMonth = null, initialMode = null }) {
   // שתי לשוניות: התלושים שהתקבלו מהגזברות, והכנת התלושים לפי חישוב המערכת (שרה אישרה, 6.10)
-  const [mode, setMode] = useState(onSaveTeacher ? 'archive' : 'prep');
+  const [mode, setMode] = useState(initialMode || (onSaveTeacher ? 'archive' : 'prep'));
   const [openSc, setOpenSc] = useState(null);
   /*
     "לא רואה את כל התלושים… פה" (שרה, 6.10): גם בהכנת התלושים רואים, לכל
@@ -13029,6 +13033,7 @@ export default function App() {
   const [months,  setMonths]  = useState({});
   const [fixes,   setFixes]   = useState([]);   // תיקונים שהוצעו מהשרת (22.9)
   const [onbList, setOnbList] = useState([]);       // רשומות הקליטה — למסמכי ממלאת מקום שאינה משובצת (8.10)
+  const [staffTab, setStaffTab] = useState('data');   // המסך של שרה: 'data' נתוני העובדים | 'slips' תלושי סימולציה
   const [rejections, setRejections] = useState([]); // דיווחים שנדחו בחודש הפעיל (8.10)
   // מועדי הדיווח לכל חודש — מסך הדיווח של המנהלת סופר לפיהם
   const [due,     setDue]     = useState({});
@@ -13491,6 +13496,17 @@ export default function App() {
   const area = view === 'bottomline' ? 'director' : ['calc', 'slips', 'mm', 'calibration'].includes(view) ? 'clerk' : 'mine';
   const inClerk = isClerk || (isCoord && area === 'clerk');
   const inMine = isCoord && area === 'mine';
+  // לשוניות המסך של שרה — נתוני העובדים והסימולציה | התלושים שהמערכת מכינה
+  const staffTabs = (
+    <div className="page-wrap no-print" style={{ maxWidth:1180, paddingBottom:0 }} dir="rtl">
+      <div className="apple-seg" role="group" aria-label="עובדים ותלושי סימולציה">
+        <button onClick={() => setStaffTab('data')} aria-pressed={staffTab === 'data'}
+          className={['apple-seg-item', staffTab === 'data' ? 'active' : ''].join(' ')} style={{ padding:'7px 16px', fontSize:15.5, minHeight:42 }}>נתוני כל העובדים</button>
+        <button onClick={() => setStaffTab('slips')} aria-pressed={staffTab === 'slips'}
+          className={['apple-seg-item', staffTab === 'slips' ? 'active' : ''].join(' ')} style={{ padding:'7px 16px', fontSize:15.5, minHeight:42 }}>תלושי סימולציה</button>
+      </div>
+    </div>
+  );
   const finTabs = isCoord ? (
     <div className="apple-seg even-grid no-print" role="group" aria-label="כספי הסניפים" style={{ marginBottom:16, maxWidth:560, gap:2 }}>
       {[['finance', 'כמה כל סניף מעביר'], ['ledger', 'מה התקבל והועבר']].map(([k, l]) => (
@@ -13648,6 +13664,17 @@ export default function App() {
               <button className={`nav-btn ${view==='schools' || view==='school' ? 'active' : ''}`} onClick={() => setView('schools')}>
                 <Building2 size={15} strokeWidth={2.2} />
                 בתי הספר
+              </button>
+            )}
+            {/*
+              "אצלי צריך להיות מסך נתוני כל העובדים ותלוש סימולציה" (שרה, 8.10): אותם שני מסכים
+              של אזור הגזברית — נתוני העובדים והסימולציה, והתלושים שהמערכת מכינה — גם באזור שלה,
+              במסך אחד עם שתי לשוניות.
+            */}
+            {inMine && (
+              <button className={`nav-btn ${view==='staff' ? 'active' : ''}`} onClick={() => setView('staff')}>
+                <Calculator size={15} strokeWidth={2.2} />
+                עובדים ותלושי סימולציה
               </button>
             )}
             {/* ── עבודה חודשית ── */}
@@ -13814,7 +13841,8 @@ export default function App() {
             onReportMonth={(schoolId, key) =>
               store.reportMonth(schoolId, key).then(async r => { await refresh(); return r; })}
           />
-        ) : view === 'calc' ? (
+        ) : (view === 'calc' || (view === 'staff' && staffTab === 'data')) ? (
+          <>{view === 'staff' && staffTabs}
           <PayrollDesk
             teachers={teachers}
             schools={schools}
@@ -13831,7 +13859,7 @@ export default function App() {
             onSaveScope={(id, which, val) => run(() => store.saveTeacher(
               which === 'gender' ? { id, gender: val }
                 : { id, scopePct: val, scopeSetAt: new Date().toISOString() }, activeMonth))}
-          />
+          /></>
         ) : view === 'alerts' ? (
           <NotificationsView />
         ) : view === 'report' ? (
@@ -13850,15 +13878,16 @@ export default function App() {
           <CalibrationView schools={schools} teachers={teachers} monthKey={activeMonth} />
         ) : view === 'mm' && (user.role === 'coordinator' || user.role === 'clerk') ? (
           <AbsencesView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} canReopen={user.role === 'coordinator'} onb={onbList} rejections={rejections} />
-        ) : view === 'slips' ? (
-          <SlipsView schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} onPickMonth={setActiveMonth}
+        ) : (view === 'slips' || (view === 'staff' && staffTab === 'slips')) ? (
+          <>{view === 'staff' && staffTabs}
+          <SlipsView key={view} initialMode={view === 'staff' ? 'prep' : undefined} schools={schools} teachers={teachers} monthKey={activeMonth} fmtMonthFn={fmtMonth} onPickMonth={setActiveMonth}
             docs={(user.role === 'coordinator' || user.role === 'clerk')
               ? <div style={{ marginTop:22 }}><MonthDocuments monthKey={activeMonth} schools={schools} userRole={user.role} userId={user.id} title="מסמכי החודש וקובצי השכר" /></div> : null}
             onSaveTeacher={user.role === 'coordinator' ? onSaveTeacher : null}
             onMarkSlip={(user.role === 'coordinator' || user.role === 'clerk')
               ? (id, issued) => run(() => store.markSlipIssued(id, issued)) : null}
             onSaveSlipGross={(user.role === 'coordinator' || user.role === 'clerk')
-              ? (id, amount) => run(() => store.saveSlipGross(id, amount)) : null} />
+              ? (id, amount) => run(() => store.saveSlipGross(id, amount)) : null} /></>
         ) : view === 'school' && activeSchool ? (
           <SchoolView userId={user.id}
             school={activeSchool}
