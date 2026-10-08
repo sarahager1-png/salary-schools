@@ -1342,3 +1342,23 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .gap-chip.ok  { background: #E6F6EC; border-color: #BBE5C8; }
 .gap-chip.bad { background: var(--danger-bg); border-color: var(--danger-line, #F3C7C7); }
 .big-table.pvam tfoot td { font-size: 14px !important; letter-spacing: -0.02em; padding-inline: 1px; }
+
+/* טבלת נתוני הבסיס (שרה, 8.10: "חסר תכנון מול ביצוע בכל חלק"): תכנון שנתי ולצדו "בוצע עד כה" בכל חלק */
+.big-table.pvab { table-layout: fixed; }
+.big-table.pvab col { background: transparent !important; width: 8.7%; }
+.big-table.pvab col.c-name { width: 13%; }
+.big-table.pvab col.c-act { background: #FAF8FE !important; }
+.big-table.pvab tbody td, .big-table.pvab tfoot td { padding-inline: 2px; font-size: 14.4px !important; }
+.big-table.pvab tbody td { height: 48px; vertical-align: middle; }
+.big-table.pvab tbody tr { border-bottom: 1px solid var(--line); }
+.big-table.pvab tbody tr:nth-child(even) td:not([class*="tgt-"]), .big-table.pvab tbody tr:nth-child(even) th[scope="row"] { background: transparent !important; }
+.big-table.pvab td.tgt-ok  { background: #DDF3E4 !important; }
+.big-table.pvab td.tgt-mid { background: #FCEBC8 !important; }
+.big-table.pvab td.tgt-bad { background: #FBDCDC !important; }
+.big-table.pvab td[class*="tgt-"] { box-shadow: inset 0 0 0 2px #fff; }
+.big-table.pvab tr > :nth-child(2), .big-table.pvab tr > :nth-child(4), .big-table.pvab tr > :nth-child(6),
+.big-table.pvab tr > :nth-child(8), .big-table.pvab tr > :nth-child(9), .big-table.pvab tr > :nth-child(10) { border-inline-start: 2px solid #E3DCF2; }
+.big-table.pvab tr.bl-groups > :nth-child(n) { border-inline-start: 0; }
+.big-table.pvab tr.bl-groups > :nth-child(n+2) { border-inline-start: 2px solid #E3DCF2; }
+.big-table.pvab .apple-input { width: 100% !important; max-width: 84px; padding: 4px 2px !important; font-size: 14.4px !important; }
+.big-table.pvab tfoot td { font-size: 14px !important; letter-spacing: -0.02em; }

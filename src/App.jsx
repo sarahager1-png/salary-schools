@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 152;
+const BUILD = 153;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5698,6 +5698,20 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const yearOf = id => months.reduce((a, m) => { const p = pvaIn(m, id); return p ? { sal: a.sal + (p.planSal - p.actSal), plan: a.plan + p.planSal, gap: a.gap + p.actGap, planGap: a.planGap + p.planGap } : a; }, { sal: 0, plan: 0, gap: 0, planGap: 0 });
   const yearNet = months.reduce((a, m) => { const x = pvaNet(m); return { sal: a.sal + (x.planSal - x.actSal), plan: a.plan + x.planSal, gap: a.gap + x.actGap, planGap: a.planGap + x.planGap }; }, { sal: 0, plan: 0, gap: 0, planGap: 0 });
   const salSt = salPct == null ? 'ok' : actSt(pvaTot.actSal, pvaTot.planSal);   // אותו צבע של הכרטיסייה והטבלה
+  /*
+    "חסר תכנון מול ביצוע בכל חלק" (שרה, 8.10, על טבלת הבסיס): גם בטבלה השנתית — ליד התכנון השנתי של
+    כל חלק, מה שבוצע עד כה (מצטבר מתחילת השנה). הצבע: הביצוע מול החלק היחסי של התכנון לאותם חודשים.
+  */
+  const ytdOf = id => months.reduce((a, m) => { const p = pvaIn(m, id); if (!p) return a;
+    return { n: a.n + 1, actSal: a.actSal + p.actSal, planSal: a.planSal + p.planSal, act20: a.act20 + p.act20, plan20: a.plan20 + p.plan20,
+      actMin: a.actMin + p.actMin, planMin: a.planMin + p.planMin, noMin: a.noMin + (p.noMin ? 1 : 0) }; },
+    { n: 0, actSal: 0, planSal: 0, act20: 0, plan20: 0, actMin: 0, planMin: 0, noMin: 0 });
+  const ytdTot = baseRows.reduce((a, r) => { const y = ytdOf(r.id); for (const k of Object.keys(a)) a[k] += y[k] || 0; return a; },
+    { actSal: 0, planSal: 0, act20: 0, plan20: 0, actMin: 0, planMin: 0 });
+  const Ytd = ({ v, plan, income = false, wait = false }) => (
+    <span className="num" style={{ fontWeight:800, color: wait ? '#8F4E00' : ST_COLOR[actSt(v, plan, income)] }}
+      title={`בוצע ${num(v)} מול ${num(plan)} — החלק היחסי של התכנון לחודשים שעברו`}>{num(v)}</span>);
+  const ytdCls = (v, plan, income = false, wait = false) => cellCls(wait ? 'mid' : actSt(v, plan, income));
   const PlanNote = ({ cost, plan, block = true }) => { const t = targetOf(cost, plan); if (!t) return null;
     const st = { display: block ? 'block' : 'inline', fontSize:14, fontWeight:700, marginTop: block ? 2 : 0, marginInlineStart: block ? 0 : 8 };
     if (Math.round(t.over) === 0) return <span style={{ ...st, color:'var(--ok-text)' }}>כמו בתכנון</span>;
@@ -6027,48 +6041,60 @@ function BottomLineView({ activeMonth, viewer = false }) {
           <h2 className="section-head" style={{ marginTop:26 }}>נתוני הבסיס — עלות הוראה שנתית והעברות לסניפים</h2>
           <p className="section-sub">מכאן מוזן התכנון שבטבלת החודש. עלות ההוראה, ה-20% ומשרד החינוך — לפי הדוח שסוכם ב-23.9.2026. קרית ביאליק, שאינה בדוח — לפי התקציב שסוכם איתה ב-24.9. מענק הרשת והעברת הסניף — הסכומים שבתוקף עכשיו; {canEditBase ? 'אפשר לשנות אותם כאן בכל עת, והשינוי נכנס מיד לטבלת החודש.' : 'רק מנהל הרשת משנה אותם.'}</p>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
-            <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">נתוני הבסיס לכל סניף: עלות הוראה לשנה, תוספת 20%, סך העלות, משרד החינוך, מענק הרשת, פער מחושב, העברת הסניף לחודש ולשנה</caption>
+            <table className="sticky-first big-table bl-table pva pvab" style={{ width:'100%', borderCollapse:'collapse' }}>
+              <caption className="sr-only">נתוני הבסיס לכל סניף: לכל חלק התכנון השנתי ומה שבוצע עד כה — עלות הוראה, תוספת 20%, משרד החינוך; מענק הרשת, פער מחושב, העברת הסניף לחודש ולשנה</caption>
               <colgroup>
-                <col /><col className="g-cost" /><col className="g-cost" /><col className="g-cost" />
-                <col className="g-inc" /><col className="g-inc" /><col className="g-res" />
-                <col className="g-res g-sum" /><col className="g-res g-sum" />
+                <col className="c-name" /><col /><col className="c-act" /><col /><col className="c-act" /><col /><col className="c-act" />
+                <col /><col /><col /><col />
               </colgroup>
               <thead>
                 <tr className="bl-groups">
                   <th />
-                  <th colSpan={3} scope="colgroup" className="gh-cost">העלות לשנה</th>
-                  <th colSpan={2} scope="colgroup" className="gh-inc">הכיסוי לשנה</th>
-                  <th colSpan={3} scope="colgroup" className="gh-res">הסניף מעביר</th>
+                  <th colSpan={2} scope="colgroup" className="gh-cost">עלות ההוראה</th>
+                  <th colSpan={2} scope="colgroup" className="gh-cost"><Op c="+" />תוספת 20%</th>
+                  <th colSpan={2} scope="colgroup" className="gh-inc"><Op c="−" />משרד החינוך</th>
+                  <th scope="col" className="gh-inc"><Op c="−" />מענק הרשת</th>
+                  <th scope="col" className="gh-res"><Op c="=" />פער</th>
+                  <th colSpan={2} scope="colgroup" className="gh-res">הסניף מעביר</th>
                 </tr>
                 <tr>
-                  <TH>סניף</TH><TH>עלות הוראה</TH><TH><Op c="+" />תוספת 20%</TH><TH><Op c="=" />סה"כ עלות</TH>
-                  <TH><Op c="−" />משרד החינוך</TH><TH><Op c="−" />מענק הרשת</TH><TH><Op c="=" />פער מחושב</TH>
-                  <TH>העברה לחודש</TH><TH>העברה לשנה</TH>
+                  <TH>סניף</TH><TH>תכנון שנתי</TH><TH>בוצע עד כה</TH><TH>תכנון שנתי</TH><TH>בוצע עד כה</TH>
+                  <TH>תכנון שנתי</TH><TH>התקבל עד כה</TH><TH>לשנה</TH><TH>מחושב לשנה</TH><TH>לחודש</TH><TH>לשנה</TH>
                 </tr>
               </thead>
               <tbody>
-                {baseRows.map(r => (
-                  <tr key={'base-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
-                    <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }}>{r.name}
-                      {(r.fromSeptember || r.src) && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3, color:'#8a6d1f', background:'#FBF6E6', borderColor:'#EBDDA8' }}>{r.src || 'אינו בדוח — לפי ספטמבר בפועל'}</span>}
-                      {r.hourlyYear > 0 && <span className="bl-tag" title="הדוח מ-23.9 הוא עלות הוראה בלבד; הצהרון נוסף לתכנון לפי שעות המשרה" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3 }}>כולל צהרון {num(r.hourlyYear)} לשנה</span>}</th>
-                    <td style={td}>{num(r.annual)}</td>
-                    <td style={{ ...td, color:'var(--text2)' }}>{num(r.add20)}</td>
-                    <td style={{ ...td, fontWeight:800 }}>{num(r.total)}</td>
-                    <td style={td}>{num(r.ministry)}</td>
-                    <td style={td}>{canEditBase ? baseInput(r.id, 'supportYear', r.supportYear, `מענק הרשת לשנה, ${r.name}`) : num(r.supportYear)}</td>
-                    <td style={td}>{num(r.gap)}</td>
+                {baseRows.map(r => { const y = ytdOf(r.id); return (
+                  <tr key={'base-' + r.id}>
+                    <th scope="row" style={{ padding:'8px 8px', fontWeight:700, textAlign:'start', fontSize:15.5 }} title={r.name}>{r.name.replace(/^(שלהבות|בית חינוך) /, '')}
+                      {(r.fromSeptember || r.src) && <span className="bl-tag" style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3, color:'#8a6d1f', background:'#FBF6E6', borderColor:'#EBDDA8' }}>{r.src ? 'תקציב 24.9' : 'לפי ספטמבר'}</span>}
+                      {r.hourlyYear > 0 && <span className="bl-tag" title={`הדוח מ-23.9 הוא עלות הוראה בלבד; הצהרון (${num(r.hourlyYear)} לשנה) נוסף לתכנון לפי שעות המשרה`} style={{ display:'block', width:'fit-content', marginInlineStart:0, marginTop:3 }}>כולל צהרון</span>}</th>
+                    <td style={tdP}>{num(r.annual)}</td>
+                    <td className={y.n ? ytdCls(y.actSal, y.planSal) : undefined} style={tdP}>{y.n ? <Ytd v={y.actSal} plan={y.planSal} /> : '—'}</td>
+                    <td style={{ ...tdP, color:'var(--text2)' }}>{num(r.add20)}</td>
+                    <td className={y.n ? ytdCls(y.act20, y.plan20) : undefined} style={tdP}>{y.n ? <Ytd v={y.act20} plan={y.plan20} /> : '—'}</td>
+                    <td style={tdP}>{num(r.ministry)}</td>
+                    <td className={y.n ? ytdCls(y.actMin, y.planMin, true, y.noMin === y.n) : undefined} style={tdP} title={y.noMin ? `ב-${y.noMin} מתוך ${y.n} חודשים טרם התקבל` : undefined}>{y.n ? <Ytd v={y.actMin} plan={y.planMin} income wait={y.noMin === y.n} /> : '—'}</td>
+                    <td style={tdP}>{canEditBase ? baseInput(r.id, 'supportYear', r.supportYear, `מענק הרשת לשנה, ${r.name}`) : num(r.supportYear)}</td>
+                    <td style={tdP}>{num(r.gap)}</td>
                     <td className={cellCls(r.year == null ? 'mid' : r.year >= r.gap ? 'ok' : 'bad')} title={r.year == null ? 'טרם סוכמה העברה' : r.year >= r.gap ? `ההעברה לשנה מכסה את הפער המחושב; עודף ${num(r.year - r.gap)}` : `ההעברה לשנה נמוכה מהפער המחושב ב-${num(r.gap - r.year)}`}
-                      style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{canEditBase ? baseInput(r.id, 'transfer', r.month, `העברת הסניף לחודש, ${r.name}`) : num(r.month)}</td>
-                    <td style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{num(r.year)}</td>
+                      style={{ ...tdP, fontWeight:800, color:'var(--purple)' }}>{canEditBase ? baseInput(r.id, 'transfer', r.month, `העברת הסניף לחודש, ${r.name}`) : num(r.month)}</td>
+                    <td style={{ ...tdP, fontWeight:800, color:'var(--purple)' }}>{num(r.year)}</td>
                   </tr>
-                ))}
+                ); })}
               </tbody>
               <tfoot>
                 <tr>
-                  <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  {['annual', 'add20', 'total', 'ministry', 'supportYear', 'gap', 'month', 'year'].map(k => <td key={k} style={td}>{num(baseTot[k])}</td>)}
+                  <td style={{ padding:'10px 8px' }}>סה"כ</td>
+                  <td style={tdP}>{num(baseTot.annual)}</td>
+                  <td className={ytdCls(ytdTot.actSal, ytdTot.planSal)} style={tdP}><Ytd v={ytdTot.actSal} plan={ytdTot.planSal} /></td>
+                  <td style={tdP}>{num(baseTot.add20)}</td>
+                  <td className={ytdCls(ytdTot.act20, ytdTot.plan20)} style={tdP}><Ytd v={ytdTot.act20} plan={ytdTot.plan20} /></td>
+                  <td style={tdP}>{num(baseTot.ministry)}</td>
+                  <td className={ytdCls(ytdTot.actMin, ytdTot.planMin, true)} style={tdP}><Ytd v={ytdTot.actMin} plan={ytdTot.planMin} income /></td>
+                  <td style={tdP}>{num(baseTot.supportYear)}</td>
+                  <td style={tdP}>{num(baseTot.gap)}</td>
+                  <td style={tdP}>{num(baseTot.month)}</td>
+                  <td style={tdP}>{num(baseTot.year)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -6080,10 +6106,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <CardRow label="העברת הסניף לחודש" strong color="var(--purple)">{canEditBase ? baseInput(r.id, 'transfer', r.month, `העברת הסניף לחודש, ${r.name}`) : num(r.month)}</CardRow>
                 <CardRow label="העברה לשנה" color="var(--purple)">{num(r.year)}</CardRow>
                 <CardRow label="מענק הרשת לשנה">{canEditBase ? baseInput(r.id, 'supportYear', r.supportYear, `מענק הרשת לשנה, ${r.name}`) : num(r.supportYear)}</CardRow>
-                <CardRow label={r.hourlyYear > 0 ? `עלות הוראה לשנה (כולל צהרון ${num(r.hourlyYear)})` : 'עלות הוראה לשנה'}>{num(r.annual)}</CardRow>
-                <CardRow label="תוספת 20%">{num(r.add20)}</CardRow>
-                <CardRow label="סה״כ עלות">{num(r.total)}</CardRow>
-                <CardRow label="משרד החינוך">{num(r.ministry)}</CardRow>
+                <CardRow label={r.hourlyYear > 0 ? `עלות הוראה — תכנון שנתי (כולל צהרון ${num(r.hourlyYear)})` : 'עלות הוראה — תכנון שנתי'}>{num(r.annual)}</CardRow>
+                <CardRow label="עלות הוראה — בוצע עד כה"><Ytd v={ytdOf(r.id).actSal} plan={ytdOf(r.id).planSal} /></CardRow>
+                <CardRow label="תוספת 20% — תכנון שנתי">{num(r.add20)}</CardRow>
+                <CardRow label="תוספת 20% — בוצע עד כה"><Ytd v={ytdOf(r.id).act20} plan={ytdOf(r.id).plan20} /></CardRow>
+                <CardRow label="משרד החינוך — תכנון שנתי">{num(r.ministry)}</CardRow>
+                <CardRow label="משרד החינוך — התקבל עד כה"><Ytd v={ytdOf(r.id).actMin} plan={ytdOf(r.id).planMin} income wait={ytdOf(r.id).noMin === ytdOf(r.id).n} /></CardRow>
                 <CardRow label="פער מחושב">{num(r.gap)}</CardRow>
               </div>
             ))}
@@ -6096,8 +6124,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
             </div>
           </div>
           <p style={{ fontSize:14.6, color:'var(--text2)', marginTop:10, lineHeight:1.7 }}>
-            <b>פער מחושב</b> — סה״כ העלות פחות משרד החינוך ופחות מענק הרשת. <b>העברה לשנה</b> — ההעברה החודשית × 12.
-            {' '}סניף שהעברתו נמוכה מהפער המחושב חלקי 12 יופיע בטבלת החודש עם "חסר" כבר בתכנון.
+            <b>בוצע עד כה</b> — מצטבר מתחילת השנה עד {months.length ? fmtMonth(months[months.length - 1].key) : ''} ({months.length === 1 ? 'חודש אחד' : `${months.length} חודשים`}). הצבע משווה אותו לחלק היחסי של התכנון השנתי לאותם חודשים: ירוק — עומד, כתום — חריגה עד 5% או שמשרד החינוך טרם התקבל, אדום — מעבר לזה.
+            {' '}<b>פער מחושב</b> — עלות ההוראה + 20% − משרד החינוך − מענק הרשת. משבצת ההעברה ירוקה כשההעברה לשנה מכסה אותו.
           </p>
 
           {/* סגירת החודש — לשרה בלבד. האישור בתוך הדף, עם מה שייקרה */}
