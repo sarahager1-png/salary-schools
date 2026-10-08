@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 135;
+const BUILD = 136;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5482,9 +5482,16 @@ function BottomLineView({ activeMonth, viewer = false }) {
             <div className="bl-tile t-res"><p className="l"><span className="op" aria-hidden="true">=</span>נשאר</p>
               <p className="v"><Left v={-beforeSum} /></p>
               <p className="s">אחרי השכר של החודש{summed.filter(r => minInfo(r).key === 'none').length ? `; ${summed.filter(r => minInfo(r).key === 'none').length} סניפים עוד בלי תקבול` : ''}</p></div>
-            <div className="bl-tile t-res"><p className="l">לאיפוס החודש</p>
-              <p className="v num" style={{ color: zeroRows > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>{zeroRows > 0 ? num(zeroRows) : 'מאופס'}</p>
-              <p className="s">{zeroRows > 0 ? `להעביר לסניפים שבמינוס; נשאר ${num(surplusRows)} בסניפים שבעודף` : `נשאר ${num(surplusRows)} בעודף`}</p></div>
+            {/*
+              "אני צריכה סכום כללי שהרשת מעבירה לסגור ספטמבר. מה שהתחייבה כמענק פחות
+              הזכות או החובה" (שרה, 8.10): מספר אחד לכל הרשת — המענק שהתחייבה, פחות
+              העודף בסניפים שבזכות ועוד החוסר בסניפים שבחובה. מחליף את "לאיפוס החודש",
+              שהציג רק את החוסרים והשאיר את הזכות בצד.
+            */}
+            <div className="bl-tile t-res" title={`מענק ${num(tot.support)} − זכות ${num(surplusRows)} + חובה ${num(zeroRows)}`}>
+              <p className="l">הרשת מעבירה לסגירת {cur ? shortMonth(cur.key) : 'החודש'}</p>
+              <p className="v num">{num(tot.support - surplusRows + zeroRows)}</p>
+              <p className="s">מענק {num(tot.support)} פחות זכות {num(surplusRows)}{zeroRows > 0 ? ` ועוד חובה ${num(zeroRows)}` : ''}{rows.length > summed.length ? ` · בלי ${rows.length - summed.length} סניפים שחסר להם תקציב משרד החינוך` : ''}</p></div>
             <div className="bl-tile t-res t-final"><p className="l">מתחילת השנה</p>
               <p className="v">{isBase ? <span style={{ fontSize:20, color:'var(--text2)' }}>חודש הבסיס</span> : <Credit v={runningRows} />}</p>
               <p className="s">{isBase ? `${fmtMonth(baseMonth.key)} = 100%` : <>שכר: <Saved v={saveTotalNet()} /></>}</p></div>
