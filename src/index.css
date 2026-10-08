@@ -1381,3 +1381,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .big-table.pva tbody tr:hover th[scope="row"] { background: #E2D8F5 !important; }
 .big-table.pva thead tr:not(.bl-groups) th:first-child, .big-table.pva tr.bl-groups th:first-child { background: #E2D8F5 !important; color: #3A1F6E; }
 .big-table.pva tfoot td:first-child { background: #4B2A85 !important; color: #fff !important; }
+/* "תמרכז" (שרה, 8.10): שמות הסניפים, הכותרת "סניף" ו"סה"כ" ממורכזים בעמודה */
+.big-table.pva tbody th[scope="row"], .big-table.pva thead th:first-child, .big-table.pva tfoot td:first-child {
+  text-align: center !important; padding-inline: 6px !important; }
+.big-table.pva tbody th[scope="row"] .bl-tag { margin-inline: auto !important; }
