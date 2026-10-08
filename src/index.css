@@ -1373,3 +1373,11 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .bl-tile.t-clean .v { font-size: 26px; margin-top: 4px; }
 .bl-tile.t-clean .s { margin-top: 4px; }
 @media (max-width: 1100px) { .bl-tile.t-clean .v { font-size: 24px; } }
+/* "תצבע לנראות" (שרה, 8.10): עמודת הסניף צבועה בסגול בהיר בכל טבלאות דף המנכ"ל, כדי שהשורה תיקרא ממנה */
+.big-table.pva tbody tr th[scope="row"], .big-table.pva tbody tr:nth-child(even) th[scope="row"],
+.big-table.pvam tbody tr th[scope="row"], .big-table.pvam tbody tr:nth-child(even) th[scope="row"],
+.big-table.pvab tbody tr th[scope="row"], .big-table.pvab tbody tr:nth-child(even) th[scope="row"] {
+  background: #EDE6F9 !important; color: #3A1F6E; border-inline-end: 2px solid #CFC2EC; }
+.big-table.pva tbody tr:hover th[scope="row"] { background: #E2D8F5 !important; }
+.big-table.pva thead tr:not(.bl-groups) th:first-child, .big-table.pva tr.bl-groups th:first-child { background: #E2D8F5 !important; color: #3A1F6E; }
+.big-table.pva tfoot td:first-child { background: #4B2A85 !important; color: #fff !important; }
