@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 145;
+const BUILD = 146;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5634,11 +5634,18 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const pvaTot = pvaRows.reduce((a, { p }) => { if (p) for (const k of Object.keys(a)) a[k] += p[k] || 0; return a; },
     { planSal: 0, actSal: 0, plan20: 0, act20: 0, planMin: 0, actMin: 0, grant: 0, transfer: 0, planGap: 0, actGap: 0 });
   // הוצאה: ירוק כשהביצוע אינו מעל התכנון (עד חצי אחוז נחשב עמידה); הכנסה: ירוק כשאינה מתחתיו
-  const Act = ({ v, plan, income = false }) => { const d = v - plan, tol = Math.abs(plan) * 0.005;
-    const good = income ? d >= -tol : d <= tol;
+  /*
+    "פער לטובה ירוק וכו'" (שרה, 8.10): כל פער צבוע — לטובה ירוק, חריגה קטנה (עד 5%) כתום, מעבר לזה אדום.
+    בהוצאה "לטובה" = ביצוע לא מעל התכנון; בהכנסה = לא מתחתיו. gapSt: עודף/מאוזן ירוק, חסר אדום.
+  */
+  const actSt = (v, plan, income = false) => { const d = income ? plan - v : v - plan, tol = Math.abs(plan) * 0.005;
+    return d <= tol ? 'ok' : d <= Math.abs(plan) * 0.05 ? 'mid' : 'bad'; };
+  const ST_COLOR = { ok: 'var(--ok-text)', mid: '#8F4E00', bad: 'var(--danger-text)' };
+  const gapSt = v => (Math.round(v) <= 0 ? 'ok' : 'bad');
+  const Act = ({ v, plan, income = false }) => { const d = v - plan, c = ST_COLOR[actSt(v, plan, income)];
     return (<span title={`${d >= 0 ? '+' : '−'}${num(Math.abs(d))} מול התכנון`} style={{ display:'block' }}>
-      <span className="num" style={{ fontWeight:800, color: good ? 'var(--ok-text)' : 'var(--danger-text)' }}>{num(v)}</span>
-      {Math.round(d) !== 0 && <bdi dir="ltr" className="num" style={{ display:'block', fontSize:14, fontWeight:600, color:'var(--text2)' }}>{d > 0 ? '+' : '−'}{num(Math.abs(d))}</bdi>}
+      <span className="num" style={{ fontWeight:800, color: c }}>{num(v)}</span>
+      {Math.round(d) !== 0 && <bdi dir="ltr" className="num" style={{ display:'block', fontSize:14, fontWeight:700, color: c }}>{d > 0 ? '+' : '−'}{num(Math.abs(d))}</bdi>}
     </span>); };
   // פער: חיובי = חסר (העלות גבוהה מהכיסוי), שלילי = עודף
   const GapV = ({ v }) => Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>מאוזן</span>
@@ -5660,6 +5667,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   // השוואה: לכל סניף — סך החיסכון/החריגה בשכר מול התכנון, וסך הפער, בכל החודשים שמוצגים
   const yearOf = id => months.reduce((a, m) => { const p = pvaIn(m, id); return p ? { sal: a.sal + (p.planSal - p.actSal), plan: a.plan + p.planSal, gap: a.gap + p.actGap, planGap: a.planGap + p.planGap } : a; }, { sal: 0, plan: 0, gap: 0, planGap: 0 });
   const yearNet = months.reduce((a, m) => { const x = pvaNet(m); return { sal: a.sal + (x.planSal - x.actSal), plan: a.plan + x.planSal, gap: a.gap + x.actGap, planGap: a.planGap + x.planGap }; }, { sal: 0, plan: 0, gap: 0, planGap: 0 });
+  const salSt = salPct == null ? 'ok' : actSt(pvaTot.actSal, pvaTot.planSal);   // אותו צבע של הכרטיסייה והטבלה
   const PlanNote = ({ cost, plan, block = true }) => { const t = targetOf(cost, plan); if (!t) return null;
     const st = { display: block ? 'block' : 'inline', fontSize:14, fontWeight:700, marginTop: block ? 2 : 0, marginInlineStart: block ? 0 : 8 };
     if (Math.round(t.over) === 0) return <span style={{ ...st, color:'var(--ok-text)' }}>כמו בתכנון</span>;
@@ -5701,7 +5709,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
       {cur && (
         <>
           {/* התשובה — עלות השכר בביצוע מול התכנון מנתוני הבסיס */}
-          <section className="bl-hero" data-state={salOver ? 'over' : 'ok'} aria-live="polite">
+          <section className="bl-hero" data-state={salSt === 'bad' ? 'over' : 'ok'} aria-live="polite">
             {salPct != null && (
               <div className="bl-ring" role="img" aria-label={`עלות השכר בביצוע היא ${salPct}% מהתכנון`}>
                 <svg viewBox="0 0 120 120" aria-hidden="true">
@@ -5712,7 +5720,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   </defs>
                   <circle cx="60" cy="60" r="52" fill="none" stroke="var(--fill2)" strokeWidth="10" />
                   <circle key={sel} className="bl-ring-prog" cx="60" cy="60" r="52" fill="none" strokeWidth="10" strokeLinecap="round"
-                    stroke={salOver ? 'var(--danger-text)' : 'url(#blGrad)'}
+                    stroke={salSt === 'bad' ? 'var(--danger-text)' : salSt === 'mid' ? '#C77700' : 'url(#blGrad)'}
                     strokeDasharray={RING} strokeDashoffset={RING * (1 - Math.min(salPct, 100) / 100)} />
                 </svg>
                 <div className="bl-ring-num"><b className="num">{salPct}%</b><span>מהתכנון</span></div>
@@ -5722,12 +5730,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <p className="bl-eyebrow">{fmtMonth(sel)}</p>
               {salPct != null ? (
                 <>
-                  <h2 className="bl-verdict" style={{ color: salOver ? 'var(--danger-text)' : 'var(--text)' }}>
-                    {salOver ? 'השכר חורג מהתכנון' : salOn ? 'השכר עומד בתכנון' : 'השכר מתחת לתכנון'}
+                  <h2 className="bl-verdict" style={{ color: salSt === 'ok' ? 'var(--text)' : ST_COLOR[salSt] }}>
+                    {salSt === 'bad' ? 'השכר חורג מהתכנון' : salSt === 'mid' ? 'השכר מעט מעל התכנון' : salOn ? 'השכר עומד בתכנון' : 'השכר מתחת לתכנון'}
                   </h2>
                   <p className="bl-line">
                     עלות השכר בביצוע <b className="num">{num(pvaTot.actSal)}</b>, מול <b className="num">{num(pvaTot.planSal)}</b> בתכנון
-                    {pvaTot.actSal > pvaTot.planSal ? <> — גבוה ב-<b className="num" style={{ color: salOver ? 'var(--danger-text)' : 'var(--text)' }}>{num(pvaTot.actSal - pvaTot.planSal)}</b>{salOver ? '' : ' (בתוך 1%)'}.</>
+                    {pvaTot.actSal > pvaTot.planSal ? <> — גבוה ב-<b className="num" style={{ color: ST_COLOR[salSt] }}>{num(pvaTot.actSal - pvaTot.planSal)}</b>{salSt === 'mid' ? ' (חריגה קטנה, עד 5%)' : ''}.</>
                       : <> — נמוך ב-<b className="num" style={{ color:'var(--ok-text)' }}>{num(pvaTot.planSal - pvaTot.actSal)}</b>.</>}
                     {' '}הפער לחודש: <GapV v={pvaTot.actGap} /> (בתכנון: <GapV v={pvaTot.planGap} />).
                   </p>
@@ -5761,12 +5769,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
 
           {/* שש כרטיסיות, אותו חשבון של הטבלה: שכר + 20% − משרד החינוך − מענק והעברות = הפער; בכל אחת ביצוע ומתחתיו התכנון */}
           <div className="bl-eq" role="group" aria-label="החשבון החודשי של הרשת — ביצוע מול תכנון">
-            <div className="bl-tile t-cost"><p className="l">עלות השכר — ביצוע</p><p className="v num">{num(pvaTot.actSal)}</p>
+            <div className="bl-tile t-cost"><p className="l">עלות השכר — ביצוע</p><p className="v num" style={{ color: ST_COLOR[actSt(pvaTot.actSal, pvaTot.planSal)] }}>{num(pvaTot.actSal)}</p>
               <p className="s">תכנון {num(pvaTot.planSal)}<PlanNote cost={pvaTot.actSal} plan={pvaTot.planSal} block={false} /></p></div>
-            <div className="bl-tile t-cost"><p className="l"><span className="op" aria-hidden="true">+</span>ה-20% — ביצוע</p><p className="v num">{num(pvaTot.act20)}</p>
+            <div className="bl-tile t-cost"><p className="l"><span className="op" aria-hidden="true">+</span>ה-20% — ביצוע</p><p className="v num" style={{ color: ST_COLOR[actSt(pvaTot.act20, pvaTot.plan20)] }}>{num(pvaTot.act20)}</p>
               <p className="s">תכנון {num(pvaTot.plan20)}<PlanNote cost={pvaTot.act20} plan={pvaTot.plan20} block={false} /></p></div>
             <div className="bl-tile t-inc" title={noMinN ? `טרם התקבל: ${pvaRows.filter(x => x.p?.noMin).map(x => shortName(x.r.name)).join(', ')}` : undefined}>
-              <p className="l"><span className="op" aria-hidden="true">−</span>משרד החינוך — התקבל</p><p className="v num">{num(pvaTot.actMin)}</p>
+              <p className="l"><span className="op" aria-hidden="true">−</span>משרד החינוך — התקבל</p><p className="v num" style={{ color: ST_COLOR[actSt(pvaTot.actMin, pvaTot.planMin, true)] }}>{num(pvaTot.actMin)}</p>
               <p className="s">תכנון {num(pvaTot.planMin)}{noMinN ? ` · ${noMinN} סניפים טרם` : ''}</p></div>
             <div className="bl-tile t-inc" title="הסכומים שבטבלת נתוני הבסיס: מענק הרשת (החלק ה-12) והעברות הסניפים">
               <p className="l"><span className="op" aria-hidden="true">−</span>מענק הרשת + העברות הסניפים</p><p className="v num">{num(pvaTot.grant + pvaTot.transfer)}</p>
@@ -5830,12 +5838,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
                         <PlanNote cost={p.actSal} plan={p.planSal} />
                       </td>
                     ) : (
-                      <td key={key} style={{ ...td, fontWeight: key === sel ? 800 : 500 }} title={p.noMin ? 'משרד החינוך טרם התקבל' : undefined}>
+                      <td key={key} className={cellCls(gapSt(p.actGap))} style={{ ...td, fontWeight: key === sel ? 800 : 500 }} title={p.noMin ? 'משרד החינוך טרם התקבל' : undefined}>
                         <GapV v={p.actGap} />
                         {p.noMin && <span style={{ display:'block', fontSize:14, fontWeight:600, color:'#8F4E00', marginTop:2 }}>טרם התקבל</span>}
                       </td>
                     ); })}
-                    <td className={cmpKind === 'salary' ? yearCls(y) : undefined} style={{ ...td, fontWeight:800 }}>{cmpKind === 'salary' ? <SavedP v={y.sal} /> : <GapV v={y.gap} />}</td>
+                    <td className={cmpKind === 'salary' ? yearCls(y) : cellCls(gapSt(y.gap))} style={{ ...td, fontWeight:800 }}>{cmpKind === 'salary' ? <SavedP v={y.sal} /> : <GapV v={y.gap} />}</td>
                   </tr>
                 ); })}
               </tbody>
@@ -5849,9 +5857,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
                       <PlanNote cost={x.actSal} plan={x.planSal} />
                     </td>
                   ) : (
-                    <td key={key} style={td}><GapV v={x.actGap} /></td>
+                    <td key={key} className={cellCls(gapSt(x.actGap))} style={td}><GapV v={x.actGap} /></td>
                   ); })}
-                  <td className={cmpKind === 'salary' ? yearCls(yearNet) : undefined} style={td}>{cmpKind === 'salary' ? <SavedP v={yearNet.sal} /> : <GapV v={yearNet.gap} />}</td>
+                  <td className={cmpKind === 'salary' ? yearCls(yearNet) : cellCls(gapSt(yearNet.gap))} style={td}>{cmpKind === 'salary' ? <SavedP v={yearNet.sal} /> : <GapV v={yearNet.gap} />}</td>
                 </tr>
               </tfoot>
             </table>
@@ -5907,17 +5915,17 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <th scope="row" style={{ padding:'10px 8px', fontWeight:700, textAlign:'start', fontSize:15.5 }} title={r.name}>{shortName(r.name).replace(/^שלהבות /, '')}</th>
                     {!p ? <td colSpan={10} style={{ ...tdP, color:'var(--text2)' }}>אין לסניף נתוני בסיס</td> : (<>
                       <td style={tdP}>{num(p.planSal)}</td>
-                      <td style={tdP}><Act v={p.actSal} plan={p.planSal} /></td>
+                      <td className={cellCls(actSt(p.actSal, p.planSal))} style={tdP}><Act v={p.actSal} plan={p.planSal} /></td>
                       <td style={{ ...tdP, color:'var(--text2)' }}>{num(p.plan20)}</td>
-                      <td style={tdP}><Act v={p.act20} plan={p.plan20} /></td>
+                      <td className={cellCls(actSt(p.act20, p.plan20))} style={tdP}><Act v={p.act20} plan={p.plan20} /></td>
                       <td style={tdP}>{num(p.planMin)}</td>
-                      <td style={tdP}>{p.noMin
+                      <td className={cellCls(p.noMin ? 'mid' : actSt(p.actMin, p.planMin, true))} style={tdP}>{p.noMin
                         ? <span style={{ color:'#8F4E00', fontWeight:700 }}>0<span className="bl-tag" style={{ display:'block', width:'fit-content', margin:'3px auto 0', color:'#8F4E00', background:'var(--warn-bg)', borderColor:'var(--warn-line)' }}>טרם התקבל</span></span>
                         : <Act v={p.actMin} plan={p.planMin} income />}</td>
                       <td style={tdP}>{num(p.grant)}</td>
                       <td style={{ ...tdP, fontWeight:700, color:'var(--purple)' }}>{num(p.transfer)}</td>
-                      <td style={tdP}><GapV v={p.planGap} /></td>
-                      <td style={tdP}><GapV v={p.actGap} /></td>
+                      <td className={cellCls(gapSt(p.planGap))} style={tdP}><GapV v={p.planGap} /></td>
+                      <td className={cellCls(gapSt(p.actGap))} style={tdP}><GapV v={p.actGap} /></td>
                     </>)}
                   </tr>
                 ))}
@@ -5926,15 +5934,15 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
                   <td style={tdP}>{num(pvaTot.planSal)}</td>
-                  <td style={tdP}><Act v={pvaTot.actSal} plan={pvaTot.planSal} /></td>
+                  <td className={cellCls(actSt(pvaTot.actSal, pvaTot.planSal))} style={tdP}><Act v={pvaTot.actSal} plan={pvaTot.planSal} /></td>
                   <td style={tdP}>{num(pvaTot.plan20)}</td>
-                  <td style={tdP}><Act v={pvaTot.act20} plan={pvaTot.plan20} /></td>
+                  <td className={cellCls(actSt(pvaTot.act20, pvaTot.plan20))} style={tdP}><Act v={pvaTot.act20} plan={pvaTot.plan20} /></td>
                   <td style={tdP}>{num(pvaTot.planMin)}</td>
-                  <td style={tdP}><Act v={pvaTot.actMin} plan={pvaTot.planMin} income /></td>
+                  <td className={cellCls(actSt(pvaTot.actMin, pvaTot.planMin, true))} style={tdP}><Act v={pvaTot.actMin} plan={pvaTot.planMin} income /></td>
                   <td style={tdP}>{num(pvaTot.grant)}</td>
                   <td style={tdP}>{num(pvaTot.transfer)}</td>
-                  <td style={tdP}><GapV v={pvaTot.planGap} /></td>
-                  <td style={tdP}><GapV v={pvaTot.actGap} /></td>
+                  <td className={cellCls(gapSt(pvaTot.planGap))} style={tdP}><GapV v={pvaTot.planGap} /></td>
+                  <td className={cellCls(gapSt(pvaTot.actGap))} style={tdP}><GapV v={pvaTot.actGap} /></td>
                 </tr>
               </tfoot>
             </table>
@@ -6016,7 +6024,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     <td style={td}>{num(r.ministry)}</td>
                     <td style={td}>{canEditBase ? baseInput(r.id, 'supportYear', r.supportYear, `מענק הרשת לשנה, ${r.name}`) : num(r.supportYear)}</td>
                     <td style={td}>{num(r.gap)}</td>
-                    <td style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{canEditBase ? baseInput(r.id, 'transfer', r.month, `העברת הסניף לחודש, ${r.name}`) : num(r.month)}</td>
+                    <td className={cellCls(r.year == null ? 'mid' : r.year >= r.gap ? 'ok' : 'bad')} title={r.year == null ? 'טרם סוכמה העברה' : r.year >= r.gap ? `ההעברה לשנה מכסה את הפער המחושב; עודף ${num(r.year - r.gap)}` : `ההעברה לשנה נמוכה מהפער המחושב ב-${num(r.gap - r.year)}`}
+                      style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{canEditBase ? baseInput(r.id, 'transfer', r.month, `העברת הסניף לחודש, ${r.name}`) : num(r.month)}</td>
                     <td style={{ ...td, fontWeight:800, color:'var(--purple)' }}>{num(r.year)}</td>
                   </tr>
                 ))}
