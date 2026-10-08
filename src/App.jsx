@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 144;
+const BUILD = 145;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5643,6 +5643,31 @@ function BottomLineView({ activeMonth, viewer = false }) {
   // פער: חיובי = חסר (העלות גבוהה מהכיסוי), שלילי = עודף
   const GapV = ({ v }) => Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>מאוזן</span>
     : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>{v > 0 ? 'חסר ' : 'עודף '}{num(Math.abs(v))}</span>;
+  /*
+    "להעביר גם אותן למדידה מול התכנון? — כן" (שרה, 8.10.26): גם הכותרת, הכרטיסיות וההשוואה בין
+    החודשים נמדדות מול התכנון מנתוני הבסיס, ולא מול ספטמבר. אותו חישוב של טבלת החודש (pvaOf),
+    לכל חודש ולכל הרשת.
+  */
+  const PVA0 = () => ({ planSal: 0, actSal: 0, plan20: 0, act20: 0, planMin: 0, actMin: 0, grant: 0, transfer: 0, planGap: 0, actGap: 0 });
+  const pvaIn = (m, id) => { const b = m?.branches.find(x => x.id === id); return b ? pvaOf({ ...b, _key: m.key }) : null; };
+  const pvaNet = m => (m?.branches || []).reduce((a, b) => { const p = pvaOf({ ...b, _key: m.key }); if (p) for (const k of Object.keys(a)) a[k] += p[k] || 0; return a; }, PVA0());
+  const pvaCum = upTo.reduce((a, m) => { const x = pvaNet(m); for (const k of Object.keys(a)) a[k] += x[k]; return a; }, PVA0());
+  const salPct = pvaTot.planSal > 0 ? Math.round(pvaTot.actSal / pvaTot.planSal * 100) : null;
+  const salOver = salPct != null && pvaTot.actSal > pvaTot.planSal * 1.01;       // חריגה רק מעל 1% מהתכנון
+  const salOn = salPct != null && Math.abs(pvaTot.actSal - pvaTot.planSal) <= pvaTot.planSal * 0.01;
+  const cumSalPct = pvaCum.planSal > 0 ? Math.round(pvaCum.actSal / pvaCum.planSal * 100) : null;
+  const noMinN = pvaRows.filter(x => x.p?.noMin).length;
+  // השוואה: לכל סניף — סך החיסכון/החריגה בשכר מול התכנון, וסך הפער, בכל החודשים שמוצגים
+  const yearOf = id => months.reduce((a, m) => { const p = pvaIn(m, id); return p ? { sal: a.sal + (p.planSal - p.actSal), plan: a.plan + p.planSal, gap: a.gap + p.actGap, planGap: a.planGap + p.planGap } : a; }, { sal: 0, plan: 0, gap: 0, planGap: 0 });
+  const yearNet = months.reduce((a, m) => { const x = pvaNet(m); return { sal: a.sal + (x.planSal - x.actSal), plan: a.plan + x.planSal, gap: a.gap + x.actGap, planGap: a.planGap + x.planGap }; }, { sal: 0, plan: 0, gap: 0, planGap: 0 });
+  const PlanNote = ({ cost, plan, block = true }) => { const t = targetOf(cost, plan); if (!t) return null;
+    const st = { display: block ? 'block' : 'inline', fontSize:14, fontWeight:700, marginTop: block ? 2 : 0, marginInlineStart: block ? 0 : 8 };
+    if (Math.round(t.over) === 0) return <span style={{ ...st, color:'var(--ok-text)' }}>כמו בתכנון</span>;
+    return t.over < 0 ? <span className="num" style={{ ...st, color:'var(--ok-text)' }}>חסך {num(-t.over)}</span>
+      : <span className="num" style={{ ...st, color: t.state === 'bad' ? 'var(--danger-text)' : '#8F4E00' }}>חרג {num(t.over)}</span>; };
+  const SavedP = ({ v }) => Math.round(v) === 0 ? <span style={{ color:'var(--text2)', fontWeight:600 }}>כמו בתכנון</span>
+    : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--ok-text)' : 'var(--danger-text)' }}>{v > 0 ? 'חסך ' : 'חרג '}{num(Math.abs(v))}</span>;
+  const yearCls = y => cellCls(y.sal >= 0 ? 'ok' : -y.sal <= y.plan * 0.05 ? 'mid' : 'bad');
   // סימן החשבון ליד שם העמודה — כדי שהשורה תיקרא כתרגיל
   const Op = ({ c }) => <span aria-hidden="true" style={{ color:'var(--text3)', fontWeight:800, marginInlineEnd:4 }}>{c}</span>;
 
@@ -5675,10 +5700,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
 
       {cur && (
         <>
-          {/* התשובה */}
-          <section className="bl-hero" data-state={over || (usePct == null && net < 0) ? 'over' : 'ok'} aria-live="polite">
-            {usePct != null && (
-              <div className="bl-ring" role="img" aria-label={`עלות השכר בפועל היא ${usePct}% מהתכנון המשוער`}>
+          {/* התשובה — עלות השכר בביצוע מול התכנון מנתוני הבסיס */}
+          <section className="bl-hero" data-state={salOver ? 'over' : 'ok'} aria-live="polite">
+            {salPct != null && (
+              <div className="bl-ring" role="img" aria-label={`עלות השכר בביצוע היא ${salPct}% מהתכנון`}>
                 <svg viewBox="0 0 120 120" aria-hidden="true">
                   <defs>
                     <linearGradient id="blGrad" x1="0" y1="0" x2="1" y2="1">
@@ -5687,28 +5712,28 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   </defs>
                   <circle cx="60" cy="60" r="52" fill="none" stroke="var(--fill2)" strokeWidth="10" />
                   <circle key={sel} className="bl-ring-prog" cx="60" cy="60" r="52" fill="none" strokeWidth="10" strokeLinecap="round"
-                    stroke={over ? 'var(--danger-text)' : 'url(#blGrad)'}
-                    strokeDasharray={RING} strokeDashoffset={RING * (1 - Math.min(usePct, 100) / 100)} />
+                    stroke={salOver ? 'var(--danger-text)' : 'url(#blGrad)'}
+                    strokeDasharray={RING} strokeDashoffset={RING * (1 - Math.min(salPct, 100) / 100)} />
                 </svg>
-                <div className="bl-ring-num"><b className="num">{usePct}%</b><span>{isBase ? 'הבסיס' : `מ${fmtMonth(baseMonth.key)}`}</span></div>
+                <div className="bl-ring-num"><b className="num">{salPct}%</b><span>מהתכנון</span></div>
               </div>
             )}
             <div style={{ minWidth:0, flex:'1 1 320px' }}>
               <p className="bl-eyebrow">{fmtMonth(sel)}</p>
-              {usePct != null ? (
+              {salPct != null ? (
                 <>
-                  <h2 className="bl-verdict" style={{ color: over ? 'var(--danger-text)' : 'var(--text)' }}>
-                    {isBase ? `${fmtMonth(cur.key)} — חודש הבסיס` : over ? `חורגים מ${fmtMonth(baseMonth.key)}` : onPlan ? `כמו ${fmtMonth(baseMonth.key)}` : `מתחת ל${fmtMonth(baseMonth.key)}`}
+                  <h2 className="bl-verdict" style={{ color: salOver ? 'var(--danger-text)' : 'var(--text)' }}>
+                    {salOver ? 'השכר חורג מהתכנון' : salOn ? 'השכר עומד בתכנון' : 'השכר מתחת לתכנון'}
                   </h2>
                   <p className="bl-line">
-                    {isBase ? <>עלות השכר בפועל <b className="num">{num(planCost)}</b> — זה הבסיס (100%) שמולו נמדדים החודשים הבאים.</>
-                      : <>עלות השכר בפועל <b className="num">{num(planCost)}</b>, מול <b className="num">{num(planSum)}</b> ב{fmtMonth(baseMonth.key)}
-                    {planCost > planSum ? <> — גבוה ב-<b className="num" style={{ color: over ? 'var(--danger-text)' : 'var(--text)' }}>{num(planCost - planSum)}</b>{over ? '' : ' (בתוך 1%)'}.</>
-                          : <> — נמוך ב-<b className="num" style={{ color:'var(--ok-text)' }}>{num(planSum - planCost)}</b>.</>}</>}
+                    עלות השכר בביצוע <b className="num">{num(pvaTot.actSal)}</b>, מול <b className="num">{num(pvaTot.planSal)}</b> בתכנון
+                    {pvaTot.actSal > pvaTot.planSal ? <> — גבוה ב-<b className="num" style={{ color: salOver ? 'var(--danger-text)' : 'var(--text)' }}>{num(pvaTot.actSal - pvaTot.planSal)}</b>{salOver ? '' : ' (בתוך 1%)'}.</>
+                      : <> — נמוך ב-<b className="num" style={{ color:'var(--ok-text)' }}>{num(pvaTot.planSal - pvaTot.actSal)}</b>.</>}
+                    {' '}הפער לחודש: <GapV v={pvaTot.actGap} /> (בתכנון: <GapV v={pvaTot.planGap} />).
                   </p>
                 </>
               ) : (
-                <h2 className="bl-verdict">{net >= 0 ? 'ההעברות מכסות את הפער' : 'ההעברות אינן מכסות את הפער'}</h2>
+                <h2 className="bl-verdict">אין נתוני בסיס לחודש הזה</h2>
               )}
               <div className="bl-facts">
                 {cur?.frozenAt && (
@@ -5717,22 +5742,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     החודש נסגר ב-{new Date(cur.frozenAt).toLocaleDateString('he-IL')}
                   </span>
                 )}
-                {upTo.length > 1 && cumPct != null && (
-                  <span className="bl-fact">מתחילת השנה <b className="num" style={{ color: cumPct > 100 ? 'var(--danger-text)' : undefined }}>{cumPct}%</b></span>
+                {upTo.length > 1 && cumSalPct != null && (
+                  <span className="bl-fact" title="עלות השכר בביצוע מול התכנון, בכל החודשים עד החודש הזה">מתחילת השנה <b className="num" style={{ color: cumSalPct > 101 ? 'var(--danger-text)' : undefined }}>{cumSalPct}%</b> מהתכנון</span>
                 )}
-                {upTo.length > 1 && (
-                  <span className="bl-fact" title="התכנון פחות הבפועל בכל החודשים עד החודש הזה, יחד: זכות כששילמנו פחות מהתכנון, חובה כששילמנו יותר">
-                    מתחילת השנה <Credit v={runningNet} />
-                  </span>
-                )}
-                {usePct != null && (
-                  <span className="bl-fact" title="החודש הראשון במערכת הוא הבסיס: 100% = עלות השכר בפועל באותו חודש">
-                    הבסיס: {fmtMonth(baseMonth.key)} = 100%
-                  </span>
-                )}
+                <span className="bl-fact" title="התכנון הוא נתוני הבסיס שבטבלה למטה, חלקי 12">התכנון: נתוני הבסיס ÷ 12</span>
                 {simN > 0 && (
                   <span className="bl-fact" style={{ background:'var(--warn-bg)', borderColor:'var(--warn-line)', color:'#8F4E00', fontWeight:700 }}
-                    title="בסניפים האלה יש תיקוני ברוטו לפי התלושים שעוד לא אושרו במסך אישורים. עד האישור הם מוצגים לפי הסימולציה, ואינם נכללים באחוז.">
+                    title="בסניפים האלה יש תיקוני ברוטו לפי התלושים שעוד לא אושרו במסך אישורים. עד האישור הם מוצגים לפי הסימולציה.">
                     <b className="num">{simN}</b> סניפים עדיין לפי הסימולציה
                   </span>
                 )}
@@ -5743,44 +5759,24 @@ function BottomLineView({ activeMonth, viewer = false }) {
             </div>
           </section>
 
-          {/*
-            "תבדוק מה צריך ומה מיותר — הכי מעולה שאפשר" (שרה, 6.10). הכותרת כבר
-            אומרת סימולציה מול בפועל, ולכן שש הכרטיסיות שחזרו על אותם מספרים
-            הוחלפו ברצועה אחת — החשבון של הרשת, באותו סדר ובאותן מילים של הטבלה:
-            בפועל − משרד החינוך − מענק הרשת − הסניפים מעבירים = לפני הכרית; + כרית = כולל הכרית.
-          */}
-          {/*
-            "תעמיק מה הנתונים שצריכים פה" (שרה, 8.10): שישה כרטיסים, סיפור אחד —
-            כמה שילמנו ועמדנו ביעד; מה המשרד העביר ומי עוד לא; המענק (קבוע);
-            העברות הסניפים (קבוע) ומי העביר; כמה הרשת משלימה החודש; ומתחילת השנה.
-            "נשאר" ו"משרד + מענק יחד" ירדו — נתוני ביניים שיושבים בטבלה.
-          */}
-          <div className="bl-eq" role="group" aria-label="החשבון החודשי של הרשת">
-            <div className="bl-tile t-cost"><p className="l">עלות השכר בפועל</p><p className="v num">{num(sum('cost') + tzSum)}</p>
-              <p className="s" style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}><TargetBar cost={sum('cost') + tzSum} base={baseCostNet} isBaseMonth={isBase} /><TargetNote cost={sum('cost') + tzSum} base={baseCostNet} isBaseMonth={isBase} block={false} /></p></div>
-            <div className="bl-tile t-inc" title={summed.filter(r => minInfo(r).key === 'none').length ? `טרם התקבל: ${summed.filter(r => minInfo(r).key === 'none').map(r => shortName(r.name)).join(', ')}` : undefined}>
-              <p className="l">משרד החינוך — התקבל</p><p className="v num">{num(minSum)}</p>
-              <p className="s">{recvN === summed.length ? 'בכל הסניפים' : `ב-${recvN} מתוך ${summed.length} סניפים; ${summed.length - recvN} טרם`}</p></div>
-            {/* "מה עם מה שנשאר?" (שרה, 8.10): שני הקבועים אוחדו לכרטיס אחד, ו"נשאר" חזר */}
-            <div className="bl-tile t-inc" title={`מענק הרשת ${num(tot.support)} (החלק ה-12) + העברות הסניפים ${num(dealSum)} (הסכומים שסוכמו)`}>
-              <p className="l">כיסוי קבוע — מענק + סניפים</p><p className="v num">{num(tot.support + dealSum)}</p>
-              <p className="s">מענק {num(tot.support)} · סניפים {num(dealSum)}{summed.some(r => r.chabadPaid != null) ? ` · העבירו ${summed.filter(r => r.chabadPaid != null).length} מתוך ${summed.length}` : ''}</p></div>
-            <div className="bl-tile t-res"><p className="l"><span className="op" aria-hidden="true">=</span>נשאר</p>
-              <p className="v"><Left v={-beforeSum} /></p>
-              <p className="s">אחרי השכר של החודש{summed.filter(r => minInfo(r).key === 'none').length ? `; ${summed.filter(r => minInfo(r).key === 'none').length} סניפים עוד בלי תקבול` : ''}</p></div>
-            {/*
-              "אני צריכה סכום כללי שהרשת מעבירה לסגור ספטמבר. מה שהתחייבה כמענק פחות
-              הזכות או החובה" (שרה, 8.10): מספר אחד לכל הרשת — המענק שהתחייבה, פחות
-              העודף בסניפים שבזכות ועוד החוסר בסניפים שבחובה. מחליף את "לאיפוס החודש",
-              שהציג רק את החוסרים והשאיר את הזכות בצד.
-            */}
-            <div className="bl-tile t-res" title={`מענק ${num(tot.support)} − זכות ${num(surplusRows)} + חובה ${num(zeroRows)}`}>
-              <p className="l">הרשת מעבירה לסגירת {cur ? shortMonth(cur.key) : 'החודש'}</p>
-              <p className="v num">{num(tot.support - surplusRows + zeroRows)}</p>
-              <p className="s">מענק {num(tot.support)} פחות זכות {num(surplusRows)}{zeroRows > 0 ? ` ועוד חובה ${num(zeroRows)}` : ''}{rows.length > summed.length ? ` · בלי ${rows.length - summed.length} סניפים שחסר להם תקציב משרד החינוך` : ''}</p></div>
-            <div className="bl-tile t-res t-final"><p className="l">מתחילת השנה</p>
-              <p className="v">{isBase ? <span style={{ fontSize:20, color:'var(--text2)' }}>חודש הבסיס</span> : <Credit v={runningRows} />}</p>
-              <p className="s">{isBase ? `${fmtMonth(baseMonth.key)} = 100%` : <>שכר: <Saved v={saveTotalNet()} /></>}</p></div>
+          {/* שש כרטיסיות, אותו חשבון של הטבלה: שכר + 20% − משרד החינוך − מענק והעברות = הפער; בכל אחת ביצוע ומתחתיו התכנון */}
+          <div className="bl-eq" role="group" aria-label="החשבון החודשי של הרשת — ביצוע מול תכנון">
+            <div className="bl-tile t-cost"><p className="l">עלות השכר — ביצוע</p><p className="v num">{num(pvaTot.actSal)}</p>
+              <p className="s">תכנון {num(pvaTot.planSal)}<PlanNote cost={pvaTot.actSal} plan={pvaTot.planSal} block={false} /></p></div>
+            <div className="bl-tile t-cost"><p className="l"><span className="op" aria-hidden="true">+</span>ה-20% — ביצוע</p><p className="v num">{num(pvaTot.act20)}</p>
+              <p className="s">תכנון {num(pvaTot.plan20)}<PlanNote cost={pvaTot.act20} plan={pvaTot.plan20} block={false} /></p></div>
+            <div className="bl-tile t-inc" title={noMinN ? `טרם התקבל: ${pvaRows.filter(x => x.p?.noMin).map(x => shortName(x.r.name)).join(', ')}` : undefined}>
+              <p className="l"><span className="op" aria-hidden="true">−</span>משרד החינוך — התקבל</p><p className="v num">{num(pvaTot.actMin)}</p>
+              <p className="s">תכנון {num(pvaTot.planMin)}{noMinN ? ` · ${noMinN} סניפים טרם` : ''}</p></div>
+            <div className="bl-tile t-inc" title="הסכומים שבטבלת נתוני הבסיס: מענק הרשת (החלק ה-12) והעברות הסניפים">
+              <p className="l"><span className="op" aria-hidden="true">−</span>מענק הרשת + העברות הסניפים</p><p className="v num">{num(pvaTot.grant + pvaTot.transfer)}</p>
+              <p className="s">מענק {num(pvaTot.grant)} · סניפים {num(pvaTot.transfer)}</p></div>
+            <div className="bl-tile t-res"><p className="l"><span className="op" aria-hidden="true">=</span>הפער לחודש — ביצוע</p>
+              <p className="v"><GapV v={pvaTot.actGap} /></p>
+              <p className="s">תכנון: <GapV v={pvaTot.planGap} /></p></div>
+            <div className="bl-tile t-res t-final"><p className="l">הפער מתחילת השנה</p>
+              <p className="v"><GapV v={pvaCum.actGap} /></p>
+              <p className="s">תכנון: <GapV v={pvaCum.planGap} />{upTo.length > 1 ? ` · ${upTo.length} חודשים` : ''}</p></div>
           </div>
 
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:6 }}>
@@ -5795,96 +5791,89 @@ function BottomLineView({ activeMonth, viewer = false }) {
             )}
           </div>
           <p className="section-sub">{mode === 'compare'
-            ? (cmpKind === 'salary' ? `השכר של כל סניף בכל חודש מול ${fmtMonth(baseMonth.key)} (הבסיס); המשבצת צבועה לפי עמידה ביעד: ירוק לא יותר, כתום חריגה עד 5%, אדום יותר; ומתחת — כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.` : `מה נשאר בכל חודש אחרי השכר (משרד החינוך לפי תקבול בפועל בלבד), ומתחתיו ההפרש מול ${fmtMonth(baseMonth.key)}: זכות כשנשאר יותר, חובה כשנשאר פחות. היתרה המצטברת = סכום ההפרשים; בשורה האחרונה — כמה חסר לאיפוס בכל חודש.`)
+            ? (cmpKind === 'salary' ? 'השכר של כל סניף בכל חודש מול התכנון מנתוני הבסיס. המשבצת צבועה: ירוק — לא יותר מהתכנון, כתום — חריגה עד 5%, אדום — יותר; ומתחת כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.' : 'הפער של כל סניף בכל חודש בביצוע: שכר + 20% − משרד החינוך שהתקבל − מענק הרשת − העברת הסניף. "חסר" כשהעלות גבוהה מהכיסוי, "עודף" כשנשאר. בסוף: הפער המצטבר.')
             : <>לכל חלק תכנון מול ביצוע. התכנון מוזן מטבלת נתוני הבסיס שלמטה, חלקי 12. שכר + 20% − משרד החינוך − מענק הרשת − העברת הסניף = הפער לחודש: "חסר" כשהעלות גבוהה מהכיסוי, "עודף" כשנשאר. ביצוע ירוק = עמד בתכנון; אדום = חרג, ומתחתיו ההפרש. משרד החינוך בביצוע — רק מה שהתקבל בפועל.</>}</p>
           {mode === 'compare' ? (
           <>
           <div className="apple-seg no-print" role="group" aria-label="מה משווים" style={{ marginBottom:10 }}>
             <button onClick={() => setCmpKind('salary')} aria-pressed={cmpKind === 'salary'}
-              className={['apple-seg-item', cmpKind === 'salary' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>עמידה ביעד · שכר</button>
+              className={['apple-seg-item', cmpKind === 'salary' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>שכר מול התכנון</button>
             <button onClick={() => setCmpKind('cash')} aria-pressed={cmpKind === 'cash'}
-              className={['apple-seg-item', cmpKind === 'cash' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>מזומן · נשאר והשלמה</button>
+              className={['apple-seg-item', cmpKind === 'cash' ? 'active' : ''].join(' ')} style={{ padding:'6px 14px', fontSize:15, minHeight:40 }}>הפער לחודש</button>
           </div>
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
-            <table className="sticky-first big-table bl-table" style={{ width:'100%', borderCollapse:'collapse' }}>
-              <caption className="sr-only">{cmpKind === 'salary' ? 'מיפוי השנה לפי סניף: השכר בכל חודש מול ספטמבר, וסך החיסכון או החריגה' : 'מיפוי השנה לפי סניף: מה נשאר בכל חודש, ההפרש מול ספטמבר, היתרה המצטברת והשלמת הרשת'}</caption>
+            <table className="sticky-first big-table bl-table pva" style={{ width:'100%', borderCollapse:'collapse' }}>
+              <caption className="sr-only">{cmpKind === 'salary' ? 'מיפוי השנה לפי סניף: השכר בכל חודש מול התכנון, וסך החיסכון או החריגה' : 'מיפוי השנה לפי סניף: הפער בכל חודש בביצוע, והפער המצטבר'}</caption>
               <colgroup>
-                <col />{yearCols.map(c => <col key={c.key} className={c.key === sel ? 'g-res' : undefined} />)}
+                <col /><col className="g-cost" />{yearCols.map(c => <col key={c.key} className={c.key === sel ? 'g-res' : undefined} />)}
                 <col className="g-res g-sum" />
               </colgroup>
               <thead>
                 <tr>
                   <TH>סניף</TH>
-                  {yearCols.map(c => <TH key={c.key}>{shortMonth(c.key)}<span style={{ display:'block', fontSize:14, fontWeight:600, color: c.m ? undefined : 'var(--text3)' }}>{c.key === baseMonth.key ? 'הבסיס' : !c.m ? 'טרם' : c.m.frozenAt ? 'סגור' : 'פתוח'}</span></TH>)}
+                  <TH>תכנון לחודש<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{cmpKind === 'salary' ? 'שכר' : 'הפער'}</span></TH>
+                  {yearCols.map(c => <TH key={c.key}>{shortMonth(c.key)}<span style={{ display:'block', fontSize:14, fontWeight:600, color: c.m ? undefined : 'var(--text3)' }}>{!c.m ? 'טרם' : c.m.frozenAt ? 'סגור' : 'פתוח'}</span></TH>)}
                   {cmpKind === 'salary'
-                    ? <TH>סה"כ השנה<span style={{ display:'block', fontSize:14, fontWeight:600 }}>חסך / חרג מול {shortMonth(baseMonth.key)}</span></TH>
-                    : <TH>יתרה מצטברת<span style={{ display:'block', fontSize:14, fontWeight:600 }}>מול {shortMonth(baseMonth.key)}</span></TH>}
+                    ? <TH>סה"כ השנה<span style={{ display:'block', fontSize:14, fontWeight:600 }}>חסך / חרג מול התכנון</span></TH>
+                    : <TH>פער מצטבר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>ביצוע</span></TH>}
                 </tr>
               </thead>
               <tbody>
-                {cmpRows.map(r => (
+                {cmpRows.map(r => { const bd = baseById.get(r.id); const y = yearOf(r.id); return (
                   <tr key={'cmp-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
-                    {yearCols.map(({ key, m }) => { const isB = key === baseMonth.key; if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; return cmpKind === 'salary' ? (
-                      <td key={key} className={cellCls(isB ? 'ok' : statusOf(costIn(m, r.id), baseCostOf(r.id)))} style={{ ...td, fontWeight: key === sel ? 800 : 500 }}
-                        title={isB ? 'חודש הבסיס' : ({ ok:'עמד ביעד', mid:'כמעט — חריגה עד 5%', bad:'לא עמד' })[statusOf(costIn(m, r.id), baseCostOf(r.id))] || ''}>
-                        <span className="num">{costIn(m, r.id) == null ? '—' : num(costIn(m, r.id))}</span>
-                        <TargetNote cost={costIn(m, r.id)} base={baseCostOf(r.id)} isBaseMonth={isB} />
+                    <td style={{ ...td, color:'var(--text2)' }}>{!bd ? '—' : cmpKind === 'salary' ? num(bd.annual / 12) : <GapV v={(bd.annual + bd.add20 - bd.ministry - bd.supportYear) / 12 - (bd.month || 0)} />}</td>
+                    {yearCols.map(({ key, m }) => { const p = m ? pvaIn(m, r.id) : null; if (!p) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; return cmpKind === 'salary' ? (
+                      <td key={key} className={cellCls(statusOf(p.actSal, p.planSal))} style={{ ...td, fontWeight: key === sel ? 800 : 500 }}
+                        title={({ ok:'עמד בתכנון', mid:'כמעט — חריגה עד 5%', bad:'חרג מהתכנון' })[statusOf(p.actSal, p.planSal)] || ''}>
+                        <span className="num">{num(p.actSal)}</span>
+                        <PlanNote cost={p.actSal} plan={p.planSal} />
                       </td>
                     ) : (
-                      <td key={key} style={{ ...td, fontWeight: key === sel ? 800 : 500 }}>
-                        <Left v={leftIn(m, r.id)} />
-                        <span style={{ display:'block', fontSize:14, marginTop:2 }}>{isB ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={resultIn(m, r.id)} />}</span>
+                      <td key={key} style={{ ...td, fontWeight: key === sel ? 800 : 500 }} title={p.noMin ? 'משרד החינוך טרם התקבל' : undefined}>
+                        <GapV v={p.actGap} />
+                        {p.noMin && <span style={{ display:'block', fontSize:14, fontWeight:600, color:'#8F4E00', marginTop:2 }}>טרם התקבל</span>}
                       </td>
                     ); })}
-                    <td className={cmpKind === 'salary' ? cellCls(saveTotalOf(r.id) >= 0 ? 'ok' : -saveTotalOf(r.id) <= baseCostOf(r.id) * 0.05 ? 'mid' : 'bad') : undefined} style={{ ...td, fontWeight:800 }}>{cmpKind === 'salary' ? <Saved v={saveTotalOf(r.id)} /> : <Credit v={totalOf(r.id)} />}</td>
+                    <td className={cmpKind === 'salary' ? yearCls(y) : undefined} style={{ ...td, fontWeight:800 }}>{cmpKind === 'salary' ? <SavedP v={y.sal} /> : <GapV v={y.gap} />}</td>
                   </tr>
-                ))}
+                ); })}
               </tbody>
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
-                  {yearCols.map(({ key, m }) => { const isB = key === baseMonth.key; if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; return cmpKind === 'salary' ? (
-                    <td key={key} className={cellCls(isB ? 'ok' : statusOf(netCost(m), baseCostNet))} style={td}>
-                      <span className="num">{num(netCost(m))}</span>
-                      <TargetNote cost={netCost(m)} base={baseCostNet} isBaseMonth={isB} />
+                  <td style={td}>{cmpKind === 'salary' ? num(baseTot.annual / 12) : <GapV v={(baseTot.annual + baseTot.add20 - baseTot.ministry - baseTot.supportYear) / 12 - baseTot.month} />}</td>
+                  {yearCols.map(({ key, m }) => { if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; const x = pvaNet(m); return cmpKind === 'salary' ? (
+                    <td key={key} className={cellCls(statusOf(x.actSal, x.planSal))} style={td}>
+                      <span className="num">{num(x.actSal)}</span>
+                      <PlanNote cost={x.actSal} plan={x.planSal} />
                     </td>
                   ) : (
-                    <td key={key} style={td}><Left v={netLeft(m)} /><span style={{ display:'block', fontSize:14, marginTop:2 }}>{isB ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={netResult(m)} />}</span></td>
+                    <td key={key} style={td}><GapV v={x.actGap} /></td>
                   ); })}
-                  <td className={cmpKind === 'salary' ? cellCls(saveTotalNet() >= 0 ? 'ok' : -saveTotalNet() <= baseCostNet * 0.05 ? 'mid' : 'bad') : undefined} style={td}>{cmpKind === 'salary' ? <Saved v={saveTotalNet()} /> : <Credit v={totalNet} />}</td>
+                  <td className={cmpKind === 'salary' ? yearCls(yearNet) : undefined} style={td}>{cmpKind === 'salary' ? <SavedP v={yearNet.sal} /> : <GapV v={yearNet.gap} />}</td>
                 </tr>
-                {cmpKind === 'cash' && (
-                <tr>
-                  <td style={{ padding:'10px 12px', color:'var(--danger-text)' }}>לאיפוס החודש<span style={{ display:'block', fontSize:14, fontWeight:600 }}>החוסרים בסניפים</span></td>
-                  {yearCols.map(({ key, m }) => { if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; return <td key={key} style={{ ...td, fontWeight:800, color: zeroIn(m) > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }} title={`נשאר בעודף ${num(surplusIn(m))}`}>{zeroIn(m) > 0 ? num(zeroIn(m)) : 'מאופס'}</td>; })}
-                  <td style={{ ...td, fontWeight:800, color:'var(--danger-text)' }} title="סך החוסרים בכל החודשים">{num(months.reduce((a, m) => a + zeroIn(m), 0))}</td>
-                </tr>
-                )}
               </tfoot>
             </table>
           </div>
           <div className="only-mobile big-cards">
-            {cmpRows.map(r => (
+            {cmpRows.map(r => { const y = yearOf(r.id); return (
               <div key={'cmpm-' + r.id} className="apple-card mcard">
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
-                {yearCols.filter(c => c.m).map(({ key, m }) => { const isB = key === baseMonth.key; return cmpKind === 'salary' ? (
+                {yearCols.filter(c => c.m).map(({ key, m }) => { const p = pvaIn(m, r.id); if (!p) return null; return cmpKind === 'salary' ? (
                   <CardRow key={key} label={shortMonth(key)} strong={key === sel}>
-                    {!isB && <span style={{ marginInlineEnd:8 }}><Pill s={statusOf(costIn(m, r.id), baseCostOf(r.id))} /></span>}
-                    {costIn(m, r.id) == null ? '—' : num(costIn(m, r.id))}
-                    <TargetNote cost={costIn(m, r.id)} base={baseCostOf(r.id)} isBaseMonth={isB} block={false} />
+                    <span style={{ marginInlineEnd:8 }}><Pill s={statusOf(p.actSal, p.planSal)} /></span>
+                    {num(p.actSal)}
+                    <PlanNote cost={p.actSal} plan={p.planSal} block={false} />
                   </CardRow>
                 ) : (
-                  <CardRow key={key} label={shortMonth(key)} strong={key === sel}>
-                    <Left v={leftIn(m, r.id)} />
-                    <span style={{ fontSize:14, marginInlineStart:8 }}>{isB ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={resultIn(m, r.id)} />}</span>
-                  </CardRow>
+                  <CardRow key={key} label={shortMonth(key)} strong={key === sel}><GapV v={p.actGap} /></CardRow>
                 ); })}
                 {cmpKind === 'salary'
-                  ? <CardRow label="סה&quot;כ השנה מול הבסיס" strong><Saved v={saveTotalOf(r.id)} /></CardRow>
-                  : <CardRow label="יתרה מצטברת" strong><Credit v={totalOf(r.id)} /></CardRow>}
+                  ? <CardRow label="סה&quot;כ השנה מול התכנון" strong><SavedP v={y.sal} /></CardRow>
+                  : <CardRow label="פער מצטבר" strong><GapV v={y.gap} /></CardRow>}
               </div>
-            ))}
+            ); })}
           </div>
           </>
           ) : (
