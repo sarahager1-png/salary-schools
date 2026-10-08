@@ -367,6 +367,16 @@ export async function approveReport(ids) {
   return (data || []).map(rowToTeacher);
 }
 
+/* "אפשרות למחיקה מלאה" (שרה, 8.10.26): מחיקת דיווח שנדחה — ימי ושעות ההיעדרות, הסיבה,
+   האישור המצורף ומילוי המקום מתאפסים, והשורה יוצאת מתור האישור. העובד/ת עצמו/ה נשאר/ת. */
+export async function clearReports(ids) {
+  const { error } = await supabase.from('teacher_months').update({
+    absence_days: 0, absence_hours: 0, absence_reason: null, sick_form_path: null,
+    mm_hours: 0, mm_for: null, mm_from: null, mm_to: null, report_pending: false,
+  }).in('id', ids);
+  raise(error, 'מחיקת הדיווח נכשלה');
+}
+
 export async function netApprove(ids) {
   const { error } = await supabase.from('teacher_months').update({ net_approved: true }).in('id', ids);
   raise(error, 'האישור הרשתי נכשל');

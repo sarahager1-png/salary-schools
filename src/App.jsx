@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 140;
+const BUILD = 141;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -1027,7 +1027,7 @@ function ReportRejectDialog({ rows, label, monthLabel, schoolName, onCancel, onC
   );
 }
 
-function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose, fixes = [], onDecideFix, onDecideAllFixes = null, monthLabel = '', otherFixes = 0, onb = [], rejections = [], onRejectReports = null }) {
+function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose, fixes = [], onDecideFix, onDecideAllFixes = null, onClearReports = null, monthLabel = '', otherFixes = 0, onb = [], rejections = [], onRejectReports = null }) {
   // דיווחי מנהלות — השלב הראשון: בלי אישורה אין סימולציה ואין שכר (21.9.26)
   // מה-8.10.26: דיווח שחסר בו מסמך מוחזק ואינו בתור האישור; דיווח שנדחה ממתין לתיקון המנהלת
   const pendingAll = onApproveReport ? teachers.filter(reportPending) : [];
@@ -1250,11 +1250,25 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
               {rejected.length === 1 ? 'דיווח אחד נדחה' : `${rejected.length} דיווחים נדחו`} — ממתינים לתיקון המנהלת
             </p>
             <p style={{ fontSize:14, color:'var(--apple-text2)', marginBottom:10 }}>כשהמנהלת תתקן ותשמור, הדיווח יחזור לכאן לבדיקה.</p>
+            {onClearReports && rejected.length > 1 && (
+              <button className="apple-btn apple-btn-ghost" style={{ minHeight:42, fontSize:14.5, fontWeight:700, color:'var(--danger-text)', marginBottom:10 }}
+                onClick={() => { if (window.confirm(`למחוק לגמרי את ${rejected.length} הדיווחים שנדחו? ימי ושעות ההיעדרות, הסיבה, האישור המצורף ומילוי המקום יימחקו. העובדים עצמם נשארים.`)) onClearReports(rejected); }}>
+                <Trash2 size={15} strokeWidth={2.2} />מחיקה מלאה של כל הדיווחים ({rejected.length})
+              </button>
+            )}
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
               {rejected.map(t => { const r = rejectionOf(t, rejections); return (
-                <div key={t.id} style={{ border:'1px solid var(--line, #e5e5ea)', borderRadius:12, padding:'9px 12px', background:'var(--surface, #fff)' }}>
-                  <p style={{ fontWeight:600, fontSize:15.5 }}>{t.name} <span style={{ fontWeight:400, color:'var(--apple-text2)', fontSize:14 }}>· {shortName(schoolName(t.schoolId))}{repLine(t) ? ` · ${repLine(t)}` : ''}</span></p>
-                  <p style={{ fontSize:14.4, color:'var(--danger-text)', marginTop:2 }}>נדחה {new Date(r.created_at).toLocaleDateString('he-IL')}: {r.body}</p>
+                <div key={t.id} style={{ border:'1px solid var(--line, #e5e5ea)', borderRadius:12, padding:'9px 12px', background:'var(--surface, #fff)', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                  <div style={{ flex:'1 1 260px', minWidth:0 }}>
+                    <p style={{ fontWeight:600, fontSize:15.5 }}>{t.name} <span style={{ fontWeight:400, color:'var(--apple-text2)', fontSize:14 }}>· {shortName(schoolName(t.schoolId))}{repLine(t) ? ` · ${repLine(t)}` : ''}</span></p>
+                    <p style={{ fontSize:14.4, color:'var(--danger-text)', marginTop:2 }}>נדחה {new Date(r.created_at).toLocaleDateString('he-IL')}: {r.body}</p>
+                  </div>
+                  {onClearReports && (
+                    <button className="apple-btn apple-btn-ghost" style={{ minHeight:42, fontSize:14.5, fontWeight:700, color:'var(--danger-text)', flexShrink:0 }}
+                      onClick={() => { if (window.confirm(`למחוק לגמרי את הדיווח של ${t.name}? ימי ושעות ההיעדרות, הסיבה, האישור המצורף ומילוי המקום יימחקו. העובד/ת נשאר/ת.`)) onClearReports([t]); }}>
+                      <Trash2 size={15} strokeWidth={2.2} />מחיקה מלאה
+                    </button>
+                  )}
                 </div>
               ); })}
             </div>
@@ -8075,7 +8089,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
             <p className="only-print" style={{ fontSize:17.2, fontWeight:800, margin:'10px 16px 8px' }}>{sc.name} · {live.length} תלושים</p>
             <div className="slip-body" style={{ padding:'0 14px 14px' }}>
             <div className="table-scroll only-desktop">
-              <table className="apple-table sticky-first slip-table" style={{ fontSize:15.2 }}>
+              <table className={'apple-table sticky-first slip-table' + (simOnly ? ' sim' : '')} style={{ fontSize:15.2 }}>
                 <thead><tr>
                   <th>שם</th>
                   <th style={{ textAlign:'center' }} title="קובע את תוספת האם: 24 שעות לאם = 90%">מין</th>
@@ -8090,26 +8104,26 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                 </tr></thead>
                 <tbody>
                   {rows.map(({ t, r }) => r.skip ? (
-                    <tr key={t.id} style={{ color:'var(--text3)' }}>
+                    <tr key={t.id} className="sk" style={{ color:'var(--text3)' }}>
                       <td style={{ fontWeight:600 }}>
                         {t.name}
                         {subInfo(t) && <p style={{ fontSize:14, fontWeight:600, color:'var(--apple-orange)' }}>{subInfo(t)}</p>}
                       </td>
-                      <td colSpan={9} style={{ fontSize:14 }}>{r.skip}</td>
+                      <td colSpan={simOnly ? 5 : 9} style={{ fontSize:14 }}>{r.skip}</td>
                     </tr>
                   ) : (
                     <tr key={t.id} onClick={() => ((lines[t.id] && !r.hourly) || r.principal) && setOpenSlip({ t, r })}
                       style={{ cursor: ((lines[t.id] && !r.hourly) || r.principal) ? 'pointer' : 'default' }}
                       title={((lines[t.id] && !r.hourly) || r.principal) ? 'לחיצה פותחת את התלוש המלא' : 'התלוש המפורט בהכנה — יופיע בסיום החישוב'}>
                       <td style={{ fontWeight:600 }}>
-                        {r.principal && <Briefcase size={12} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}
-                        {t.name}
                         {((lines[t.id] && !r.hourly) || r.principal) && (
-                          <span className="no-print" style={{ display:'inline-flex', alignItems:'center', gap:4, marginInlineStart:8, padding:'2px 9px', borderRadius:999,
+                          <span className="no-print" style={{ float:'inline-end', display:'inline-flex', alignItems:'center', gap:4, marginInlineStart:10, padding:'4px 11px', borderRadius:999,
                             background:'var(--purple-100)', color:'var(--purple)', fontSize:14, fontWeight:700, whiteSpace:'nowrap' }}>
                             <FileText size={13} strokeWidth={2.2} />לתלוש
                           </span>
                         )}
+                        {r.principal && <Briefcase size={12} strokeWidth={2.4} style={{ display:'inline', verticalAlign:'-1px', marginInlineEnd:4 }} />}
+                        {t.name}
                         <p style={{ fontSize:14, fontWeight:500, color:'var(--text3)' }}>
                           {r.hourly
                             ? [jobLabel(t.job), `${r.rate} ₪ לשעה`, r.fromAttendance ? `לפי דוח נוכחות: ${r.hours} שעות` : r.awaiting ? 'ממתין לדוח נוכחות (אומדן)' : `כ-${r.hours} שעות בחודש (אומדן)`].join(' · ')
@@ -8183,7 +8197,7 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
                   ))}
                 </tbody>
                 <tfoot><tr style={{ background:'var(--apple-fill)', fontWeight:800 }}>
-                  <td colSpan={5}>סה"כ {shortName(sc.name)}</td>
+                  <td colSpan={simOnly ? 3 : 5}>סה"כ {shortName(sc.name)}</td>
                   <td style={{ textAlign:'center' }}>{money(tot.base)}</td>
                   <td style={{ textAlign:'center' }}>{money(tot.supp)}</td>
                   <td style={{ textAlign:'center' }}>{money(tot.gross)}</td>
@@ -13480,6 +13494,7 @@ export default function App() {
     await store.rejectReports({ ids: rows.map(t => t.id), reason, monthKey: activeMonth, principal, message });
     setRejections(await store.listReportRejections(activeMonth));
   };
+  const onClearReports = (rows) => run(() => store.clearReports(rows.map(t => t.id)));
   const onApproveReport = (rows) => run(async () => {
     const done = await store.approveReport(rows.map(t => t.id));
     for (const t of done) {
@@ -14044,6 +14059,7 @@ export default function App() {
           onApproveReport={user.role === 'coordinator' ? onApproveReport : null}
           onb={onbList} rejections={rejections}
           onRejectReports={user.role === 'coordinator' ? onRejectReports : null}
+          onClearReports={user.role === 'coordinator' ? onClearReports : null}
           onClose={() => setShowApproval(false)}
         />
       )}

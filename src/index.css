@@ -1307,3 +1307,8 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .resbar .pc { font-size: 14.5px; font-weight: 800; color: #8F4E00; min-width: 38px; text-align: start; }
 .resbar svg { flex-shrink: 0; min-width: 38px; }
 .bl-tile .resbar .track { width: 100%; flex: 1 1 auto; height: 16px; } .bl-tile .v .resbar { width: 100%; }
+
+/* מסך תלושי הסימולציה של שרה (8.10): רק עמודות התלוש — בלי מין, ילדים, "יצא בתלוש" וסימון ההוצאה */
+.slip-table.sim thead th:nth-child(2), .slip-table.sim thead th:nth-child(3), .slip-table.sim thead th:nth-child(9), .slip-table.sim thead th:nth-child(10),
+.slip-table.sim tbody tr:not(.sk) td:nth-child(2), .slip-table.sim tbody tr:not(.sk) td:nth-child(3), .slip-table.sim tbody tr:not(.sk) td:nth-child(9), .slip-table.sim tbody tr:not(.sk) td:nth-child(10),
+.slip-table.sim tfoot td:nth-child(5), .slip-table.sim tfoot td:nth-child(6) { display: none; }
