@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 156;
+const BUILD = 157;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5206,6 +5206,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const [mode, setMode] = useState('month');   // 'month' — החודש שנבחר | 'compare' — השוואה בין החודשים
   const [cmpKind, setCmpKind] = useState('salary');
   const [baseBusy, setBaseBusy] = useState('');
+  const [help, setHelp] = useState('');   // "ההסברים בלחיצה" (שרה, 8.10): 'month' | 'base' | '' — ההסבר שפתוח עכשיו
   const [copied, setCopied] = useState(false);   // "סיכום להעברה" הועתק   // בהשוואה: 'salary' — עמידה ביעד (שכר) | 'cash' — מזומן
   const doClose = async action => {
     setClosing(true); setErr('');
@@ -5734,6 +5735,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const SavedP = ({ v }) => Math.round(v) === 0 ? <span style={{ color:'var(--text2)', fontWeight:600 }}>כמו בתכנון</span>
     : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--ok-text)' : 'var(--danger-text)' }}>{v > 0 ? 'חסך ' : 'חרג '}{num(Math.abs(v))}</span>;
   const yearCls = y => cellCls(-y.sal <= y.plan * 0.005 ? 'ok' : -y.sal <= y.plan * 0.05 ? 'mid' : 'bad');
+  const HelpBtn = ({ id }) => (
+    <button type="button" className="no-print" onClick={() => setHelp(h => (h === id ? '' : id))} aria-expanded={help === id}
+      style={{ display:'inline-flex', alignItems:'center', gap:5, background: help === id ? 'var(--purple-100)' : 'none', border:'1px solid #D8CEEF', borderRadius:999,
+        padding:'4px 12px', minHeight:36, cursor:'pointer', fontSize:14, fontWeight:700, color:'var(--purple)' }}>
+      <span aria-hidden="true" style={{ fontWeight:900 }}>?</span>{help === id ? 'סגירת ההסבר' : 'הסבר'}
+    </button>);
+  const helpBox = { fontSize:14.6, color:'var(--text2)', lineHeight:1.75, background:'#FAF8FE', border:'1px solid #E3DCF2', borderRadius:12, padding:'10px 14px', margin:'0 0 10px' };
   // סימן החשבון ליד שם העמודה — כדי שהשורה תיקרא כתרגיל
   const Op = ({ c }) => <span aria-hidden="true" style={{ color:'var(--text3)', fontWeight:800, marginInlineEnd:4 }}>{c}</span>;
 
@@ -5863,9 +5871,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
               </div>
             )}
           </div>
-          <p className="section-sub">{mode === 'compare'
+          <div style={{ margin:'2px 0 8px' }}><HelpBtn id="month" /></div>
+          {help === 'month' && (
+            <p style={helpBox}>{mode === 'compare'
             ? (cmpKind === 'salary' ? 'התכנון השנתי של עלות ההוראה לכל סניף, החלק החודשי שלו (השנתי ÷ 12), ועלות ההוראה בפועל בכל חודש מולו. ירוק — עומד בתכנון; כתום — כמעט (חריגה עד 5%); אדום — לא עומד. מתחת: כמה חסך או חרג. בסוף: סה"כ מתחילת השנה.' : 'הפער של כל סניף בכל חודש בביצוע: שכר + 20% − משרד החינוך שהתקבל − מענק הרשת − העברת הסניף. "חסר" כשהעלות גבוהה מהכיסוי, "עודף" כשנשאר. בסוף: הפער המצטבר.')
-            : <>תכנון = נתוני הבסיס שלמטה ÷ 12. פער ירוק — לטובה · כתום — חריגה עד 5% · אדום — מעבר לזה.</>}</p>
+            : <>תכנון = נתוני הבסיס שלמטה ÷ 12. פער ירוק — לטובה · כתום — חריגה עד 5% · אדום — מעבר לזה.</>}
+              {mode !== 'compare' && <> מענק הרשת והעברת הסניף נכנסים לחשבון לפי התכנון; הביצוע שלהם למעקב: את המענק ששולם רושם מנהל הרשת בטבלה, ואת העברת הסניף — במסך "תקבולים ותשלומים".</>}</p>
+          )}
           {mode === 'compare' ? (
           <>
           <div className="apple-seg no-print" role="group" aria-label="מה משווים" style={{ marginBottom:10 }}>
@@ -6060,11 +6072,6 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </>
           )}
 
-          {!hasPay && (
-            <p style={{ fontSize:14.6, color:'var(--text2)', marginTop:10, lineHeight:1.6 }}>
-              העברת הסניף קבועה — הסכום שסוכם. מה שהסניף העביר בפועל נרשם במסך "תקבולים" למעקב, ואינו משנה את החשבון כאן.
-            </p>
-          )}
 
           {/*
             "את הטבלה הזו תעצב ותכניס לדוח המנכ"ל… את הטבלה שהבאתי בהתחלה
@@ -6073,8 +6080,14 @@ function BottomLineView({ activeMonth, viewer = false }) {
             לסניפים כפי שירד ב-23.9.2026 — מספרים קבועים (CEO_TRANSFERS_REPORT),
             לא חישוב חי. טבלת החודש שמעליו היא שמתעדכנת מהמערכת.
           */}
-          <h2 className="section-head" style={{ marginTop:26 }}>נתוני הבסיס — עלות הוראה שנתית והעברות לסניפים</h2>
-          <p className="section-sub">מכאן מוזן התכנון שבטבלת החודש. עלות ההוראה, ה-20% ומשרד החינוך — לפי הדוח שסוכם ב-23.9.2026. קרית ביאליק, שאינה בדוח — לפי התקציב שסוכם איתה ב-24.9. מענק הרשת והעברת הסניף — הסכומים שבתוקף עכשיו; {canEditBase ? 'אפשר לשנות אותם כאן בכל עת, והשינוי נכנס מיד לטבלת החודש.' : 'רק מנהל הרשת משנה אותם.'}</p>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginTop:26, marginBottom:8 }}>
+            <h2 className="section-head" style={{ margin:0 }}>נתוני הבסיס — עלות הוראה שנתית והעברות לסניפים</h2>
+            <HelpBtn id="base" />
+          </div>
+          {help === 'base' && (
+            <p style={helpBox}>מכאן מוזן התכנון שבטבלת החודש. עלות ההוראה, ה-20% ומשרד החינוך — לפי הדוח שסוכם ב-23.9.2026. קרית ביאליק, שאינה בדוח — לפי התקציב שסוכם איתה ב-24.9. מענק הרשת והעברת הסניף — הסכומים שבתוקף עכשיו; {canEditBase ? 'אפשר לשנות אותם כאן בכל עת, והשינוי נכנס מיד לטבלת החודש.' : 'רק מנהל הרשת משנה אותם.'}{' '}<b>בוצע עד כה</b> — מצטבר מתחילת השנה עד {months.length ? fmtMonth(months[months.length - 1].key) : ''} ({months.length === 1 ? 'חודש אחד' : `${months.length} חודשים`}). הצבע משווה אותו לחלק היחסי של התכנון השנתי לאותם חודשים: ירוק — עומד, כתום — חריגה עד 5% או שמשרד החינוך טרם התקבל, אדום — מעבר לזה.
+            {' '}<b>פער מחושב</b> — עלות ההוראה + 20% − משרד החינוך − מענק הרשת. משבצת ההעברה ירוקה כשההעברה לשנה מכסה אותו.</p>
+          )}
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
             <table className="sticky-first big-table bl-table pva pvab" style={{ width:'100%', borderCollapse:'collapse' }}>
               <caption className="sr-only">נתוני הבסיס לכל סניף: לכל חלק התכנון השנתי ומה שבוצע עד כה — עלות הוראה, תוספת 20%, משרד החינוך; מענק הרשת, פער מחושב, העברת הסניף לחודש ולשנה</caption>
@@ -6158,10 +6171,6 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <CardRow label="פער מחושב">{num(baseTot.gap)}</CardRow>
             </div>
           </div>
-          <p style={{ fontSize:14.6, color:'var(--text2)', marginTop:10, lineHeight:1.7 }}>
-            <b>בוצע עד כה</b> — מצטבר מתחילת השנה עד {months.length ? fmtMonth(months[months.length - 1].key) : ''} ({months.length === 1 ? 'חודש אחד' : `${months.length} חודשים`}). הצבע משווה אותו לחלק היחסי של התכנון השנתי לאותם חודשים: ירוק — עומד, כתום — חריגה עד 5% או שמשרד החינוך טרם התקבל, אדום — מעבר לזה.
-            {' '}<b>פער מחושב</b> — עלות ההוראה + 20% − משרד החינוך − מענק הרשת. משבצת ההעברה ירוקה כשההעברה לשנה מכסה אותו.
-          </p>
 
           {/* סגירת החודש — לשרה בלבד. האישור בתוך הדף, עם מה שייקרה */}
           {!viewer && cur && data?.canClose && (
@@ -6192,20 +6201,6 @@ function BottomLineView({ activeMonth, viewer = false }) {
             </div>
           )}
 
-          <button onClick={() => setShowNote(v => !v)} aria-expanded={showNote}
-            style={{ background:'none', border:'none', padding:'10px 2px', marginTop:6, minHeight:44, cursor:'pointer', fontSize:14.8, fontWeight:700, color:'var(--purple)' }}>
-            {showNote ? 'הסתרת ההסבר על המספרים' : 'הסבר על המספרים'}
-          </button>
-          {showNote && (
-            <p style={{ fontSize:15, color:'var(--text2)', lineHeight:1.8 }}>
-              <b>הבסיס</b> — עלות השכר בפועל בחודש הראשון במערכת (ספטמבר 2026); היא ה-100% שמולו נמדדים החודשים הבאים, והכרית היא 20% ממנה. <b>בפועל</b> — עלות המעביד של כל עובדי בית הספר בחודש, כולל מנהלת, הנהלה וצהרון; למי שיש תלוש — לפי התלוש. האחוז שלידה הוא בפועל מתוך הסימולציה.
-              {' '}<b>עמד ביעד?</b> — השכר של הסניף החודש מול השכר שלו בספטמבר (הבסיס): ירוק = לא יותר, כתום = חריגה עד 5%, אדום = יותר; מתחת לפס — כמה חסך או חרג. זה המדד של הסניף; תקבולי משרד החינוך אינם חלק ממנו. <b>משרד החינוך</b> — רק מה שהתקבל בפועל (הוזן במסך "תקבולים"); תקבול שהוזן נשאר בתוקף לחודשים הבאים עד שמוזן חדש, וסניף שטרם התקבל לו דבר נספר 0 — לא "מתוכנן". <b>מענק רשת</b> — החלק ה-12 מהסכום השנתי.
-              {' '}<b>העברת סניף קבועה</b> — הסכום החודשי שסוכם עם הסניף, סכום אחד כולל משרות שעתיות; קבוע, אינו משתנה לפי תקבולים; "טרם סוכם" נספר כאפס. מה שהסניף העביר בפועל נרשם במסך "תקבולים" למעקב. <b>לאיפוס</b> (מתחת למענק, וברצועה) — כמה חסר לסניף כדי לאפס את החודש: ה"נשאר" השלילי שלו; ברשת — סכום החוסרים, מול "נשאר" בסניפים שבעודף. כשנרשמה במסך התקבולים העברה בפועל — היא שמוצגת ונספרת ("בפועל"). <b>נותר לפני הכרית</b> — בפועל, פחות משרד החינוך, המענק ומה שהסניף מעביר. <b>נותר כולל הכרית</b> — אותו סכום ועוד כרית ה-20%. אדום = חסר, "עודף" בירוק = נשאר כסף.
-              {anyTz && <>{' '}<b>הנהלה וצהרון</b> — המשרות השעתיות מגולמות בשכר (לפי המחשבון ובפועל); אין מולן הכנסה ממשרד החינוך, והן כולן על הסניף: הסכום ש"הסניף מעביר" כולל אותן, וכרית ה-20% מחושבת גם עליהן.</>}
-              {' '}<b>יתרה מצטברת</b> — מה שנשאר החודש פחות מה שנשאר בספטמבר (הבסיס), מצטבר: "זכות" כשנשאר יותר (שכר נמוך יותר, או תקבול ממשרד החינוך שהגיע), "חובה" כשנשאר פחות; היתרה עוברת מחודש לחודש.
-              {' '}רק סניפים שהרשת משלמת בהם שכר ושיש בהם עובדות בחודש.
-            </p>
-          )}
         </>
       )}
     </div>
