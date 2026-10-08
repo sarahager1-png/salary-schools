@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 164;
+const BUILD = 165;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5692,11 +5692,11 @@ function BottomLineView({ activeMonth, viewer = false }) {
     return <span style={{ fontWeight:700, whiteSpace:'nowrap', color: cushion ? (d > 0 ? ST_COLOR.bad : v > 0 ? ST_COLOR.mid : ST_COLOR.ok) : ST_COLOR[actSt(v, plan, income)] }}>{cushion ? (d > 0 ? 'חרג' : 'נשאר') : income ? (d > 0 ? 'יותר' : 'פחות') : (d > 0 ? 'חרג' : 'חסך')} <span className="num">{num(Math.abs(d))}</span></span>; };
   /*
     "הפער ברעננה הוא מול הכנסות משרד החינוך ולא מול ההוראה" (שרה, 8.10): ליד כל "חסר" כתוב ממה הוא נובע —
-    משרד החינוך שלא התקבל (או התקבל פחות מהתכנון), חריגה בשכר מעבר לכרית, או פער שקיים כבר בתכנון.
+    משרד החינוך שלא התקבל (או התקבל פחות מהתכנון), חריגה בשכר מעבר לכרית, או העברת סניף שאינה מכסה (חסר שקיים כבר בתכנון).
     מוצג הגורם הגדול ביותר, עם הסכום שלו.
   */
   const gapCause = p => { if (!p || Math.round(p.actGap) <= 0) return null;
-    const c = [['משרד החינוך', Math.max(0, p.planMin - p.actMin)], ['חריגה בשכר', Math.max(0, p.act20 - p.plan20)], ['כבר בתכנון', Math.max(0, p.planGap)]]
+    const c = [['משרד החינוך', Math.max(0, p.planMin - p.actMin)], ['חריגה בשכר', Math.max(0, p.act20 - p.plan20)], ['העברת הסניף', Math.max(0, p.planGap)]]
       .sort((a, b) => b[1] - a[1])[0];
     return c[1] > 0 ? { t: c[0], v: c[1] } : null; };
   const Cause = ({ p }) => { const c = gapCause(p); return c ? <span style={{ display:'block', fontSize:14, fontWeight:600, color:'var(--text2)', whiteSpace:'nowrap', marginTop:1 }}>{c.t}</span> : null; };
