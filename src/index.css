@@ -1328,7 +1328,12 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 .big-table.pvam tbody td, .big-table.pvam tfoot td { padding-inline: 2px; font-size: 14.4px !important; }
 .big-table.pvam tbody td { height: 48px; padding-top: 6px; padding-bottom: 6px; vertical-align: middle; }
 .big-table.pvam tbody tr { border-bottom: 1px solid var(--line); }
-.big-table.pvam tbody tr:nth-child(even) td, .big-table.pvam tbody tr:nth-child(even) th[scope="row"] { background: transparent !important; }
+.big-table.pvam tbody tr:nth-child(even) td:not([class*="tgt-"]), .big-table.pvam tbody tr:nth-child(even) th[scope="row"] { background: transparent !important; }
+/* "תצבע משבצות לנראות ברורה יותר" (שרה, 8.10): משבצת הפער כולה צבועה — ירוק, כתום, אדום — גם בשורת הסיכום */
+.big-table.pvam td.tgt-ok  { background: #DDF3E4 !important; }
+.big-table.pvam td.tgt-mid { background: #FCEBC8 !important; }
+.big-table.pvam td.tgt-bad { background: #FBDCDC !important; }
+.big-table.pvam tbody td[class*="tgt-"], .big-table.pvam tfoot td[class*="tgt-"] { box-shadow: inset 0 0 0 2px #fff; }
 .big-table.pvam tr > :nth-child(2), .big-table.pvam tr > :nth-child(5), .big-table.pvam tr > :nth-child(8),
 .big-table.pvam tr > :nth-child(11), .big-table.pvam tr > :nth-child(12) { border-inline-start: 2px solid #E3DCF2; }
 .big-table.pvam tr.bl-groups > :nth-child(n) { border-inline-start: 0; }

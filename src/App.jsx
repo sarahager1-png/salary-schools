@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 149;
+const BUILD = 150;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5666,10 +5666,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
     "הפער לא נראה טוב" (שרה, 8.10): הפער הוא השורה התחתונה, ולכן בשורה אחת וברורה — "חסר 31,277" /
     "עודף 9,874". התכנון: טקסט צבעוני בלבד. הביצוע: תווית מלאה ובולטת, המספר גדול יותר.
   */
-  const GapCell = ({ v, strong = false }) => { const z = Math.round(v) === 0, bad = v > 0 && !z;
+  const GapCell = ({ v, strong = false, big = false }) => { const z = Math.round(v) === 0, bad = v > 0 && !z;
     const c = bad ? 'var(--danger-text)' : 'var(--ok-text)';
-    return (<span className={strong ? 'gap-chip ' + (bad ? 'bad' : 'ok') : undefined} style={{ display:'inline-block', whiteSpace:'nowrap', color: c, fontWeight: strong ? 800 : 700 }}>
-      {z ? 'מאוזן' : <>{bad ? 'חסר' : 'עודף'} <span className="num" style={{ fontSize: strong ? 15.5 : undefined }}>{num(Math.abs(v))}</span></>}
+    return (<span className={strong ? 'gap-chip ' + (bad ? 'bad' : 'ok') : undefined} style={{ display:'inline-block', whiteSpace:'nowrap', color: c, fontWeight: strong || big ? 800 : 700 }}>
+      {z ? 'מאוזן' : <>{bad ? 'חסר' : 'עודף'} <span className="num" style={{ fontSize: strong || big ? 15.5 : undefined }}>{num(Math.abs(v))}</span></>}
     </span>); };
   const GapV = ({ v }) => Math.round(v) === 0 ? <span style={{ fontWeight:700, color:'var(--ok-text)' }}>מאוזן</span>
     : <span className="num" style={{ fontWeight:800, whiteSpace:'nowrap', color: v > 0 ? 'var(--danger-text)' : 'var(--ok-text)' }}>{v > 0 ? 'חסר ' : 'עודף '}{num(Math.abs(v))}</span>;
@@ -5943,15 +5943,15 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     {!p ? <td colSpan={11} style={{ ...tdP, color:'var(--text2)' }}>אין לסניף נתוני בסיס</td> : (<>
                       <td style={tdP}>{num(p.planSal)}</td>
                       <td style={{ ...tdP, fontWeight:700 }}>{num(p.actSal)}</td>
-                      <td style={tdP}><Diff v={p.actSal} plan={p.planSal} /></td>
+                      <td className={cellCls(Math.round(p.actSal - p.planSal) === 0 ? null : actSt(p.actSal, p.planSal))} style={tdP}><Diff v={p.actSal} plan={p.planSal} /></td>
                       <td style={tdP}>{num(p.plan20)}</td>
                       <td style={{ ...tdP, fontWeight:700 }}>{num(p.act20)}</td>
-                      <td style={tdP}><Diff v={p.act20} plan={p.plan20} /></td>
+                      <td className={cellCls(Math.round(p.act20 - p.plan20) === 0 ? null : actSt(p.act20, p.plan20))} style={tdP}><Diff v={p.act20} plan={p.plan20} /></td>
                       <td style={tdP}>{num(p.planMin)}</td>
                       <td style={{ ...tdP, fontWeight:700 }}>{num(p.actMin)}</td>
-                      <td style={tdP}>{p.noMin ? <span style={{ color:'#8F4E00', fontWeight:700 }}>טרם התקבל</span> : <Diff v={p.actMin} plan={p.planMin} income />}</td>
+                      <td className={cellCls(p.noMin ? 'mid' : Math.round(p.actMin - p.planMin) === 0 ? null : actSt(p.actMin, p.planMin, true))} style={tdP}>{p.noMin ? <span style={{ color:'#8F4E00', fontWeight:700 }}>טרם התקבל</span> : <Diff v={p.actMin} plan={p.planMin} income />}</td>
                       <td style={tdP} title={`מענק הרשת ${num(p.grant)} + העברת הסניף ${num(p.transfer)}`}>{num(p.grant + p.transfer)}</td>
-                      <td style={tdP} title={`בתכנון: ${Math.round(p.planGap) === 0 ? 'מאוזן' : (p.planGap > 0 ? 'חסר ' : 'עודף ') + num(Math.abs(p.planGap))}`}><GapCell v={p.actGap} strong /></td>
+                      <td className={cellCls(gapSt(p.actGap))} style={tdP} title={`בתכנון: ${Math.round(p.planGap) === 0 ? 'מאוזן' : (p.planGap > 0 ? 'חסר ' : 'עודף ') + num(Math.abs(p.planGap))}`}><GapCell v={p.actGap} big /></td>
                     </>)}
                   </tr>
                 ))}
@@ -5959,11 +5959,11 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <tfoot>
                 <tr>
                   <td style={{ padding:'10px 8px' }}>סה"כ</td>
-                  <td style={tdP}>{num(pvaTot.planSal)}</td><td style={tdP}>{num(pvaTot.actSal)}</td><td style={tdP}><Diff v={pvaTot.actSal} plan={pvaTot.planSal} /></td>
-                  <td style={tdP}>{num(pvaTot.plan20)}</td><td style={tdP}>{num(pvaTot.act20)}</td><td style={tdP}><Diff v={pvaTot.act20} plan={pvaTot.plan20} /></td>
-                  <td style={tdP}>{num(pvaTot.planMin)}</td><td style={tdP}>{num(pvaTot.actMin)}</td><td style={tdP}><Diff v={pvaTot.actMin} plan={pvaTot.planMin} income /></td>
+                  <td style={tdP}>{num(pvaTot.planSal)}</td><td style={tdP}>{num(pvaTot.actSal)}</td><td className={cellCls(Math.round(pvaTot.actSal - pvaTot.planSal) === 0 ? null : actSt(pvaTot.actSal, pvaTot.planSal))} style={tdP}><Diff v={pvaTot.actSal} plan={pvaTot.planSal} /></td>
+                  <td style={tdP}>{num(pvaTot.plan20)}</td><td style={tdP}>{num(pvaTot.act20)}</td><td className={cellCls(Math.round(pvaTot.act20 - pvaTot.plan20) === 0 ? null : actSt(pvaTot.act20, pvaTot.plan20))} style={tdP}><Diff v={pvaTot.act20} plan={pvaTot.plan20} /></td>
+                  <td style={tdP}>{num(pvaTot.planMin)}</td><td style={tdP}>{num(pvaTot.actMin)}</td><td className={cellCls(Math.round(pvaTot.actMin - pvaTot.planMin) === 0 ? null : actSt(pvaTot.actMin, pvaTot.planMin, true))} style={tdP}><Diff v={pvaTot.actMin} plan={pvaTot.planMin} income /></td>
                   <td style={tdP} title={`מענק הרשת ${num(pvaTot.grant)} + העברות הסניפים ${num(pvaTot.transfer)}`}>{num(pvaTot.grant + pvaTot.transfer)}</td>
-                  <td style={tdP} title={`בתכנון: ${(pvaTot.planGap > 0 ? 'חסר ' : 'עודף ') + num(Math.abs(pvaTot.planGap))}`}><GapCell v={pvaTot.actGap} strong /></td>
+                  <td className={cellCls(gapSt(pvaTot.actGap))} style={tdP} title={`בתכנון: ${(pvaTot.planGap > 0 ? 'חסר ' : 'עודף ') + num(Math.abs(pvaTot.planGap))}`}><GapCell v={pvaTot.actGap} big /></td>
                 </tr>
               </tfoot>
             </table>
