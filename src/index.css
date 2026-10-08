@@ -1398,3 +1398,11 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 /* שדה מספר בלי חיצי הדפדפן — הם אוכלים רוחב בעמודה צרה */
 input.nospin::-webkit-outer-spin-button, input.nospin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 input.nospin { -moz-appearance: textfield; appearance: textfield; }
+
+/* טבלת הבסיס — שש עמודות שוות (שנתי / חודשי) */
+.big-table.pvab col { width: 14.2% !important; background: transparent !important; }
+.big-table.pvab col.c-name { width: 14.8% !important; }
+.big-table.pvab tr > :nth-child(n) { border-inline-start: 0; }
+.big-table.pvab tr > :nth-child(n+2) { border-inline-start: 2px solid #E3DCF2; }
+.big-table.pvab tbody td, .big-table.pvab tfoot td { font-size: 15.5px !important; }
+.big-table.pvab .apple-input { max-width: 120px; font-size: 15px !important; }
