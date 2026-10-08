@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 130;
+const BUILD = 131;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5269,8 +5269,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const baseCostOf = id => { const b = baseMonth?.branches.find(x => x.id === id); return b ? costAll(b) : 0; };
   const baseCostNet = (baseMonth?.branches || []).reduce((a, b) => a + costAll(b), 0);
   const statusOf = (cost, base) => targetOf(cost, base)?.state ?? null;
-  const CELL_BG = { ok:'#E6F6EC', mid:'var(--warn-bg)', bad:'var(--danger-bg)' };
-  const cellBg = st => (st ? { background: CELL_BG[st] } : {});
+  const cellCls = st => (st ? 'tgt-' + st : undefined);   // צבע המשבצת לפי עמידה ביעד (CSS: .bl-table td.tgt-*)
   const Pill = ({ s }) => s == null ? null : (
     <span style={{ display:'inline-block', fontSize:14, fontWeight:700, borderRadius:999, padding:'1px 9px', marginBottom:3, lineHeight:1.5,
       ...(s === 'ok' ? { background:'#E6F6EC', color:'#166534' } : s === 'mid' ? { background:'var(--warn-bg)', color:'#8F4E00' } : { background:'var(--danger-bg)', color:'var(--danger-text)' }) }}>
@@ -5517,7 +5516,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <tr key={'cmp-' + r.id} style={{ borderBottom:'1px solid var(--line)' }}>
                     <th scope="row" style={{ padding:'10px 12px', fontWeight:700, textAlign:'start', fontSize:16.6 }} title={r.name}>{shortName(r.name)}</th>
                     {yearCols.map(({ key, m }) => { const isB = key === baseMonth.key; if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; return cmpKind === 'salary' ? (
-                      <td key={key} style={{ ...td, fontWeight: key === sel ? 800 : 500, ...(isB ? {} : cellBg(statusOf(costIn(m, r.id), baseCostOf(r.id)))) }}
+                      <td key={key} className={cellCls(isB ? 'ok' : statusOf(costIn(m, r.id), baseCostOf(r.id)))} style={{ ...td, fontWeight: key === sel ? 800 : 500 }}
                         title={isB ? 'חודש הבסיס' : ({ ok:'עמד ביעד', mid:'כמעט — חריגה עד 5%', bad:'לא עמד' })[statusOf(costIn(m, r.id), baseCostOf(r.id))] || ''}>
                         <span className="num">{costIn(m, r.id) == null ? '—' : num(costIn(m, r.id))}</span>
                         <TargetNote cost={costIn(m, r.id)} base={baseCostOf(r.id)} isBaseMonth={isB} />
@@ -5528,7 +5527,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                         <span style={{ display:'block', fontSize:14, marginTop:2 }}>{isB ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={resultIn(m, r.id)} />}</span>
                       </td>
                     ); })}
-                    <td style={{ ...td, fontWeight:800 }}>{cmpKind === 'salary' ? <Saved v={saveTotalOf(r.id)} /> : <Credit v={totalOf(r.id)} />}</td>
+                    <td className={cmpKind === 'salary' ? cellCls(saveTotalOf(r.id) >= 0 ? 'ok' : -saveTotalOf(r.id) <= baseCostOf(r.id) * 0.05 ? 'mid' : 'bad') : undefined} style={{ ...td, fontWeight:800 }}>{cmpKind === 'salary' ? <Saved v={saveTotalOf(r.id)} /> : <Credit v={totalOf(r.id)} />}</td>
                   </tr>
                 ))}
               </tbody>
@@ -5536,14 +5535,14 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <tr>
                   <td style={{ padding:'10px 12px' }}>סה"כ</td>
                   {yearCols.map(({ key, m }) => { const isB = key === baseMonth.key; if (!m) return <td key={key} style={{ ...td, color:'var(--text3)' }}>—</td>; return cmpKind === 'salary' ? (
-                    <td key={key} style={{ ...td, ...(isB ? {} : cellBg(statusOf(netCost(m), baseCostNet))) }}>
+                    <td key={key} className={cellCls(isB ? 'ok' : statusOf(netCost(m), baseCostNet))} style={td}>
                       <span className="num">{num(netCost(m))}</span>
                       <TargetNote cost={netCost(m)} base={baseCostNet} isBaseMonth={isB} />
                     </td>
                   ) : (
                     <td key={key} style={td}><Left v={netLeft(m)} /><span style={{ display:'block', fontSize:14, marginTop:2 }}>{isB ? <span style={{ color:'var(--text2)', fontWeight:600 }}>בסיס</span> : <Credit v={netResult(m)} />}</span></td>
                   ); })}
-                  <td style={td}>{cmpKind === 'salary' ? <Saved v={saveTotalNet()} /> : <Credit v={totalNet} />}</td>
+                  <td className={cmpKind === 'salary' ? cellCls(saveTotalNet() >= 0 ? 'ok' : -saveTotalNet() <= baseCostNet * 0.05 ? 'mid' : 'bad') : undefined} style={td}>{cmpKind === 'salary' ? <Saved v={saveTotalNet()} /> : <Credit v={totalNet} />}</td>
                 </tr>
                 {cmpKind === 'cash' && (
                 <tr>

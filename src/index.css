@@ -1041,6 +1041,13 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 
 /* ── טבלת "שורה תחתונה": שלוש קבוצות בצבע — השכר, ההכנסות, מה נשאר (אותה שפה של הטבלה הראשית) ── */
 .bl-table tbody td, .bl-table tbody th[scope="row"] { background: transparent !important; }
+/* "המשבצות נצבעות מול עמידה ביעדים" (שרה, 8.10): משבצות מיפוי השנה לפי עמידה ביעד — גובר על איפוס הרקע */
+.bl-table td.tgt-ok  { background: #E6F6EC !important; }
+.bl-table td.tgt-mid { background: var(--warn-bg) !important; }
+.bl-table td.tgt-bad { background: var(--danger-bg) !important; }
+.bl-table tbody tr:hover td.tgt-ok  { background: #D7EFE0 !important; }
+.bl-table tbody tr:hover td.tgt-mid { background: #F9E9C7 !important; }
+.bl-table tbody tr:hover td.tgt-bad { background: #F8D9D9 !important; }
 .bl-table col.g-cost { background: #FDF6F6; }
 .bl-table col.g-inc  { background: #F3FBF6; }
 .bl-table col.g-res  { background: #F7F4FC; }
