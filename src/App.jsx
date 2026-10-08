@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 142;
+const BUILD = 143;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -10910,12 +10910,14 @@ function LinkMonthlyReport({ rows, locked, onSave, code, onAttachDoc }) {
                 </>
               )}
             </div>
-            {/* אישור ההיעדרות — לכל סיבה (שרה, 4.10.26) */}
-            {reason && (
-              <div style={{ marginTop:9 }}>
+            {/* אישור ההיעדרות — לכל סיבה (שרה, 4.10.26). "אין אפשרות להעלאת קובץ למרות שזה חלק
+                משמעותי מהתהליך" (שרה, 8.10): הכפתור מופיע מיד עם בחירת העובד/ת, גם לפני
+                בחירת הסיבה, ובולט — בלי אישור הדיווח אינו נשלח לאישור. */}
+            {(
+              <div style={{ marginTop:11, padding:'11px 12px', borderRadius:12, border:'1px dashed var(--purple)', background:'var(--purple-100)' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-                  <label className="apple-btn apple-btn-ghost" style={{ minHeight:40, paddingInline:14, cursor:'pointer' }}>
-                    📎 {uploading ? 'מעלה…' : (absDraft.sickFormPath || absT.sickFormPath) ? 'החלפת האישור' : `צירוף ${docLabel(reason)}`}
+                  <label className={'apple-btn ' + ((absDraft.sickFormPath || absT.sickFormPath) ? 'apple-btn-ghost' : 'apple-btn-blue')} style={{ minHeight:44, paddingInline:16, cursor:'pointer', fontSize:15.5, fontWeight:700 }}>
+                    📎 {uploading ? 'מעלה…' : (absDraft.sickFormPath || absT.sickFormPath) ? 'החלפת האישור' : reason ? `צירוף ${docLabel(reason)}` : 'צירוף אישור ההיעדרות'}
                     <input type="file" accept="image/*,application/pdf" hidden
                       onChange={e => { attachFile(e.target.files?.[0]); e.target.value = ''; }} />
                   </label>
@@ -10923,9 +10925,9 @@ function LinkMonthlyReport({ rows, locked, onSave, code, onAttachDoc }) {
                     <span style={{ fontSize:14.4, color:'var(--ok)', fontWeight:600 }}>✓ האישור מצורף</span>}
                 </div>
                 {!(absDraft.sickFormPath || absT.sickFormPath) && !uploading && (
-                  <p style={{ fontSize:13.8, color:'var(--warn)', marginTop:7, lineHeight:1.6 }}>
-                    אפשר לשמור גם בלי אישור, אבל כל עוד הוא חסר מילוי המקום שמול ההיעדרות מוחזק
-                    ואינו עובר לשכר.
+                  <p style={{ fontSize:14, color:'var(--text2)', marginTop:7, lineHeight:1.6 }}>
+                    צילום או קובץ PDF. בלי אישור הדיווח נשמר אך אינו נשלח לאישור, ומילוי המקום
+                    שמול ההיעדרות מוחזק ואינו עובר לשכר.
                     {/* "מנהלת תדאג לצרף, גם אמורה לדאוג לאישורים" (שרה, 4.10.26):
                         בחופשת לידה אין הודעה ליולדת — האישור באחריות המנהלת. */}
                     {reason === 'maternity'
