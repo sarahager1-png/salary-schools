@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 165;
+const BUILD = 168;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5614,10 +5614,16 @@ function BottomLineView({ activeMonth, viewer = false }) {
       (צהרון), והדוח מ-23.9 הוא עלות הוראה בלבד — ולכן גני תקוה נראתה חורגת. התכנון כולל עכשיו גם את
       הצהרון לפי שעות המשרה (planHourly מהשרת, × 12), וה-20% מחושב גם עליו ("20 אחוז על הכל", 7.10).
     */
-    const hourlyYear = Math.round((b.planHourly || 0) * 12);
-    const annual0 = rp ? rp.annual : Math.round(baseCostOf(b.id) * 12);
+    /*
+      "חודש ספטמבר הוא המוצא"; "ספטמבר בפועל, בכל הסניפים"; "אין צורך בתכנון" (שרה, 8.10, לילה): בעמודת השכר אין
+      תכנון מהדוח או מהתקציב — הבסיס הוא עלות השכר בפועל בספטמבר (כולל המשרות השעתיות, שנכללות בביצוע), בכל
+      הסניפים; לשנה: × 12. בספטמבר עצמו אין פער, ומאוקטובר כל חודש נמדד מולו. הדוח מ-23.9 והתקציב של קרית
+      ביאליק נשארים מקור רק להכנסות משרד החינוך. סניף שלא היה בספטמבר — לפי הדוח, עד שיהיה לו חודש ראשון.
+    */
+    const hourlyYear = 0;
+    const annual0 = Math.round(baseCostOf(b.id) * 12) || (rp ? rp.annual : 0);
     if (!annual0) return null;
-    const annual = annual0 + hourlyYear;
+    const annual = annual0;
     /*
       "15 אחוז"; "תמיד תוספת מול הפער מעלות ההוראה"; "ה-15 אחוז תמיד מול העלות של ספטמבר" (שרה, 8.10):
       התוספת היא כרית של 15% מעלות השכר בפועל בספטמבר — סכום חודשי קבוע לכל סניף (לשנה: × 12). מולה
@@ -5630,7 +5636,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
     const supportYear = lb.supportYear ?? (b.support || 0) * 12;
     const month = lb.transfer !== undefined ? lb.transfer : (b.agreed ?? null);
     const total = annual + add20;
-    return { id: b.id, name: rp ? rp.name : shortName(b.name), ord: rp ? (CEO_TRANSFERS_REPORT.rows.indexOf(rp) + 1 || 50) : 99, fromSeptember: !rp, src: rp?.src || null, hourlyYear,
+    return { id: b.id, name: rp ? rp.name : shortName(b.name), ord: rp ? (CEO_TRANSFERS_REPORT.rows.indexOf(rp) + 1 || 50) : 99, fromSeptember: false, src: null, hourlyYear,
       annual, add20, total, ministry, supportYear, gap: total - ministry - supportYear, month, year: month == null ? null : month * 12 };
   }).filter(Boolean).sort((a, b) => a.ord - b.ord);
   const baseById = new Map(baseRows.map(x => [x.id, x]));
@@ -5696,7 +5702,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
     מוצג הגורם הגדול ביותר, עם הסכום שלו.
   */
   const gapCause = p => { if (!p || Math.round(p.actGap) <= 0) return null;
-    const c = [['משרד החינוך', Math.max(0, p.planMin - p.actMin)], ['חריגה בשכר', Math.max(0, p.act20 - p.plan20)], ['העברת הסניף', Math.max(0, p.planGap)]]
+    const c = [['משרד החינוך', p.noMin || p.noMin === undefined ? Math.max(0, p.planMin - p.actMin) : 0], ['חריגה בשכר', Math.max(0, p.act20 - p.plan20)], ['העברת הסניף', Math.max(0, p.planGap)]]
       .sort((a, b) => b[1] - a[1])[0];
     return c[1] > 0 ? { t: c[0], v: c[1] } : null; };
   const Cause = ({ p }) => { const c = gapCause(p); return c ? <span style={{ display:'block', fontSize:14, fontWeight:600, color:'var(--text2)', whiteSpace:'nowrap', marginTop:1 }}>{c.t}</span> : null; };
@@ -5814,7 +5820,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                     stroke={salSt === 'bad' ? 'var(--danger-text)' : salSt === 'mid' ? '#C77700' : 'url(#blGrad)'}
                     strokeDasharray={RING} strokeDashoffset={RING * (1 - Math.min(salPct, 100) / 100)} />
                 </svg>
-                <div className="bl-ring-num"><b className="num">{salPct}%</b><span>מהתכנון</span></div>
+                <div className="bl-ring-num"><b className="num">{salPct}%</b><span>{isBase ? 'המוצא' : `מ${shortMonth(baseMonth.key)}`}</span></div>
               </div>
             )}
             <div style={{ minWidth:0, flex:'1 1 320px' }}>
@@ -5822,12 +5828,13 @@ function BottomLineView({ activeMonth, viewer = false }) {
               {salPct != null ? (
                 <>
                   <h2 className="bl-verdict" style={{ color: salSt === 'ok' ? 'var(--text)' : ST_COLOR[salSt] }}>
-                    {salSt === 'bad' ? 'השכר חורג מהתכנון' : salSt === 'mid' ? 'השכר מעט מעל התכנון' : salOn ? 'השכר עומד בתכנון' : 'השכר מתחת לתכנון'}
+                    {isBase ? `${fmtMonth(cur.key)} — חודש המוצא` : salSt === 'bad' ? `השכר חורג מ${shortMonth(baseMonth.key)}` : salSt === 'mid' ? `השכר מעט מעל ${shortMonth(baseMonth.key)}` : salOn ? `השכר כמו ב${shortMonth(baseMonth.key)}` : `השכר מתחת ל${shortMonth(baseMonth.key)}`}
                   </h2>
                   <p className="bl-line">
-                    ביצוע <b className="num">{num(pvaTot.actSal)}</b> מול תכנון <b className="num">{num(pvaTot.planSal)}</b>
-                    {pvaTot.actSal > pvaTot.planSal ? <> — גבוה ב-<b className="num" style={{ color: ST_COLOR[salSt] }}>{num(pvaTot.actSal - pvaTot.planSal)}</b>{salSt === 'mid' ? ' (חריגה קטנה, עד 5%)' : ''}.</>
-                      : <> — נמוך ב-<b className="num" style={{ color:'var(--ok-text)' }}>{num(pvaTot.planSal - pvaTot.actSal)}</b>.</>}
+                    {isBase ? <>עלות השכר <b className="num">{num(pvaTot.actSal)}</b> — זה המוצא: מולו נמדד השכר בחודשים הבאים, וממנו נגזרת הכרית (15%).</>
+                      : <>עלות השכר <b className="num">{num(pvaTot.actSal)}</b> מול <b className="num">{num(pvaTot.planSal)}</b> ב{shortMonth(baseMonth.key)}
+                        {pvaTot.actSal > pvaTot.planSal ? <> — גבוה ב-<b className="num" style={{ color: ST_COLOR[salSt] }}>{num(pvaTot.actSal - pvaTot.planSal)}</b>.</>
+                          : <> — נמוך ב-<b className="num" style={{ color:'var(--ok-text)' }}>{num(pvaTot.planSal - pvaTot.actSal)}</b>.</>}</>}
                   </p>
                 </>
               ) : (
@@ -5841,7 +5848,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   </span>
                 )}
                 {upTo.length > 1 && cumSalPct != null && (
-                  <span className="bl-fact" title="עלות השכר בביצוע מול התכנון, בכל החודשים עד החודש הזה">מתחילת השנה <b className="num" style={{ color: cumSalPct > 101 ? 'var(--danger-text)' : undefined }}>{cumSalPct}%</b> מהתכנון</span>
+                  <span className="bl-fact" title="עלות השכר מול ספטמבר, בכל החודשים עד החודש הזה">מתחילת השנה <b className="num" style={{ color: cumSalPct > 101 ? 'var(--danger-text)' : undefined }}>{cumSalPct}%</b> מ{shortMonth(baseMonth.key)}</span>
                 )}
                 {simN > 0 && (
                   <span className="bl-fact" style={{ background:'var(--warn-bg)', borderColor:'var(--warn-line)', color:'#8F4E00', fontWeight:700 }}
@@ -5862,12 +5869,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
           */}
           <div className="bl-eq n3" role="group" aria-label="החודש בשלושה מספרים — ביצוע מול תכנון">
             {[
-              { l:'עלות השכר', v:<span style={{ color: ST_COLOR[actSt(pvaTot.actSal, pvaTot.planSal)] }}>{num(pvaTot.actSal)}</span>, s:<>תכנון {num(pvaTot.planSal)}</> },
-              { l:'משרד החינוך — התקבל', v:<span style={{ color: ST_COLOR[actSt(pvaTot.actMin, pvaTot.planMin, true)] }}>{num(pvaTot.actMin)}</span>,
-                s:<>תכנון {num(pvaTot.planMin)}{noMinN ? ` · ${noMinN} סניפים טרם קיבלו` : ''}</>,
+              { l:'עלות השכר', v:<span style={{ color: ST_COLOR[actSt(pvaTot.actSal, pvaTot.planSal)] }}>{num(pvaTot.actSal)}</span>, s: isBase ? 'חודש המוצא' : <>ב{shortMonth(baseMonth.key)} {num(pvaTot.planSal)}</> },
+              { l:'משרד החינוך — התקבל', v:num(pvaTot.actMin),
+                s: noMinN ? <span style={{ color:'#8F4E00', fontWeight:700 }}>{noMinN} סניפים טרם קיבלו</span> : 'התקבל בכל הסניפים',
                 title: noMinN ? `טרם התקבל: ${pvaRows.filter(x => x.p?.noMin).map(x => shortName(x.r.name)).join(', ')}` : undefined },
               { l:'הפער לחודש', v:<GapV v={pvaTot.actGap} />,
-                s:<>תכנון: <GapV v={pvaTot.planGap} />{gapCause(pvaTot) && <> · עיקר החוסר: {gapCause(pvaTot).t}</>}{upTo.length > 1 && <> · מתחילת השנה: <GapV v={pvaCum.actGap} /></>}</> },
+                s:<>{noMinN && pvaTot.actGap > 0 ? 'עיקר החוסר: משרד החינוך שטרם התקבל' : gapCause(pvaTot) ? `עיקר החוסר: ${gapCause(pvaTot).t}` : 'אחרי השכר, הכרית, משרד החינוך, המענק וההעברות'}{upTo.length > 1 && <> · מתחילת השנה: <GapV v={pvaCum.actGap} /></>}</> },
             ].map(x => (
               <div key={x.l} className="bl-tile t-clean" title={x.title}>
                 <p className="l">{x.l}</p>
@@ -5891,9 +5898,9 @@ function BottomLineView({ activeMonth, viewer = false }) {
           </div>
           {help === 'month' && (
             <p style={helpBox}>{mode === 'compare'
-            ? (cmpKind === 'cash' ? 'הפער של כל סניף בכל חודש בביצוע: שכר + מה שנשאר מהכרית − משרד החינוך שהתקבל − מענק הרשת − העברת הסניף. "חסר" כשהעלות גבוהה מהכיסוי, "עודף" כשנשאר. בסוף: הפער המצטבר.' : `התכנון השנתי של ${cmpKind === 'ministry' ? 'הכנסות משרד החינוך' : 'עלות ההוראה'} לכל סניף, החלק החודשי שלו (השנתי ÷ 12), ו${cmpKind === 'ministry' ? 'מה שהתקבל' : 'העלות בפועל'} בכל חודש מולו. ירוק — עומד בתכנון; כתום — חריגה עד 5% או שטרם התקבל; אדום — מעבר לזה. בסוף: המצטבר מתחילת השנה מול התכנון.`)
-            : <>תכנון = נתוני הבסיס שלמטה ÷ 12. פער ירוק — לטובה · כתום — חריגה עד 5% · אדום — מעבר לזה. הכרית: 15% מעלות השכר בספטמבר; "נוצל" = החריגה של עלות ההוראה מהתכנון החודש; "נשאר" = מה שלא נוצל. הפער לחודש = שכר בפועל + מה שנשאר מהכרית − משרד החינוך שהתקבל − מענק − העברה.</>}
-              {mode !== 'compare' && <> מענק הרשת והעברת הסניף נכנסים לחשבון לפי התכנון; הביצוע שלהם למעקב: את המענק ששולם רושם מנהל הרשת בטבלה, ואת העברת הסניף — במסך "תקבולים ותשלומים".</>}</p>
+            ? (cmpKind === 'cash' ? 'הפער של כל סניף בכל חודש בביצוע: שכר + מה שנשאר מהכרית − משרד החינוך שהתקבל − מענק הרשת − העברת הסניף. "חסר" כשהעלות גבוהה מהכיסוי, "עודף" כשנשאר. בסוף: הפער המצטבר.' : `${cmpKind === 'ministry' ? 'התכנון השנתי של הכנסות משרד החינוך לכל סניף, החלק החודשי שלו (השנתי ÷ 12), ומה שהתקבל' : 'עלות ההוראה של ספטמבר (המוצא) לכל סניף, והעלות בפועל'} בכל חודש מולו. ירוק — עומד בתכנון; כתום — חריגה עד 5% או שטרם התקבל; אדום — מעבר לזה. בסוף: המצטבר מתחילת השנה מול התכנון.`)
+            : <>השכר נמדד מול ספטמבר (המוצא). משרד החינוך — רק מה שהתקבל בפועל. מענק הרשת והעברת הסניף — הסכומים שבנתוני הבסיס שלמטה. פער ירוק — לטובה · כתום — חריגה עד 5% · אדום — מעבר לזה. הכרית: 15% מעלות השכר בספטמבר; "נוצל" = החריגה של עלות ההוראה מהתכנון החודש; "נשאר" = מה שלא נוצל. הפער לחודש = שכר בפועל + מה שנשאר מהכרית − משרד החינוך שהתקבל − מענק − העברה.</>}
+              </p>
           )}
           {mode === 'compare' ? (
           <>
@@ -5940,8 +5947,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <thead>
                 <tr>
                   <TH>סניף</TH>
-                  {!gapView && <TH>תכנון שנתי<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{what}</span></TH>}
-                  <TH>תכנון לחודש<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{gapView ? 'הפער' : 'השנתי ÷ 12'}</span></TH>
+                  {!gapView && <TH>{inc ? 'תכנון שנתי' : 'לשנה'}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{inc ? what : 'ספטמבר × 12'}</span></TH>}
+                  <TH>{gapView || inc ? 'תכנון לחודש' : 'המוצא'}<span style={{ display:'block', fontSize:14, fontWeight:600 }}>{gapView ? 'הפער' : inc ? 'השנתי ÷ 12' : 'ספטמבר'}</span></TH>
                   {yearCols.map(c => <TH key={c.key}>{c.m ? shortMonth(c.key) : shortMonth(c.key).slice(0, 3) + "'"}{c.m && <span style={{ display:'block', fontSize:14, fontWeight:600 }}>{c.m.frozenAt ? 'סגור' : 'פתוח'}</span>}</TH>)}
                   {gapView ? <TH>פער מצטבר<span style={{ display:'block', fontSize:14, fontWeight:600 }}>ביצוע</span></TH>
                     : <TH>סה"כ השנה<span style={{ display:'block', fontSize:14, fontWeight:600 }}>מול התכנון</span></TH>}
@@ -5976,8 +5983,8 @@ function BottomLineView({ activeMonth, viewer = false }) {
             {cmpRows.map(r => { const bd = baseById.get(r.id); const c = cumOf(r.id); return (
               <div key={'cmpm-' + r.id} className="apple-card mcard">
                 <p className="mcard-name" style={{ wordBreak:'keep-all', marginBottom:4 }}>{shortName(r.name)}</p>
-                {!gapView && bd && <CardRow label={`תכנון שנתי — ${what}`} strong>{num(annOf(bd))}</CardRow>}
-                {!gapView && bd && <CardRow label="תכנון לחודש (השנתי ÷ 12)">{num(annOf(bd) / 12)}</CardRow>}
+                {!gapView && bd && <CardRow label={inc ? `תכנון שנתי — ${what}` : 'עלות ההוראה לשנה (ספטמבר × 12)'} strong>{num(annOf(bd))}</CardRow>}
+                {!gapView && bd && <CardRow label={inc ? 'תכנון לחודש (השנתי ÷ 12)' : 'המוצא — ספטמבר'}>{num(annOf(bd) / 12)}</CardRow>}
                 {yearCols.filter(c => c.m).map(({ key, m }) => { const p = pvaIn(m, r.id); if (!p) return null; return (
                   <CardRow key={key} label={shortMonth(key)} strong={key === sel}>
                     {gapView ? <GapV v={p.actGap} /> : <>{num(actOf(p))}<span style={{ marginInlineStart:8, fontSize:14 }}>{inc && p.noMin ? <span style={{ fontWeight:700, color:'#8F4E00' }}>טרם התקבל</span> : <Diff v={actOf(p)} plan={planOf2(p)} income={inc} />}</span></>}
@@ -6001,48 +6008,41 @@ function BottomLineView({ activeMonth, viewer = false }) {
               <caption className="sr-only">{`תכנון מול ביצוע לפי סניף, ${fmtMonth(sel)}: לכל חלק תכנון, ביצוע ופער — עלות השכר, כרית 15%, משרד החינוך; מענק הרשת והעברת הסניף; והפער לחודש`}</caption>
               <colgroup>
                 <col className="c-name" />
-                <col /><col /><col className="c-gap" /><col /><col /><col className="c-gap" /><col /><col /><col className="c-gap" />
-                <col /><col /><col /><col /><col className="c-final" />
+                <col /><col /><col className="c-gap" /><col /><col /><col className="c-gap" /><col />
+                <col /><col /><col className="c-final" />
               </colgroup>
               <thead>
                 <tr className="bl-groups">
                   <th />
                   <th colSpan={3} scope="colgroup" className="gh-cost">עלות השכר</th>
                   <th colSpan={3} scope="colgroup" className="gh-cost" title="כרית של 15% מעלות השכר בספטמבר; נוצל = מה שעלות ההוראה חרגה מהתכנון החודש"><Op c="+" />כרית 15%</th>
-                  <th colSpan={3} scope="colgroup" className="gh-inc"><Op c="−" />משרד החינוך</th>
-                  {/* "לחלק ל-2, תכנון מול ביצוע לכל חלק" (שרה, 8.10): מענק הרשת והעברת הסניף — כל אחד תכנון וביצוע */}
-                  <th colSpan={2} scope="colgroup" className="gh-inc"><Op c="−" />מענק הרשת</th>
-                  <th colSpan={2} scope="colgroup" className="gh-inc"><Op c="−" />העברת הסניף</th>
+                  {/* "אין צורך בתכנון"; "תוריד" (שרה, 8.10, על עמודת התכנון של משרד החינוך): משרד החינוך — רק מה שהתקבל בפועל */}
+                  <th scope="col" className="gh-inc"><Op c="−" />משרד החינוך</th>
+                  {/* "בלי תכנון וביצוע" (שרה, 8.10, לילה): מענק הרשת והעברת הסניף — עמודה אחת כל אחד, הסכום שבנתוני הבסיס */}
+                  <th scope="col" className="gh-inc"><Op c="−" />מענק הרשת</th>
+                  <th scope="col" className="gh-inc"><Op c="−" />העברת הסניף</th>
                   <th scope="col" className="gh-res"><Op c="=" />הפער לחודש</th>
                 </tr>
                 <tr>
-                  <TH>סניף</TH><TH>תכנון</TH><TH>ביצוע</TH><TH>פער</TH><TH>הכרית</TH><TH>נוצל</TH><TH>נשאר</TH>
-                  <TH>תכנון</TH><TH>ביצוע</TH><TH>פער</TH><TH>תכנון</TH><TH>ביצוע</TH><TH>תכנון</TH><TH>ביצוע</TH><TH>ביצוע</TH>
+                  <TH>סניף</TH><TH>ספטמבר</TH><TH>ביצוע</TH><TH>פער</TH><TH>הכרית</TH><TH>נוצל</TH><TH>נשאר</TH>
+                  <TH>התקבל</TH><TH>לחודש</TH><TH>לחודש</TH><TH>ביצוע</TH>
                 </tr>
               </thead>
               <tbody>
                 {pvaRows.map(({ r, p }) => (
                   <tr key={'pva-' + r.id}>
                     <th scope="row" style={{ padding:'10px 8px', fontWeight:700, textAlign:'start', fontSize:15.5 }} title={r.name}>{shortName(r.name).replace(/^שלהבות /, '').replace(/ קטמון$/, '')}</th>
-                    {!p ? <td colSpan={14} style={{ ...tdP, color:'var(--text2)' }}>אין לסניף נתוני בסיס</td> : (<>
+                    {!p ? <td colSpan={10} style={{ ...tdP, color:'var(--text2)' }}>אין לסניף נתוני בסיס</td> : (<>
                       <td style={tdP}>{num(p.planSal)}</td>
                       <td style={{ ...tdP, fontWeight:700 }}>{num(p.actSal)}</td>
                       <td className={cellCls(Math.round(p.actSal - p.planSal) === 0 ? null : actSt(p.actSal, p.planSal))} style={tdP}><Diff v={p.actSal} plan={p.planSal} /></td>
                       <td style={tdP}>{num(p.plan20)}</td>
                       <td style={{ ...tdP, fontWeight:700 }}>{num(p.act20)}</td>
                       <td className={cellCls(cushSt(p.act20, p.plan20))} style={tdP}><Diff v={p.act20} plan={p.plan20} cushion /></td>
-                      <td style={tdP}>{num(p.planMin)}</td>
-                      <td style={{ ...tdP, fontWeight:700 }}>{num(p.actMin)}</td>
-                      <td className={cellCls(p.noMin ? 'mid' : Math.round(p.actMin - p.planMin) === 0 ? null : actSt(p.actMin, p.planMin, true))} style={tdP}>{p.noMin ? <span style={{ color:'#8F4E00', fontWeight:700 }}>טרם התקבל</span> : <Diff v={p.actMin} plan={p.planMin} income />}</td>
+                      <td className={p.noMin ? cellCls('mid') : undefined} style={tdP}>{p.noMin ? <span style={{ color:'#8F4E00', fontWeight:700 }}>טרם התקבל</span> : <span className="num" style={{ fontWeight:700 }}>{num(p.actMin)}</span>}</td>
                       <td style={tdP}>{num(p.grant)}</td>
-                      <td className={p.grantPaid == null || canEditBase ? undefined : cellCls(actSt(p.grantPaid, p.grant, true))} style={tdP} title={p.grantPaid == null ? 'טרם נרשם מענק ששולם לחודש הזה' : `שולם ${num(p.grantPaid)} מול ${num(p.grant)} בתכנון`}>
-                        {canEditBase ? grantInput(r.id, cur.key, p.grantPaid, `מענק הרשת ששולם, ${shortName(r.name)}`)
-                          : p.grantPaid == null ? <span style={{ color:'var(--text3)' }}>—</span>
-                          : <span className="num" style={{ fontWeight:800, color: ST_COLOR[actSt(p.grantPaid, p.grant, true)] }}>{num(p.grantPaid)}</span>}</td>
                       <td style={{ ...tdP, color:'var(--purple)', fontWeight:700 }}>{num(p.transfer)}</td>
-                      <td className={p.paid == null ? undefined : cellCls(actSt(p.paid, p.transfer, true))} style={tdP} title={p.paid == null ? 'טרם נרשם במסך "תקבולים ותשלומים" מה שהסניף העביר' : undefined}>
-                        {p.paid == null ? <span style={{ color:'var(--text3)' }}>—</span> : <span className="num" style={{ fontWeight:800, color: ST_COLOR[actSt(p.paid, p.transfer, true)] }}>{num(p.paid)}</span>}</td>
-                      <td className={cellCls(gapSt(p.actGap))} style={tdP} title={`בתכנון: ${Math.round(p.planGap) === 0 ? 'מאוזן' : (p.planGap > 0 ? 'חסר ' : 'עודף ') + num(Math.abs(p.planGap))}${gapCause(p) ? ` · עיקר החוסר: ${gapCause(p).t} ${num(gapCause(p).v)}` : ''}`}><GapCell v={p.actGap} big /><Cause p={p} /></td>
+                      <td className={cellCls(gapSt(p.actGap))} style={tdP} title={gapCause(p) ? `עיקר החוסר: ${gapCause(p).t} ${num(gapCause(p).v)}` : undefined}><GapCell v={p.actGap} big /><Cause p={p} /></td>
                     </>)}
                   </tr>
                 ))}
@@ -6052,12 +6052,10 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <td style={{ padding:'10px 8px' }}>סה"כ</td>
                   <td style={tdP}>{num(pvaTot.planSal)}</td><td style={tdP}>{num(pvaTot.actSal)}</td><td className={cellCls(Math.round(pvaTot.actSal - pvaTot.planSal) === 0 ? null : actSt(pvaTot.actSal, pvaTot.planSal))} style={tdP}><Diff v={pvaTot.actSal} plan={pvaTot.planSal} /></td>
                   <td style={tdP}>{num(pvaTot.plan20)}</td><td style={tdP}>{num(pvaTot.act20)}</td><td className={cellCls(cushSt(pvaTot.act20, pvaTot.plan20))} style={tdP}><Diff v={pvaTot.act20} plan={pvaTot.plan20} cushion /></td>
-                  <td style={tdP}>{num(pvaTot.planMin)}</td><td style={tdP}>{num(pvaTot.actMin)}</td><td className={cellCls(Math.round(pvaTot.actMin - pvaTot.planMin) === 0 ? null : actSt(pvaTot.actMin, pvaTot.planMin, true))} style={tdP}><Diff v={pvaTot.actMin} plan={pvaTot.planMin} income /></td>
+                  <td style={tdP} title={noMinN ? `${noMinN} סניפים טרם קיבלו` : undefined}>{num(pvaTot.actMin)}</td>
                   <td style={tdP}>{num(pvaTot.grant)}</td>
-                  <td style={tdP}>{pvaRows.some(x => x.p?.grantPaid != null) ? num(pvaRows.reduce((a, x) => a + (x.p?.grantPaid || 0), 0)) : <span style={{ color:'var(--text3)' }}>—</span>}</td>
                   <td style={tdP}>{num(pvaTot.transfer)}</td>
-                  <td style={tdP}>{pvaRows.some(x => x.p?.paid != null) ? num(pvaRows.reduce((a, x) => a + (x.p?.paid || 0), 0)) : <span style={{ color:'var(--text3)' }}>—</span>}</td>
-                  <td className={cellCls(gapSt(pvaTot.actGap))} style={tdP} title={`בתכנון: ${(pvaTot.planGap > 0 ? 'חסר ' : 'עודף ') + num(Math.abs(pvaTot.planGap))}`}><GapCell v={pvaTot.actGap} big /><Cause p={pvaTot} /></td>
+                  <td className={cellCls(gapSt(pvaTot.actGap))} style={tdP} title={undefined}><GapCell v={pvaTot.actGap} big />{noMinN && pvaTot.actGap > 0 ? <span style={{ display:'block', fontSize:14, fontWeight:600, whiteSpace:'nowrap', marginTop:1 }}>משרד החינוך</span> : <Cause p={pvaTot} />}</td>
                 </tr>
               </tfoot>
             </table>
@@ -6071,25 +6069,20 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 {!p ? <p style={{ fontSize:14, color:'var(--text2)' }}>אין לסניף נתוני בסיס</p> : (<>
                   <CardRow label="הפער לחודש — ביצוע" strong><GapV v={p.actGap} /></CardRow>
                   {gapCause(p) && <CardRow label="עיקר החוסר">{gapCause(p).t} · {num(gapCause(p).v)}</CardRow>}
-                  <CardRow label="הפער לחודש — תכנון"><GapV v={p.planGap} /></CardRow>
-                  <CardRow label="עלות השכר — תכנון">{num(p.planSal)}</CardRow>
+                  <CardRow label="עלות השכר — ספטמבר">{num(p.planSal)}</CardRow>
                   <CardRow label="עלות השכר — ביצוע"><Act v={p.actSal} plan={p.planSal} /></CardRow>
                   <CardRow label="כרית 15% (מעלות ספטמבר)">{num(p.plan20)}</CardRow>
                   <CardRow label="נוצל מהכרית — החריגה בשכר">{num(p.act20)}<span style={{ marginInlineStart:8, fontSize:14 }}><Diff v={p.act20} plan={p.plan20} cushion /></span></CardRow>
-                  <CardRow label="משרד החינוך — תכנון">{num(p.planMin)}</CardRow>
-                  <CardRow label="משרד החינוך — ביצוע">{p.noMin ? <span style={{ color:'#8F4E00', fontWeight:700 }}>0 · טרם התקבל</span> : <Act v={p.actMin} plan={p.planMin} income />}</CardRow>
-                  <CardRow label="מענק הרשת — תכנון">{num(p.grant)}</CardRow>
-                  <CardRow label="מענק הרשת — ביצוע">{canEditBase ? grantInput(r.id, cur.key, p.grantPaid, `מענק הרשת ששולם, ${shortName(r.name)}`) : p.grantPaid == null ? <span style={{ color:'var(--text3)' }}>טרם נרשם</span> : <span className="num" style={{ fontWeight:800, color: ST_COLOR[actSt(p.grantPaid, p.grant, true)] }}>{num(p.grantPaid)}</span>}</CardRow>
-                  <CardRow label="העברת הסניף — תכנון" color="var(--purple)">{num(p.transfer)}</CardRow>
-                  <CardRow label="העברת הסניף — ביצוע">{p.paid == null ? <span style={{ color:'var(--text3)' }}>טרם נרשם</span> : <span className="num" style={{ fontWeight:800, color: ST_COLOR[actSt(p.paid, p.transfer, true)] }}>{num(p.paid)}</span>}</CardRow>
+                  <CardRow label="משרד החינוך — התקבל">{p.noMin ? <span style={{ color:'#8F4E00', fontWeight:700 }}>טרם התקבל</span> : num(p.actMin)}</CardRow>
+                  <CardRow label="מענק הרשת">{num(p.grant)}</CardRow>
+                  <CardRow label="העברת הסניף" color="var(--purple)">{num(p.transfer)}</CardRow>
                 </>)}
               </div>
             ))}
             <div className="apple-card mcard"><p className="mcard-name" style={{ marginBottom:4 }}>סה"כ הרשת</p>
               <CardRow label="הפער לחודש — ביצוע" strong><GapV v={pvaTot.actGap} /></CardRow>
-              <CardRow label="הפער לחודש — תכנון"><GapV v={pvaTot.planGap} /></CardRow>
               <CardRow label="עלות השכר — תכנון / ביצוע">{num(pvaTot.planSal)} / {num(pvaTot.actSal)}</CardRow>
-              <CardRow label="משרד החינוך — תכנון / ביצוע">{num(pvaTot.planMin)} / {num(pvaTot.actMin)}</CardRow>
+              <CardRow label="משרד החינוך — התקבל">{num(pvaTot.actMin)}</CardRow>
             </div>
           </div>
           </>
@@ -6108,7 +6101,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             <HelpBtn id="base" />
           </div>
           {help === 'base' && (
-            <p style={helpBox}>מכאן מוזן התכנון שבטבלת החודש. עלות ההוראה ומשרד החינוך — לפי הדוח שסוכם ב-23.9.2026. הכרית — 15% מעלות השכר בפועל בספטמבר, סכום קבוע לחודש; "נוצל" הוא מה שעלות ההוראה חרגה מהתכנון. קרית ביאליק, שאינה בדוח — לפי התקציב שסוכם איתה ב-24.9. מענק הרשת והעברת הסניף — הסכומים שבתוקף עכשיו; {canEditBase ? 'אפשר לשנות אותם כאן בכל עת, והשינוי נכנס מיד לטבלת החודש.' : 'רק מנהל הרשת משנה אותם.'}{' '}<b>בוצע עד כה</b> — מצטבר מתחילת השנה עד {months.length ? fmtMonth(months[months.length - 1].key) : ''} ({months.length === 1 ? 'חודש אחד' : `${months.length} חודשים`}). הצבע משווה אותו לחלק היחסי של התכנון השנתי לאותם חודשים: ירוק — עומד, כתום — חריגה עד 5% או שמשרד החינוך טרם התקבל, אדום — מעבר לזה.
+            <p style={helpBox}>מכאן מוזן התכנון שבטבלת החודש. עלות ההוראה — ספטמבר בפועל × 12 (חודש המוצא). משרד החינוך — לפי הדוח שסוכם ב-23.9.2026. הכרית — 15% מעלות השכר בפועל בספטמבר, סכום קבוע לחודש; "נוצל" הוא מה שעלות ההוראה חרגה מהתכנון. קרית ביאליק, שאינה בדוח — לפי התקציב שסוכם איתה ב-24.9. מענק הרשת והעברת הסניף — הסכומים שבתוקף עכשיו; {canEditBase ? 'אפשר לשנות אותם כאן בכל עת, והשינוי נכנס מיד לטבלת החודש.' : 'רק מנהל הרשת משנה אותם.'}{' '}<b>בוצע עד כה</b> — מצטבר מתחילת השנה עד {months.length ? fmtMonth(months[months.length - 1].key) : ''} ({months.length === 1 ? 'חודש אחד' : `${months.length} חודשים`}). הצבע משווה אותו לחלק היחסי של התכנון השנתי לאותם חודשים: ירוק — עומד, כתום — חריגה עד 5% או שמשרד החינוך טרם התקבל, אדום — מעבר לזה.
             {' '}<b>פער מחושב</b> — עלות ההוראה + הכרית − משרד החינוך − מענק הרשת. משבצת ההעברה ירוקה כשההעברה לשנה מכסה אותו.</p>
           )}
           <div className="apple-card table-scroll only-desktop" style={{ padding:0, overflowX:'auto' }}>
@@ -6129,7 +6122,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                   <th colSpan={2} scope="colgroup" className="gh-res">הסניף מעביר</th>
                 </tr>
                 <tr>
-                  <TH>סניף</TH><TH>תכנון שנתי</TH><TH>בוצע עד כה</TH><TH>לשנה</TH><TH>נוצל עד כה</TH>
+                  <TH>סניף</TH><TH>ספטמבר × 12</TH><TH>בוצע עד כה</TH><TH>לשנה</TH><TH>נוצל עד כה</TH>
                   <TH>תכנון שנתי</TH><TH>התקבל עד כה</TH><TH>לשנה</TH><TH>מחושב לשנה</TH><TH>לחודש</TH><TH>לשנה</TH>
                 </tr>
               </thead>
@@ -6177,7 +6170,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 <CardRow label="העברת הסניף לחודש" strong color="var(--purple)">{canEditBase ? baseInput(r.id, 'transfer', r.month, `העברת הסניף לחודש, ${r.name}`) : num(r.month)}</CardRow>
                 <CardRow label="העברה לשנה" color="var(--purple)">{num(r.year)}</CardRow>
                 <CardRow label="מענק הרשת לשנה">{canEditBase ? baseInput(r.id, 'supportYear', r.supportYear, `מענק הרשת לשנה, ${r.name}`) : num(r.supportYear)}</CardRow>
-                <CardRow label={r.hourlyYear > 0 ? `עלות הוראה — תכנון שנתי (כולל צהרון ${num(r.hourlyYear)})` : 'עלות הוראה — תכנון שנתי'}>{num(r.annual)}</CardRow>
+                <CardRow label="עלות הוראה — ספטמבר × 12">{num(r.annual)}</CardRow>
                 <CardRow label="עלות הוראה — בוצע עד כה"><Ytd v={ytdOf(r.id).actSal} plan={ytdOf(r.id).planSal} /></CardRow>
                 <CardRow label="כרית 15% — לשנה">{num(r.add20)}</CardRow>
                 <CardRow label="כרית 15% — נוצל עד כה"><span className="num" style={{ fontWeight:800, color: ST_COLOR[cushSt(ytdOf(r.id).act20, ytdOf(r.id).plan20)] }}>{num(ytdOf(r.id).act20)}</span></CardRow>
