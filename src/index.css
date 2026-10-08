@@ -1388,3 +1388,7 @@ input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(75,
 
 /* שורת "ממה נובע החוסר" מתחת לפער — התא האחרון גבוה מעט יותר, וכל השורות נשארות באותו גובה */
 .big-table.pvam tbody td { height: 58px; }
+
+/* טבלת הבסיס בתצוגה החודשית: 9 עמודות */
+.big-table.pvab.mo col { width: 10.8%; }
+.big-table.pvab.mo col.c-name { width: 13.6%; }

@@ -1068,6 +1068,15 @@ export async function saveLedger(schoolId, monthKey, v) {
   raise(error, 'שמירת התקבולים והתשלומים נכשלה');
 }
 
+// תקבול משרד החינוך לסניף בחודש — הזנה מדף המנכ"ל (שרה, 8.10.26). מעדכן רק את השדה הזה;
+// העברת הסניף, המענק ששולם וההערה שבאותה שורה אינם נוגעים. ההרשאה: רכזת בלבד (RLS).
+export async function setMinistryReceived(schoolId, monthKey, amount) {
+  const { error } = await supabase.from('school_payment_ledger').upsert({
+    school_id: schoolId, month_key: monthKey, ministry_received: amount ?? null, updated_at: new Date().toISOString(),
+  }, { onConflict: 'school_id,month_key' });
+  raise(error, 'שמירת תקבול משרד החינוך נכשלה');
+}
+
 /* משיכת תקציב וייעול ממבט-רשת — דרך שרת הביניים של המערכת, שמחזיק
    את קוד הגישה ומוודא שהמבקשת היא שרה. */
 export async function fetchHubBudget() {
