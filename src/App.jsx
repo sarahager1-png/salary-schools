@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 131;
+const BUILD = 132;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5452,25 +5452,28 @@ function BottomLineView({ activeMonth, viewer = false }) {
             הוחלפו ברצועה אחת — החשבון של הרשת, באותו סדר ובאותן מילים של הטבלה:
             בפועל − משרד החינוך − מענק הרשת − הסניפים מעבירים = לפני הכרית; + כרית = כולל הכרית.
           */}
+          {/*
+            "תעמיק מה הנתונים שצריכים פה" (שרה, 8.10): שישה כרטיסים, סיפור אחד —
+            כמה שילמנו ועמדנו ביעד; מה המשרד העביר ומי עוד לא; המענק (קבוע);
+            העברות הסניפים (קבוע) ומי העביר; כמה הרשת משלימה החודש; ומתחילת השנה.
+            "נשאר" ו"משרד + מענק יחד" ירדו — נתוני ביניים שיושבים בטבלה.
+          */}
           <div className="bl-eq" role="group" aria-label="החשבון החודשי של הרשת">
             <div className="bl-tile t-cost"><p className="l">עלות השכר בפועל</p><p className="v num">{num(sum('cost') + tzSum)}</p>
-              <p className="s">{anyTz ? `כולל מנהלות, הנהלה וצהרון (${num(tzSum)})` : 'כולל מנהלות'}</p></div>
-            <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>משרד החינוך + מענק הרשת</p><p className="v num">{num(minSum + tot.support)}</p>
-              <p className="s">{recvN === summed.length ? 'משרד החינוך: התקבל בפועל בכל הסניפים'
-                : recvN ? `משרד החינוך: התקבל בפועל ב-${recvN} מתוך ${summed.length} סניפים; בשאר — 0 עד שיתקבל`
-                : 'משרד החינוך: טרם הוזנו תקבולים — נספר 0'}</p></div>
-            <div className="bl-tile t-inc"><p className="l"><span className="op" aria-hidden="true">−</span>העברות סניפים קבועות</p><p className="v num">{num(dealSum)}</p>
-              <p className="s">{noDeal ? `עם ${noDeal === 1 ? 'סניף אחד' : noDeal + ' סניפים'} טרם סוכם` : 'לפי מה שסוכם איתם'}</p></div>
-            <div className="bl-tile t-res"><p className="l"><span className="op" aria-hidden="true">=</span>נשאר</p>
-              <p className="v"><Left v={-beforeSum} /></p>
-              <p className="s">אחרי השכר של החודש</p></div>
-            <div className="bl-tile t-res"><p className="l">עמד ביעד? · שכר מול {fmtMonth(baseMonth.key)}</p>
-              <p className="v" style={{ display:'flex', alignItems:'center' }}><TargetBar cost={sum('cost') + tzSum} base={baseCostNet} isBaseMonth={isBase} /></p>
-              <p className="s"><TargetNote cost={sum('cost') + tzSum} base={baseCostNet} isBaseMonth={isBase} block={false} /></p></div>
-            {/* "איפה כמה הרשת צריכה השלמה לכל חודש כולל המענק" (שרה, 8.10): המענק פחות היתרה — מה שהרשת מעבירה בפועל החודש */}
-            <div className="bl-tile t-res t-final"><p className="l">הרשת משלימה החודש</p>
+              <p className="s" style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}><TargetBar cost={sum('cost') + tzSum} base={baseCostNet} isBaseMonth={isBase} /><TargetNote cost={sum('cost') + tzSum} base={baseCostNet} isBaseMonth={isBase} block={false} /></p></div>
+            <div className="bl-tile t-inc" title={summed.filter(r => minInfo(r).key === 'none').length ? `טרם התקבל: ${summed.filter(r => minInfo(r).key === 'none').map(r => shortName(r.name)).join(', ')}` : undefined}>
+              <p className="l">משרד החינוך — התקבל</p><p className="v num">{num(minSum)}</p>
+              <p className="s">{recvN === summed.length ? 'בכל הסניפים' : `ב-${recvN} מתוך ${summed.length} סניפים; ${summed.length - recvN} טרם`}</p></div>
+            <div className="bl-tile t-inc"><p className="l">מענק הרשת</p><p className="v num">{num(tot.support)}</p>
+              <p className="s">קבוע — החלק ה-12 מהסכום השנתי</p></div>
+            <div className="bl-tile t-inc"><p className="l">העברות הסניפים — קבוע</p><p className="v num">{num(dealSum)}</p>
+              <p className="s">{summed.some(r => r.chabadPaid != null) ? `העבירו ${summed.filter(r => r.chabadPaid != null).length} מתוך ${summed.length}` : 'מי העביר — מסומן במסך התקבולים'}</p></div>
+            <div className="bl-tile t-res"><p className="l">הרשת משלימה החודש</p>
               <p className="v num">{num(completeRows)}</p>
               <p className="s">{isBase ? 'המענק — חודש הבסיס' : `מענק ${num(tot.support)}; חוסר מתווסף, עודף מקטין (לא מתחת לאפס)`}</p></div>
+            <div className="bl-tile t-res t-final"><p className="l">מתחילת השנה</p>
+              <p className="v">{isBase ? <span style={{ fontSize:20, color:'var(--text2)' }}>חודש הבסיס</span> : <Credit v={runningRows} />}</p>
+              <p className="s">{isBase ? `${fmtMonth(baseMonth.key)} = 100%` : <>שכר: <Saved v={saveTotalNet()} /></>}</p></div>
           </div>
 
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:6 }}>
