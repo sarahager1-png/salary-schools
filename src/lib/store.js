@@ -516,6 +516,45 @@ export async function linkAttachDoc(code, teacherMonthId, path) {
   return data ? rowToTeacher(data) : null;
 }
 
+/* ── בעיות בתלושי שכר (11.10.26) ──────────────────────────────
+   המנהלת מדווחת מהקישור החודשי: שם עובד/ת ומה הבעיה. הרכזת וחשבת השכר רואות
+   את הרשימה במסך האישורים ומסמנות "טופל". הדיווח אינו משנה שום נתון שכר. */
+const toSlipIssue = r => ({
+  id: r.id, createdAt: r.created_at, schoolId: r.school_id, monthKey: r.month_key,
+  teacherId: r.teacher_month_id, teacherName: r.teacher_name, issue: r.issue,
+  status: r.status, resolution: r.resolution, resolvedAt: r.resolved_at,
+});
+export async function linkAddSlipIssue(code, name, issue) {
+  const { data, error } = await supabase.rpc('link_slip_issue_add', { p_code: code, p_name: name, p_issue: issue });
+  raise(error, 'שמירת הדיווח נכשלה');
+  if (!data?.id) throw new Error('הדיווח לא נשמר. כדאי לנסות שוב.');
+  return toSlipIssue(data);
+}
+export async function linkSlipIssues(code) {
+  const { data, error } = await supabase.rpc('link_slip_issues', { p_code: code });
+  if (error) return null;   // הפונקציה עוד לא הותקנה במסד — החלק פשוט לא מוצג
+  return (data || []).map(toSlipIssue);
+}
+export async function listSlipIssues() {
+  // הפתוחים כולם, ובנפרד מה שטופל לאחרונה — כדי שמגבלת שורות לא תסתיר דיווח פתוח
+  const [open, done] = await Promise.all([
+    supabase.from('slip_issues').select('*').eq('status', 'open')
+      .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(1000),
+    supabase.from('slip_issues').select('*').eq('status', 'done')
+      .order('resolved_at', { ascending: false }).order('id', { ascending: false }).limit(100),
+  ]);
+  if (open.error || done.error) return null;   // אין הרשאה / הטבלה חסרה — אין מה להציג
+  return [...(open.data || []), ...(done.data || [])].map(toSlipIssue);
+}
+export async function resolveSlipIssue(id, done, resolution) {
+  // מי סימן ומתי נקבעים במסד (private.slip_issue_stamp); מכאן נשלחים רק הסטטוס והתשובה
+  const { data, error } = await supabase.from('slip_issues').update(done
+    ? { status: 'done', resolution: (resolution || '').trim().slice(0, 300) || null }
+    : { status: 'open', resolution: null }).eq('id', id).select('id');
+  raise(error, 'שמירת הסימון נכשלה');
+  if (!data?.length) throw new Error('הסימון לא נשמר. כדאי לרענן את המסך ולנסות שוב.');
+}
+
 // קישור צפייה לטופס מחלה — לשרה ולחשבת (מדיניות הדלי מגבילה לקריאה שלהן)
 export async function sickFormUrl(path) {
   const { data, error } = await supabase.storage.from('sick-forms').createSignedUrl(path, 600);

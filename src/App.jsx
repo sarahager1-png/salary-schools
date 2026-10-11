@@ -1027,6 +1027,75 @@ function ReportRejectDialog({ rows, label, monthLabel, schoolName, onCancel, onC
   );
 }
 
+/* בעיות בתלושים שמנהלות דיווחו מהקישור (שרה, 11.10.26). הרכזת וחשבת השכר רואות;
+   לתפקיד אחר הטבלה סגורה, והרכיב אינו מוצג. */
+function SlipIssuesPanel({ schools }) {
+  const inputStyle = { minHeight:40, fontSize:15.5 };
+  const [issues, setIssues] = useState(null);
+  const [showDone, setShowDone] = useState(false);
+  const [note, setNote] = useState({});
+  const [busy, setBusy] = useState('');   // פעולה אחת בכל פעם: בזמן שמירה כל הכפתורים נעולים
+  const load = useCallback(() => store.listSlipIssues().then(setIssues).catch(() => setIssues(null)), []);
+  useEffect(() => { load(); }, [load]);
+  if (!issues || issues.length === 0) return null;
+  const open = issues.filter(x => x.status !== 'done');
+  const done = issues.filter(x => x.status === 'done');
+  const shown = showDone ? issues : open;
+  const sName = id => shortName(schools.find(s => s.id === id)?.name || '');
+  const day = iso => new Date(iso).toLocaleDateString('he-IL', { day:'numeric', month:'numeric' });
+  const mark = async (x, on) => {
+    if (busy) return;
+    setBusy(x.id);
+    try { await store.resolveSlipIssue(x.id, on, note[x.id]); await load(); }
+    catch (e) { window.alert(e.message); }
+    finally { setBusy(''); }
+  };
+  return (
+    <div className="apple-card" style={{ padding:16, marginBottom:16, borderRight:'3px solid var(--warn)' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', marginBottom:8 }}>
+        <p style={{ fontWeight:700, fontSize:16.1, color:'var(--apple-text)' }}>
+          בעיות בתלושים שדווחו · {open.length === 0 ? 'אין פתוחות' : open.length === 1 ? 'אחת פתוחה' : `${open.length} פתוחות`}
+        </p>
+        {done.length > 0 && (
+          <button className="apple-btn apple-btn-ghost" style={{ fontSize:14, padding:'6px 12px', minHeight:36 }}
+            onClick={() => setShowDone(v => !v)}>
+            {showDone ? 'רק הפתוחות' : `גם מה שטופל (${done.length})`}
+          </button>
+        )}
+      </div>
+      {shown.length === 0 && <p style={{ fontSize:14, color:'var(--apple-text2)' }}>כל הדיווחים טופלו.</p>}
+      <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
+        {shown.map(x => (
+          <div key={x.id} style={{ border:'1px solid var(--line, rgba(0,0,0,.08))', borderRadius:12, padding:'10px 12px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', gap:8, alignItems:'baseline', flexWrap:'wrap' }}>
+              <span style={{ fontSize:15.5, fontWeight:700, wordBreak:'keep-all' }}>{x.teacherName}</span>
+              <span style={{ fontSize:14, color:'var(--apple-text2)' }}>{sName(x.schoolId)} · {day(x.createdAt)}</span>
+            </div>
+            <p style={{ fontSize:14.9, marginTop:4, lineHeight:1.6, whiteSpace:'pre-wrap' }}>{x.issue}</p>
+            {x.status === 'done' ? (
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:6, flexWrap:'wrap' }}>
+                <span style={{ fontSize:14, fontWeight:700, color:'var(--ok)' }}>✓ טופל{x.resolution ? `: ${x.resolution}` : ''}</span>
+                <button className="apple-btn apple-btn-ghost" disabled={!!busy} onClick={() => mark(x, false)}
+                  style={{ fontSize:14, padding:'5px 10px', minHeight:36 }}>פתיחה מחדש</button>
+              </div>
+            ) : (
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:8, flexWrap:'wrap' }}>
+                <input className="apple-input" style={{ ...inputStyle, flex:'1 1 200px', minWidth:0 }} maxLength={300}
+                  placeholder="מה נעשה (לא חובה, המנהלת רואה)" value={note[x.id] || ''}
+                  onChange={e => setNote(m => ({ ...m, [x.id]: e.target.value }))} />
+                <button className="apple-btn apple-btn-green" disabled={!!busy} onClick={() => mark(x, true)}
+                  style={{ fontSize:14.4, padding:'7px 16px', minHeight:40 }}>
+                  {busy === x.id ? 'שומרת…' : 'טופל'}
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, onApproveReport, onClose, fixes = [], onDecideFix, onDecideAllFixes = null, onClearReports = null, monthLabel = '', otherFixes = 0, onb = [], rejections = [], onRejectReports = null }) {
   // דיווחי מנהלות — השלב הראשון: בלי אישורה אין סימולציה ואין שכר (21.9.26)
   // מה-8.10.26: דיווח שחסר בו מסמך מוחזק ואינו בתור האישור; דיווח שנדחה ממתין לתיקון המנהלת
@@ -1071,6 +1140,8 @@ function ApprovalView({ teachers, schools, onApprove, onReject, onApproveAll, on
             <button className="apple-btn apple-btn-ghost" onClick={onClose} style={{ fontSize:14.9 }}>סגור</button>
           </div>
         </div>
+
+        <SlipIssuesPanel schools={schools} />
 
         {/* מה שמוצג כאן שייך לחודש הנבחר בלבד — שיהיה ברור, ושיידעו שיש עוד בחודש אחר */}
         {otherFixes > 0 && (
@@ -11173,6 +11244,82 @@ function LinkApproval({ rows, code, onSave, onAdd, schoolReform, schoolName, mal
   );
 }
 
+/* בעיה בתלוש שכר — המנהלת כותבת שם ומה הבעיה, והדיווח מגיע לחשבת השכר (שרה, 11.10.26).
+   פתוח גם כשהדיווח החודשי נעול: תלוש מתקבל אחרי סגירת החודש. הרשימה המשותפת
+   (datalist school-teachers) מוגדרת ב-LinkMonthlyReport. */
+function LinkSlipIssues({ code }) {
+  const inputStyle = { minHeight:42, fontSize:16.1 };
+  const [issues, setIssues] = useState(null);   // null = עוד לא נטען, או שהחלק אינו זמין במסד
+  const [name, setName] = useState('');
+  const [text, setText] = useState('');
+  const [state, setState] = useState('');
+  const saving = state === 'saving';
+  const sending = useRef(false);   // חוסם לחיצה כפולה לפני שהמצב מתעדכן
+  useEffect(() => {
+    let live = true;
+    store.linkSlipIssues(code).then(x => { if (live) setIssues(x); }).catch(() => {});
+    return () => { live = false; };
+  }, [code]);
+  if (issues === null) return null;
+  const send = async () => {
+    if (name.trim().length < 2) { setState('יש לכתוב את שם העובד/ת'); return; }
+    if (text.trim().length < 3) { setState('יש לכתוב מה הבעיה בתלוש'); return; }
+    if (sending.current) return;
+    sending.current = true;
+    setState('saving');
+    try {
+      const row = await store.linkAddSlipIssue(code, name, text);
+      setIssues(prev => [row, ...(prev || [])]);
+      setName(''); setText(''); setState('saved');
+    } catch (e) { setState(e.message || 'שמירת הדיווח נכשלה'); }   // מה שנכתב נשאר בטופס
+    finally { sending.current = false; }
+  };
+  const day = iso => new Date(iso).toLocaleDateString('he-IL', { day:'numeric', month:'numeric' });
+  return (
+    <div className="apple-card" style={{ padding:'14px 15px' }}>
+      <p style={{ fontSize:16.7, fontWeight:800, color:'var(--warn)', marginBottom:4 }}>בעיה בתלוש שכר</p>
+      <p style={{ fontSize:14, color:'var(--text2)', marginBottom:9, lineHeight:1.6 }}>
+        קיבלתן תלוש שיש בו טעות? רשמו את שם העובד/ת ומה הבעיה, וזה מגיע ישר לחשבת השכר.
+      </p>
+      <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
+        <input list="school-teachers" className="apple-input" style={{ ...inputStyle, width:'100%' }}
+          placeholder="שם העובד/ת…" value={name} maxLength={80} disabled={saving}
+          onChange={e => { setName(e.target.value); setState(''); }} />
+        <textarea className="apple-input" rows={3} maxLength={600}
+          style={{ ...inputStyle, width:'100%', height:'auto', minHeight:84, paddingBlock:10, lineHeight:1.6, resize:'vertical' }}
+          placeholder="מה הבעיה? למשל: חסרות שעות, לא שולם גמול, ותק לא נכון…" value={text} disabled={saving}
+          onChange={e => { setText(e.target.value); setState(''); }} />
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:10, flexWrap:'wrap' }}>
+        <button className="apple-btn apple-btn-blue" disabled={state === 'saving'} onClick={send}
+          style={{ minHeight:40, paddingInline:20 }}>
+          {state === 'saving' ? 'שולחת…' : 'שליחת הדיווח'}
+        </button>
+        {state === 'saved' && <span style={{ fontSize:14.4, color:'var(--ok)', fontWeight:600 }}>✓ הדיווח נשלח</span>}
+        {state && !['saving','saved'].includes(state) &&
+          <span style={{ fontSize:14, color:'var(--danger)' }}>{state}</span>}
+      </div>
+      {issues.length > 0 && (
+        <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:7 }}>
+          <p style={{ fontSize:14, fontWeight:700, color:'var(--text2)' }}>מה שדיווחתן ({issues.length})</p>
+          {issues.map(x => (
+            <div key={x.id} style={{ border:'1px solid var(--line, rgba(0,0,0,.08))', borderRadius:12, padding:'9px 11px' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', gap:8, alignItems:'baseline', flexWrap:'wrap' }}>
+                <span style={{ fontSize:15, fontWeight:700 }}>{x.teacherName}</span>
+                <span style={{ fontSize:14, fontWeight:700, color: x.status === 'done' ? 'var(--ok)' : 'var(--warn)' }}>
+                  {x.status === 'done' ? '✓ טופל' : 'בטיפול'} · {day(x.createdAt)}
+                </span>
+              </div>
+              <p style={{ fontSize:14.4, color:'var(--text2)', marginTop:3, lineHeight:1.6, whiteSpace:'pre-wrap' }}>{x.issue}</p>
+              {x.resolution && <p style={{ fontSize:14, color:'var(--ok)', marginTop:3, lineHeight:1.6, whiteSpace:'pre-wrap' }}>תשובה: {x.resolution}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LinkMonthlyReport({ rows, locked, onSave, code, onAttachDoc }) {
   const byName = (n) => rows.find(t => t.name === String(n || '').trim());
   // "צרוף אשור רק ליולדת" (שרה, 4.10.26): אחרי ה-20 הדיווח סגור, ורק אישור
@@ -11507,6 +11654,8 @@ function LinkMonthlyReport({ rows, locked, onSave, code, onAttachDoc }) {
           </div>
         );
       })()}
+
+      <LinkSlipIssues key={code} code={code} />
 
       {/* ── מה שדווח החודש ── */}
       <p style={{ fontSize:14.9, fontWeight:700, color:'var(--text2)', marginTop:2 }}>
