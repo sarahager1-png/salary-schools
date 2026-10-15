@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 182;
+const BUILD = 183;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -8622,7 +8622,13 @@ function SlipsView({ schools, teachers, monthKey, fmtMonthFn, onSaveTeacher, onM
           folded.set(main.id, [...(folded.get(main.id) || []), t]);
           return false;
         });
-        const extraOf = t => (folded.get(t.id) || []).map(h => ({ h, gross: Number(h._agreedGross) || Number(h._officialGross) || 0 }));
+        // שורה שעתית ששכרה לפי דוח נוכחות (סייעת שיש לה גם שורת הוראה — 15.10):
+        // הסכום מהדוח × התעריף, כמו בשורה שעתית עצמאית; בלי זה נספר 0 כי אין לה ברוטו מוזן
+        const extraGross = h => {
+          const pb = payBreakdown(h);
+          return pb.fromAttendance || pb.awaitingAttendance ? pb.gross : (Number(h._agreedGross) || Number(h._officialGross) || 0);
+        };
+        const extraOf = t => (folded.get(t.id) || []).map(h => ({ h, gross: extraGross(h) }));
         const rows = ts.map(t => {
           const r = rowFor(t, paysSupp);
           const ex = extraOf(t);
