@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 183;
+const BUILD = 184;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5408,6 +5408,228 @@ function CeoImportDialog({ branches, month, monthLabel, onClose, onSave }) {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   מצגת לפגישה עם סניף — מנהלת, שליח ורשת
+   ═══════════════════════════════════════════════════════════════
+   "יש לי פגישה עם המנהלת, השליח והרשת על נושא השכר. צריך להציג נתונים
+   כלליים, נתוני החודש, להסביר שיתכנו שינויים — שקוף"; "עם כל אחד ואחד";
+   "דף מצגת לנייד/מקרן"; "שיהיה בתוך מערכת שכר מורים" (שרה, 18.10.26).
+
+   שקף אחד בכל פעם, לסניף אחד ולחודש אחד. כל המספרים מאותו חישוב של
+   "תמונת מצב חודשית" (pvaOf בדף המנכ"ל) — המצגת אינה מחשבת דבר משלה,
+   רק מסדרת. שקף הרשת מציג סכומים לכל הרשת בלבד, בלי שמות סניפים אחרים.
+   קריאה בלבד.
+*/
+// שם הסניף במצגת: העיר בלבד ("גני תקוה", "רעננה")
+const deckName = n => shortName(n).replace(/^(שלהבות|בנות|בנים)\s+/, '').replace(/\s*קטמון$/, '');
+function MeetingDeck({ branches, monthList, initialMonth, deckOf, netOf, onClose }) {
+  const [month, setMonth] = useState(initialMonth);
+  const [bid, setBid] = useState('');
+  const [withNet, setWithNet] = useState(true);
+  const [i, setI] = useState(0);
+  const d = bid ? deckOf(bid, month) : null;
+  const net = withNet ? netOf(month) : null;
+  const num = v => (v == null || Number.isNaN(v) ? '—' : Math.round(v).toLocaleString('he-IL'));
+  const name = deckName;
+  const mLabel = fmtMonth(month);
+  const nextKey = (() => { const [y, m] = month.split('-').map(Number); const x = new Date(y, m, 1); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}`; })();
+  const Money = ({ v }) => <span style={{ whiteSpace:'nowrap' }}><bdi dir="ltr" className="num">{num(v)}</bdi> ₪</span>;
+  const Gap = ({ v }) => Math.round(v) === 0 ? <span className="md-ok">מאוזן</span>
+    : v > 0 ? <span className="md-bad">חסר <Money v={v} /></span> : <span className="md-ok">עודף <Money v={-v} /></span>;
+
+  const slides = [];
+  if (d) {
+    const bd = d.bd, R = Math.round;
+    const cushLeft = d.p ? R(Math.max(0, d.p.plan20 - d.p.act20)) : 0;
+    /*
+      כל מרכיב מוצג מעוגל לשקל, והפער מחושב מהמרכיבים המעוגלים — כדי שהתרגיל על המסך יסתדר
+      בחיבור ובחיסור. ההפרש מהטבלה במסך (שמעגלת רק את התוצאה) הוא לכל היותר שקלים בודדים.
+    */
+    const p = d.p && { ...d.p, actSal: R(d.p.actSal), actMin: R(d.p.actMin), grant: R(d.p.grant), transfer: R(d.p.transfer) };
+    if (p) p.actGap = p.actSal + cushLeft - p.actMin - p.grant - p.transfer;
+    slides.push({ key: 'cover', render: () => (
+      <div className="md-cover">
+        <p className="md-eyebrow">רשת חינוך חב"ד · שכר המורים</p>
+        <h1>{name(d.name)}</h1>
+        <p className="md-lead">תמונת מצב · {mLabel}</p>
+        <p className="md-who">פגישת המנהלת, השליח והרשת</p>
+        <p className="md-small">{d.frozenAt ? `החודש נסגר ב-${new Date(d.frozenAt).toLocaleDateString('he-IL')} — המספרים שלו קבועים` : 'החודש עדיין פתוח — המספרים עשויים להתעדכן'}</p>
+      </div>) });
+    if (net) slides.push({ key: 'net', render: () => (
+      <div>
+        <h2>הרשת כולה · {mLabel}</h2>
+        <p className="md-lead">כדי לראות את הסניף בתוך התמונה הכללית. סכומים לכל הרשת יחד.</p>
+        <div className="md-tiles">
+          <div className="md-tile"><p className="l">סניפים</p><p className="v num">{net.branches}</p></div>
+          <div className="md-tile"><p className="l">עובדות בשכר</p><p className="v num">{net.staff}</p></div>
+          <div className="md-tile t-cost"><p className="l">עלות השכר בחודש</p><p className="v"><Money v={net.actSal} /></p></div>
+          <div className="md-tile t-inc"><p className="l">משרד החינוך — התקבל</p><p className="v"><Money v={net.actMin} /></p></div>
+          <div className="md-tile t-inc"><p className="l">מענק הרשת</p><p className="v"><Money v={net.grant} /></p></div>
+          <div className="md-tile t-inc"><p className="l">העברות הסניפים</p><p className="v"><Money v={net.transfer} /></p></div>
+        </div>
+        <p className="md-note">הרשת משלמת את השכר לכל העובדות בכל הסניפים. מולו נכנסים: משרד החינוך, מענק הרשת וההעברה החודשית של כל סניף.</p>
+      </div>) });
+    if (bd) {
+      const yearTransfer = bd.month == null ? null : bd.month * 12;
+      const yearLeft = R(bd.annual) + R(bd.add20) - R(d.minYear) - R(bd.supportYear) - (yearTransfer == null ? 0 : R(yearTransfer));
+      slides.push({ key: 'model', render: () => (
+        <div>
+          <h2>איך בנוי המימון של השכר</h2>
+          <p className="md-lead">לשנה, לפי עלות השכר של {fmtMonth(d.baseKey)} (חודש המוצא) כפול 12.</p>
+          <div className="md-eq">
+            <div className="md-row t-cost"><span>עלות השכר לשנה</span><Money v={bd.annual} /></div>
+            <div className="md-row t-cost"><span><b className="op">+</b>כרית ביטחון 15%</span><Money v={bd.add20} /></div>
+            <div className="md-row t-inc"><span><b className="op">−</b>משרד החינוך (צפי)</span><Money v={d.minYear} /></div>
+            <div className="md-row t-inc"><span><b className="op">−</b>מענק הרשת</span><Money v={bd.supportYear} /></div>
+            <div className="md-row t-inc"><span><b className="op">−</b>העברת הסניף</span>{yearTransfer == null ? <span className="md-warn">טרם סוכם</span> : <Money v={yearTransfer} />}</div>
+            <div className="md-row t-res"><span><b className="op">=</b>נשאר לשנה</span><Gap v={yearLeft} /></div>
+          </div>
+          <p className="md-note">הכרית שומרת מקום לשינויים במהלך השנה (ותק, החלפות, תוספות). {bd.month != null && <>ההעברה החודשית שסוכמה: <b><Money v={bd.month} /></b>.</>}</p>
+        </div>) });
+    }
+    if (p) slides.push({ key: 'month', render: () => (
+      <div>
+        <h2>{mLabel} במספרים</h2>
+        <div className="md-tiles">
+          <div className="md-tile"><p className="l">עובדות בשכר</p><p className="v num">{d.staff}</p>
+            <p className="s">{d.withActual >= d.staff ? 'כולן לפי התלוש' : `${d.withActual} לפי התלוש, השאר אומדן`}</p></div>
+          <div className="md-tile t-cost"><p className="l">עלות השכר</p><p className="v"><Money v={p.actSal} /></p>
+            <p className="s">{d.isBase ? 'חודש המוצא' : Math.round(p.actSal - p.planSal) === 0 ? `כמו ב${fmtMonth(d.baseKey)}` : p.actSal > p.planSal ? <span className="md-bad">גבוה ב-<Money v={p.actSal - p.planSal} /> מ{fmtMonth(d.baseKey)}</span> : <span className="md-ok">נמוך ב-<Money v={p.planSal - p.actSal} /> מ{fmtMonth(d.baseKey)}</span>}</p></div>
+          <div className="md-tile t-inc"><p className="l">משרד החינוך</p><p className="v">{p.noMin ? <span className="md-warn">טרם התקבל</span> : <Money v={p.actMin} />}</p>
+            <p className="s">{p.noMin ? <>צפי: <Money v={d.minMonth} /></> : p.minFrom ? `לפי התקבול של ${fmtMonth(p.minFrom)}` : 'התקבל לחודש'}</p></div>
+          <div className="md-tile t-inc"><p className="l">מענק הרשת</p><p className="v"><Money v={p.grant} /></p><p className="s">לחודש</p></div>
+          <div className="md-tile t-inc"><p className="l">העברת הסניף</p><p className="v">{bd?.month == null ? <span className="md-warn">טרם סוכם</span> : <Money v={p.transfer} />}</p><p className="s">לחודש</p></div>
+          <div className="md-tile t-res"><p className="l">הפער לחודש</p><p className="v"><Gap v={p.actGap} /></p><p className="s">{d.cause ? `עיקר החוסר: ${d.cause}` : 'אחרי כל המקורות'}</p></div>
+        </div>
+      </div>) });
+    if (p) slides.push({ key: 'calc', render: () => (
+      <div>
+        <h2>החשבון של {mLabel}</h2>
+        <div className="md-eq">
+          <div className="md-row t-cost"><span>עלות השכר בפועל</span><Money v={p.actSal} /></div>
+          <div className="md-row t-cost"><span><b className="op">+</b>כרית הביטחון שנשארה</span><Money v={cushLeft} /></div>
+          <div className="md-row t-inc"><span><b className="op">−</b>משרד החינוך</span>{p.noMin ? <span className="md-warn">טרם התקבל (0)</span> : <Money v={p.actMin} />}</div>
+          <div className="md-row t-inc"><span><b className="op">−</b>מענק הרשת</span><Money v={p.grant} /></div>
+          <div className="md-row t-inc"><span><b className="op">−</b>העברת הסניף</span><Money v={p.transfer} /></div>
+          <div className="md-row t-res"><span><b className="op">=</b>הפער לחודש</span><Gap v={p.actGap} /></div>
+        </div>
+        <p className="md-note">
+          {p.act20 > 0 ? <>השכר החודש גבוה מ{fmtMonth(d.baseKey)}, ולכן נוצלו <Money v={Math.min(p.act20, p.plan20)} /> מהכרית ({num(p.plan20)} ₪). </> : <>הכרית ({num(p.plan20)} ₪) לא נוצלה. </>}
+          בלי הכרית: <Gap v={p.actGap - cushLeft} />.
+          {p.noMin && <> כשיגיע התקבול ממשרד החינוך (צפי <Money v={d.minMonth} />), הפער יקטן בהתאם.</>}
+        </p>
+      </div>) });
+    if (d.hist.length > 1) slides.push({ key: 'hist', render: () => (
+      <div>
+        <h2>מתחילת השנה</h2>
+        <div className="md-table-wrap">
+          <table className="md-table">
+            <thead><tr><th>חודש</th><th>עלות השכר</th><th>הפער לחודש</th><th>מצב</th></tr></thead>
+            <tbody>{d.hist.map(h => (
+              <tr key={h.key}><th scope="row">{fmtMonth(h.key)}</th><td><Money v={h.actSal} /></td><td><Gap v={h.actGap} /></td><td>{h.frozen ? 'נסגר' : 'פתוח'}</td></tr>
+            ))}</tbody>
+          </table>
+        </div>
+        <p className="md-note">חודש פתוח עשוי להשתנות עד שהוא נסגר ב-10 בחודש שאחריו.</p>
+      </div>) });
+    const flags = [];
+    if (!d.frozenAt) flags.push(`${mLabel} עדיין פתוח: התלושים שלו מגיעים עד ה-10 ב${fmtMonth(nextKey).replace(/\s*\d{4}$/, '')}, ועד אז חלק מהמספרים הם אומדן של המערכת.`);
+    if (d.withActual < d.staff) flags.push(`${d.staff - d.withActual} מתוך ${d.staff} העובדות עדיין לפי אומדן (מחשבון משרד החינוך), לא לפי התלוש.`);
+    if (d.simOnly) flags.push('יש תיקוני ברוטו לפי התלושים שממתינים לאישור. עד האישור הסניף מוצג לפי הסימולציה.');
+    if (p?.noMin) flags.push(`משרד החינוך טרם העביר לחודש הזה. הצפי: ${num(d.minMonth)} ₪. כשהתקבול יגיע — הפער יקטן.`);
+    if (d.hourly > 0) flags.push('שכר הצהרון והמנהלה נקבע כל חודש לפי דוח הנוכחות, ולכן משתנה מחודש לחודש.');
+    if (bd && bd.month == null) flags.push('עוד לא נקבע סכום להעברה החודשית של הסניף.');
+    slides.push({ key: 'change', render: () => (
+      <div>
+        <h2>מה עשוי להשתנות — בשקיפות</h2>
+        {flags.length > 0 && (<>
+          <p className="md-sub">אצלכם, עכשיו</p>
+          <ul className="md-list md-list-warn">{flags.map(f => <li key={f}>{f}</li>)}</ul>
+        </>)}
+        <p className="md-sub">במהלך השנה, בכל הסניפים</p>
+        <ul className="md-list">
+          <li>ותק, דרגות, גמולי השתלמות ותוספות מתעדכנים במהלך השנה ומעלים את השכר.</li>
+          <li>שינויים בצוות — עובדת חדשה, שינוי שעות, חופשת לידה ומילוי מקום — משנים את העלות מהחודש שבו קרו.</li>
+          <li>כשתלוש שונה מהחישוב, מתקנים בחודש שאחרי (הפרשים), וזה יכול להזיז חודש מסוים.</li>
+          <li>תקבולי משרד החינוך מגיעים לפעמים באיחור או בסכום אחר מהתכנון, לפי מצבת התלמידים ושעות התקן.</li>
+          <li>שינויים ארציים בשכר המורים חלים על כולם.</li>
+        </ul>
+      </div>) });
+    slides.push({ key: 'next', render: () => (
+      <div>
+        <h2>איך ממשיכים מכאן</h2>
+        <ol className="md-steps">
+          <li><b>מה-1 עד ה-20 בכל חודש</b><span>המנהלת מדווחת בקישור החודשי על כל שינוי: שעות, היעדרויות, עובדות חדשות.</span></li>
+          <li><b>עד ה-10 בחודש שאחרי</b><span>מגיעים התלושים, והעלות מתעדכנת מאומדן לבפועל.</span></li>
+          <li><b>ב-10 בחודש שאחרי</b><span>החודש נסגר, והמספרים שלו קבועים.</span></li>
+          <li><b>כל חודש</b><span>{bd?.month != null ? <>הסניף מעביר <Money v={bd.month} /> לחודש, כפי שסוכם.</> : 'הסניף מעביר את הסכום החודשי שיסוכם.'}</span></li>
+        </ol>
+        <p className="md-note">שינוי שידוע מראש — עדיף לעדכן לפני שהוא קורה, כדי שלא יפתיע בתלוש.</p>
+      </div>) });
+  }
+  const n = slides.length;
+  const at = Math.min(i, Math.max(0, n - 1));
+  useEffect(() => { setI(0); }, [bid, month, withNet]);
+  useEffect(() => {
+    const onKey = e => {
+      if (e.target?.tagName === 'SELECT' || e.target?.tagName === 'INPUT') return;
+      if (e.key === 'Escape') { onClose(); return; }
+      if (!n || (e.key === ' ' && e.target?.tagName === 'BUTTON')) return;
+      else if (e.key === 'ArrowLeft' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); setI(x => Math.min(x + 1, n - 1)); }
+      else if (e.key === 'ArrowRight' || e.key === 'PageUp') { e.preventDefault(); setI(x => Math.max(x - 1, 0)); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [n, onClose]);
+  // החלקה בנייד: ימינה = הקודם, שמאלה = הבא (כמו קריאה בעברית)
+  const touch = useRef(null);
+  const onTouchStart = e => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
+  const onTouchEnd = e => { const t0 = touch.current; touch.current = null; if (!t0 || !n) return;
+    const dx = e.changedTouches[0].clientX - t0.x, dy = e.changedTouches[0].clientY - t0.y;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;   // גלילה אנכית בשקף אינה מעבר שקף
+    setI(x => dx < 0 ? Math.min(x + 1, n - 1) : Math.max(x - 1, 0)); };
+
+  return createPortal(
+    <div className="mdeck" dir="rtl" role="dialog" aria-modal="true" aria-label="מצגת לפגישה עם סניף">
+      <div className="md-bar no-print">
+        <select className="apple-input" value={bid} onChange={e => { setBid(e.target.value); e.target.blur(); }} aria-label="סניף">
+          <option value="">בחירת סניף…</option>
+          {branches.map(b => <option key={b.id} value={b.id}>{name(b.name)}</option>)}
+        </select>
+        <select className="apple-input" value={month} onChange={e => { setMonth(e.target.value); e.target.blur(); }} aria-label="חודש">
+          {monthList.map(m => <option key={m.key} value={m.key}>{fmtMonth(m.key)}</option>)}
+        </select>
+        <label className="md-check"><input type="checkbox" checked={withNet} onChange={e => setWithNet(e.target.checked)} />שקף הרשת</label>
+        <span style={{ flex:1 }} />
+        {d && <button type="button" className="apple-btn apple-btn-ghost" onClick={() => window.print()}><Printer size={16} />הדפסה</button>}
+        <button type="button" className="apple-btn apple-btn-ghost" onClick={onClose} aria-label="סגירת המצגת"><X size={18} />סגירה</button>
+      </div>
+      {!d ? (
+        <div className="md-stage"><div className="md-slide md-empty">
+          <h2>מצגת לפגישה עם סניף</h2>
+          <p className="md-lead">בוחרים סניף וחודש למעלה. המצגת מציגה את נתוני הסניף בלבד, מאותו חישוב של תמונת המצב החודשית.</p>
+        </div></div>
+      ) : (<>
+        <div className="md-stage" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onTouchCancel={() => { touch.current = null; }}>
+          {slides.map((s, k) => (
+            <section key={s.key} className="md-slide" data-on={k === at ? '' : undefined} aria-hidden={k === at ? undefined : true}>
+              {s.render()}
+              <p className="md-foot"><span>{name(d.name)} · {mLabel}</span><bdi dir="ltr" className="num">{k + 1} / {n}</bdi></p>
+            </section>
+          ))}
+        </div>
+        <div className="md-nav no-print">
+          <button type="button" className="apple-btn apple-btn-ghost" disabled={at === 0} onClick={() => setI(at - 1)} aria-label="השקף הקודם"><ChevronRight size={22} />הקודם</button>
+          <div className="md-dots" role="tablist" aria-label="שקפים">
+            {slides.map((s, k) => <button key={s.key} type="button" role="tab" aria-selected={k === at} aria-label={`שקף ${k + 1}`} onClick={() => setI(k)} />)}
+          </div>
+          <button type="button" className="apple-btn apple-btn-blue" disabled={at === n - 1} onClick={() => setI(at + 1)} aria-label="השקף הבא">הבא<ChevronLeft size={22} /></button>
+        </div>
+      </>)}
+    </div>,
+    document.body);
+}
+
 function BottomLineView({ activeMonth, viewer = false }) {
   const [data, setData] = useState(null);
   const [err, setErr]   = useState('');
@@ -5424,6 +5646,12 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const [basePer, setBasePer] = useState('year');   // טבלת הבסיס: 'year' שנתי | 'month' חודשי (שרה, 8.10: "אם אני לוחצת — שנתי; אם אני לוחצת — חודשי")
   const [help, setHelp] = useState('');   // "ההסברים בלחיצה" (שרה, 8.10): 'month' | 'base' | '' — ההסבר שפתוח עכשיו
   const [copied, setCopied] = useState(false);   // "סיכום להעברה" הועתק   // בהשוואה: 'salary' — עמידה ביעד (שכר) | 'cash' — מזומן
+  const [deck, setDeck] = useState(false);   // מצגת לפגישה עם סניף (שרה, 18.10.26)
+  useEffect(() => {   // בזמן המצגת ההדפסה מדפיסה את השקפים בלבד
+    if (!deck) return;
+    document.body.classList.add('md-open');
+    return () => document.body.classList.remove('md-open');
+  }, [deck]);
   const doClose = async action => {
     setClosing(true); setErr('');
     try { await store.closeMonthSummary(sel, action); setData(await store.fetchMonthlySummary()); setAskClose(null); }
@@ -6025,6 +6253,32 @@ function BottomLineView({ activeMonth, viewer = false }) {
   const helpBox = { fontSize:14.6, color:'var(--text2)', lineHeight:1.75, background:'#FAF8FE', border:'1px solid #E3DCF2', borderRadius:12, padding:'10px 14px', margin:'0 0 10px' };
   // סימן החשבון ליד שם העמודה — כדי שהשורה תיקרא כתרגיל
   const Op = ({ c }) => <span aria-hidden="true" style={{ color:'var(--text3)', fontWeight:800, marginInlineEnd:4 }}>{c}</span>;
+  /*
+    המצגת לפגישה (MeetingDeck): אותם מספרים של הטבלה למעלה — pvaIn לחודש ולסניף, ונתוני הבסיס
+    השנתיים מ-baseById. המצגת נפתחת על החודש האחרון שנסגר (הנתונים הסופיים), ואפשר לעבור לחודש פתוח.
+  */
+  const deckOf = (id, key) => {
+    const m = months.find(x => x.key === key), b = m?.branches.find(x => x.id === id);
+    if (!b) return null;
+    const p = pvaIn(m, id);
+    return { id, name: b.name, key, frozenAt: m.frozenAt || null, isBase: key === baseMonth?.key, baseKey: baseMonth?.key,
+      staff: b.staff || 0, withActual: b.withActual || 0, simOnly: !!b.simOnly, hourly: b.hourly || 0,
+      p, bd: baseById.get(id) || null, cause: gapCause(p)?.t || null,
+      get minMonth() { return Math.round(this.minYear / 12); },
+      /*
+        צפי משרד החינוך — מה שרשום לסניף ב"כספי הסניפים" (school_finance.ministry_budget), שעודכן לפי
+        התקבולים בפועל (שרה, 7.10: גני תקוה, אור עקיבא, ירושלים). לא הדוח מ-23.9, שאצל חלק מהסניפים ישן.
+      */
+      minYear: liveBase.get(id)?.ministryYear ?? (b.ministry != null ? b.ministry * 12 : baseById.get(id)?.ministry ?? 0),
+
+      hist: months.filter(x => x.key <= key).map(x => { const q = pvaIn(x, id); const R = Math.round;
+        // אותו עיגול של שקף החשבון — כדי שהפער לחודש יהיה אותו מספר בשני השקפים
+        return q ? { key: x.key, actSal: R(q.actSal), actGap: R(q.actSal) + R(Math.max(0, q.plan20 - q.act20)) - R(q.actMin) - R(q.grant) - R(q.transfer), frozen: !!x.frozenAt } : null; }).filter(Boolean) };
+  };
+  const deckNet = key => { const m = months.find(x => x.key === key);
+    return { ...pvaNet(m), branches: m?.branches.length || 0, staff: (m?.branches || []).reduce((a, b) => a + (b.staff || 0), 0) }; };
+  const deckMonth = [...months].reverse().find(m => m.frozenAt)?.key || sel;
+  const deckBranches = (months.find(m => m.key === deckMonth)?.branches || []).slice().sort((a, b) => deckName(a.name).localeCompare(deckName(b.name), 'he'));
 
   return (
     <div className="fade-in page-wrap" style={{ maxWidth:1180 }} dir="rtl">
@@ -6036,6 +6290,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
             <ShieldCheck size={14} strokeWidth={2.4} />צפייה בלבד
           </span>) : null}
         actions={months.length > 0 ? (
+          <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
           <div className="apple-seg" role="group" aria-label="בחירת חודש" style={{ flexWrap:'wrap' }}>
             {months.map(m => (
               <button key={m.key} onClick={() => setSel(m.key)} aria-pressed={sel === m.key}
@@ -6043,8 +6298,15 @@ function BottomLineView({ activeMonth, viewer = false }) {
                 style={{ padding:'6px 15px', fontSize:15, minHeight:40 }}>{fmtMonth(m.key)}</button>
             ))}
           </div>
+          {!viewer && deckBranches.length > 0 && (
+            <button type="button" className="apple-btn apple-btn-blue no-print" onClick={() => setDeck(true)} style={{ minHeight:40, fontSize:15 }}>
+              <Users size={16} strokeWidth={2.2} />מצגת לפגישה עם סניף
+            </button>
+          )}
+          </div>
         ) : null}
       />
+      {deck && <MeetingDeck branches={deckBranches} monthList={months} initialMonth={deckMonth} deckOf={deckOf} netOf={deckNet} onClose={() => setDeck(false)} />}
 
       {err && (
         <div role="alert" style={{ background:'var(--danger-bg)', color:'var(--danger-text)', border:'1px solid var(--danger-line)', borderRadius:12,

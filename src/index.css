@@ -1443,3 +1443,130 @@ input.nospin { -moz-appearance: textfield; appearance: textfield; }
 .big-table.pvaf col:nth-child(12) { width: 6.9%; }
 .big-table.pvaf col:nth-child(13) { width: 9.9%; }
 .big-table.pvaf tr:not(.bl-groups) > :nth-child(12) { border-inline-start: 2px solid #E3DCF2; }
+
+/* ═══════════════════════════════════════════════════
+   מצגת לפגישה עם סניף (MeetingDeck) — שקף אחד בכל פעם,
+   לנייד ולמקרן; בהדפסה — כל שקף בעמוד משלו.
+═══════════════════════════════════════════════════ */
+.mdeck { position: fixed; inset: 0; z-index: 90; background: linear-gradient(160deg, #F6F3FC 0%, #EEF8FA 100%);
+  display: flex; flex-direction: column; color: var(--text); }
+.mdeck .md-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 16px;
+  background: rgba(255,255,255,.85); border-bottom: 1px solid var(--line); }
+.mdeck .md-bar select { min-height: 42px; font-size: 15px; font-weight: 700; max-width: 220px; }
+.mdeck .md-bar .apple-btn { min-height: 42px; font-size: 15px; }
+.mdeck .md-check { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 700; color: var(--text2); min-height: 42px; cursor: pointer; }
+.mdeck .md-check input { width: 18px; height: 18px; accent-color: var(--purple); }
+.mdeck .md-stage { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: clamp(10px, 2.5vw, 28px) 16px; overflow: hidden; }
+.mdeck .md-slide { display: none; position: relative; width: 100%; max-width: 1100px; max-height: 100%; overflow-y: auto;
+  background: #fff; border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow-lg);
+  padding: clamp(20px, 4vw, 52px) clamp(18px, 4.5vw, 60px) clamp(16px, 3vw, 30px); animation: mdIn .35s var(--ease-out); }
+.mdeck .md-slide[data-on] { display: flex; flex-direction: column; }
+.mdeck .md-slide > div:first-child { flex: 1 1 auto; }
+@keyframes mdIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .mdeck .md-slide { animation: none; } }
+.mdeck h1 { font-size: clamp(34px, 6.4vw, 72px); font-weight: 900; color: var(--purple); line-height: 1.1; letter-spacing: -.02em; margin: 6px 0 10px; }
+.mdeck h2 { font-size: clamp(24px, 3.8vw, 42px); font-weight: 900; color: var(--purple); line-height: 1.2; margin: 0 0 10px; }
+.mdeck .md-eyebrow { font-size: clamp(15px, 1.8vw, 20px); font-weight: 800; color: var(--teal-700); letter-spacing: .02em; }
+.mdeck .md-lead { font-size: clamp(17px, 2.2vw, 25px); color: var(--text2); line-height: 1.5; margin-bottom: clamp(12px, 2vw, 22px); }
+.mdeck .md-who { font-size: clamp(17px, 2.2vw, 24px); font-weight: 700; color: var(--text); }
+.mdeck .md-small { font-size: clamp(14px, 1.6vw, 18px); color: var(--text3); margin-top: 18px; }
+.mdeck .md-sub { font-size: clamp(16px, 2vw, 22px); font-weight: 800; color: var(--text); margin: 14px 0 6px; }
+.mdeck .md-note { font-size: clamp(15px, 1.8vw, 20px); color: var(--text2); line-height: 1.6; margin-top: clamp(12px, 2vw, 22px); }
+.mdeck .md-cover { display: flex; flex-direction: column; justify-content: center; min-height: min(52vh, 440px); }
+.mdeck .md-empty { text-align: center; display: block; }
+.mdeck .md-ok { color: var(--ok-text, #166534); font-weight: 800; }
+.mdeck .md-bad { color: var(--danger-text, #B91C1C); font-weight: 800; }
+.mdeck .md-warn { color: #8F4E00; font-weight: 800; }
+/* כרטיסיות שוות — רשת עמודות שוות, גובה שווה */
+.mdeck .md-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); grid-auto-rows: 1fr; gap: clamp(8px, 1.4vw, 14px); }
+.mdeck .md-tile { min-width: 0; display: flex; flex-direction: column; justify-content: space-between; padding: clamp(12px, 1.8vw, 20px);
+  border-radius: 18px; border: 1px solid var(--line); background: var(--surface); }
+.mdeck .md-tile.t-cost, .mdeck .md-row.t-cost { background: #FDF3F4; border-color: #F3D5D9; }
+.mdeck .md-tile.t-inc,  .mdeck .md-row.t-inc  { background: #F1F9F3; border-color: #CFE8D5; }
+.mdeck .md-tile.t-res,  .mdeck .md-row.t-res  { background: #F5F1FC; border-color: #D8CEEF; }
+.mdeck .md-tile .l { font-size: clamp(15px, 1.7vw, 19px); font-weight: 700; color: var(--text2); line-height: 1.3; }
+.mdeck .md-tile .v { font-size: clamp(24px, 3.2vw, 36px); font-weight: 900; letter-spacing: -.02em; margin-top: 6px; line-height: 1.15; overflow-wrap: anywhere; }
+.mdeck .md-tile .s { font-size: clamp(14px, 1.5vw, 17px); color: var(--text2); margin-top: 6px; line-height: 1.4; min-height: 1.4em; }
+/* תרגיל: שורה לכל מרכיב, הסכום בצד שמאל */
+.mdeck .md-eq { display: grid; gap: 8px; max-width: 760px; }
+.mdeck .md-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: clamp(10px, 1.4vw, 15px) clamp(14px, 2vw, 22px);
+  border: 1px solid var(--line); border-radius: 14px; font-size: clamp(17px, 2.2vw, 25px); font-weight: 700; }
+.mdeck .md-row > :last-child { font-weight: 900; white-space: nowrap; }
+.mdeck .md-row.t-res { border-width: 2px; font-size: clamp(19px, 2.6vw, 29px); }
+.mdeck .md-row .op { display: inline-block; min-width: 1.1em; color: var(--purple); font-weight: 900; }
+.mdeck .md-list { list-style: disc; margin: 0; padding-inline-start: 1.2em; display: grid; gap: 6px; font-size: clamp(16px, 2vw, 22px); line-height: 1.5; }
+.mdeck .md-list-warn li::marker { color: #C77700; }
+.mdeck .md-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.mdeck .md-steps li { display: grid; grid-template-columns: minmax(0, 15em) minmax(0, 1fr); gap: 4px 16px; align-items: baseline;
+  padding: clamp(10px, 1.4vw, 16px) clamp(14px, 2vw, 22px); border-radius: 14px; background: var(--fill); border: 1px solid var(--line-soft); }
+.mdeck .md-steps b { font-size: clamp(17px, 2.1vw, 24px); color: var(--purple); }
+.mdeck .md-steps span { font-size: clamp(16px, 2vw, 22px); line-height: 1.5; }
+@media (max-width: 640px) { .mdeck .md-steps li { grid-template-columns: minmax(0, 1fr); } }
+.mdeck .md-table-wrap { overflow-x: auto; }
+.mdeck .md-table { width: 100%; border-collapse: collapse; font-size: clamp(16px, 2vw, 22px); }
+.mdeck .md-table th, .mdeck .md-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: center; white-space: nowrap; }
+.mdeck .md-table thead th { font-size: clamp(14px, 1.6vw, 18px); color: var(--text2); }
+.mdeck .md-table tbody th { text-align: start; }
+.mdeck .md-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: clamp(14px, 2vw, 24px); padding-top: 10px;
+  border-top: 1px solid var(--line-soft); font-size: 14px; color: var(--text3); font-weight: 600; }
+.mdeck .md-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px 14px; }
+.mdeck .md-nav .apple-btn { min-height: 48px; font-size: 16px; min-width: 112px; justify-content: center; }
+.mdeck .md-dots { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.mdeck .md-dots button { width: 12px; height: 12px; padding: 0; border-radius: 999px; border: none; background: var(--fill2); cursor: pointer; }
+.mdeck .md-dots button[aria-selected="true"] { background: var(--purple); width: 28px; }
+@media print {
+  body.md-open #root { display: none !important; }
+  body.md-open .mdeck { position: static; background: #fff; display: block; }
+  body.md-open .mdeck .md-stage { display: block; padding: 0; overflow: visible; }
+  body.md-open .mdeck .md-slide { display: block !important; max-width: none; max-height: none; overflow: visible; box-shadow: none; border: none;
+    border-radius: 0; padding: 10mm 6mm; animation: none; break-after: page; }
+  body.md-open .mdeck .md-slide:last-child { break-after: auto; }
+}
+/* מקרן נמוך (למשל 1000×440 או 1280×720 עם סרגלים): צפוף יותר, כדי שכל שקף ייכנס בלי גלילה */
+@media (max-height: 760px) and (min-width: 641px) {
+  .mdeck .md-stage { padding-block: 8px; }
+  .mdeck .md-slide { padding: 18px 34px 12px; }
+  .mdeck h1 { font-size: clamp(32px, 9vh, 64px); }
+  .mdeck h2 { font-size: clamp(22px, 5.4vh, 36px); margin-bottom: 6px; }
+  .mdeck .md-lead { font-size: clamp(15px, 3vh, 21px); margin-bottom: 8px; }
+  .mdeck .md-eq { gap: 5px; }
+  .mdeck .md-row { padding: 6px 18px; font-size: clamp(15px, 3.2vh, 22px); border-radius: 12px; }
+  .mdeck .md-row.t-res { font-size: clamp(16px, 3.6vh, 24px); }
+  .mdeck .md-tile { padding: 10px 14px; }
+  .mdeck .md-tile .v { font-size: clamp(20px, 4.4vh, 30px); margin-top: 2px; }
+  .mdeck .md-tile .s { margin-top: 2px; }
+  .mdeck .md-list, .mdeck .md-steps span { font-size: clamp(14.5px, 2.8vh, 20px); }
+  .mdeck .md-list { gap: 3px; }
+  .mdeck .md-steps { gap: 6px; }
+  .mdeck .md-steps li { padding: 7px 16px; }
+  .mdeck .md-steps b { font-size: clamp(15px, 3vh, 21px); }
+  .mdeck .md-note { font-size: clamp(14px, 2.6vh, 18px); margin-top: 8px; }
+  .mdeck .md-sub { margin: 6px 0 3px; font-size: clamp(15px, 3vh, 20px); }
+  .mdeck .md-foot { margin-top: 8px; padding-top: 6px; }
+  .mdeck .md-nav { padding: 6px 16px 8px; }
+  .mdeck .md-nav .apple-btn { min-height: 42px; }
+  .mdeck .md-cover { min-height: 0; }
+}
+@media (max-height: 520px) and (min-width: 641px) {
+  .mdeck .md-bar { padding: 5px 12px; }
+  .mdeck .md-bar select, .mdeck .md-bar .apple-btn { min-height: 36px; }
+  .mdeck .md-slide { padding: 12px 28px 8px; border-radius: 18px; }
+  .mdeck .md-row { padding: 3px 16px; }
+  .mdeck .md-lead { margin-bottom: 4px; }
+  .mdeck .md-note { margin-top: 4px; }
+  .mdeck .md-foot { margin-top: 4px; padding-top: 4px; }
+  .mdeck .md-nav { padding: 4px 12px 6px; }
+  .mdeck .md-nav .apple-btn { min-height: 38px; }
+}
+@media (max-width: 640px) {
+  .mdeck .md-bar { padding: 8px 12px; gap: 6px; }
+  .mdeck .md-bar select { flex: 1 1 40%; max-width: none; min-width: 0; }
+  .mdeck .md-bar > span { display: none; }
+  .mdeck .md-dots { display: none; }
+  .mdeck .md-slide { border-radius: 18px; }
+}
+@media (max-width: 640px) {
+  .mdeck .md-table { font-size: 14.5px; }
+  .mdeck .md-table th, .mdeck .md-table td { padding: 8px 2px; }
+  .mdeck .md-bar select { font-size: 14.5px; }
+}
