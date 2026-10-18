@@ -7,7 +7,7 @@
   אותו. חודש שכבר נסגר ידנית אינו נדרס. שרה יכולה לפתוח מחדש מהדף.
 */
 import { db, guard, monthKeyNow } from '../_lib/db.js';
-import { readAll, summarize } from '../monthly-summary.js';
+import { readAll, summarize, withoutPeople } from '../monthly-summary.js';
 
 export default async function handler(req, res) {
   const bad = guard(req);
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     if (frozen.some(f => f.month_key === month)) return res.status(200).json({ ok: true, month, skipped: 'החודש כבר סגור' });
     const live = summarize(...args, []).months.find(m => m.key === month);
     if (!live || !live.branches.length) return res.status(200).json({ ok: true, month, skipped: 'אין נתונים לחודש' });
-    const { error } = await sb.from('month_summary').insert(live.branches.map(b => ({ month_key: month, school_id: b.id, data: b })));
+    const { error } = await sb.from('month_summary').insert(live.branches.map(b => ({ month_key: month, school_id: b.id, data: withoutPeople(b) })));
     if (error?.code === '23505') return res.status(200).json({ ok: true, month, skipped: 'החודש כבר סגור' });
     if (error) throw new Error(error.message);
     return res.status(200).json({ ok: true, month, closed: live.branches.length });

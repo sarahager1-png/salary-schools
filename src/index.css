@@ -1570,3 +1570,19 @@ input.nospin { -moz-appearance: textfield; appearance: textfield; }
   .mdeck .md-table th, .mdeck .md-table td { padding: 8px 2px; }
   .mdeck .md-bar select { font-size: 14.5px; }
 }
+/* שקף העובדות */
+.mdeck .md-people th, .mdeck .md-people td { padding: 6px 10px; }
+.mdeck .md-people tbody th { white-space: normal; }
+.mdeck .md-people { font-size: clamp(15px, 1.9vw, 20px); }
+.mdeck .md-people .nm { font-weight: 800; }
+.mdeck .md-people .rl { font-size: .75em; font-weight: 600; color: var(--text2); margin-inline-start: 8px; }
+@media (max-width: 640px) { .mdeck .md-people .nm, .mdeck .md-people .rl { display: block; margin: 0; } }
+.mdeck .md-people td:last-child { font-weight: 800; }
+.mdeck .md-people tfoot th, .mdeck .md-people tfoot td { border-top: 2px solid var(--line); border-bottom: none; font-weight: 900; color: var(--purple); }
+.mdeck .md-est { display: inline-block; margin-inline-start: 6px; font-size: 12.5px; font-weight: 700; color: #8F4E00; background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 999px; padding: 0 7px; }
+@media (max-width: 640px) {
+  .mdeck .md-people th:nth-child(3), .mdeck .md-people td:nth-child(3) { display: none; }
+  .mdeck .md-people td:last-child { white-space: normal; }
+}
+.mdeck .md-hm { display: none; }
+@media (max-width: 640px) { .mdeck .md-hm { display: block; font-size: .8em; color: var(--text2); } .mdeck .md-people td:nth-child(2) { white-space: normal; } }

@@ -20,7 +20,7 @@ import './index.css';
    SALARY TABLES
 ═══════════════════════════════════════════════════════════════ */
 // מעדכנים ביד בכל פריסה. מוצג בכותרת ובמסך הכניסה.
-const BUILD = 184;
+const BUILD = 185;
 
 // אילו בתי ספר משלמים תוספת בית חב"ד — מתעדכן בכל טעינת נתונים.
 // payBreakdown נקרא גם ממסכים שאין בהם אובייקט בית ספר ביד.
@@ -5426,6 +5426,7 @@ function MeetingDeck({ branches, monthList, initialMonth, deckOf, netOf, onClose
   const [month, setMonth] = useState(initialMonth);
   const [bid, setBid] = useState('');
   const [withNet, setWithNet] = useState(true);
+  const [withPeople, setWithPeople] = useState(true);   // שקף העובדות: שם, משרה, שעות ועלות מעביד (שרה, 18.10)
   const [i, setI] = useState(0);
   const d = bid ? deckOf(bid, month) : null;
   const net = withNet ? netOf(month) : null;
@@ -5519,6 +5520,37 @@ function MeetingDeck({ branches, monthList, initialMonth, deckOf, netOf, onClose
           {p.noMin && <> כשיגיע התקבול ממשרד החינוך (צפי <Money v={d.minMonth} />), הפער יקטן בהתאם.</>}
         </p>
       </div>) });
+    /*
+      "תן שקיפות של עובדות, שעות ועלות שכר"; "בפועל" (שרה, 18.10.26): שורה לכל עובדת — עלות מעביד
+      מהתלוש כשהגיע, ואחרת אומדן המערכת, מסומן. סכום השורות = עלות השכר של הסניף. 7 שורות בשקף, כדי שייכנס במקרן בלי גלילה.
+    */
+    const people = withPeople ? (d.people || []) : [];
+    if (people.length) {
+      const per = 7, pages = Math.ceil(people.length / per);
+      const pSum = people.reduce((a, x) => a + (x.cost || 0), 0);
+      const est = people.filter(x => !x.fromSlip).length;
+      for (let pg = 0; pg < pages; pg++) slides.push({ key: 'people' + pg, render: () => (
+        <div>
+          <h2>העובדות ועלות השכר{pages > 1 ? ` (${pg + 1} מתוך ${pages})` : ''}</h2>
+          <p className="md-lead" style={{ marginBottom:8 }}>עלות מעביד לכל עובדת ב{mLabel}: {est ? `לפי התלוש, ול-${est} לפי אומדן המערכת עד שיגיע התלוש` : 'כולן לפי התלוש בפועל'}.</p>
+          <div className="md-table-wrap">
+            <table className="md-table md-people">
+              <thead><tr><th>עובדת</th><th>משרה</th><th>שעות שבועיות</th><th>עלות מעביד</th></tr></thead>
+              <tbody>{people.slice(pg * per, pg * per + per).map((x, k) => (
+                <tr key={pg * per + k}>
+                  <th scope="row"><span className="nm">{x.name}</span><span className="rl">{[x.role, x.leave, x.mm ? 'ממלאת מקום' : null].filter(Boolean).join(' · ')}</span></th>
+                  <td>{x.scope != null ? `${x.scope}%` : x.hourly ? 'שעתית' : '—'}{x.hours ? <span className="md-hm">{x.hours} ש' שבועיות</span> : null}</td>
+                  <td>{x.hours ?? '—'}</td>
+                  <td><Money v={x.cost} />{!x.fromSlip && <span className="md-est">אומדן</span>}</td>
+                </tr>
+              ))}</tbody>
+              {pg === pages - 1 && <tfoot><tr><th scope="row">סה"כ · {people.length} שורות</th><td /><td /><td><Money v={pSum} /></td></tr></tfoot>}
+            </table>
+          </div>
+          {pg === pages - 1 && p && Math.abs(pSum - p.actSal) > 1 && (
+            <p className="md-note">הפירוט מחושב לפי הנתונים העדכניים; עלות {mLabel} כפי שנסגרה: <Money v={p.actSal} />.</p>)}
+        </div>) });
+    }
     if (d.hist.length > 1) slides.push({ key: 'hist', render: () => (
       <div>
         <h2>מתחילת השנה</h2>
@@ -5569,7 +5601,7 @@ function MeetingDeck({ branches, monthList, initialMonth, deckOf, netOf, onClose
   }
   const n = slides.length;
   const at = Math.min(i, Math.max(0, n - 1));
-  useEffect(() => { setI(0); }, [bid, month, withNet]);
+  useEffect(() => { setI(0); }, [bid, month, withNet, withPeople]);
   useEffect(() => {
     const onKey = e => {
       if (e.target?.tagName === 'SELECT' || e.target?.tagName === 'INPUT') return;
@@ -5600,6 +5632,7 @@ function MeetingDeck({ branches, monthList, initialMonth, deckOf, netOf, onClose
           {monthList.map(m => <option key={m.key} value={m.key}>{fmtMonth(m.key)}</option>)}
         </select>
         <label className="md-check"><input type="checkbox" checked={withNet} onChange={e => setWithNet(e.target.checked)} />שקף הרשת</label>
+        <label className="md-check"><input type="checkbox" checked={withPeople} onChange={e => setWithPeople(e.target.checked)} />העובדות</label>
         <span style={{ flex:1 }} />
         {d && <button type="button" className="apple-btn apple-btn-ghost" onClick={() => window.print()}><Printer size={16} />הדפסה</button>}
         <button type="button" className="apple-btn apple-btn-ghost" onClick={onClose} aria-label="סגירת המצגת"><X size={18} />סגירה</button>
@@ -6262,7 +6295,7 @@ function BottomLineView({ activeMonth, viewer = false }) {
     if (!b) return null;
     const p = pvaIn(m, id);
     return { id, name: b.name, key, frozenAt: m.frozenAt || null, isBase: key === baseMonth?.key, baseKey: baseMonth?.key,
-      staff: b.staff || 0, withActual: b.withActual || 0, simOnly: !!b.simOnly, hourly: b.hourly || 0,
+      staff: b.staff || 0, withActual: b.withActual || 0, simOnly: !!b.simOnly, hourly: b.hourly || 0, people: b.people || [],
       p, bd: baseById.get(id) || null, cause: gapCause(p)?.t || null,
       get minMonth() { return Math.round(this.minYear / 12); },
       /*

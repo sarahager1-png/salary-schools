@@ -103,7 +103,7 @@ export default async function handler(req, res) {
       const live = summarize(...args, []).months.find(m => m.key === month);
       if (!live || !live.branches.length) return res.status(400).json({ error: 'אין נתונים לחודש הזה' });
       const { error } = await sb.from('month_summary').insert(live.branches.map(b => ({
-        month_key: month, school_id: b.id, data: b, closed_by: userData.user.id })));
+        month_key: month, school_id: b.id, data: withoutPeople(b), closed_by: userData.user.id })));
       if (error?.code === '23505') return res.status(409).json({ error: 'החודש כבר סגור' });
       if (error) throw new Error(`month_summary: ${error.message}`);
       return res.status(200).json({ ok: true, month, closed: live.branches.length });
@@ -125,13 +125,19 @@ export default async function handler(req, res) {
         otherIncYear: incLines.reduce((a, x) => a + x.amount, 0) || n(f.income_total) || 0,
         otherExpYear: expLines.reduce((a, x) => a + x.amount, 0) || n(f.expenses_other) || 0,
         incLines, expLines }; });
-    return res.status(200).json({ ...summarize(...args, frozen), base, canEditBase, canClose, fetchedAt: new Date().toISOString() });
+    const sum = summarize(...args, frozen);
+    // שורות העובדות — לרכזת בלבד. מנהל בצפייה (director) מקבל סכומים לסניף, כמו קודם
+    if (prof.role !== 'coordinator') for (const m of sum.months) m.branches = m.branches.map(withoutPeople);
+    return res.status(200).json({ ...sum, base, canEditBase, canClose, fetchedAt: new Date().toISOString() });
   } catch (e) {
     // הפרטים ליומן השרת בלבד — מי שנכנס לצפייה מקבל הודעה כללית
     console.error('monthly-summary', e);
     return res.status(500).json({ error: req.method === 'POST' ? 'הפעולה לא נשמרה. נסי שוב בעוד רגע.' : 'הסיכום החודשי לא נטען. נסו שוב בעוד רגע.' });
   }
 }
+
+/* שורת סניף בלי פירוט העובדות — למה שנשמר בסגירה ולמה שנשלח למי שאינו רכזת */
+export const withoutPeople = ({ people, peopleLive, ...b }) => b;
 
 /* כל הקריאות שהסיכום נשען עליהן — משותף לדף ולסגירה האוטומטית ב-11 בחודש */
 export async function readAll(sb) {
@@ -245,6 +251,22 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
       if (!cost) continue;
       const f = finBy.get(s.id) || {};
       const paid = ts.filter(t => !emp.unpaidThisMonth(t));
+      /*
+        "תן שקיפות של עובדות, שעות ועלות שכר" (שרה, 18.10.26) — למצגת הפגישה עם הסניף.
+        שורה לכל עובדת: אותה עלות (costT) שנכנסת לסכום הסניף, כך שסכום השורות = עלות הסניף.
+        הפירוט נשלח לרכזת בלבד (withoutPeople ב-handler); מנהל בצפייה מקבל סכומים בלבד.
+      */
+      const people = allTs.map(t => {
+        const hourly = emp.isHourlyRow(t);
+        const scope = hourly ? null : t.reform === 'ofek' ? (emp.deriveHours(t)?.scopePct || t.scopePct || null) : (t.scope || null);
+        return {
+          name: String(t.name || '').trim(), hourly,
+          role: emp.isPrincipalRow(t) ? 'ניהול' : hourly ? emp.jobLabel(t.job) : (emp.rolesText(t) || 'הוראה'),
+          hours: Number(t.frontalHours) || null, scope: scope == null ? null : Math.round(Number(scope)),
+          cost: Math.round(costT(t)), fromSlip: t._slipCost > 0 || Number(t._actualEmployerCost) > 0,
+          leave: emp.onLeave(t) ? emp.leaveLabel(t.leaveType) : null, mm: Boolean(String(t.mmFor || '').trim()),
+        };
+      }).sort((a, b) => (a.hourly - b.hourly) || (b.cost - a.cost));
       const ministry = n(f.ministry_budget) == null ? null : n(f.ministry_budget) / 12;
       const support  = (n(f.network_support) || 0) / 12;
       // "כן, 20 אחוז על הכל" (שרה, 7.10.26): הכרית מחושבת גם על המשרות השעתיות (צהרון, מנהלה), לא רק על ההוראה
@@ -264,7 +286,7 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
         plan: null,   // מתמלא למטה: העלות לפי מחשבון המשרד
         hourly: Math.round(hourly),
         staff: sl ? sl.n : paid.length, withActual: sl ? sl.n : paid.filter(t => t._slipCost > 0 || Number(t._actualEmployerCost)).length,
-        fromSlips: !!sl,
+        fromSlips: !!sl, people: sl ? [] : people,
       });
     }
     const m = moBy.get(key) || {};
@@ -346,10 +368,13 @@ export function summarize(schools, rows, finance, ledger, monthsRows, snapshots,
   for (const mo of months) {
     const fr = frBy.get(mo.key);
     if (!fr) continue;
+    const livePeople = new Map(mo.branches.map(b => [b.id, b.people || []]));
     mo.frozenAt = fr.map(f => f.closed_at).sort()[0];
     mo.branches = fr.map(f => {
       const l = ledBy.get(`${mo.key}|${f.school_id}`) || {};
+      // peopleLive: הפירוט מחושב עכשיו, ולכן סכומו עשוי להיות שונה מעלות החודש שנשמרה בסגירה
       return { ...f.data, id: f.school_id, name: scBy.get(f.school_id)?.name || f.data.name,
+        people: livePeople.get(f.school_id) || [], peopleLive: true,
         ministryReceived: n(l.ministry_received) ?? f.data.ministryReceived ?? null,
         chabadPaid: n(l.chabad_paid) ?? f.data.chabadPaid ?? null,
         grantPaid: n(l.grant_paid) ?? f.data.grantPaid ?? null };
